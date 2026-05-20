@@ -23,7 +23,6 @@ BUILDING_CONFIG = {
     },
     "site-003": {"name": "Centurion Mall", "type": "retail", "desk_mult": 0.3, "floors": ["G", "L1", "L2"]},
     "site-004": {"name": "V&A Waterfront Retail", "type": "retail", "desk_mult": 0.25, "floors": ["G", "L1"]},
-    "site-005": {"name": "Gateway Theatre", "type": "retail", "desk_mult": 0.2, "floors": ["G", "L1", "L2", "L3"]},
     "site-006": {
         "name": "Mediclinic Sandton",
         "type": "hospital",

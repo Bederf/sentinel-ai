@@ -54,7 +54,7 @@ export function ElectricalCompliancePanel({ siteCode }: ElectricalCompliancePane
   if (isLoading) {
     return (
       <div className="p-6">
-        <p className="text-gray-500">Loading electrical compliance data...</p>
+        <p style={{ color: "var(--color-sentinel-text-disabled)" }}>Loading electrical compliance data...</p>
       </div>
     )
   }

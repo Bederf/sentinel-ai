@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   MapPin,
   HelpCircle,
+  Locate,
 } from "lucide-react";
 import type {
   Site,
@@ -21,6 +22,7 @@ import type {
   SimbiotCapabilitiesSummary,
 } from '@/lib/api';
 import { sitesApi } from '@/lib/api/sites';
+import { siteGeocodeApi } from '@/lib/api/zone_ingestion';
 import { api, niagaraApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
@@ -72,6 +74,10 @@ interface WizardState {
   siteType: string;
   siteFloors: string;  // Comma-separated list
   siteSqm: number;
+  // Geocoded location
+  latitude: number | null;
+  longitude: number | null;
+  orientation_degrees: number | null;
   // BMS connection
   bmsVendor: BMSVendor;
   host: string;
@@ -117,7 +123,8 @@ type WizardAction =
   | { type: "SET_ERROR"; error: string | null }
   | { type: "SET_VERIFICATION_WIZARD"; show: boolean }
   | { type: "SET_DISCOVERY_PHASE"; phase: number }
-  | { type: "SET_ZONE_INGESTION_WIZARD"; show: boolean };
+  | { type: "SET_ZONE_INGESTION_WIZARD"; show: boolean }
+  | { type: "SET_GEOCODE"; latitude: number | null; longitude: number | null; orientation_degrees: number | null; address?: string };
 
 function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
@@ -179,6 +186,15 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return { ...state, discoveryPhase: action.phase };
     case "SET_ZONE_INGESTION_WIZARD":
       return { ...state, showZoneIngestionWizard: action.show };
+    case "SET_GEOCODE":
+      return {
+        ...state,
+        latitude: action.latitude,
+        longitude: action.longitude,
+        orientation_degrees: action.orientation_degrees,
+        siteAddress: action.address ?? state.siteAddress,
+        loading: false,
+      };
     default:
       return state;
   }
@@ -698,25 +714,62 @@ export function BMSConnectionWizard({
             />
           </div>
 
-          {/* Address */}
+          {/* Address + Geocode */}
           <div className="col-span-2">
             <label className="block text-sm font-medium mb-1" style={labelStyle}>
               Address
             </label>
-            <input
-              type="text"
-              value={state.siteAddress}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_FIELD",
-                  field: "siteAddress",
-                  value: e.target.value,
-                })
-              }
-              placeholder="123 Main Street, City"
-              className="w-full rounded px-3 py-2 text-sm"
-              style={inputStyle}
-            />
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={state.siteAddress}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "siteAddress",
+                    value: e.target.value,
+                  })
+                }
+                placeholder="123 Main Street, City"
+                className="flex-1 rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (!state.siteAddress.trim()) return;
+                  dispatch({ type: "SET_LOADING", loading: true });
+                  siteGeocodeApi
+                    .geocode(state.siteAddress)
+                    .then((result) => {
+                      dispatch({
+                        type: "SET_GEOCODE",
+                        latitude: result.lat,
+                        longitude: result.lon,
+                        orientation_degrees: result.orientation_degrees,
+                        address: result.display_name,
+                      });
+                    })
+                    .catch(() => dispatch({ type: "SET_LOADING", loading: false }));
+                }}
+                disabled={state.loading || !state.siteAddress.trim()}
+                title="Look up address on map"
+                className="flex items-center gap-1 px-3 py-2 rounded text-sm transition-colors"
+                style={{
+                  background: "var(--color-sentinel-blue)",
+                  color: "white",
+                  opacity: state.loading || !state.siteAddress.trim() ? 0.5 : 1,
+                }}
+              >
+                <Locate className="w-4 h-4" />
+              </button>
+            </div>
+            {state.latitude !== null && state.longitude !== null && (
+              <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                📍 {state.latitude.toFixed(5)}, {state.longitude.toFixed(5)}
+                {state.orientation_degrees !== null && ` • ↗ ${state.orientation_degrees}°`}
+              </p>
+            )}
           </div>
 
           {/* Region */}
@@ -1012,7 +1065,7 @@ export function BMSConnectionWizard({
                   ))}
                 </select>
                 <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Discovery, point ingestion, and control will use this device instance.
+                  Discovery and point ingestion will use this device instance. Control remains gated by site phase and modules.
                 </p>
               </div>
             )}
@@ -1630,22 +1683,23 @@ export function BMSConnectionWizard({
           className="text-lg font-semibold mb-1"
           style={{ color: "var(--color-sentinel-text-primary)" }}
         >
-          Step 4: Approve &amp; Activate
+          Step 4: Approve &amp; Start Monitoring
         </h3>
         <p
           className="text-sm"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
           Confirm the classified mappings to create equipment models and
-          activate monitoring.
+          start data collection.
         </p>
       </div>
 
       {/* Help section */}
       <HelpSection title="Final Activation" variant="success">
         After approval, SENTINEL will create equipment models with v2.0 naming standard and
-        auto-assigned zones. You'll then be offered to verify equipment functionality before going
-        fully live. All discovered equipment will be available for control and monitoring.
+        auto-assigned zones. You'll then be offered to verify read-only telemetry before continuous
+        data collection begins. Control and maintenance workflows remain disabled until their modules
+        and policy gates are explicitly enabled.
       </HelpSection>
 
       {state.approveStatus === "approved" ? (
@@ -1666,7 +1720,7 @@ export function BMSConnectionWizard({
           >
             {state.approveResult?.equipment_created ?? 0} equipment model
             {(state.approveResult?.equipment_created ?? 0) !== 1 ? "s" : ""}{" "}
-            created and monitoring activated.
+            created and data collection activated.
           </p>
           {state.approveMessage && (
             <p
@@ -1952,7 +2006,7 @@ export function BMSConnectionWizard({
         className="text-sm mb-8"
         style={{ color: "var(--color-sentinel-text-secondary)" }}
       >
-        Connect your building management system to SENTINEL for AI-powered monitoring and control.
+        Connect your building management system to SENTINEL for AI-powered monitoring. Control stays gated until enabled.
       </p>
 
       <StepIndicator currentStep={state.step} />

@@ -241,6 +241,7 @@ export default function PhotoCapture({
               <button
                 onClick={cancelPreview}
                 className="absolute top-2 right-2 p-2 bg-black/50 rounded-full text-white hover:bg-black/70 transition-colors"
+                aria-label="Cancel photo capture"
               >
                 <X className="w-5 h-5" />
               </button>

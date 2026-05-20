@@ -1,6 +1,6 @@
 // Equipment Verification Wizard for post-ingestion testing.
 //
-// Tests discovered equipment to ensure control and monitoring works before going live.
+// Tests discovered equipment to ensure monitoring works before promotion.
 
 import { useState, useCallback } from "react";
 import {
@@ -49,8 +49,8 @@ type VerificationStep = 1 | 2 | 3;
 
 const TEST_TYPES = [
   { id: "read_sensors", name: "Read Sensor Points", description: "Test reading all sensor values" },
-  { id: "read_commands", name: "Read Command Points", description: "Test reading command status" },
-  { id: "write_setpoint", name: "Write Setpoint", description: "Test writing a setpoint value" },
+  { id: "read_commands", name: "Read Command Status", description: "Verify command points are visible without writing" },
+  { id: "writable_inventory", name: "Writable Point Inventory", description: "Catalog writable points for future gated control" },
 ];
 
 export function EquipmentVerificationWizard({
@@ -235,16 +235,16 @@ export function EquipmentVerificationWizard({
           Step 1: Select Equipment to Verify
         </h3>
         <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          Choose equipment to test. Controls and sensors should already be operational.
+          Choose equipment to verify. SENTINEL will read points and catalog capabilities without writing to the BMS.
         </p>
       </div>
 
       <HelpSection title="Testing Explained" variant="info">
-        SENTINEL will test three capabilities for each selected equipment:
+        SENTINEL will verify three read-only capabilities for each selected equipment:
         <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">
           <li><strong>Read Sensors:</strong> Verify all sensor points return valid values</li>
-          <li><strong>Read Commands:</strong> Verify command point status is readable</li>
-          <li><strong>Write Setpoint:</strong> Attempt to write a setpoint and verify change</li>
+          <li><strong>Read Command Status:</strong> Verify command point status is readable without changing values</li>
+          <li><strong>Writable Point Inventory:</strong> Record which points may be controllable later, after policy gates allow it</li>
         </ol>
         Select at least 3 representative devices from different floors/types for best coverage.
       </HelpSection>
@@ -343,7 +343,7 @@ export function EquipmentVerificationWizard({
           Step 2: Running Verification Tests
         </h3>
         <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          Testing equipment connectivity and control capabilities...
+          Testing equipment connectivity and read-only capability discovery...
         </p>
       </div>
 
@@ -608,12 +608,12 @@ export function EquipmentVerificationWizard({
             }}
           >
             <div className="font-semibold text-sm mb-2">✓ All Equipment Verified</div>
-            <p className="text-xs">Equipment is ready for production use. You can now:</p>
+            <p className="text-xs">Equipment is ready for continuous data collection. You can now:</p>
             <ul className="text-xs space-y-1 ml-4 mt-2 list-disc">
-              <li>Access equipment controls from the dashboard</li>
-              <li>Set up predictive maintenance monitoring</li>
+              <li>Review live telemetry and equipment health</li>
+              <li>Build shadow baselines before advisory recommendations appear</li>
               <li>Configure alert thresholds</li>
-              <li>Create automation profiles</li>
+              <li>Enable add-on modules later when policy gates allow them</li>
             </ul>
           </div>
         )}

@@ -501,6 +501,7 @@ class ModelGateway:
                     input_tokens=usage.get("prompt_tokens", 0),
                     output_tokens=usage.get("completion_tokens", 0),
                     source=source,
+                    feature="ai_optimizer",
                 )
             except Exception:
                 pass

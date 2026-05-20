@@ -5,7 +5,7 @@
  * Domain tabs: delegate to existing sub-panel components (migrated separately).
  */
 
-import { useState } from "react";
+import { useState, useContext, type ReactNode } from "react";
 import {
   ShieldCheck,
   AlertTriangle,
@@ -38,9 +38,7 @@ import { EmergencyLightPanel } from "../components/compliance/EmergencyLightPane
 import { LegionellaPanel } from "../components/compliance/LegionellaPanel";
 import { ElectricalCompliancePanel } from "../components/compliance/ElectricalCompliancePanel";
 import { LiftInspectionPanel } from "../components/compliance/LiftInspectionPanel";
-
-// site-002 is the active default site; site-001 is blocked from frontend polling
-const SITE_CODE = "site-002";
+import { ModuleContext } from "../contexts/moduleContextStore";
 
 const TABS = [
   { id: "overview",   label: "Overview" },
@@ -85,9 +83,12 @@ function auditStatusLabel(status: AuditStatus): string {
 
 export function CompliancePage() {
   const [activeTab, setActiveTab] = useState("overview");
+  const { siteId: contextSiteId } = useContext(ModuleContext);
+  // site-001 is blocked from frontend polling — fall back to site-002 if context is invalid
+  const siteCode = contextSiteId && contextSiteId !== "site-001" ? contextSiteId : "site-002";
 
-  const { data: status, isLoading } = useComplianceStatus(SITE_CODE);
-  const { data: auditsData } = useComplianceAudits(SITE_CODE);
+  const { data: status, isLoading } = useComplianceStatus(siteCode);
+  const { data: auditsData } = useComplianceAudits(siteCode);
   const { data: retentionStatus } = useRetentionStatus();
   const { data: retentionHistory } = useRetentionHistory(5);
 
@@ -440,12 +441,12 @@ export function CompliancePage() {
           </>
         )}
 
-        {activeTab === "ohs"        && <OHSPanel siteCode={SITE_CODE} />}
-        {activeTab === "fire"       && <FireEquipmentPanel siteCode={SITE_CODE} />}
-        {activeTab === "emergency"  && <EmergencyLightPanel siteCode={SITE_CODE} />}
-        {activeTab === "legionella" && <LegionellaPanel siteCode={SITE_CODE} />}
-        {activeTab === "electrical" && <ElectricalCompliancePanel siteCode={SITE_CODE} />}
-        {activeTab === "lift"       && <LiftInspectionPanel siteCode={SITE_CODE} />}
+        {activeTab === "ohs"        && <OHSPanel siteCode={siteCode} />}
+        {activeTab === "fire"       && <FireEquipmentPanel siteCode={siteCode} />}
+        {activeTab === "emergency"  && <EmergencyLightPanel siteCode={siteCode} />}
+        {activeTab === "legionella" && <LegionellaPanel siteCode={siteCode} />}
+        {activeTab === "electrical" && <ElectricalCompliancePanel siteCode={siteCode} />}
+        {activeTab === "lift"       && <LiftInspectionPanel siteCode={siteCode} />}
       </div>
       )}
     </div>

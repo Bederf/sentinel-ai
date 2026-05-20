@@ -889,6 +889,159 @@ async def chat_tts(request: FastAPIRequest, tts_request: TTSRequest):
 
 
 # ---------------------------------------------------------------------------
+# Streaming STT — real-time audio transcription for voice mode
+# ---------------------------------------------------------------------------
+
+
+class StreamingSTTRequest(BaseModel):
+    """Request model for streaming STT."""
+
+    audio: str = Field(..., description="Base64-encoded audio data (webm/opus)")
+    format: str = Field(default="webm", description="Audio format: webm, wav, mp4")
+    language: str = Field(default="en", description="BCP-47 language code")
+
+
+@router.post("/chat/stt/stream")
+@limiter.limit("30/minute")
+async def chat_stt_stream(request: FastAPIRequest, stt_request: StreamingSTTRequest):
+    """Transcribe audio stream to text via ElevenLabs STT.
+
+    Accepts base64-encoded audio chunks and returns partial transcripts
+    as they are processed. Used for real-time voice in chat mode.
+
+    Rate limited to 30 requests per minute.
+    """
+    if not settings.elevenlabs_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Speech-to-text is not configured. Set ELEVENLABS_API_KEY.",
+        )
+
+    try:
+        import base64
+
+        audio_bytes = base64.b64decode(stt_request.audio)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid audio data: {e}")
+
+    if len(audio_bytes) < 100:
+        raise HTTPException(status_code=400, detail="Audio data too short")
+
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            stt_resp = await client.post(
+                "https://api.elevenlabs.io/v1/speech-to-text",
+                headers={
+                    "xi-api-key": settings.elevenlabs_api_key,
+                },
+                data={
+                    "model_id": "s2t_medium",
+                    "language": stt_request.language,
+                },
+                files={
+                    "file": (
+                        f"audio.{stt_request.format}",
+                        audio_bytes,
+                        f"audio/{stt_request.format}",
+                    )
+                },
+            )
+        stt_resp.raise_for_status()
+        result = stt_resp.json()
+        text = result.get("text", "").strip()
+
+        return {"text": text, "language": stt_request.language}
+
+    except httpx.HTTPStatusError as e:
+        logger.error(f"ElevenLabs STT error {e.response.status_code}: {e.response.text[:200]}")
+        raise HTTPException(status_code=e.response.status_code, detail="Transcription failed")
+    except Exception as e:
+        logger.error(f"Streaming STT failed: {e}")
+        raise HTTPException(status_code=500, detail="Transcription failed")
+
+
+# ---------------------------------------------------------------------------
+# Streaming TTS — real-time audio synthesis with chunked streaming
+# ---------------------------------------------------------------------------
+
+
+class StreamingTTSRequest(BaseModel):
+    """Request model for streaming TTS."""
+
+    text: str = Field(..., max_length=4000, description="Text to synthesize")
+    voice_id: str | None = Field(
+        default=None,
+        description="ElevenLabs voice ID. Defaults to configured voice.",
+    )
+    model: str = Field(default="eleven_multilingual", description="ElevenLabs model")
+
+
+@router.post("/chat/tts/stream")
+@limiter.limit("30/minute")
+async def chat_tts_stream(
+    request: FastAPIRequest,
+    stt_request: StreamingTTSRequest,
+):
+    """Stream synthesized speech audio as chunks via ElevenLabs streaming API.
+
+    Uses ElevenLabs /v1/text-to-speech/{voice_id}/stream endpoint which returns
+    audio data as it is generated, allowing progressive playback.
+
+    Rate limited to 30 requests per minute.
+    """
+    from app.services.tts_service import get_tts_service
+
+    tts = get_tts_service()
+
+    if not tts.is_configured():
+        raise HTTPException(
+            status_code=503,
+            detail="Text-to-speech is not configured.",
+        )
+
+    text = stt_request.text.strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="Text cannot be empty")
+
+    voice_id = stt_request.voice_id or settings.elevenlabs_voice_id
+
+    async def stream_audio():
+        try:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                async with client.stream(
+                    "POST",
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
+                    headers={
+                        "xi-api-key": settings.elevenlabs_api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "audio/mpeg",
+                    },
+                    json={
+                        "text": text,
+                        "model_id": stt_request.model,
+                        "voice_settings": {
+                            "stability": 0.5,
+                            "similarity_boost": 0.75,
+                        },
+                    },
+                ) as response:
+                    response.raise_for_status()
+                    async for chunk in response.aiter_bytes(chunk_size=8192):
+                        if chunk:
+                            yield chunk
+        except httpx.HTTPStatusError as e:
+            logger.error(f"ElevenLabs streaming TTS error {e.response.status_code}: {e.response.text[:200]}")
+        except Exception as e:
+            logger.error(f"Streaming TTS failed: {e}")
+
+    return StreamingResponse(
+        stream_audio(),
+        media_type="audio/mpeg",
+        headers={"Content-Disposition": "inline; filename=response.mp3"},
+    )
+
+
+# ---------------------------------------------------------------------------
 # Voice summary — summarize AI response then speak it
 # ---------------------------------------------------------------------------
 

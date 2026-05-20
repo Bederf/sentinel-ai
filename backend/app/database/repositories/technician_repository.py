@@ -60,7 +60,7 @@ class TechnicianRepository:
         1. Compact (Office): {site}-{type}-{floor/zone}
            Example: S002-DALI-L2-20 → parts[1]=DALI → specialty=dali
         2. Hospital: {site}-{building}-{type}-{floor}-{id}
-           Example: site-005-UMH-AHU-L3-ICU → parts[3]=AHU → specialty=hvac
+           Example: site-003-BLDG-AHU-L3-ICU → parts[3]=AHU → specialty=hvac
 
         Returns the matched specialty or 'general' as fallback.
         """
@@ -124,7 +124,7 @@ class TechnicianRepository:
             if parts[1] in type_to_specialty:
                 return type_to_specialty[parts[1]]
 
-            # Strategy 2: parts[3] for hospital format (site-005-UMH-TYPE-...)
+            # Strategy 2: parts[3] for hospital format (site-003-BLDG-TYPE-...)
             if len(parts) > 3 and parts[3] in type_to_specialty:
                 return type_to_specialty[parts[3]]
 
@@ -143,7 +143,7 @@ class TechnicianRepository:
         the assigned technician for that specialty at the equipment's site.
 
         Args:
-            equipment_code: Equipment code (e.g., S002-DALI-L2-20 or site-005-UMH-AHU-L3-ICU)
+            equipment_code: Equipment code (e.g., S002-DALI-L2-20 or site-003-BLDG-AHU-L3-ICU)
 
         Returns:
             Technician details or None if not found
@@ -164,7 +164,7 @@ class TechnicianRepository:
             _equipment_id = equipment["id"]
             site_id = equipment["site_id"]
 
-            # Parse code to determine specialty (supports both site-002 and site-005 formats)
+            # Parse code to determine specialty (supports both site-002 and site-003 formats)
             specialty = self._parse_specialty_from_code(equipment_code)
             logger.debug(f"Parsed equipment {equipment_code} → specialty={specialty}")
 

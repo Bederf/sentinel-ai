@@ -4,7 +4,7 @@ type: "procedure"
 status: "active"
 version: "1.1.0"
 created: "2026-02-23"
-updated: "2026-05-10"
+updated: "2026-05-20"
 author: "SENTINEL Compliance Team"
 tags: ["compliance", "popia", "retention", "privacy"]
 domain: "compliance"
@@ -63,7 +63,7 @@ Implemented in `backend/app/services/supabase_retention_service.py`, wired into 
 
 | Tier | Tables | Retention | POPIA Basis |
 |------|--------|-----------|-------------|
-| **ML_TRAINING** | `equipment_fault_events` (recorded_at), `adapter_health` (timestamp), `adapter_health_current` (updated_at), `adapter_health_alerts` (created_at), `space_occupancy_events` (timestamp), `equipment_sensor_readings` (recorded_at) | 7 days | S14(1) — data no longer necessary after ML processing |
+| **ML_TRAINING** | `equipment_fault_events` (recorded_at), `adapter_health` (timestamp), `adapter_health_current` (updated_at), `adapter_health_alerts` (created_at), `space_occupancy_events` (timestamp), `equipment_sensor_readings` (recorded_at), `alerts` (created_at) | 7 days | S14(1) — data no longer necessary after ML processing |
 | **SNAPSHOT** | `asset_health_snapshots`, `system_health_snapshots` | 30 days | S14(1) — stale operational data |
 | **AUDIT_TRAIL** | `recommendations`, `parasite_decisions` | 5 years | S14(2) — lawful purpose (audit/compliance) |
 

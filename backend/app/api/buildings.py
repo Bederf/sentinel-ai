@@ -391,7 +391,8 @@ async def list_sites(current_user: dict | None = None) -> dict:
             info = building.to_dict()
             info["status"] = "active" if site_id in active_ids else "inactive"
 
-            # Override site status with active alert severity if present
+            # Annotate with alarm flood indicator — does NOT override equipment-derived status
+            # Equipment health (when available via equipment-summary) drives status; alerts annotate
             try:
                 from app.database.supabase_client import get_supabase_client
 
@@ -407,12 +408,10 @@ async def list_sites(current_user: dict | None = None) -> dict:
                         .execute()
                     )
                     if alerts.data:
-                        has_critical_alert = any(a.get("severity") == "critical" for a in alerts.data)
-                        has_warning_alert = any(a.get("severity") == "warning" for a in alerts.data)
-                        if has_critical_alert:
-                            info["status"] = "critical"
-                        elif has_warning_alert:
-                            info["status"] = "warning"
+                        # Only annotate, never override — status is driven by equipment health
+                        info["anomaly_flag"] = True
+                        info["alarm_flood"] = len(alerts.data) > 5
+                        info["alert_count"] = len(alerts.data)
             except Exception:
                 pass
 
@@ -484,6 +483,7 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
                     "schedule_overrides": opt.get("schedule_overrides", []),
                 },
                 "is_active": b.get("sentinel_processing_enabled", False),
+                "onboarding_phase": b.get("onboarding_phase") or "shadow",
                 "desk_count": b.get("total_desks") or b.get("equipment_count", 0),
                 "zone_count": 0,
                 "equipment_count": b.get("equipment_count", 0),

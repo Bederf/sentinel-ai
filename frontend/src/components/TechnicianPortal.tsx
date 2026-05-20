@@ -85,28 +85,28 @@ export default function TechnicianPortal(): ReactElement {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">Loading dashboard...</p>
+        <p style={{ color: "var(--color-sentinel-text-disabled)" }}>Loading dashboard...</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
       {/* Header */}
       <div className="bg-white border-b px-4 py-3">
         <h1 className="text-xl font-semibold">Technician Portal</h1>
-        <p className="text-sm text-gray-500">Welcome back</p>
-        {error && <p className="text-sm text-red-600 mt-1">{error}</p>}
+        <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Welcome back</p>
+        {error && <p style={{ color: "var(--color-sentinel-red)" }}>{error}</p>}
       </div>
 
       {/* Tabs */}
-      <div className="bg-white border-b px-4 flex gap-4">
+      <div style={{ background: "var(--color-sentinel-bg-panel)", borderBottom: "1px solid var(--color-sentinel-border)" }} className="px-4 flex gap-4">
         <button
           onClick={() => setSelectedTab('overview')}
           className={`py-3 px-2 border-b-2 transition ${
             selectedTab === 'overview'
               ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-800'
+              : 'border-transparent' style={{ color: "var(--color-sentinel-text-secondary)" }}
           }`}
         >
           Overview
@@ -116,7 +116,7 @@ export default function TechnicianPortal(): ReactElement {
           className={`py-3 px-2 border-b-2 transition ${
             selectedTab === 'orders'
               ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-800'
+              : 'border-transparent' style={{ color: "var(--color-sentinel-text-secondary)" }}
           }`}
         >
           My Orders
@@ -126,7 +126,7 @@ export default function TechnicianPortal(): ReactElement {
           className={`py-3 px-2 border-b-2 transition ${
             selectedTab === 'approvals'
               ? 'border-blue-600 text-blue-600'
-              : 'border-transparent text-gray-600 hover:text-gray-800'
+              : 'border-transparent' style={{ color: "var(--color-sentinel-text-secondary)" }}
           }`}
         >
           Pending Approvals
@@ -297,7 +297,7 @@ function OrderCard({ order, showApprovalActions }: OrderCardProps): ReactElement
       <div className="flex justify-between items-start mb-2">
         <div>
           <p className="font-medium">{order.id}</p>
-          <p className="text-sm text-gray-600">{order.items.length} items</p>
+          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>{order.items.length} items</p>
         </div>
         <span className={`text-xs px-2 py-1 rounded ${colors.bg} ${colors.text}`}>
           {order.status}
@@ -309,13 +309,19 @@ function OrderCard({ order, showApprovalActions }: OrderCardProps): ReactElement
         <div className="flex gap-2">
           <button
             onClick={handleApprove}
-            className="flex-1 px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+            className="flex-1 px-3 py-2 text-sm rounded"
+            style={{ background: "var(--color-sentinel-green)", color: "#fff" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--color-sentinel-green-hover, #16a34a)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--color-sentinel-green)")}
           >
             Approve
           </button>
           <button
             onClick={handleReject}
-            className="flex-1 px-3 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+            className="flex-1 px-3 py-2 text-sm rounded"
+            style={{ background: "var(--color-sentinel-red)", color: "#fff" }}
+            onMouseEnter={e => (e.currentTarget.style.background = "var(--color-sentinel-red-hover, #dc2626)")}
+            onMouseLeave={e => (e.currentTarget.style.background = "var(--color-sentinel-red)")}
           >
             Reject
           </button>
@@ -323,7 +329,7 @@ function OrderCard({ order, showApprovalActions }: OrderCardProps): ReactElement
       )}
 
       {order.status === 'shipped' && (
-        <div className="text-xs text-gray-500 mt-2">
+        <div className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
           <p>Track delivery status in your orders list</p>
         </div>
       )}

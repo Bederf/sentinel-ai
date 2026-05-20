@@ -153,4 +153,4 @@ Configured sites as of 2026-05-03:
 | site-002 | bridge | http://10.99.0.1:8080 | Active, telemetry flowing |
 | site-005 | bridge | (configured on bridge) | Not tracked in SENTINEL DB yet |
 
-Site-005 (Busamed Gateway Private Hospital, Umhlanga) is configured on the bridge (Niagara/Tridium, oBIX protocol) but not yet in `site_adapter_config`.
+Site-005 (Example Hospital Private Hospital, Umhlanga) is configured on the bridge (Niagara/Tridium, oBIX protocol) but not yet in `site_adapter_config`.

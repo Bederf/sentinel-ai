@@ -48,21 +48,21 @@ function getSegmentColor(type: ScheduleSegment["type"]): { bg: string; border: s
   switch (type) {
     case "precooling":
       return {
-        bg: "bg-blue-900/20",
-        border: "border-blue-500/50",
-        text: "text-blue-300"
+        bg: "rgba(59, 130, 246, 0.15)",
+        border: "rgba(59, 130, 246, 0.4)",
+        text: "var(--color-sentinel-blue)"
       };
     case "load_shedding":
       return {
-        bg: "bg-red-900/20",
-        border: "border-red-500/50",
-        text: "text-red-300"
+        bg: "rgba(220, 38, 38, 0.15)",
+        border: "rgba(220, 38, 38, 0.4)",
+        text: "var(--color-sentinel-red)"
       };
     case "recovery":
       return {
-        bg: "bg-green-900/20",
-        border: "border-green-500/50",
-        text: "text-green-300"
+        bg: "rgba(16, 185, 129, 0.15)",
+        border: "rgba(16, 185, 129, 0.4)",
+        text: "var(--color-sentinel-green)"
       };
   }
 }

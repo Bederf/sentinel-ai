@@ -801,7 +801,7 @@ def _get_next_site_number() -> int:
 
 @router.get("/sites/next-id", response_model=NextSiteIdResponse)
 async def get_next_site_id() -> NextSiteIdResponse:
-    """Get next available site ID (e.g., site-005)."""
+    """Get next available site ID (e.g., site-003)."""
     next_num = _get_next_site_number()
     return NextSiteIdResponse(next_id=f"site-{next_num:03d}")
 
@@ -865,6 +865,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
             "total_devices": 0,
             "on_bms_count": 0,
             "bms_coverage_pct": 0,
+            "onboarding_phase": "commissioning",
         },
     }
 
@@ -898,6 +899,61 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
         logger.error(f"Failed to update registry: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update registry: {e}")
 
+    # 4b. Create mode policy state file at the start of the onboarding lifecycle.
+    policy_state = {
+        "site_id": site_id,
+        "current_stage": "commissioning",
+        "candidate_stage": None,
+        "candidate_since": None,
+        "violation_stage": None,
+        "violation_since": None,
+        "last_demoted_at": None,
+        "last_evaluated_at": None,
+    }
+    policy_state_path = Path(__file__).parent.parent / "data" / "policies" / f"{site_id}-mode-policy-state.json"
+    try:
+        policy_state_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(policy_state_path, "w") as f:
+            json.dump(policy_state, f, indent=2)
+        logger.info(f"Created mode policy state: {policy_state_path.name}")
+    except Exception as e:
+        logger.warning(f"Failed to create mode policy state: {e}")
+
+    # 4c. Copy mode policy template for new site
+    policy_src = Path(__file__).parent.parent / "data" / "policies" / "site-002-mode-policy.json"
+    policy_dst = Path(__file__).parent.parent / "data" / "policies" / f"{site_id}-mode-policy.json"
+    try:
+        if policy_src.exists():
+            import shutil
+            shutil.copy2(policy_src, policy_dst)
+            # Patch site_id in the copied policy
+            with open(policy_dst, "r") as f:
+                policy_data = json.load(f)
+            policy_data["site_id"] = site_id
+            policy_data["default_stage"] = "commissioning"
+            policy_data.setdefault("stages", {}).setdefault("commissioning", {}).setdefault(
+                "promotion",
+                {},
+            ).setdefault("entry_thresholds", {})["truth_check_required"] = True
+            with open(policy_dst, "w") as f:
+                json.dump(policy_data, f, indent=2)
+            logger.info(f"Copied mode policy template to: {policy_dst.name}")
+    except Exception as e:
+        logger.warning(f"Failed to copy mode policy template: {e}")
+
+    # 4d. Seed only base modules. Add-ons remain disabled until explicitly activated.
+    try:
+        from app.services.module_registry_service import module_registry
+
+        seeded_modules = module_registry.ensure_base_modules(site_id, request.name)
+        logger.info(
+            "Seeded base modules for %s; add-on modules remain inactive: %s",
+            site_id,
+            seeded_modules,
+        )
+    except Exception as e:
+        logger.warning(f"Failed to seed base modules for {site_id}: {e}")
+
     # 5. Create in Supabase (best-effort)
     if not settings.use_json_storage:
         try:
@@ -915,6 +971,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
                         "sqm": request.sqm,
                         "floors": len(request.floors) if request.floors else 1,
                         "timezone": "Africa/Johannesburg",
+                        "onboarding_phase": "commissioning",
                         "sentinel_processing_enabled": False,
                     }
                 ).execute()
@@ -922,6 +979,9 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
 
                 # Auto-seed municipal tariff schedule + account based on region
                 _seed_municipal_tariff_and_account(client, site_id, request.region)
+
+                # Auto-generate site compliance annex
+                _generate_compliance_annex(site_id, request)
         except Exception as e:
             # Log but don't fail - JSON is primary storage
             logger.warning(f"Failed to create building in Supabase: {e}")
@@ -1009,6 +1069,199 @@ def _seed_municipal_tariff_and_account(client, site_id: str, region: str) -> Non
             ).execute()
     except Exception as exc:
         logger.info("Municipal account auto-seed failed: %s", exc)
+
+
+def _generate_compliance_annex(site_id: str, request: CreateSiteRequest) -> None:
+    """Auto-generate site compliance annex from template and save to vault."""
+    try:
+        template_path = (
+            Path(__file__).parent.parent.parent.parent
+            / "docs"
+            / "09-security"
+            / "compliance"
+            / "site-compliance-annex-template.md"
+        )
+        if not template_path.exists():
+            logger.warning("Compliance annex template not found at %s", template_path)
+            return
+
+        with open(template_path) as f:
+            content = f.read()
+
+        now = datetime.now().strftime("%Y-%m-%d")
+        floor_count = len(request.floors) if request.floors else 1
+        sqm = request.sqm or 0
+        prefix = site_id.replace("site-", "S").upper()
+
+        # Compute LEU status from floor area (rough estimate: 150 kWh/m²/yr)
+        est_annual_kwh = sqm * 150
+        est_monthly_kwh = est_annual_kwh / 12
+        leu_status = "NOT LEU" if est_monthly_kwh < 400_000 else "LEU"
+        leu_status_note = (
+            f"NOT LEU ({est_monthly_kwh:,.0f} kWh/mo vs 400,000 kWh/mo threshold — {est_monthly_kwh/400000*100:.1f}%)"
+            if est_monthly_kwh < 400_000
+            else f"LEU ({est_monthly_kwh:,.0f} kWh/mo — register with DoE within 30 days)"
+        )
+
+        # Green Star / EDGE eligibility based on building type
+        gs_eligible = "Yes" if request.type in ("office", "retail", "hotel", "mixed-use") else "EDGE only"
+        edge_eligible = "Yes" if request.type in ("warehouse", "industrial") else "No"
+
+        # Compliance domain applicability
+        building_type = request.type or "office"
+        has_lift = building_type in ("hotel", "retail")
+        has_cooling_tower = False  # Not known at onboarding — update after BMS discovery
+
+        # Equipment placeholder rows (5 HVAC, 3 compliance-critical)
+        hvac_rows = ""
+        for i in range(1, 6):
+            hvac_rows += f"| __HVAC_EQUIP_{i}__ | {prefix}-AHU-{i:03d} | BACnet | No | Tier 3 | BACnet/IP |\n"
+
+        comp_rows = ""
+        for i in range(1, 4):
+            comp_rows += f"| __COMP_EQUIP_{i}__ | {prefix}-COMP-{i:03d} | __COMP_DOMAIN_{i}__ | __COMP_COC_{i}__ | __COMP_LAST_{i}__ | __COMP_NEXT_{i}__ |\n"
+
+        # Zone placeholder rows (6 zones)
+        zone_rows = ""
+        zone_types = ["office_floor", "meeting_room", "lobby", "server_room", "plant_room", "basement"]
+        for i, ztype in enumerate(zone_types, 1):
+            zone_rows += (
+                f"| __ZONE_CODE_{i}__ | {ztype} | 1.0 | 800 | 1000 | 4 | __ZONE_MON_{i}__ |\n"
+            )
+
+        # Site-specific risk placeholder rows
+        risk_rows = ""
+        for i in range(1, 4):
+            risk_rows += f"| __RISK_{i}__ | __RISK_{i}_LIK__ | __RISK_{i}_IMP__ | __RISK_{i}_MIT__ | __RISK_{i}_OWNER__ |\n"
+
+        replacements = {
+            "__CREATED_DATE__": now,
+            "__UPDATED_DATE__": now,
+            "__SITE_ID__": site_id,
+            "__BUILDING_NAME__": request.name,
+            "__BUILDING_TYPE__": request.type,
+            "__ADDRESS__": request.address,
+            "__FLOOR_AREA_SQM__": str(sqm),
+            "__FLOOR_COUNT__": str(floor_count),
+            "__SITE_CLASSIFICATION__": request.type,
+            "__REGION__": request.region,
+            "__EST_MONTHLY_KWH__": f"{est_monthly_kwh:,.0f}",
+            "__LEU_STATUS__": leu_status,
+            "__LEU_DATE__": f"{now} (estimated)",
+            "__LEU_OBLIGATION__": "Not applicable — NOT LEU" if leu_status == "NOT LEU" else "Register with DoE within 30 days",
+            "__GS_ELIGIBLE__": gs_eligible,
+            "__EDGE_ELIGIBLE__": edge_eligible,
+            "__GS_PATHWAY__": "Office Performance" if gs_eligible == "Yes" else "N/A",
+            "__EDGE_PATHWAY__": "N/A" if edge_eligible == "No" else "Standard",
+            "__GS_RP__": "__GS_RP__",
+            "__GS_ENERGY__": "Yes" if gs_eligible == "Yes" else "No",
+            "__GS_ENERGY_TARGET__": "75",
+            "__GS_IEQ__": "Yes",
+            "__GS_CO2__": "1000",
+            "__GS_BMS__": "Yes",
+            "__GS_HVAC__": "Yes",
+            "__GS_HVAC_DATE__": now,
+            "__GS_WATER__": "No",
+            "__GS_WATER_METER__": "N/A",
+            "__GS_MATERIALS__": "No",
+            "__GS_POINTS__": "4–6" if gs_eligible == "Yes" else "N/A",
+            "__GS_OBLIGATION__": "Not applicable" if gs_eligible == "Yes" else "N/A",
+            "__EDGE_OBLIGATION__": "Not applicable" if edge_eligible == "Yes" else "N/A",
+            # Equipment
+            "__GRID_METER_CODE__": f"{prefix}-MTR-E-MAIN",
+            "__GRID_METER_TYPE__": "Active Energy",
+            "__GRID_METER_LOC__": "Main LV Panel",
+            "__SOLAR_CODE__": f"{prefix}-MTR-SOLAR",
+            "__SOLAR_TYPE__": "Solar Generation",
+            "__SOLAR_LOC__": "Roof",
+            "__BESS_CODE__": f"{prefix}-MTR-BESS",
+            "__BESS_TYPE__": "Battery Storage",
+            "__BESS_LOC__": "Plant Room",
+            "__HVAC_SUBMETER_CODE__": f"{prefix}-MTR-HVAC",
+            "__HVAC_SUBMETER_TYPE__": "HVAC Sub-meter",
+            "__HVAC_SUBMETER_LOC__": "AHU Panel",
+            "__LIGHTING_SUBMETER_CODE__": f"{prefix}-MTR-LIGHT",
+            "__LIGHTING_SUBMETER_TYPE__": "Lighting Sub-meter",
+            "__LIGHTING_SUBMETER_LOC__": "DB Light",
+            # HVAC rows
+            "__HVAC_ROWS__": hvac_rows,
+            # Compliance-critical rows
+            "__COMP_ROWS__": comp_rows,
+            # Zone type map rows
+            "__ZONE_ROWS__": zone_rows,
+            # OA damper points
+            "__OA_DAMPER_POINTS__": "__NOT_CONFIRMED__ — confirm during BMS discovery",
+            "__OA_FLOW_POINT__": "__NOT_CONFIRMED__ — confirm if metered OA flow available",
+            # Compliance domains
+            "__OHS_APPLICABLE__": "Yes",
+            "__OHS_STATUS__": "pending",
+            "__OHS_LAST__": "__OHS_LAST__",
+            "__OHS_NEXT__": "__OHS_NEXT__",
+            "__OHS_NOTES__": "Zone checklist to be created via compliance API",
+            "__FIRE_APPLICABLE__": "Yes",
+            "__FIRE_STATUS__": "pending",
+            "__FIRE_LAST__": "__FIRE_LAST__",
+            "__FIRE_NEXT__": "__FIRE_NEXT__",
+            "__FIRE_NOTES__": "Fire extinguisher inventory to be added",
+            "__LEGIONELLA_APPLICABLE__": "Yes" if has_cooling_tower else "No",
+            "__LEGIONELLA_STATUS__": "not_required" if not has_cooling_tower else "pending",
+            "__LEGIONELLA_LAST__": "__LEGIONELLA_LAST__",
+            "__LEGIONELLA_NEXT__": "__LEGIONELLA_NEXT__",
+            "__LEGIONELLA_NOTES__": "No cooling tower identified at onboarding" if not has_cooling_tower else "__LEGIONELLA_NOTES__",
+            "__ELEC_APPLICABLE__": "Yes",
+            "__ELEC_STATUS__": "pending",
+            "__ELEC_LAST__": "__ELEC_LAST__",
+            "__ELEC_NEXT__": "__ELEC_NEXT__",
+            "__ELEC_NOTES__": "CoC to be obtained from certified electrician",
+            "__LIFT_APPLICABLE__": "Yes" if has_lift else "No",
+            "__LIFT_STATUS__": "not_applicable" if not has_lift else "pending",
+            "__LIFT_LAST__": "__LIFT_LAST__",
+            "__LIFT_NEXT__": "__LIFT_NEXT__",
+            "__LIFT_NOTES__": "No lifts identified at onboarding" if not has_lift else "__LIFT_NOTES__",
+            "__EMLIGHT_APPLICABLE__": "Yes",
+            "__EMLIGHT_STATUS__": "pending",
+            "__EMLIGHT_LAST__": "__EMLIGHT_LAST__",
+            "__EMLIGHT_NEXT__": "__EMLIGHT_NEXT__",
+            "__EMLIGHT_NOTES__": "IEC 62034 test schedule to be configured",
+            "__VENT_APPLICABLE__": "Yes",
+            "__VENT_STATUS__": "pending",
+            "__VENT_LAST__": now,
+            "__VENT_NEXT__": "__VENT_NEXT__",
+            "__VENT_NOTES__": "Zone CO₂ monitoring to be enabled per SANS 10400-X",
+            "__IAQ_APPLICABLE__": "Yes",
+            "__IAQ_STATUS__": "pending",
+            "__IAQ_LAST__": now,
+            "__IAQ_NEXT__": "__IAQ_NEXT__",
+            "__IAQ_NOTES__": "IAQ dashboard to be activated",
+            # Risks
+            "__RISK_ROWS__": risk_rows,
+            # ML Gate
+            "__ML_HOURS__": "0",
+            "__ML_GATE_STATUS__": "pending",
+            "__PHASE_FLIP_ELIGIBLE__": "not yet eligible",
+            "__ML_GATE_CLEAR_DATE__": "~72h after first ML training data ingested",
+            # Next review
+            "__NEXT_REVIEW_DATE__": now,
+            "__LEU_REASSESSMENT_DATE__": now,
+            "__ELEC_COC_RENEWAL_DATE__": "__IN 5 YEARS__",
+            "__LIFT_INSPECTION_DATE__": "__LIFT_NOTES__" if has_lift else "N/A",
+            "__GS_MILESTONE_DATE__": "__GS_RP__",
+        }
+
+        for placeholder, value in replacements.items():
+            content = content.replace(placeholder, value)
+
+        vault_dir = Path(f"/home/bederf/sentinel-vault/sites/{site_id}/compliance")
+        vault_dir.mkdir(parents=True, exist_ok=True)
+        vault_path = vault_dir / f"{site_id}-compliance-annex.md"
+
+        with open(vault_path, "w") as f:
+            f.write(content)
+
+        logger.info("Generated compliance annex at %s", vault_path)
+
+    except Exception as exc:
+        logger.warning("Compliance annex generation failed: %s", exc)
 
 
 # ============= SENTINEL Processing Toggle =============

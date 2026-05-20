@@ -118,3 +118,118 @@ export const zoneIngestionApi = {
   getAllCentroids: (siteId: string) =>
     fetchApi(`/api/buildings/${siteId}/zone-ingestion/centroids`),
 };
+
+// ============= Floor Plan Extraction Types =============
+
+export interface FloorConfig {
+  level: string;
+  height: number;
+  width: number;
+  depth: number;
+}
+
+export interface EquipmentConfig {
+  name: string;
+  equipment_type: string;
+  floor: string;
+  x: number;
+  y: number;
+  zone: string | null;
+  confidence: number | null;
+}
+
+export interface ZoneExtractConfig {
+  zone_id: string;
+  floor: string;
+  zone_type: string;
+  equipment: string[];
+}
+
+export interface BuildingConfigResponse {
+  site_code: string;
+  site_name: string;
+  floors: FloorConfig[];
+  equipment: EquipmentConfig[];
+  zones: ZoneExtractConfig[];
+  extraction_metadata: Record<string, unknown>;
+}
+
+// ============= Site Geocoding API =============
+
+export interface GeocodeResult {
+  lat: number;
+  lon: number;
+  display_name: string;
+  orientation_degrees: number | null;
+  type: string;
+  address: {
+    road?: string;
+    suburb?: string;
+    city?: string;
+    province?: string;
+    country?: string;
+    postcode?: string;
+  };
+}
+
+export const siteGeocodeApi = {
+  /**
+   * Geocode a building address and get GPS orientation
+   *
+   * @param address - Building name or address
+   * @returns Lat/lon + orientation + normalized address
+   */
+  geocode: (address: string) =>
+    fetchApi<GeocodeResult>(`/api/digital-twin/geocode?address=${encodeURIComponent(address)}`),
+};
+
+export const floorPlanApi = {
+  /**
+   * Extract building config from PDF floor plan
+   *
+   * @param file - PDF file
+   * @param siteCode - Building code (e.g. 'site-002')
+   * @param siteName - Building name
+   * @param floorsCount - Expected number of floors
+   * @returns Building configuration with floors, equipment, zones
+   */
+  extractFromPdf: (file: File, siteCode: string, siteName?: string, floorsCount = 3) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("site_code", siteCode);
+    if (siteName) formData.append("site_name", siteName);
+    formData.append("floors_count", String(floorsCount));
+    formData.append("skip_sanitization", "true");
+
+    return fetch("/api/digital-twin/extract-from-pdf", {
+      method: "POST",
+      body: formData,
+    }).then((res) => {
+      if (!res.ok) throw new Error(`PDF extraction failed: ${res.statusText}`);
+      return res.json() as Promise<BuildingConfigResponse>;
+    });
+  },
+
+  /**
+   * Extract building config from DXF floor plan
+   *
+   * @param file - DXF file
+   * @param siteCode - Building code (e.g. 'site-002')
+   * @param siteName - Building name
+   * @returns Building configuration with floors, equipment, zones
+   */
+  extractFromDxf: (file: File, siteCode: string, siteName?: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("site_code", siteCode);
+    if (siteName) formData.append("site_name", siteName);
+
+    return fetch("/api/digital-twin/extract-from-dxf", {
+      method: "POST",
+      body: formData,
+    }).then((res) => {
+      if (!res.ok) throw new Error(`DXF extraction failed: ${res.statusText}`);
+      return res.json() as Promise<BuildingConfigResponse>;
+    });
+  },
+};

@@ -60,9 +60,9 @@ export function SolarFinancialReport({ siteId }: SolarFinancialReportProps) {
 
   if (loading) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-lg p-6 animate-pulse">
-        <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-48 mb-4" />
-        <div className="h-40 bg-gray-200 dark:bg-gray-700 rounded" />
+      <div className="rounded-lg p-6 animate-pulse" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div className="h-6 rounded w-48 mb-4" style={{ background: "var(--color-sentinel-bg-secondary)" }}
+        <div className="h-40 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }} />
       </div>
     );
   }
@@ -70,7 +70,7 @@ export function SolarFinancialReport({ siteId }: SolarFinancialReportProps) {
   if (error || !summary) {
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-6">
-        <p className="text-red-500">{error || "No financial data"}</p>
+        <p style={{ color: "var(--color-sentinel-red)" }}>{error || "No financial data"}</p>
       </div>
     );
   }
@@ -79,16 +79,16 @@ export function SolarFinancialReport({ siteId }: SolarFinancialReportProps) {
   const maxSavings = Math.max(...months.map((m) => m.total_savings_zar || 0), 1);
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 space-y-6">
+    <div className="rounded-lg p-6 space-y-6" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <DollarSign className="w-5 h-5 text-green-500" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <DollarSign className="w-5 h-5" style={{ color: "var(--color-sentinel-green)" }} />
+          <h3 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
             Financial Report
           </h3>
         </div>
-        <span className="text-sm text-gray-500 dark:text-gray-400">
+        <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           {summary.period === "ytd" ? "Year to Date" : summary.period}
         </span>
       </div>
@@ -145,24 +145,24 @@ export function SolarFinancialReport({ siteId }: SolarFinancialReportProps) {
                   <span className="text-xs text-gray-600 dark:text-gray-400 w-24">
                     {month.month_name}
                   </span>
-                  <span className="text-xs font-semibold text-gray-800 dark:text-gray-200">
+                  <span className="text-xs font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                     R{formatCurrency(total)}
                   </span>
                 </div>
-                <div className="flex h-6 rounded-md overflow-hidden bg-gray-100 dark:bg-gray-700">
+                <div className="flex h-6 rounded-md overflow-hidden" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
                   <div
-                    className="bg-blue-500"
-                    style={{ width: `${arb}%` }}
+                    className="h-full"
+                    style={{ width: `${arb}%`, background: "var(--color-sentinel-blue)" }}
                     title={`Arbitrage: R${formatCurrency(month.arbitrage_zar || 0)}`}
                   />
                   <div
-                    className="bg-purple-500"
-                    style={{ width: `${dem}%` }}
+                    className="h-full"
+                    style={{ width: `${dem}%`, background: "var(--color-sentinel-purple, #a78bfa)" }}
                     title={`Demand: R${formatCurrency(month.demand_charge_zar || 0)}`}
                   />
                   <div
-                    className="bg-green-500"
-                    style={{ width: `${sc}%` }}
+                    className="h-full"
+                    style={{ width: `${sc}%`, background: "var(--color-sentinel-green)" }}
                     title={`Self-consumption: R${formatCurrency(month.self_consumption_zar || 0)}`}
                   />
                   <div

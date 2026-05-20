@@ -2121,6 +2121,39 @@ Example: "carbon_saving": "1.2 kgCO2 this evening (Eskom 0.9 kgCO2/kWh)"
 
 Provide ONLY the JSON response, no additional text."""
 
+        # Inject valid equipment codes into prompt so AI never hallucinates
+        try:
+            from app.database.repositories.equipment_repository import EquipmentRepository
+            eq_repo = EquipmentRepository()
+            site_resp = self.sites().get(site_id)
+            if site_resp:
+                site_uuid = site_resp.get("id")
+            else:
+                site_uuid = None
+            if site_uuid:
+                valid_equipment = eq_repo.get_all(site_id=site_uuid)
+            else:
+                valid_equipment = eq_repo.get_all()
+            if valid_equipment:
+                equipment_lines = []
+                for eq in valid_equipment[:50]:  # Limit to 50 to avoid token bloat
+                    code = eq.get("code", "UNKNOWN")
+                    eq_type = eq.get("type", "unknown")
+                    location = eq.get("location", "unknown location")
+                    equipment_lines.append(f"  - {code} ({eq_type}, {location})")
+                valid_equip_block = "\n".join(equipment_lines)
+                prompt += f"""
+
+VALID EQUIPMENT CODES FOR THIS SITE:
+Only generate recommendations for equipment in this list.
+Do not invent, guess, or modify equipment codes.
+If no appropriate equipment exists in this list, do not generate a recommendation for that type.
+
+{valid_equip_block}
+"""
+        except Exception as e:
+            logger.debug(f"[AI-OPT] Could not inject equipment list: {e}")
+
         return prompt
 
     async def _analyze_with_claude(
@@ -2206,6 +2239,23 @@ Provide ONLY the JSON response, no additional text."""
                         MAX_RECS,
                     )
                     normalised_recommendations = normalised_recommendations[:MAX_RECS]
+
+                # Validate and resolve equipment codes — drop any hallucinated codes
+                resolved = []
+                for r in normalised_recommendations:
+                    raw_code = r.get("target_equipment", "")
+                    if raw_code:
+                        valid_code = await self._resolve_equipment_code(raw_code, site_id)
+                        if valid_code:
+                            if valid_code != raw_code:
+                                logger.info(f"[AI-OPT] Equipment code corrected: {raw_code} → {valid_code}")
+                            r["target_equipment"] = valid_code
+                            resolved.append(r)
+                        else:
+                            logger.warning(f"[AI-OPT] Dropping recommendation for unknown equipment: {raw_code}")
+                    else:
+                        resolved.append(r)
+                normalised_recommendations = resolved
 
                 # Validate allowed control points before proceeding
 
@@ -2842,6 +2892,149 @@ Provide ONLY the JSON response, no additional text."""
             return 3  # Default priority
 
         return sorted(recommendations, key=get_priority)
+
+    async def _resolve_equipment_code(
+        self,
+        generated_code: str,
+        site_id: str,
+    ) -> str | None:
+        """
+        Resolve an AI-generated equipment code to a valid DB code.
+
+        The AI model sometimes generates slightly wrong codes (e.g. S002-AHU-B1-001
+        instead of S002-AHU-B01). This function finds the closest matching valid
+        equipment code in the database.
+
+        Returns:
+            Valid equipment code, or None if no match found (recommendation should be dropped).
+        """
+        import re
+
+        if not generated_code:
+            return None
+
+        from app.database.repositories.equipment_repository import EquipmentRepository
+
+        eq_repo = EquipmentRepository()
+
+        # Try exact match first
+        equipment = eq_repo.get_by_code(generated_code)
+        if equipment:
+            return generated_code
+
+        # Strategy 1: Normalize common AI-generated code format variations
+        normalised = self._normalize_code_format(generated_code)
+        if normalised != generated_code:
+            equipment = eq_repo.get_by_code(normalised)
+            if equipment:
+                logger.info(f"[AI-OPT] Normalised equipment code: {generated_code} → {normalised}")
+                return normalised
+
+        # Strategy 2: Find codes with same equipment type and location prefix
+        prefix = self._extract_prefix(generated_code)
+        if not prefix:
+            logger.warning(f"[AI-OPT] Unknown equipment code {generated_code} — no match in DB. Skipping.")
+            return None
+
+        # Get all equipment for site and find prefix matches
+        try:
+            from app.database.supabase_client import get_supabase_client
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if site_resp.data:
+                site_uuid = site_resp.data[0]["id"]
+            else:
+                site_uuid = None
+        except Exception:
+            site_uuid = None
+
+        if site_uuid:
+            all_equipment = eq_repo.get_all(site_id=site_uuid)
+        else:
+            all_equipment = eq_repo.get_all()
+
+        all_codes = [eq.get("code", "") for eq in all_equipment if eq.get("code")]
+        matches = [c for c in all_codes if c.startswith(prefix)]
+
+        if len(matches) == 1:
+            logger.info(f"[AI-OPT] Resolved equipment code by prefix: {generated_code} → {matches[0]}")
+            return matches[0]
+
+        if len(matches) > 1:
+            logger.warning(
+                f"[AI-OPT] Ambiguous equipment code {generated_code} — "
+                f"multiple prefix matches: {matches}. Skipping recommendation."
+            )
+            return None
+
+        logger.warning(f"[AI-OPT] Unknown equipment code {generated_code} — no match in DB. Skipping.")
+        return None
+
+    def _normalize_code_format(self, code: str) -> str:
+        """
+        Normalise common AI-generated code format variations.
+
+        Examples:
+        S002-AHU-B1-001 → S002-AHU-B01
+        S002-FCU-L1-001 → S002-FCU-101
+        S002-AHU-L2-001 → S002-AHU-201
+        S002-CHILLER-B1-001 → S002-CHILLER-B01
+        S002-CT-R-001 → S002-CT-R01
+        S002-FCU-L0-001 → S002-FCU-001
+        """
+        import re
+
+        # Pattern: S002-TYPE-L{floor}-{seq} → S002-TYPE-{floor*100 + seq}
+        # e.g. S002-FCU-L1-001 → S002-FCU-101 (1*100 + 1)
+        # e.g. S002-AHU-L2-001 → S002-AHU-201 (2*100 + 1)
+        # e.g. S002-FCU-L0-001 → S002-FCU-001 (ground floor, no zone letter)
+        match = re.match(r'^(S\d+)-(\w+)-L(\d+)-(\d+)$', code)
+        if match:
+            site, equip_type, floor, seq = match.groups()
+            numeric_floor = int(floor)
+            if numeric_floor == 0:
+                normalized_seq = f"{int(seq):03d}"  # Ground: 001 → "001", 005 → "005"
+            else:
+                normalized_seq = numeric_floor * 100 + int(seq)
+            return f"{site}-{equip_type}-{normalized_seq}"
+
+        # Pattern: S002-TYPE-B{num}-{seq} → S002-TYPE-B{num_basin} (basement with 2-digit pad)
+        # e.g. S002-AHU-B1-001 → S002-AHU-B01
+        match = re.match(r'^(S\d+)-(\w+)-B(\d+)-(\d+)$', code)
+        if match:
+            site, equip_type, basement, seq = match.groups()
+            return f"{site}-{equip_type}-B{basement.zfill(2)}"
+
+        # Pattern: S002-TYPE-G-{seq} → S002-TYPE-{seq} (ground floor, no zone letter)
+        # e.g. S002-LTG-G-001 → S002-LTG-001
+        match = re.match(r'^(S\d+)-(\w+)-G-(\d+)$', code)
+        if match:
+            site, equip_type, seq = match.groups()
+            return f"{site}-{equip_type}-{seq.zfill(3)}"
+
+        # Pattern: S002-TYPE-R-{seq} → S002-TYPE-R{seq_basin} (rooftop, 2-digit seq)
+        # e.g. S002-CT-R-001 → S002-CT-R01
+        match = re.match(r'^(S\d+)-(\w+)-R-(\d+)$', code)
+        if match:
+            site, equip_type, seq = match.groups()
+            return f"{site}-{equip_type}-R{int(seq):02d}"
+
+        return code
+
+    def _extract_prefix(self, code: str) -> str:
+        """
+        Extract meaningful prefix for fuzzy matching.
+
+        S002-AHU-B1-001 → S002-AHU-B
+        S002-FCU-L1-001 → S002-FCU-L
+        S002-AHU-201 → S002-AHU-2
+        """
+        parts = code.split('-')
+        if len(parts) >= 3:
+            # e.g. S002-AHU-B01 → S002-AHU-B
+            # e.g. S002-FCU-101 → S002-FCU-1
+            return '-'.join(parts[:2]) + '-' + parts[2][0]
+        return '-'.join(parts[:2]) + '-'
 
     def _format_zone_context(self, hvac_devices: list[Device]) -> str:
         """Format zone context for Claude prompt."""

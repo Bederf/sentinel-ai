@@ -58,6 +58,7 @@ _PUBLIC_PREFIXES = (
     "/api/sentry-email/",  # Sentry email intake v2 — advisor strategy (authenticated via X-Sentry-API-Key in endpoint)
     "/api/emails/",  # Email cluster intake (authenticated via Bearer token in endpoint)
     "/api/whatsapp/",  # WhatsApp/Twilio webhooks (authenticated at webhook layer)
+    "/api/telegram/",  # Telegram bot webhook (authenticated via X-Telegram-Bot-Api-Secret-Token)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)

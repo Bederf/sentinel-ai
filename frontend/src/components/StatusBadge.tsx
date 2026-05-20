@@ -39,12 +39,13 @@ interface StatusConfig {
   bdr: string;
 }
 
-const G = { color: '#10B981', bg: 'rgba(16,185,129,0.12)',  bdr: 'rgba(16,185,129,0.3)' };
-const A = { color: '#F59E0B', bg: 'rgba(245,158,11,0.12)',  bdr: 'rgba(245,158,11,0.3)' };
-const R = { color: '#DC2626', bg: 'rgba(220,38,38,0.12)',   bdr: 'rgba(220,38,38,0.3)' };
-const B = { color: '#3B82F6', bg: 'rgba(59,130,246,0.12)',  bdr: 'rgba(59,130,246,0.3)' };
-const N = { color: '#8B8B8B', bg: 'rgba(142,142,142,0.12)', bdr: 'rgba(142,142,142,0.3)' };
-const P = { color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)',  bdr: 'rgba(139,92,246,0.3)' };
+/* All colors reference CSS design tokens — theme switching Just Works */
+const G: StatusConfig = { color: 'var(--color-sentinel-green)',  bg: 'color-mix(in oklch, var(--color-sentinel-green) 12%, transparent)',  bdr: 'color-mix(in oklch, var(--color-sentinel-green) 30%, transparent)' };
+const A: StatusConfig = { color: 'var(--color-sentinel-amber)', bg: 'color-mix(in oklch, var(--color-sentinel-amber) 12%, transparent)', bdr: 'color-mix(in oklch, var(--color-sentinel-amber) 30%, transparent)' };
+const R: StatusConfig = { color: 'var(--color-sentinel-red)',   bg: 'color-mix(in oklch, var(--color-sentinel-red) 12%, transparent)',   bdr: 'color-mix(in oklch, var(--color-sentinel-red) 30%, transparent)' };
+const B: StatusConfig = { color: 'var(--color-sentinel-blue)',  bg: 'color-mix(in oklch, var(--color-sentinel-blue) 12%, transparent)',  bdr: 'color-mix(in oklch, var(--color-sentinel-blue) 30%, transparent)' };
+const N: StatusConfig = { color: 'var(--color-sentinel-text-disabled)', bg: 'color-mix(in oklch, var(--color-sentinel-text-disabled) 12%, transparent)', bdr: 'color-mix(in oklch, var(--color-sentinel-text-disabled) 30%, transparent)' };
+const P: StatusConfig = { color: 'var(--color-sentinel-purple)', bg: 'color-mix(in oklch, var(--color-sentinel-purple) 12%, transparent)', bdr: 'color-mix(in oklch, var(--color-sentinel-purple) 30%, transparent)' };
 
 const STATUS_CONFIG: Record<StatusKey, StatusConfig> = {
   // Compliance

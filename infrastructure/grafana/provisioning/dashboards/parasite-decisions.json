@@ -6,7 +6,7 @@
         "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -20,9 +20,9 @@
   "links": [],
   "panels": [
     {
-      "title": "Decision Pipeline Overview",
+      "title": "Decision Pipeline Overview — 24h",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -31,20 +31,44 @@
           "refId": "A"
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 50 },
+              { "color": "#ef4444", "value": 200 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
+        }
+      },
       "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["sum"],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
-        "colorMode": "value",
-        "graphMode": "area"
+        "textMode": "auto"
       }
     },
     {
       "title": "Events by Pipeline Stage",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
+      "gridPos": { "h": 8, "w": 8, "x": 6, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -52,12 +76,23 @@
           "legendFormat": "{{stage}}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "none",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
     },
     {
       "title": "Events by Tier",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
+      "gridPos": { "h": 8, "w": 5, "x": 14, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -65,20 +100,119 @@
           "legendFormat": "{{tier}}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "none",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
     },
     {
       "title": "Events by Status",
       "type": "piechart",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 4 },
+      "gridPos": { "h": 8, "w": 5, "x": 19, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
-          "expr": "sum by (status) (count_over_time({job=\"sentinel-decisions\"} [24h]))",
+          "expr": "sum by (status) (count_over_time({job=\"sentinel-decisions\", status!=\"Value\"} [24h]))",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "none",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
+    },
+    {
+      "title": "Tier 3 Auto-Execute Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"pipeline.complete\"} [1h]))",
+          "legendFormat": "Successful Auto-Executes",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"safety.validated\", status=\"failed\"} [1h]))",
+          "legendFormat": "Safety Rejections",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"rollback.executed\"} [1h]))",
+          "legendFormat": "Auto-Rollbacks",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Successful Auto-Executes" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#10b981", "mode": "fixed" } }]}
+        ]
+      }
+    },
+    {
+      "title": "Tier 2 Approval Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"approval.decided\", status=\"approved\"} [1h]))",
+          "legendFormat": "Approved",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"approval.decided\", status=\"rejected\"} [1h]))",
+          "legendFormat": "Rejected",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Approved" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "#10b981", "mode": "fixed" } }]}
+        ]
+      }
     },
     {
       "title": "Pipeline Event Timeline",
@@ -106,7 +240,7 @@
       "title": "Correlation ID Trace",
       "description": "Enter a correlation_id to see all pipeline events for a single recommendation",
       "type": "logs",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 22 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 22 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -126,9 +260,9 @@
       }
     },
     {
-      "title": "Failed Decisions (Last 24h)",
+      "title": "Failed Decisions — Last 24h",
       "type": "logs",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 34 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -143,65 +277,6 @@
         "prettifyLogMessage": true,
         "enableLogDetails": true,
         "sortOrder": "Descending"
-      }
-    },
-    {
-      "title": "Tier 3 Auto-Execute Rate",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 42 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"pipeline.complete\"} [1h]))",
-          "legendFormat": "Successful Auto-Executes",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"safety.validated\", status=\"failed\"} [1h]))",
-          "legendFormat": "Safety Rejections",
-          "refId": "B"
-        },
-        {
-          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"rollback.executed\"} [1h]))",
-          "legendFormat": "Auto-Rollbacks",
-          "refId": "C"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
-          }
-        }
-      }
-    },
-    {
-      "title": "Tier 2 Approval Rate",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 42 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"approval.decided\", status=\"approved\"} [1h]))",
-          "legendFormat": "Approved",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(count_over_time({job=\"sentinel-decisions\", stage=\"approval.decided\", status=\"rejected\"} [1h]))",
-          "legendFormat": "Rejected",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 50,
-            "stacking": { "mode": "normal" }
-          }
-        }
       }
     }
   ],
@@ -246,7 +321,11 @@
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "Africa/Johannesburg",
-  "title": "PARASITE Decision Pipeline",
+  "title": "PARASITE — Decision Pipeline",
   "uid": "sentinel-parasite-decisions",
-  "version": 1
+  "version": 2,
+  "weekStart": "",
+  "style": "dark",
+  "links": [],
+  "fiscalYearStartMonth": 0
 }

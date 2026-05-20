@@ -414,8 +414,8 @@ class PointClassifier:
         among the segments. Works for any BMS vendor naming convention.
 
         Examples:
-            "site-005-UMH-COLD-B1-001.door" → ("cold", HIGH)
-            "site-005-UMH-LIFT-003.current"  → ("lift", HIGH)
+            "site-003-BLDG-COLD-B1-001.door" → ("cold", HIGH)
+            "site-003-BLDG-LIFT-003.current"  → ("lift", HIGH)
             "S002-AHU-L1-A"                  → ("ahu", HIGH)
         """
         segments = re.split(r"[-.]", equipment_id.upper())

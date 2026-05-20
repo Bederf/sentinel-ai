@@ -149,6 +149,9 @@ export interface CockpitState {
   site: {
     id: string
     name: string
+    latitude: number | null
+    longitude: number | null
+    orientationDegrees: number | null
     onboardingPhase: 'shadow' | 'advisory' | 'supervised' | 'auto'
     posture: string
     mode: CockpitGuidanceMode

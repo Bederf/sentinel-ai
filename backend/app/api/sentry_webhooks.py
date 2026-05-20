@@ -2124,6 +2124,75 @@ async def handle_telegram_callback(
                 pass
         return {"success": True, "intent": "certified_ack", "confirmed": result["success"]}
 
+    # Prediction acknowledgement button (✅ Acknowledge from prediction Telegram message)
+    if payload.data.startswith("pred_ack:"):
+        from app.services.notification_service import notification_service
+
+        result = await notification_service.handle_prediction_acknowledge(
+            callback_data=payload.data,
+            acknowledged_by_telegram_id=payload.user_id,
+        )
+        if result["success"]:
+            try:
+                sender = get_telegram_sender()
+                await sender.send_text(
+                    chat_id=payload.chat_id,
+                    text="✅ Prediction acknowledged.",
+                )
+            except Exception:
+                pass
+        return {"success": True, "intent": "prediction_ack", "confirmed": result["success"]}
+
+    # Prediction Create Work Order button (🛠 Create Work Order from prediction Telegram message)
+    if payload.data.startswith("pred_wo:"):
+        from app.services.notification_service import notification_service
+
+        parts = payload.data.split(":", 1)
+        if len(parts) == 2:
+            prediction_id = parts[1]
+            result = await notification_service.handle_prediction_work_order_request(
+                callback_data=payload.data,
+                prediction_id=prediction_id,
+                requested_by_telegram_id=payload.user_id,
+            )
+        else:
+            result = {"success": False, "error": "invalid_callback_data"}
+
+        try:
+            sender = get_telegram_sender()
+            if result["success"]:
+                work_order = result.get("work_order") or {}
+                text = f"🛠 Work order created: {work_order.get('code', 'created')}."
+            else:
+                text = f"Could not create work order: {result.get('error', 'unknown_error')}"
+            await sender.send_text(chat_id=payload.chat_id, text=text)
+        except Exception:
+            pass
+        return {"success": True, "intent": "prediction_work_order", "confirmed": result["success"], "result": result}
+
+    if payload.data.startswith("wo:"):
+        from app.services.notification_service import notification_service
+
+        result = await notification_service.handle_work_order_request(
+            callback_data=payload.data,
+            requested_by_telegram_id=payload.user_id,
+        )
+        try:
+            sender = get_telegram_sender()
+            if result["success"]:
+                if result.get("action") == "open_work_order_exists":
+                    work_order = result.get("work_order") or {}
+                    text = f"🛠 Open work order already exists: {work_order.get('code', 'unknown')}."
+                else:
+                    work_order = result.get("work_order") or {}
+                    text = f"🛠 Work order created: {work_order.get('code', 'created')}."
+            else:
+                text = f"Could not create work order: {result.get('error', 'unknown_error')}"
+            await sender.send_text(chat_id=payload.chat_id, text=text)
+        except Exception:
+            pass
+        return {"success": True, "intent": "create_work_order", "confirmed": result["success"], "result": result}
+
     if payload.data.startswith("docintake:"):
         from app.services.telegram_document_intake_service import get_telegram_document_intake_service
 

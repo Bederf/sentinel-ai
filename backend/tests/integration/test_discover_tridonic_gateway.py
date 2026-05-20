@@ -75,7 +75,7 @@ async def test_discover_tridonic_gateway_equipment_code_format():
     from app.mcp.simbiot_server import discover_tridonic_gateway_tool
 
     result = await discover_tridonic_gateway_tool(
-        site_id="site-005",
+        site_id="site-003",
         gateway_ip="192.168.10.50",
         use_simulated=True,
     )

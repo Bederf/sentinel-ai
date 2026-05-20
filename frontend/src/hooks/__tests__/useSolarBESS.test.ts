@@ -570,7 +570,7 @@ describe('useSolarBESS Hook', () => {
 
     it('should invalidate cache when siteId changes', async () => {
       const mockData1 = createMockBESSStatus({ site_id: 'site-002' });
-      const mockData2 = createMockBESSStatus({ site_id: 'site-005' });
+      const mockData2 = createMockBESSStatus({ site_id: 'site-003' });
       vi.mocked(fetchBESSStatus).mockResolvedValueOnce(mockData1);
       vi.mocked(fetchBESSStatus).mockResolvedValueOnce(mockData2);
 
@@ -585,10 +585,10 @@ describe('useSolarBESS Hook', () => {
 
       expect(result.current.data?.site_id).toBe('site-002');
 
-      rerender({ siteId: 'site-005' });
+      rerender({ siteId: 'site-003' });
 
       await waitFor(() => {
-        expect(result.current.data?.site_id).toBe('site-005');
+        expect(result.current.data?.site_id).toBe('site-003');
       });
 
       expect(vi.mocked(fetchBESSStatus)).toHaveBeenCalledTimes(2);

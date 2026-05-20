@@ -70,15 +70,7 @@ describe('useBuildingsList Hook', () => {
 
   describe('Successful Buildings/Sites Fetching', () => {
     it('should fetch list of buildings/sites', async () => {
-      const mockSitesList = [
-        mockSite,
-        {
-          ...mockSite,
-          id: '550e8400-e29b-41d4-a716-446655440001',
-          code: 'site-005',
-          name: 'Office Building 2',
-        },
-      ];
+      const mockSitesList = [mockSite];
 
       mockSitesApi.mockResolvedValueOnce({ sites: mockSitesList });
 
@@ -522,12 +514,6 @@ describe('useBuildingsList Hook', () => {
         mockSite,
         {
           ...mockSite,
-          id: '550e8400-e29b-41d4-a716-446655440001',
-          code: 'site-005',
-          name: 'Building 2',
-        },
-        {
-          ...mockSite,
           id: '550e8400-e29b-41d4-a716-446655440002',
           code: 'site-012',
           name: 'Building 3',
@@ -545,8 +531,8 @@ describe('useBuildingsList Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(result.current.data?.length).toBe(3);
-      expect(result.current.data?.map((s) => s.code)).toEqual(['site-002', 'site-005', 'site-012']);
+      expect(result.current.data?.length).toBe(2);
+      expect(result.current.data?.map((s) => s.code)).toEqual(['site-002', 'site-012']);
     });
 
     it('should handle large building lists', async () => {
@@ -574,8 +560,7 @@ describe('useBuildingsList Hook', () => {
     it('should preserve site order from API response', async () => {
       const mockSitesList = [
         { ...mockSite, code: 'site-002', name: 'First' },
-        { ...mockSite, code: 'site-005', name: 'Second' },
-        { ...mockSite, code: 'site-012', name: 'Third' },
+        { ...mockSite, code: 'site-012', name: 'Second' },
       ];
 
       mockSitesApi.mockResolvedValueOnce({ sites: mockSitesList });
@@ -589,7 +574,7 @@ describe('useBuildingsList Hook', () => {
         expect(result.current.isSuccess).toBe(true);
       });
 
-      expect(result.current.data?.map((s) => s.name)).toEqual(['First', 'Second', 'Third']);
+      expect(result.current.data?.map((s) => s.name)).toEqual(['First', 'Second']);
     });
   });
 

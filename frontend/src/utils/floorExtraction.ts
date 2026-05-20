@@ -3,7 +3,6 @@
  *
  * Supports multiple building types:
  * - Site-002 (Office): S002-TYPE-ZONE (zone encodes floor: 001-099=L0, 100-199=L1, 200-299=L2)
- * - Site-005 (Hospital): site-005-UMH-TYPE-FLOOR-ID (explicit floor: B1, L1-L9, R)
  * - Site-012 (Generic): S012-TYPE-FLOOR-ID (explicit floor: G, R)
  */
 
@@ -19,17 +18,10 @@ export interface Floor {
  *
  * Handles:
  * - S002-TYPE-ZONE_ID → Extract floor from zone (001-099=L0, 100-199=L1, 200-299=L2)
- * - site-005-UMH-TYPE-FLOOR-ID → Extract FLOOR (B1, L1-L9, R)
  * - S012-TYPE-FLOOR-ID → Extract FLOOR (G, R)
  */
 export function extractFloorFromCode(code: string): string | null {
   if (!code) return null;
-
-  // Site-005 format: site-005-UMH-TYPE-FLOOR-ID or site-005-UMH-TYPE-FLOOR-ID.POINT
-  if (code.startsWith('site-005-UMH-')) {
-    const match = code.match(/site-005-UMH-[^-]+-([^-.]+)/);
-    if (match && match[1]) return match[1]; // B1, L1-L9, R
-  }
 
   // S012 format: S012-TYPE-FLOOR-ID or S012-TYPE-FLOOR-ID.POINT
   if (code.startsWith('S012-')) {

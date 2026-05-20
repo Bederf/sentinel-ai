@@ -29,42 +29,46 @@ function toneClasses(level: string) {
     return {
       border: 'rgba(239, 68, 68, 0.5)',
       glow: 'rgba(248, 113, 113, 0.25)',
-      text: 'text-red-300',
-      badge: 'bg-red-500/15 text-red-200',
+      text: 'var(--color-sentinel-red)',
+      badgeBg: 'rgba(239, 68, 68, 0.2)',
+      badgeColor: 'var(--color-sentinel-red)',
     }
   }
   if (level === 'approaching') {
     return {
       border: 'rgba(249, 115, 22, 0.45)',
       glow: 'rgba(251, 146, 60, 0.2)',
-      text: 'text-orange-300',
-      badge: 'bg-orange-500/15 text-orange-200',
+      text: 'var(--color-sentinel-amber)',
+      badgeBg: 'rgba(249, 115, 22, 0.2)',
+      badgeColor: 'var(--color-sentinel-amber)',
     }
   }
   if (level === 'drift') {
     return {
       border: 'rgba(251, 191, 36, 0.4)',
       glow: 'rgba(253, 230, 138, 0.16)',
-      text: 'text-amber-300',
-      badge: 'bg-amber-500/15 text-amber-200',
+      text: 'rgba(253, 230, 138, 1)',
+      badgeBg: 'rgba(251, 191, 36, 0.2)',
+      badgeColor: 'rgba(251, 191, 36, 1)',
     }
   }
   return {
     border: 'rgba(56, 189, 248, 0.35)',
     glow: 'rgba(125, 211, 252, 0.12)',
-    text: 'text-sky-300',
-    badge: 'bg-sky-500/15 text-sky-200',
+    text: 'rgba(125, 211, 252, 1)',
+    badgeBg: 'rgba(56, 189, 248, 0.2)',
+    badgeColor: 'rgba(56, 189, 248, 1)',
   }
 }
 
 function intakeBadgeClasses(severity: string) {
   if (severity === 'critical') {
-    return { bg: 'rgba(239,68,68,0.25)', color: '#fca5a5', border: 'rgba(239,68,68,0.5)' }
+    return { bg: 'rgba(239,68,68,0.25)', color: 'var(--color-sentinel-red)', border: 'rgba(239,68,68,0.5)' }
   }
   if (severity === 'high') {
-    return { bg: 'rgba(249,115,22,0.2)', color: '#fdba74', border: 'rgba(249,115,22,0.4)' }
+    return { bg: 'rgba(249,115,22,0.2)', color: 'var(--color-sentinel-amber)', border: 'rgba(249,115,22,0.4)' }
   }
-  return { bg: 'rgba(251,191,36,0.15)', color: '#fde047', border: 'rgba(251,191,36,0.35)' }
+  return { bg: 'rgba(251,191,36,0.15)', color: 'rgba(253,230,138,1)', border: 'rgba(251,191,36,0.35)' }
 }
 
 const COMPLAINT_LABELS: Record<string, string> = {
@@ -146,7 +150,13 @@ export function CockpitLiteTwin({ state }: CockpitLiteTwinProps) {
                         🔥 {intakeSignals.length} heat
                       </div>
                     )}
-                    <div className={`rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${palette.badge}`}>
+                    <div
+                        className="rounded-full px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.18em]"
+                        style={{
+                          background: palette.badgeBg,
+                          color: palette.badgeColor,
+                        }}
+                      >
                       {floor.level}
                     </div>
                   </div>

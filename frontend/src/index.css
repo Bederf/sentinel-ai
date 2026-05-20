@@ -30,20 +30,24 @@
 
   --color-sentinel-text-primary: #e6edf3;
   --color-sentinel-text-secondary: #8b949e;
-  --color-sentinel-text-disabled: #6e7681;
+  --color-sentinel-text-disabled: #7d8590;
   --color-sentinel-text-link: #58a6ff;
 
   --color-sentinel-navy: #1A2B4C;
   --color-sentinel-navy-light: #2a4a7a;
   --color-sentinel-navy-dark: #0f1a2e;
   --color-sentinel-amber: #F59E0B;
+  --color-sentinel-amber-rgb: 245, 158, 11;
   --color-sentinel-amber-light: #FBBF24;
   --color-sentinel-amber-dark: #D97706;
   --color-sentinel-green: #10B981;
+  --color-sentinel-green-rgb: 16, 185, 129;
   --color-sentinel-green-light: #34D399;
   --color-sentinel-red: #DC2626;
+  --color-sentinel-red-rgb: 220, 38, 38;
   --color-sentinel-red-light: #EF4444;
   --color-sentinel-blue: #3B82F6;
+  --color-sentinel-blue-rgb: 59, 130, 246;
   --color-sentinel-blue-light: #60A5FA;
 
   --color-grafana-bg-canvas: var(--color-sentinel-bg-canvas);
@@ -201,7 +205,7 @@
   /* Text Colors */
   --color-sentinel-text-primary: #e6edf3;
   --color-sentinel-text-secondary: #8b949e;
-  --color-sentinel-text-disabled: #6e7681;
+  --color-sentinel-text-disabled: #7d8590;
   --color-sentinel-text-link: #58a6ff;
 
   /* SENTINEL Brand Colors */
@@ -212,10 +216,12 @@
   --color-sentinel-amber-light: #FBBF24;
   --color-sentinel-amber-dark: #D97706;
   --color-sentinel-green: #10B981;
+  --color-sentinel-green-rgb: 16, 185, 129;
   --color-sentinel-green-light: #34D399;
   --color-sentinel-red: #DC2626;
   --color-sentinel-red-light: #EF4444;
   --color-sentinel-blue: #3B82F6;
+  --color-sentinel-blue-rgb: 59, 130, 246;
   --color-sentinel-blue-light: #60A5FA;
 
   /* Grafana-style aliases for backward compatibility */
@@ -290,7 +296,7 @@
   /* Text */
   --sentinel-text-primary: #e6edf3;
   --sentinel-text-secondary: #8b949e;
-  --sentinel-text-disabled: #6e7681;
+  --sentinel-text-disabled: #7d8590;
   --sentinel-text-link: #58a6ff;
   /* Brand */
   --sentinel-navy: #1A2B4C;
@@ -411,6 +417,22 @@
 
   ::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.2);
+  }
+
+  /* Focus ring — keyboard navigation only */
+  :focus-visible {
+    outline: 2px solid var(--color-sentinel-amber);
+    outline-offset: 2px;
+    border-radius: var(--sentinel-radius-xs, 2px);
+  }
+
+  /* Inputs have a border — use box-shadow ring instead of double-outline */
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: none;
+    border-color: var(--color-sentinel-amber);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-sentinel-amber) 35%, transparent);
   }
 
   /* Firefox scrollbar */
@@ -821,23 +843,23 @@
 
   /* Glow effects for status - SENTINEL colors */
   .glow-green {
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.4));
   }
 
   .glow-amber {
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+    filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.4));
   }
 
   .glow-orange {
-    box-shadow: 0 0 12px rgba(245, 158, 11, 0.4);
+    filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.4));
   }
 
   .glow-red {
-    box-shadow: 0 0 12px rgba(220, 38, 38, 0.4);
+    filter: drop-shadow(0 0 12px rgba(220, 38, 38, 0.4));
   }
 
   .glow-blue {
-    box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    filter: drop-shadow(0 0 12px rgba(59, 130, 246, 0.4));
   }
 
   /* SENTINEL Shield indicator */
@@ -914,6 +936,7 @@
     pointer-events: none;
     z-index: 9999;
     opacity: 0.03;
+    will-change: transform;
   }
 
   /* Matrix label - Terminal-style text */
@@ -976,15 +999,20 @@
     letter-spacing: 0.1em;
     text-transform: uppercase;
     cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
+    transition: transform 0.2s ease, filter 0.2s ease;
     border-radius: 0;
+    box-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
   }
 
   .matrix-btn:hover {
     background: rgba(0, 255, 65, 0.1);
+    transform: scale(1.02);
     box-shadow: 0 0 16px rgba(0, 255, 65, 0.5), inset 0 0 8px rgba(0, 255, 65, 0.1);
     text-shadow: 0 0 8px var(--color-matrix-green);
+  }
+
+  .matrix-btn:hover svg {
+    filter: brightness(1.15);
   }
 
   .matrix-btn-active {
@@ -1172,6 +1200,15 @@
     box-shadow: var(--glass-shadow);
   }
 
+  /* Flat panel variant — no blur, for dense settings/data views */
+  .glass-panel.flat,
+  .glass-panel[data-variant="flat"] {
+    background: var(--sentinel-bg-panel, var(--color-sentinel-bg-panel));
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none;
+  }
+
   .glass-card {
     position: relative;
     background: var(--glass-bg);
@@ -1180,7 +1217,7 @@
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-glass);
     box-shadow: var(--glass-shadow);
-    transition: all 0.2s ease;
+    transition: background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   }
 
   /* Inner highlight line at top of glass cards */
@@ -1274,8 +1311,9 @@
 /* Mobile: reduced blur for glass performance */
 @media (max-width: 768px) {
   .glass, .glass-card, .glass-panel {
-    backdrop-filter: blur(var(--glass-blur-sm)) saturate(150%);
-    -webkit-backdrop-filter: blur(var(--glass-blur-sm)) saturate(150%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--glass-bg-heavy);
   }
 }
 
@@ -1371,4 +1409,23 @@
 /* Concierge map: match browser-tuned Cytoscape selectbox alignment */
 .concierge-cytoscape-map canvas[data-id="layer0-selectbox"] {
   top: 1px;
+}
+
+/* ─── Reduced Motion (a11y) ────────────────────────────────── */
+/* WCAG 2.1 SC 2.3.3 — kill decorative pulse/glow animations when the user
+ * has reduced-motion set. Per-keyframe disable is more surgical than the
+ * blanket `* { animation: none }` reset (which would also break loaders).
+ */
+@media (prefers-reduced-motion: reduce) {
+  .pulse-live,
+  .pulse-slow,
+  .matrix-pulse,
+  .matrix-alert {
+    animation: none !important;
+  }
+  /* Keep loaders rotating but slow them down (functional, not decorative) */
+  .spin,
+  .skeleton {
+    animation-duration: 3s !important;
+  }
 }

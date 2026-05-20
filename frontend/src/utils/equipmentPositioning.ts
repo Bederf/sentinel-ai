@@ -2,9 +2,8 @@
  * Equipment positioning algorithms for Digital Twin visualization
  *
  * Provides zone-grid-based distribution of equipment within building zones.
- * S002 equipment codes encode floor in the zone number:
- *   001-099 = L0 (Ground), 100-199 = L1, 200-299 = L2
- * Plant equipment has explicit floor markers: S002-CHILLER-B1-001
+ * Supports office (S002: 001-099 per floor) and hospital (S005: 001-099 single floor)
+ * formats. Zone count per floor is derived dynamically from equipment codes.
  */
 
 import type { Equipment } from '@/lib/api/sites';
@@ -31,9 +30,9 @@ const BUILDING_MIN_X = -14;
 const BUILDING_MAX_X = 14;
 const BUILDING_MIN_Z = -9;
 const BUILDING_MAX_Z = 9;
-const ZONE_COUNT_PER_FLOOR = 5;
-const ZONE_STRIP_WIDTH = (BUILDING_MAX_X - BUILDING_MIN_X) / ZONE_COUNT_PER_FLOOR;
+const MAX_ZONES_PER_FLOOR = 99; // Supports hospital-scale: 001-099 per floor
 const PLANT_ZONE_SUFFIX = 'plant';
+const ZONE_STRIP_COUNT = 5; // visual columns across building width
 
 function normalizeFloorCode(floor: string): string {
   return floor === 'G' ? 'L0' : floor;
@@ -57,11 +56,66 @@ function fullFloorBounds(): ZoneBounds {
   };
 }
 
-function normalizeZoneIndex(rawZone: number): number {
-  if (!Number.isFinite(rawZone)) return 1;
-  const lastDigit = Math.abs(rawZone) % 10;
-  if (lastDigit === 0) return ZONE_COUNT_PER_FLOOR;
-  return ((lastDigit - 1) % ZONE_COUNT_PER_FLOOR) + 1;
+/**
+ * Resolve the effective zone count for each floor from equipment codes.
+ * Used to generate the correct number of zone strips per floor dynamically.
+ */
+export function resolveMaxZonePerFloor(equipment: Equipment[]): Record<string, number> {
+  const maxZones: Record<string, number> = {};
+  for (const eq of equipment) {
+    const code = ((eq as { code?: string }).code || eq.id || '').toString();
+    const floor = normalizeFloorCode(extractFloor(code));
+    const zoneNum = extractZoneNumberFromCode(code);
+    if (floor && zoneNum > 0) {
+      const current = maxZones[floor] ?? 0;
+      if (zoneNum > current) maxZones[floor] = zoneNum;
+    }
+  }
+  return maxZones;
+}
+
+/**
+ * Extract floor-relative zone index from equipment code.
+ * Supports:
+ *   Office:     S002-AHU-204  → zone 4 (floor 2, zone 4)
+ *   Hospital:   S005-AHU-L1-042 → zone 42 (floor L1, zone 42)
+ *   Plant:      S002-CHILLER-B1-001 → 1
+ */
+export function extractZoneNumberFromCode(code: string): number {
+  if (!code) return 0;
+
+  // Hospital format: S{hospital}-TYPE-{floor}-{zone} e.g. S005-AHU-L1-042
+  // Matches the last numeric segment after a floor identifier
+  const hospitalMatch = code.match(/-(L\d+|B\d+|G|R)-(\d+)$/i);
+  if (hospitalMatch) {
+    return Math.min(parseInt(hospitalMatch[2], 10), MAX_ZONES_PER_FLOOR);
+  }
+
+  // Office format: S002-TYPE-204 or S002-TYPE-015
+  // 3-digit office: 200-299 → floor encoded in hundreds, zone = last 2 digits
+  // 3-digit office: 100-199 → direct zone 1-99 (no floor encoding)
+  // 2-digit office: 01-99 → direct zone 1-99
+  const parts = code.split('-');
+  if (parts.length >= 3) {
+    const thirdPart = parseInt(parts[2], 10);
+    if (!isNaN(thirdPart) && thirdPart > 0) {
+      if (thirdPart >= 200 && thirdPart <= 299) {
+        return Math.min(thirdPart % 100, MAX_ZONES_PER_FLOOR);
+      }
+      if (thirdPart >= 100 && thirdPart <= 199) {
+        return Math.min(thirdPart % 100 || 100, MAX_ZONES_PER_FLOOR);
+      }
+      return Math.min(thirdPart, MAX_ZONES_PER_FLOOR);
+    }
+  }
+
+  // Last numeric segment fallback
+  const numMatch = code.match(/-(\d+)$/);
+  if (numMatch) {
+    return Math.min(parseInt(numMatch[1], 10), MAX_ZONES_PER_FLOOR);
+  }
+
+  return 0;
 }
 
 function zoneIndexFromLetter(letter: string): number | null {
@@ -72,73 +126,36 @@ function zoneIndexFromLetter(letter: string): number | null {
 
 /**
  * Extract floor code from equipment code.
- * Delegates to floorExtraction.ts which handles:
- *   S002-VAV-204    → zone 204 → L2
- *   S002-CHILLER-B1-001 → B1
- *   S002-INV-R-002  → R
  */
 export function extractFloor(code: string): string {
   return extractFloorFromCode(code) || 'L0';
 }
 
 /**
- * Extract the zone number from an S002 equipment code.
- * Returns the floor-relative zone index (0-based within that floor).
- *
- * Examples:
- *   S002-VAV-204       → zone 204, floor-relative = 4
- *   S002-LUM-101-08    → zone 101, floor-relative = 1
- *   S002-FCU-015       → zone 15,  floor-relative = 15
- *   S002-CHILLER-B1-001 → seq 1,   floor-relative = 1
- *   S002-DALI-001      → 1,        floor-relative = 1
+ * Extract the zone number from equipment code.
  */
 export function extractZoneNumber(code: string): number {
-  if (!code) return 0;
-
-  // S002-TYPE-ZONE or S002-TYPE-ZONE-FIXTURE
-  // The zone number is always the 3rd segment for S002
-  const parts = code.split('-');
-  if (parts.length >= 3 && parts[0] === 'S002') {
-    // Check if 3rd part is a number (zone-based equipment)
-    const thirdPart = parseInt(parts[2], 10);
-    if (!isNaN(thirdPart)) {
-      return normalizeZoneIndex(thirdPart);
-    }
-
-    // Plant equipment: S002-TYPE-FLOOR-SEQ (e.g., S002-CHILLER-B1-001)
-    // Use the sequence number as zone
-    if (parts.length >= 4) {
-      const fourthPart = parseInt(parts[3], 10);
-      if (!isNaN(fourthPart)) return normalizeZoneIndex(fourthPart);
-    }
-  }
-
-  // Fallback: last numeric segment
-  const numMatch = code.match(/-(\d+)$/);
-  if (numMatch) return normalizeZoneIndex(parseInt(numMatch[1], 10));
-
-  return 0;
+  return extractZoneNumberFromCode(code);
 }
 
 /**
  * Build a zone key for grouping equipment.
  * Returns "Zone-{floor}-{zoneNum}" for zone-grid placement.
  */
-export function buildZoneKey(code: string): string {
+export function buildZoneKey(equipment: Equipment): string {
+  if ((equipment as any).zone_key) {
+    return (equipment as any).zone_key;
+  }
+
+  const code = ((equipment as { code?: string }).code || equipment.id || '').toString();
   const floor = normalizeFloorCode(extractFloor(code));
   if (isPlantFloor(floor)) {
     return `Zone-${floor}-${PLANT_ZONE_SUFFIX}`;
   }
 
-  const zoneNum = extractZoneNumber(code);
+  const zoneNum = extractZoneNumberFromCode(code);
   return `Zone-${floor}-${zoneNum}`;
 }
-
-// Keep backward compat export
-export const extractZoneLetter = (code: string): string => {
-  const zoneNum = extractZoneNumber(code);
-  return String(zoneNum);
-};
 
 /**
  * Clamp value to [min, max] range
@@ -149,12 +166,10 @@ export function clamp(val: number, min: number, max: number): number {
 
 /**
  * Add seeded jitter based on zone number for deterministic placement.
- * Uses a simple hash so positions don't jump on re-render.
  */
 export function addJitter(value: number, maxJitterPercent: number = 0.1, seed: number = 0): number {
-  // Simple seeded pseudo-random
   const hash = Math.sin(seed * 9301 + 49297) * 49297;
-  const rand = hash - Math.floor(hash); // 0..1
+  const rand = hash - Math.floor(hash);
   const jitterAmount = Math.abs(value) * maxJitterPercent;
   return value + (rand - 0.5) * 2 * jitterAmount;
 }
@@ -195,7 +210,6 @@ export function distributeEquipmentInZone(
 
   if (count === 0) return positions;
 
-  // Single item → place at zone center
   if (count === 1) {
     positions.set(equipment[0].id, {
       x: zoneBounds.centerX,
@@ -211,7 +225,6 @@ export function distributeEquipmentInZone(
     return codeA.localeCompare(codeB);
   });
 
-  // Multiple items → adaptive grid that fills the full zone rectangle.
   const aspectRatio = zoneBounds.width / Math.max(zoneBounds.depth, 0.01);
   const cols = Math.max(1, Math.ceil(Math.sqrt(count * aspectRatio)));
   const rows = Math.max(1, Math.ceil(count / cols));
@@ -232,7 +245,6 @@ export function distributeEquipmentInZone(
     let x = startX + col * spacingX;
     let z = startZ + row * spacingZ;
 
-    // Seeded jitter for deterministic placement
     x = addJitter(x, 0.03, idx * 7 + 1);
     z = addJitter(z, 0.03, idx * 13 + 3);
 
@@ -245,10 +257,16 @@ export function distributeEquipmentInZone(
   return positions;
 }
 
-function makeZoneBounds(zoneIndex: number): ZoneBounds {
-  const normalizedZoneIndex = Math.min(Math.max(zoneIndex, 1), ZONE_COUNT_PER_FLOOR);
-  const minX = BUILDING_MIN_X + (normalizedZoneIndex - 1) * ZONE_STRIP_WIDTH;
-  const maxX = minX + ZONE_STRIP_WIDTH;
+/**
+ * Make zone bounds for a single zone strip within a floor.
+ * Zones are laid out in ZONE_STRIP_COUNT columns × auto rows grid.
+ */
+function makeZoneBounds(zoneIndex: number, maxZones: number): ZoneBounds {
+  const stripsX = ZONE_STRIP_COUNT;
+  const stripWidth = (BUILDING_MAX_X - BUILDING_MIN_X) / stripsX;
+  const stripIndex = (zoneIndex - 1) % stripsX;
+  const minX = BUILDING_MIN_X + stripIndex * stripWidth;
+  const maxX = minX + stripWidth;
   return {
     minX,
     maxX,
@@ -256,17 +274,20 @@ function makeZoneBounds(zoneIndex: number): ZoneBounds {
     maxZ: BUILDING_MAX_Z,
     centerX: (minX + maxX) / 2,
     centerZ: (BUILDING_MIN_Z + BUILDING_MAX_Z) / 2,
-    width: ZONE_STRIP_WIDTH,
+    width: stripWidth,
     depth: BUILDING_MAX_Z - BUILDING_MIN_Z,
   };
 }
 
 /**
  * Generate synthetic zone bounds for a floor.
- * Non-plant floors are split into 5 full-depth strips across the 28m × 18m floor plate.
+ * Non-plant floors are split into zone strips — zone count derived from equipment.
  * Plant floors (B1/R) share the full floor area for all equipment.
  */
-export function generateSyntheticZoneBounds(floorCode: string): Record<string, ZoneBounds> {
+export function generateSyntheticZoneBounds(
+  floorCode: string,
+  maxZonesPerFloor: number = MAX_ZONES_PER_FLOOR
+): Record<string, ZoneBounds> {
   const normalizedFloor = normalizeFloorCode(floorCode);
   const bounds: Record<string, ZoneBounds> = {};
 
@@ -275,8 +296,9 @@ export function generateSyntheticZoneBounds(floorCode: string): Record<string, Z
     return bounds;
   }
 
-  for (let zoneIndex = 1; zoneIndex <= ZONE_COUNT_PER_FLOOR; zoneIndex++) {
-    bounds[`Zone-${normalizedFloor}-${zoneIndex}`] = makeZoneBounds(zoneIndex);
+  const effectiveMax = Math.max(1, Math.min(maxZonesPerFloor, MAX_ZONES_PER_FLOOR));
+  for (let zoneIndex = 1; zoneIndex <= effectiveMax; zoneIndex++) {
+    bounds[`Zone-${normalizedFloor}-${zoneIndex}`] = makeZoneBounds(zoneIndex, effectiveMax);
   }
 
   return bounds;
@@ -301,28 +323,12 @@ export function normalizeDeskZoneKey(zoneId: string, floorHint?: string | number
   }
 
   const numericMatches = rawZoneId?.match(/\d+/g);
-  const lastNumeric = numericMatches?.length ? parseInt(numericMatches[numericMatches.length - 1], 10) : NaN;
-  if (!Number.isNaN(lastNumeric)) {
-    return `Zone-${floor}-${normalizeZoneIndex(lastNumeric)}`;
+  if (numericMatches) {
+    const last = parseInt(numericMatches[numericMatches.length - 1], 10);
+    if (!isNaN(last)) {
+      return `Zone-${floor}-${last}`;
+    }
   }
 
   return null;
-}
-
-/**
- * Helper: convert equipment position map to array format
- */
-export function positionsToArray(positions: Map<string, EquipmentPosition>): Array<[string, EquipmentPosition]> {
-  return Array.from(positions);
-}
-
-/**
- * Helper: get position for single equipment, with fallback
- */
-export function getEquipmentPositionWithFallback(
-  equipment: Equipment,
-  positions: Map<string, EquipmentPosition>,
-  fallbackPosition: EquipmentPosition
-): EquipmentPosition {
-  return positions.get(equipment.id) || fallbackPosition;
 }

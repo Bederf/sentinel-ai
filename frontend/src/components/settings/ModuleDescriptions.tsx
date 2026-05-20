@@ -30,7 +30,7 @@ export function ModuleDescriptions({ onError }: ModuleDescriptionsProps) {
 
   if (loading) {
     return (
-      <div className="glass-panel overflow-hidden">
+      <div className="glass-panel flat overflow-hidden">
         <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
           <div className="flex items-center gap-3">
             <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }}>
@@ -49,7 +49,7 @@ export function ModuleDescriptions({ onError }: ModuleDescriptionsProps) {
   if (!modules.length) return null;
 
   return (
-    <div className="glass-panel overflow-hidden">
+    <div className="glass-panel flat overflow-hidden">
       <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }}>

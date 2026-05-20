@@ -34,6 +34,7 @@ import {
   distributeEquipmentInZone,
   extractFloor,
   generateSyntheticZoneBounds,
+  resolveMaxZonePerFloor,
   type EquipmentPosition,
 } from '@/utils/equipmentPositioning';
 import {
@@ -336,8 +337,10 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
       });
     }
 
+    const maxZonesByFloor = resolveMaxZonePerFloor(filteredEquipment);
     floorsNeeded.forEach((floor) => {
-      Object.assign(mergedBounds, generateSyntheticZoneBounds(floor));
+      const maxZones = maxZonesByFloor[floor] ?? 5;
+      Object.assign(mergedBounds, generateSyntheticZoneBounds(floor, maxZones));
     });
 
     return mergedBounds;
@@ -369,8 +372,7 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
       // Group by zone key
       const byZone: Record<string, typeof needsAlgorithmic> = {};
       needsAlgorithmic.forEach((eq) => {
-        const code = (eq as any).code || eq.id || '';
-        const zoneKey = buildZoneKey(code);
+        const zoneKey = buildZoneKey(eq);
 
         if (!byZone[zoneKey]) byZone[zoneKey] = [];
         byZone[zoneKey].push(eq);

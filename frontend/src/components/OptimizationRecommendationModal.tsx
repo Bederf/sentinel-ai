@@ -55,9 +55,9 @@ function formatConfidence(confidence: number): string {
  */
 function getConfidenceColor(confidence: number): string {
   const pct = confidence <= 1 ? confidence * 100 : confidence;
-  if (pct >= 80) return "text-green-400";
-  if (pct >= 60) return "text-yellow-400";
-  return "text-orange-400";
+  if (pct >= 80) return "var(--color-sentinel-green)";
+  if (pct >= 60) return "var(--color-sentinel-amber)";
+  return "var(--color-sentinel-red)";
 }
 
 /**
@@ -270,7 +270,7 @@ export function OptimizationRecommendationModal({
                 </div>
                 <div className="flex items-center gap-1">
                   <span>Confidence:</span>
-                  <span className={`font-semibold ${confidenceColor}`}>
+                  <span style={{ color: confidenceColor }}>
                     {formatConfidence(recommendation.confidence)}
                   </span>
                 </div>

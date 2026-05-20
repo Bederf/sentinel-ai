@@ -2338,7 +2338,7 @@ export const api = {
 
     for (const eq of response.equipment) {
       // Derive site_id from equipment code prefix
-      // e.g., "S002-..." -> "site-002", "site-005-..." -> "site-005"
+      // e.g., "S002-..." -> "site-002"
       const codeParts = eq.code.split("-");
       let siteIdFromCode = "";
       if (codeParts[0].toLowerCase() === "site" && codeParts.length >= 2) {
@@ -5448,7 +5448,21 @@ export const spaceApi = {
   async getFocusAnalytics(siteId: string): Promise<FocusAnalytics> {
     return fetchApi<FocusAnalytics>(`/api/space/focus-analytics?site_id=${encodeURIComponent(siteId)}`);
   },
+
+  /** Get current occupancy state per room from mmWave nodes */
+  async getRoomOccupancy(siteId: string, roomCode?: string): Promise<RoomOccupancyStatus[]> {
+    const params = new URLSearchParams({ site_id: siteId });
+    if (roomCode) params.set("room_code", roomCode);
+    return fetchApi<RoomOccupancyStatus[]>(`/api/space/room-occupancy?${params}`);
+  },
 };
+
+export interface RoomOccupancyStatus {
+  room_code: string;
+  sensor_id: string;
+  occupied: boolean;
+  last_seen: string;
+}
 
 export const fuelApi = {
   /** List fuel tanks with latest telemetry */

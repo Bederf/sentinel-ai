@@ -349,7 +349,7 @@ class SolarDemandService:
         Falls back to NMD_LIMIT_KVA constant if not found in database.
 
         Args:
-            site_id: Building/site code (e.g., "S002", "site-005")
+            site_id: Building/site code (e.g., "S002", "site-003")
 
         Returns:
             NMD limit in kVA from database or fallback constant

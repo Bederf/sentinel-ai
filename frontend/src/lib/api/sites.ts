@@ -16,9 +16,10 @@ export interface Site {
   address?: string;
   type?: string;
   status: "draft" | "active" | "archived";
-  gps_lat?: number;
-  gps_lon?: number;
+  latitude?: number | null;
+  longitude?: number | null;
   square_meters?: number;
+  orientation_degrees?: number | null;
   created_at: string;
 }
 
@@ -32,6 +33,7 @@ export interface Equipment {
   installation_date?: string;
   health_score: number;
   status: string;
+  zone_key?: string; // Normalized zone identifier (e.g., Zone-L1-1 for office, Zone-L3-ICU for hospital)
 }
 
 export interface BuildingEquipmentResponse {

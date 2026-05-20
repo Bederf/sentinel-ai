@@ -392,6 +392,8 @@ class NotificationService:
         alert_level: AlertLevel = AlertLevel.WARNING,
         reference_id: str | None = None,
         acknowledgement_timeout_minutes: int = 15,
+        action_label: str = "✅ Acknowledged",
+        callback_action: str = "ack",
     ) -> dict:
         """Send a certified notification requiring Telegram acknowledgement.
 
@@ -424,16 +426,19 @@ class NotificationService:
         # Build inline keyboard with acknowledgement button
         from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
-        keyboard = InlineKeyboard(
-            rows=[[InlineButton(label="✅ Acknowledged", callback_data=f"ack:{notification_id}:{reference_id or ''}")]]
-        )
+        if callback_action == "ack":
+            callback_data = f"ack:{notification_id}:{reference_id or ''}"
+        else:
+            callback_data = f"{callback_action}:{reference_id or notification_id}"
+
+        keyboard = InlineKeyboard(rows=[[InlineButton(label=action_label, callback_data=callback_data)]])
 
         # Send via Telegram sender (supports inline keyboard)
         sender = get_telegram_sender()
         try:
             result = await sender.send_text(
                 chat_id=recipient_telegram_id,
-                text=f"*{title}*\n\n{message}",
+                text=f"<b>{title}</b>\n\n{message}",
                 keyboard=keyboard,
             )
             msg_id = result.get("result", {}).get("message_id") if result.get("ok") else None
@@ -480,6 +485,325 @@ class NotificationService:
             "notification_id": notification_id,
             "error": None if msg_id else "send_failed",
         }
+
+    async def handle_work_order_request(
+        self,
+        callback_data: str,
+        requested_by_telegram_id: str,
+    ) -> dict:
+        """Create a work order from an AI optimization recommendation callback."""
+        parts = callback_data.split(":", 1)
+        if len(parts) != 2 or parts[0] != "wo" or not parts[1]:
+            return {"success": False, "error": "invalid_callback_data"}
+
+        recommendation_id = parts[1]
+
+        try:
+            from app.database.repositories.recommendation_repository import get_recommendation_repository
+            from app.database.repositories.work_order_repository import get_work_order_repository
+            from app.models.recommendation import RecommendationStatus
+
+            rec_repo = get_recommendation_repository()
+            work_order_repo = get_work_order_repository()
+            rec = await rec_repo.get(recommendation_id)
+            if not rec:
+                return {"success": False, "error": "recommendation_not_found", "recommendation_id": recommendation_id}
+
+            try:
+                from app.database.supabase_client import get_supabase_client
+                from app.models.onboarding_phase import phase_allows
+                from app.models.module_registry import ModuleType
+                from app.services.module_registry_service import module_registry
+
+                try:
+                    sb = get_supabase_client()
+                    phase_result = sb.table("sites").select("onboarding_phase").eq("code", rec.site_id).limit(1).execute()
+                    site_phase = (
+                        phase_result.data[0].get("onboarding_phase") or "commissioning"
+                    ) if phase_result.data else "commissioning"
+                except Exception:
+                    site_phase = "commissioning"
+
+                if not phase_allows(site_phase, "recommendations_ui"):
+                    return {
+                        "success": False,
+                        "error": "recommendations_not_visible_in_phase",
+                        "recommendation_id": recommendation_id,
+                        "site_id": rec.site_id,
+                        "phase": site_phase,
+                    }
+
+                if not module_registry.is_module_active(rec.site_id, ModuleType.MAINTENANCE):
+                    return {
+                        "success": False,
+                        "error": "maintenance_module_inactive",
+                        "recommendation_id": recommendation_id,
+                        "site_id": rec.site_id,
+                    }
+            except Exception as gate_err:
+                logger.warning("[CERTIFIED] Maintenance module gate failed for %s: %s", rec.site_id, gate_err)
+                return {
+                    "success": False,
+                    "error": "maintenance_module_gate_failed",
+                    "recommendation_id": recommendation_id,
+                    "site_id": rec.site_id,
+                }
+
+            equipment_code = rec.target_equipment
+            if equipment_code:
+                open_wos = await work_order_repo.get_open_work_orders_for_equipment(equipment_code)
+                if open_wos:
+                    return {
+                        "success": True,
+                        "action": "open_work_order_exists",
+                        "recommendation_id": recommendation_id,
+                        "work_order": open_wos[0],
+                    }
+
+            action = rec.action or {}
+            impact = rec.expected_impact or {}
+            point = action.get("point") or "recommended adjustment"
+            value = action.get("value")
+            unit = impact.get("unit") or ""
+            current_value = impact.get("current_value")
+            recommended_value = impact.get("recommended_value", value)
+            current_line = (
+                f"Current value: {current_value}{unit}\n"
+                if current_value is not None
+                else ""
+            )
+
+            description = (
+                f"Created from SENTINEL AI advisory recommendation {recommendation_id}.\n\n"
+                f"Equipment: {equipment_code or 'Unknown'}\n"
+                f"Action: Set {point} to {recommended_value}{unit}\n"
+                f"{current_line}"
+                f"Goal: {(rec.profile or 'optimization').replace('_', ' ').title()}\n"
+                f"Confidence: {round((rec.confidence_score or rec.get_numeric_confidence()) * 100)}%\n\n"
+                f"Reason:\n{rec.reason}"
+            )
+
+            created_wo = await work_order_repo.create_work_order(
+                {
+                    "title": f"SENTINEL Advisory Action: {equipment_code or 'Equipment'}",
+                    "description": description,
+                    "priority": "medium",
+                    "status": "scheduled",
+                    "equipment_code": equipment_code,
+                    "site_id": rec.site_id,
+                    "created_by": "SENTINEL_AI_RECOMMENDATION",
+                    "milestone_status": "assigned",
+                    "estimated_duration_hours": 1,
+                }
+            )
+
+            if not created_wo:
+                return {"success": False, "error": "work_order_create_failed", "recommendation_id": recommendation_id}
+
+            rec.status = RecommendationStatus.APPROVED
+            rec.approved_by = f"telegram:{requested_by_telegram_id}"
+            rec.approved_at = datetime.utcnow()
+            rec.approval_reason = f"Work order created from Telegram advisory button: {created_wo.get('code')}"
+            rec.external_ticket_id = created_wo.get("code")
+            try:
+                await rec_repo.update(recommendation_id, rec)
+            except Exception as update_err:
+                logger.warning("[CERTIFIED] Work order created but recommendation update failed: %s", update_err)
+
+            logger.info(
+                "[CERTIFIED] Work order %s created from recommendation %s by %s",
+                created_wo.get("code"),
+                recommendation_id,
+                requested_by_telegram_id,
+            )
+            return {
+                "success": True,
+                "action": "work_order_created",
+                "recommendation_id": recommendation_id,
+                "work_order": created_wo,
+            }
+        except Exception as e:
+            logger.warning("[CERTIFIED] Failed to create work order from %s: %s", recommendation_id, e)
+            return {"success": False, "error": str(e), "recommendation_id": recommendation_id}
+
+    async def handle_prediction_work_order_request(
+        self,
+        callback_data: str,
+        prediction_id: str,
+        requested_by_telegram_id: str,
+    ) -> dict:
+        """Create a work order from a prediction Telegram notification button press.
+
+        Uses the workflow trigger engine (on_prediction_critical) to create
+        the work order, which handles dedup against existing open work orders.
+        """
+        from uuid import UUID as _UUID
+
+        try:
+            from app.database.repositories.prediction_repository import get_prediction_repository
+            from app.services.workflow_triggers import get_trigger_engine
+
+            pred_repo = get_prediction_repository()
+            prediction = pred_repo.get_by_id(prediction_id)
+
+            if not prediction:
+                return {"success": False, "error": "prediction_not_found", "prediction_id": prediction_id}
+
+            # Get equipment
+            equipment_id = prediction.get("equipment_id")
+            equipment_code = None
+            equipment_health = 50
+
+            if equipment_id:
+                from app.database.repositories.equipment_repository import get_equipment_repository
+
+                eq_repo = get_equipment_repository()
+                equipment = eq_repo.get_by_uuid(equipment_id)
+                if equipment:
+                    equipment_code = equipment.get("code")
+                    equipment_health = equipment.get("health_score", 50)
+
+            # Get site_id from prediction
+            site_id = prediction.get("site_id")
+            if not site_id and equipment:
+                site_id = equipment.get("site_id")
+
+            # Gate check: maintenance module must be active
+            try:
+                from app.database.supabase_client import get_supabase_client
+                from app.models.onboarding_phase import phase_allows
+                from app.models.module_registry import ModuleType
+                from app.services.module_registry_service import module_registry
+
+                try:
+                    sb = get_supabase_client()
+                    phase_result = sb.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+                    site_phase = (phase_result.data[0].get("onboarding_phase") or "commissioning") if phase_result.data else "commissioning"
+                except Exception:
+                    site_phase = "commissioning"
+
+                if not phase_allows(site_phase, "recommendations_ui"):
+                    return {
+                        "success": False,
+                        "error": "recommendations_not_visible_in_phase",
+                        "prediction_id": prediction_id,
+                        "site_id": site_id,
+                        "phase": site_phase,
+                    }
+
+                if not module_registry.is_module_active(site_id, ModuleType.MAINTENANCE):
+                    return {
+                        "success": False,
+                        "error": "maintenance_module_inactive",
+                        "prediction_id": prediction_id,
+                        "site_id": site_id,
+                    }
+            except Exception as gate_err:
+                logger.warning("[PRED-WO] Maintenance module gate failed for %s: %s", site_id, gate_err)
+                return {
+                    "success": False,
+                    "error": "maintenance_module_gate_failed",
+                    "prediction_id": prediction_id,
+                    "site_id": site_id,
+                }
+
+            # Build prediction dict for trigger engine
+            prediction_dict = {
+                "id": prediction.get("id"),
+                "code": prediction.get("code"),
+                "prediction_type": prediction.get("prediction_type"),
+                "probability_percent": prediction.get("probability_percent", 0),
+                "severity": prediction.get("severity"),
+                "recommended_action": prediction.get("recommended_action", ""),
+                "site_id": site_id,
+            }
+
+            # Use the workflow trigger engine (same path as auto-trigger for critical predictions)
+            engine = get_trigger_engine()
+            result = await engine.on_prediction_critical(
+                equipment_id=equipment_id or "",
+                prediction_id=str(prediction.get("id", "")),
+                prediction_code=prediction.get("code", ""),
+                health_score=equipment_health,
+                probability_percent=prediction.get("probability_percent", 0),
+                equipment_code=equipment_code,
+            )
+
+            if result.success:
+                created_wo = None
+                if result.action_taken in ("created_work_order", "open_work_order_exists"):
+                    # Extract work order info from result details
+                    wo_id = result.details.get("work_order_id")
+                    wo_code = result.details.get("work_order_code")
+                    if wo_id:
+                        from app.database.repositories.work_order_repository import get_work_order_repository
+                        wo_repo = get_work_order_repository()
+                        created_wo = wo_repo.get_by_id(wo_id)
+                    if not created_wo and wo_code:
+                        created_wo = {"code": wo_code, "id": wo_id}
+
+                return {
+                    "success": True,
+                    "action": result.action_taken,
+                    "prediction_id": prediction_id,
+                    "work_order": created_wo,
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.action_taken or "trigger_failed",
+                    "prediction_id": prediction_id,
+                }
+
+        except Exception as e:
+            logger.warning("[PRED-WO] Failed to create work order from prediction %s: %s", prediction_id, e)
+            return {"success": False, "error": str(e), "prediction_id": prediction_id}
+
+    async def handle_prediction_acknowledge(
+        self,
+        callback_data: str,
+        acknowledged_by_telegram_id: str,
+    ) -> dict:
+        """Handle [✅ Acknowledge] button press from a prediction Telegram notification.
+
+        Records acknowledgement in notification_delivery_log and decision memory.
+        """
+        parts = callback_data.split(":")
+        if len(parts) < 2 or parts[0] != "pred_ack":
+            return {"success": False, "error": "invalid_callback_data"}
+
+        prediction_id = parts[1]
+
+        try:
+            # Log acknowledgement
+            await self.notification_repo.update_delivery_log_acknowledged(
+                notification_id=prediction_id,
+                acknowledged_by=acknowledged_by_telegram_id,
+                acknowledged_at=datetime.utcnow(),
+            )
+
+            # Record in decision memory
+            if prediction_id:
+                try:
+                    from app.services.decision_memory_service import get_decision_memory_service
+
+                    dm = get_decision_memory_service()
+                    await dm.record_decision(
+                        equipment_id=None,
+                        action="telegram_prediction_acknowledgement",
+                        reason="Prediction acknowledged via Telegram button",
+                        outcome_record={
+                            "acknowledged_by": acknowledged_by_telegram_id,
+                            "prediction_id": prediction_id,
+                        },
+                    )
+                except Exception:
+                    pass  # Decision memory is best-effort
+
+            return {"success": True, "prediction_id": prediction_id}
+        except Exception as e:
+            logger.warning("[PRED-ACK] Failed to acknowledge prediction %s: %s", prediction_id, e)
+            return {"success": False, "error": str(e), "prediction_id": prediction_id}
 
     async def handle_acknowledgement(
         self,

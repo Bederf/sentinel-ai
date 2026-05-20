@@ -6,7 +6,7 @@
         "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -20,9 +20,9 @@
   "links": [],
   "panels": [
     {
-      "title": "MCP Security Overview (1h)",
+      "title": "MCP Security Overview — 1h",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -33,14 +33,35 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
           "thresholds": {
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 20 }
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 20 }
             ]
+          },
+          "unit": "none",
+          "decimals": 0,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.15)"
           }
         }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
       }
     },
     {
@@ -74,8 +95,21 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 2, "fillOpacity": 20 },
-          "color": { "mode": "palette-classic" }
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 10 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     },
@@ -110,8 +144,21 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 2, "fillOpacity": 20 },
-          "color": { "fixedColor": "red", "mode": "fixed" }
+          "color": { "fixedColor": "#ef4444", "mode": "fixed" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 2 },
+              { "color": "#ef4444", "value": 5 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     },
@@ -146,8 +193,21 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 2, "fillOpacity": 20 },
-          "color": { "fixedColor": "orange", "mode": "fixed" }
+          "color": { "fixedColor": "#f59e0b", "mode": "fixed" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 3 },
+              { "color": "#ef4444", "value": 5 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     },
@@ -182,13 +242,26 @@
       },
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 2, "fillOpacity": 20 },
-          "color": { "fixedColor": "purple", "mode": "fixed" }
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 1 },
+              { "color": "#ef4444", "value": 3 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     },
     {
-      "title": "Tool Calls by Category (5m)",
+      "title": "Tool Calls by Category — 5m",
       "type": "piechart",
       "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
@@ -208,7 +281,18 @@
           "legendFormat": "High Risk",
           "refId": "C"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "unit": "none",
+          "decimals": 0
+        }
+      },
+      "options": {
+        "legend": { "displayMode": "list", "placement": "right", "showLegend": true },
+        "tooltip": { "mode": "single", "sort": "none" }
+      }
     },
     {
       "title": "I2 Host/Origin Rejections",
@@ -224,8 +308,21 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 2, "fillOpacity": 20 },
-          "color": { "fixedColor": "dark-red", "mode": "fixed" }
+          "color": { "fixedColor": "#ef4444", "mode": "fixed" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 1 },
+              { "color": "#ef4444", "value": 5 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     },
@@ -243,8 +340,21 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "custom": { "lineWidth": 2, "fillOpacity": 20 },
-          "color": { "fixedColor": "yellow", "mode": "fixed" }
+          "color": { "fixedColor": "#f59e0b", "mode": "fixed" },
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 20
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 1 },
+              { "color": "#ef4444", "value": 5 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     }
@@ -255,7 +365,12 @@
   "time": { "from": "now-1h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SIMBIOT MCP Security Alerts",
+  "title": "SIMBIOT — MCP Security",
   "uid": "mcp-security-alerts",
-  "version": 1
+  "version": 2,
+  "weekStart": "",
+  "refresh": "30s",
+  "style": "dark",
+  "links": [],
+  "fiscalYearStartMonth": 0
 }

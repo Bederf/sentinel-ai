@@ -6,7 +6,7 @@
         "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -35,13 +35,16 @@
         "showTime": true,
         "sortOrder": "Descending",
         "enableLogDetails": true,
-        "dedupStrategy": "none"
+        "dedupStrategy": "none",
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "showLabels": true
       }
     },
     {
-      "title": "Slow Query Count by Repository (24h)",
+      "title": "Slow Query Count — 24h",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 12, "x": 0, "y": 8 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -52,21 +55,42 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 20 }
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 20 }
             ]
+          },
+          "unit": "none",
+          "decimals": 0,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.15)"
           }
         }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
       }
     },
     {
-      "title": "Cache Operations (24h)",
+      "title": "Cache Hit Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 12, "x": 12, "y": 8 },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -79,12 +103,109 @@
           "legendFormat": "Cache Misses",
           "refId": "B"
         }
-      ]
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#ef4444", "value": null },
+              { "color": "#f59e0b", "value": 0.6 },
+              { "color": "#10b981", "value": 0.85 }
+            ]
+          },
+          "unit": "percentunit",
+          "decimals": 2,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "title": "Slow Query by Repo — 24h",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum by (repo) (count_over_time({job=\"sentinel\"} |= \"SLOW_QUERY\" | json | repo != \"\" [1h]))",
+          "legendFormat": "{{repo}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 3 },
+              { "color": "#ef4444", "value": 10 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "title": "Cache Hits vs Misses",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"sentinel\"} |= \"cache\" |= \"hit\" [1h]))",
+          "legendFormat": "Hits",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"sentinel\"} |= \"cache\" |= \"miss\" [1h]))",
+          "legendFormat": "Misses",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12
+          },
+          "thresholds": {
+            "mode": "absolute"
+          },
+          "unit": "none",
+          "decimals": 0
+        }
+      }
     },
     {
       "title": "Database Archival Events",
       "type": "logs",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 12 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -96,13 +217,16 @@
       "options": {
         "showTime": true,
         "sortOrder": "Descending",
-        "enableLogDetails": true
+        "enableLogDetails": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "showLabels": true
       }
     },
     {
-      "title": "Gateway Tool Activity (24h)",
+      "title": "Gateway Tool Activity — 24h",
       "type": "logs",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 18 },
+      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -114,7 +238,10 @@
       "options": {
         "showTime": true,
         "sortOrder": "Descending",
-        "enableLogDetails": true
+        "enableLogDetails": true,
+        "wrapLogMessage": true,
+        "prettifyLogMessage": true,
+        "showLabels": true
       }
     }
   ],
@@ -123,9 +250,13 @@
   "templating": { "list": [] },
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
-  "timezone": "",
-  "title": "SENTINEL Database Performance",
+  "timezone": "Africa/Johannesburg",
+  "title": "SENTINEL — Database",
   "uid": "sentinel-db-perf",
-  "version": 1,
-  "weekStart": ""
+  "version": 2,
+  "weekStart": "",
+  "refresh": "30s",
+  "style": "dark",
+  "fiscalYearStartMonth": 0,
+  "links": []
 }

@@ -95,7 +95,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
   const getSafetyIcon = (safetyStatus: string, device: Device) => {
     switch (safetyStatus) {
       case "safe":
-        return <Activity className="h-3 w-3 text-green-500" />;
+        return <Activity className="h-3 w-3" style={{ color: "var(--color-sentinel-green)" }} />;
       case "warning":
       case "critical":
         return (
@@ -116,23 +116,23 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
             title="View risk intelligence"
           >
             <AlertTriangle
-              className={`h-3 w-3 ${safetyStatus === "warning" ? "text-yellow-500" : "text-red-500"}`}
+              className="h-3 w-3" style={safetyStatus === "warning" ? { color: "var(--color-sentinel-amber)" } : { color: "var(--color-sentinel-red)" }}
             />
           </span>
         );
       default:
-        return <Activity className="h-3 w-3 text-gray-500" />;
+        return <Activity className="h-3 w-3" style={{ color: "var(--color-sentinel-text-disabled)" }} />;
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "online":
-        return <Battery className="h-3 w-3 text-green-500" />;
+        return <Battery className="h-3 w-3" style={{ color: "var(--color-sentinel-green)" }} />;
       case "offline":
-        return <Battery className="h-3 w-3 text-gray-500" />;
+        return <Battery className="h-3 w-3" style={{ color: "var(--color-sentinel-text-disabled)" }} />;
       default:
-        return <Battery className="h-3 w-3 text-gray-400" />;
+        return <Battery className="h-3 w-3" style={{ color: "var(--color-sentinel-text-secondary)" }} />;
     }
   };
 
@@ -244,7 +244,7 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
               onClick={() => onDeviceSelect(device)}
               className={`w-full text-left p-4 border-b transition-colors ${
                 selectedDevice?.id === device.id
-                  ? "bg-blue-500/10"
+                  ? "bg-slate-500/10"
                   : "hover:bg-slate-500/5"
               }`}
               style={{ borderColor: "var(--color-sentinel-border)" }}
@@ -312,11 +312,11 @@ export function DeviceList({ devices, selectedDevice, onDeviceSelect, onRiskClic
               {/* Status Badge Row */}
               <div className="flex items-center gap-4 text-xs mt-2">
                 <span
-                  className={`px-2 py-0.5 rounded ${
-                    (device.status || "offline") === "online"
-                      ? "bg-green-500/10 text-green-500"
-                      : "bg-gray-500/10 text-gray-500"
-                  }`}
+                  className="px-2 py-0.5 rounded text-xs font-medium"
+                  style={(device.status || "offline") === "online"
+                    ? { background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }
+                    : { background: "rgba(148, 163, 184, 0.15)", color: "var(--color-sentinel-text-disabled)" }
+                  }
                 >
                   {(device.status || "offline").toUpperCase()}
                 </span>

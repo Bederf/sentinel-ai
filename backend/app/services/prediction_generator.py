@@ -21,6 +21,10 @@ from app.services.prediction_taxonomy import (
     normalize_prediction_urgency,
     urgency_from_severity,
 )
+from app.services.workflow_triggers import get_trigger_engine
+from app.services.equipment_alert_service import EquipmentAlertService
+from app.services.notification_service import NotificationService
+from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -164,6 +168,302 @@ class PredictionGeneratorService:
             pass
         return 0.0
 
+    async def _trigger_prediction_work_order(
+        self, equipment: dict[str, Any], prediction: dict[str, Any]
+    ) -> bool:
+        """
+        Trigger a PREDICTION_CRITICAL work order if conditions are met.
+
+        Conditions:
+          - failure_probability >= 65  OR  health_score < 50
+
+        Returns True if a work order was created/triggered, False otherwise.
+        """
+        try:
+            engine = get_trigger_engine()
+            result = await engine.on_prediction_critical(
+                equipment_id=equipment.get("id", ""),
+                prediction_id=str(prediction.get("id")),
+                prediction_code=prediction.get("code", ""),
+                health_score=equipment.get("health_score", 50),
+                probability_percent=prediction.get("probability_percent", 0),
+                equipment_code=equipment.get("code"),
+            )
+            logger.info(
+                f"Prediction critical trigger result for {equipment.get('id')}: "
+                f"success={result.success} action={result.action_taken}"
+            )
+            return result.success
+        except Exception as e:
+            logger.error(f"Prediction work order trigger failed: {e}")
+            return False
+
+    def _get_prediction_severity(self, health_score: float, probability_percent: float) -> str:
+        """Derive severity from health score and probability."""
+        if health_score < 50 or probability_percent >= 65:
+            return "critical"
+        if health_score < 70 or probability_percent >= 50:
+            return "warning"
+        return "info"
+
+    def _get_site_code(self, site_id: str | None) -> str:
+        """Convert site UUID to site code."""
+        if not site_id:
+            return "UNKNOWN"
+        try:
+            sb = get_supabase_client()
+            result = sb.table("sites").select("code").eq("id", site_id).limit(1).execute()
+            if result.data:
+                return result.data[0].get("code", "UNKNOWN")
+        except Exception:
+            pass
+        return site_id or "UNKNOWN"
+
+    def _should_notify_prediction(
+        self,
+        equipment_id: str,
+        site_id: str,
+        severity: str,
+    ) -> bool:
+        """
+        Dedup: only notify once per severity level per equipment per 24h.
+        Critical: once per 8h (more urgent).
+        """
+        from datetime import timedelta
+
+        window_hours = 8 if severity == "critical" else 24
+        cutoff = datetime.utcnow() - timedelta(hours=window_hours)
+
+        try:
+            sb = get_supabase_client()
+            result = sb.table("notification_delivery_log").select("id").eq("site_id", site_id).eq(
+                "reference_type", "prediction"
+            ).eq("severity", severity).gt("sent_at", cutoff.isoformat()).limit(1).execute()
+            return len(result.data or []) == 0
+        except Exception:
+            return True  # Allow notification if check fails
+
+    def _format_prediction_telegram(
+        self,
+        prediction: dict[str, Any],
+        equipment: dict[str, Any],
+        severity: str,
+        site_code: str,
+    ) -> str:
+        """Format prediction as HTML-safe Telegram message."""
+        emoji = "🔴" if severity == "critical" else "🟡"
+        prob = prediction.get("probability_percent", 0) / 100
+        health = equipment.get("health_score", 0)
+        repair_cost = prediction.get("repair_cost_zar", 0)
+        potential_loss = prediction.get("potential_loss_zar", 0)
+        factors = prediction.get("contributing_factors", []) or []
+
+        lines = [
+            f"{emoji} <b>SENTINEL {severity.upper()} — {site_code.upper()}</b>",
+            "",
+            f"<b>Equipment:</b> {equipment.get('code', 'UNKNOWN')}",
+            f"<b>Type:</b> {equipment.get('type', 'equipment')}",
+            f"<b>Health Score:</b> {health:.0f}%",
+            f"<b>Failure Probability:</b> {prob:.0%}",
+            f"<b>Repair Cost:</b> R{repair_cost:,.0f}",
+            f"<b>Risk Exposure:</b> R{potential_loss:,.0f}",
+            "",
+            f"<b>Recommended Action:</b>",
+            f"{prediction.get('recommended_action', 'Inspect equipment')}",
+        ]
+        if factors:
+            lines.extend(["", "<b>Contributing Factors:</b>"])
+            for f in factors[:3]:
+                if isinstance(f, dict):
+                    lines.append(f"• {f.get('factor', 'Unknown')}: {f.get('value', 'Unknown')}")
+        lines.extend(["", "-> Acknowledge to confirm review"])
+        return "\n".join(lines)
+
+    async def _notify_prediction(
+        self,
+        prediction: dict[str, Any],
+        equipment: dict[str, Any],
+        site_id: str,
+    ) -> None:
+        """
+        Route prediction notifications based on severity.
+
+        Info (health 70-89%): Dashboard bell only (via alerts table)
+        Warning (health 50-69%): Bell + Telegram
+        Critical (health <50%): Bell + Telegram + Email + Auto work order
+        """
+        probability = prediction.get("probability_percent", 0)
+        health_score = equipment.get("health_score", 50)
+        severity = self._get_prediction_severity(health_score, probability)
+        site_code = self._get_site_code(site_id)
+        equipment_code = equipment.get("code", "UNKNOWN")
+
+        # Dedup check
+        if not self._should_notify_prediction(equipment.get("id"), site_id, severity):
+            logger.info(f"[PRED-NOTIFY] Skipping duplicate notification for {equipment_code} ({severity})")
+            return
+
+        # Always create dashboard alert (bell)
+        try:
+            alert_svc = EquipmentAlertService()
+            prob_pct = prediction.get("probability_percent", 0)
+            message = (
+                f"Health score {health_score:.0f}%. "
+                f"Failure probability {prob_pct:.0%}. "
+                f"{prediction.get('recommended_action', 'Inspect equipment.')}"
+            )
+            result = alert_svc.create_alert_for_equipment(
+                equipment_id=equipment.get("id", equipment_code),
+                site_id=site_id,
+                severity=severity,
+                message=message,
+                alert_type="prediction",
+                notify_telegram=False,  # We handle Telegram below with our own format
+            )
+            if result.get("error"):
+                logger.warning(f"[PRED-NOTIFY] Alert creation failed: {result['error']}")
+            else:
+                logger.info(f"[PRED-NOTIFY] Dashboard alert created for {equipment_code}")
+        except Exception as e:
+            logger.warning(f"[PRED-NOTIFY] Alert creation error: {e}")
+
+        # Telegram for warning and critical
+        if severity in ("warning", "critical"):
+            try:
+                from app.config.settings import settings as _app_settings
+                from app.services.telegram_message_sender import get_telegram_sender, InlineButton, InlineKeyboard
+
+                chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
+                    _app_settings, "sentry_fm_chat_id", None
+                )
+                if chat_id:
+                    msg = self._format_prediction_telegram(prediction, equipment, severity, site_code)
+                    sender = get_telegram_sender()
+                    keyboard = InlineKeyboard(
+                        rows=[
+                            [InlineButton(label="✅ Acknowledge", callback_data=f"pred_ack:{prediction['id']}")],
+                            [InlineButton(label="🛠 Create Work Order", callback_data=f"pred_wo:{prediction['id']}")],
+                        ]
+                    )
+                    await sender.send_text(str(chat_id), msg, keyboard=keyboard)
+                    logger.info(f"[PRED-NOTIFY] Telegram sent for {equipment_code} ({severity})")
+
+                    # Log delivery for dedup tracking
+                    try:
+                        sb = get_supabase_client()
+                        sb.table("notification_delivery_log").insert({
+                            "id": str(uuid.uuid4()),
+                            "site_id": site_id,
+                            "notification_type": "prediction",
+                            "severity": severity,
+                            "reference_type": "prediction",
+                            "equipment_id": equipment.get("id"),
+                            "channel_type": "telegram",
+                            "status": "sent",
+                            "provider": "telegram",
+                            "sent_at": datetime.utcnow().isoformat(),
+                        }).execute()
+                    except Exception as log_err:
+                        logger.warning(f"[PRED-NOTIFY] Failed to log delivery: {log_err}")
+            except Exception as e:
+                logger.warning(f"[PRED-NOTIFY] Telegram send failed: {e}")
+
+        # Email escalation for critical only
+        if severity == "critical":
+            try:
+                self._send_prediction_email(equipment, prediction, severity, site_code)
+            except Exception as e:
+                logger.warning(f"[PRED-NOTIFY] Email send failed: {e}")
+
+    def _send_prediction_email(
+        self,
+        equipment: dict[str, Any],
+        prediction: dict[str, Any],
+        severity: str,
+        site_code: str,
+    ) -> None:
+        """Send email escalation for critical predictions."""
+        from app.services.visitor_email_service import _smtp_config
+        import smtplib
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+
+        smtp = _smtp_config()
+        if not smtp.get("host"):
+            logger.warning("[PRED-EMAIL] SMTP not configured, skipping email")
+            return
+
+        prob = prediction.get("probability_percent", 0) / 100
+        health = equipment.get("health_score", 0)
+        repair_cost = prediction.get("repair_cost_zar", 0)
+        potential_loss = prediction.get("potential_loss_zar", 0)
+        factors = prediction.get("contributing_factors", []) or []
+
+        body_html = f"""
+        <html><body>
+        <h2 style="color:{'#dc2626' if severity == 'critical' else '#d97706'}">
+            SENTINEL {severity.upper()} Prediction — {site_code.upper()}
+        </h2>
+        <table style="border-collapse:collapse;width:100%">
+        <tr><td style="padding:8px;border:1px solid #ddd"><b>Equipment</b></td>
+            <td style="padding:8px;border:1px solid #ddd">{equipment.get('code','UNKNOWN')}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd"><b>Type</b></td>
+            <td style="padding:8px;border:1px solid #ddd">{equipment.get('type','equipment')}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd"><b>Health Score</b></td>
+            <td style="padding:8px;border:1px solid #ddd">{health:.0f}%</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd"><b>Failure Probability</b></td>
+            <td style="padding:8px;border:1px solid #ddd">{prob:.0%}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd"><b>Repair Cost</b></td>
+            <td style="padding:8px;border:1px solid #ddd">R{repair_cost:,.0f}</td></tr>
+        <tr><td style="padding:8px;border:1px solid #ddd"><b>Risk Exposure</b></td>
+            <td style="padding:8px;border:1px solid #ddd">R{potential_loss:,.0f}</td></tr>
+        </table>
+        <h3>Recommended Action</h3>
+        <p>{prediction.get('recommended_action', 'Inspect equipment.')}</p>
+        {'<h3>Contributing Factors</h3><ul>' + ''.join(f"<li>{f.get('factor','Unknown')}: {f.get('value','Unknown')}" for f in factors[:3]) + '</ul>' if factors else ''}
+        </body></html>
+        """
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"[{severity.upper()}] SENTINEL Prediction — {equipment.get('code')} at {site_code.upper()}"
+        msg["From"] = smtp["from_email"]
+        msg["To"] = smtp.get("to_email", "operations@sentinel-ai.co.za")
+
+        part = MIMEText(body_html, "html")
+        msg.attach(part)
+
+        with smtplib.SMTP(smtp["host"], smtp.get("port", 587)) as server:
+            server.starttls()
+            server.login(smtp["username"], smtp["password"])
+            server.send_message(msg)
+
+        logger.info(f"[PRED-EMAIL] Email sent for {equipment.get('code')} ({severity})")
+
+    def _is_maintenance_module_active(self, site_id: str | None) -> bool:
+        """Return True only when phase and module gates permit maintenance workflows."""
+        if not site_id:
+            return False
+        try:
+            from app.database.supabase_client import get_supabase_client
+            from app.models.onboarding_phase import phase_allows
+            from app.models.module_registry import ModuleType
+            from app.services.module_registry_service import module_registry
+
+            try:
+                sb = get_supabase_client()
+                result = sb.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+                site_phase = (result.data[0].get("onboarding_phase") or "commissioning") if result.data else "commissioning"
+            except Exception:
+                site_phase = "commissioning"
+
+            return (
+                phase_allows(site_phase, "recommendations_ui")
+                and module_registry.is_module_active(site_id, ModuleType.MAINTENANCE)
+            )
+        except Exception as e:
+            logger.warning("Maintenance module gate check failed for %s: %s", site_id, e)
+            return False
+
     async def generate_predictions_for_all_sites(self) -> dict[str, Any]:
         """
         Generate predictions for all equipment with health below threshold.
@@ -220,6 +520,24 @@ class PredictionGeneratorService:
                     logger.info(
                         f"Generated prediction for {equipment.get('name')} (health: {equipment.get('health_score')}%)"
                     )
+
+                    # Notify based on severity (all predictions, not just critical)
+                    equipment_site_id = equipment.get("site_id")
+                    await self._notify_prediction(prediction, equipment, equipment_site_id)
+
+                    # Auto-create work order for critical predictions
+                    probability = prediction.get("probability_percent", 0)
+                    health_score = equipment.get("health_score", 50)
+                    if probability >= 65 or health_score < 50:
+                        if self._is_maintenance_module_active(equipment_site_id):
+                            await self._trigger_prediction_work_order(equipment, prediction)
+                        else:
+                            logger.info(
+                                "Prediction work-order trigger gated off for site=%s equipment=%s "
+                                "(maintenance module inactive)",
+                                site_id,
+                                equipment.get("code") or equipment.get("id"),
+                            )
 
                 except Exception as e:
                     error_msg = f"Error generating prediction for {equipment.get('id')}: {e!s}"
@@ -561,57 +879,158 @@ class PredictionGeneratorService:
         }
 
     def _get_contributing_factors(self, equipment: dict[str, Any]) -> list[dict[str, Any]]:
-        """Get contributing factors for the prediction."""
+        """
+        Get contributing factors for the prediction, keyed by equipment type
+        using health_calculation_config.json thresholds.
+        """
         health_score = equipment.get("health_score", 50)
-        factors = []
+        equipment_type = equipment.get("type", "unknown")
+        operating_data = equipment.get("operating_data") or {}
 
-        # Health score factor
+        factors: list[dict[str, Any]] = []
+
+        # ── 1. Health Score Factor (always present if below threshold) ─────────
         if health_score < 70:
-            factors.append(
-                {
-                    "factor": "Low Health Score",
-                    "weight": 0.4,
-                    "description": f"Equipment health at {health_score}%, below acceptable threshold",
-                }
-            )
+            factors.append({
+                "factor": "Low Health Score",
+                "weight": 0.4,
+                "description": f"Equipment health at {health_score}%, below acceptable threshold",
+            })
 
-        # Age factor (if available)
+        # ── 2. Equipment Age Factor ──────────────────────────────────────────
+        # Use config expected_life_years (critical threshold = 80% of expected life)
+        try:
+            from app.api.health_config import load_config
+            config = load_config()
+            type_config = config.get(equipment_type.lower(), {})
+            expected_life_years = float(type_config.get("expected_life_years", 15))
+        except Exception:
+            expected_life_years = 15.0
+        age_critical_years = expected_life_years * 0.8
+
         install_date = equipment.get("install_date")
         if install_date:
             try:
-                age_years = (datetime.now() - datetime.fromisoformat(install_date.replace("Z", "+00:00"))).days / 365
-                if age_years > 10:
-                    factors.append(
-                        {
-                            "factor": "Equipment Age",
-                            "weight": 0.3,
-                            "description": f"Equipment is {age_years:.1f} years old",
-                        }
-                    )
+                install_str = install_date.replace("Z", "+00:00").replace("+00:00", "")
+                age_years = (datetime.now() - datetime.fromisoformat(install_str)).days / 365.25
+                if age_years > age_critical_years:
+                    factors.append({
+                        "factor": "Equipment Age",
+                        "weight": 0.3,
+                        "description": f"Equipment is {age_years:.1f} years old (expected life: {expected_life_years:.0f} years)",
+                    })
             except Exception:
                 pass
 
-        # Runtime factor (if available) — check operating_data.total_runtime_hours
-        operating_data = equipment.get("operating_data") or {}
-        runtime = operating_data.get("total_runtime_hours", 0)
-        if runtime > 20000:
-            factors.append(
-                {
-                    "factor": "High Runtime",
-                    "weight": 0.2,
-                    "description": f"Equipment has {runtime:,} operating hours",
-                }
-            )
+        # ── 3. High Runtime Factor ───────────────────────────────────────────
+        try:
+            from app.api.health_config import load_config
+            config = load_config()
+            type_config = config.get(equipment_type.lower(), {})
+            runtime_thresholds = type_config.get("thresholds", {})
+            runtime_critical = runtime_thresholds.get("runtime_hours_critical", 40000)
+        except Exception:
+            runtime_critical = 40000
 
-        # Default factor if none found
+        runtime = operating_data.get("total_runtime_hours", 0)
+        if runtime > runtime_critical:
+            factors.append({
+                "factor": "High Runtime",
+                "weight": 0.2,
+                "description": f"Equipment has {runtime:,} operating hours (critical threshold: {runtime_critical:,})",
+            })
+
+        # ── 4. Service Overdue Factor ────────────────────────────────────────
+        try:
+            from app.api.health_config import load_config
+            config = load_config()
+            type_config = config.get(equipment_type.lower(), {})
+            service_interval_days = type_config.get("service_interval_days", 90)
+        except Exception:
+            service_interval_days = 90
+        overdue_critical_days = service_interval_days  # use interval as the overdue threshold
+
+        last_service = equipment.get("last_service") or equipment.get("last_service_date")
+        if last_service:
+            try:
+                last_service_str = last_service.replace("Z", "+00:00").replace("+00:00", "")
+                days_since_service = (datetime.now() - datetime.fromisoformat(last_service_str)).days
+                if days_since_service > overdue_critical_days:
+                    factors.append({
+                        "factor": "Service Overdue",
+                        "weight": 0.25,
+                        "description": (
+                            f"Last service {days_since_service} days ago "
+                            f"(critical threshold: {overdue_critical_days} days, "
+                            f"interval: {service_interval_days} days)"
+                        ),
+                    })
+                elif days_since_service > service_interval_days * 0.8:
+                    factors.append({
+                        "factor": "Service Approaching Overdue",
+                        "weight": 0.15,
+                        "description": (
+                            f"Last service {days_since_service} days ago "
+                            f"(warning threshold: {int(service_interval_days * 0.8)} days)"
+                        ),
+                    })
+            except Exception:
+                pass
+
+        # ── 5. Supply Temperature Deviation (HVAC equipment) ──────────────────
+        hvac_types = {"chiller", "ahu", "fcu", "vav", "cooling_tower", "ct"}
+        if equipment_type.lower() in hvac_types:
+            supply_temp = operating_data.get("supply_temp") or operating_data.get("chw_supply_temp")
+            setpoint = operating_data.get("setpoint") or operating_data.get("cooling_setpoint")
+
+            if supply_temp is not None and setpoint is not None:
+                try:
+                    deviation = abs(float(supply_temp) - float(setpoint))
+                    if deviation > 5.0:
+                        factors.append({
+                            "factor": "Supply Temperature Deviation",
+                            "weight": 0.3,
+                            "description": (
+                                f"Supply temperature {float(supply_temp):.1f}°C deviates "
+                                f"{deviation:.1f}°C from setpoint {float(setpoint):.1f}°C"
+                            ),
+                        })
+                    elif deviation > 2.0:
+                        factors.append({
+                            "factor": "Supply Temperature Deviation",
+                            "weight": 0.2,
+                            "description": (
+                                f"Supply temperature {float(supply_temp):.1f}°C deviates "
+                                f"{deviation:.1f}°C from setpoint {float(setpoint):.1f}°C"
+                            ),
+                        })
+                except (ValueError, TypeError):
+                    pass
+
+            # Low delta-T check for chillers / cooling towers
+            return_temp = operating_data.get("return_temp") or operating_data.get("chw_return_temp")
+            if return_temp is not None and supply_temp is not None:
+                try:
+                    delta_t = float(return_temp) - float(supply_temp)
+                    if delta_t < 4.0 and equipment_type.lower() in {"chiller", "ct", "cooling_tower"}:
+                        factors.append({
+                            "factor": "Low Temperature Differential",
+                            "weight": 0.25,
+                            "description": (
+                                f"Return-supply delta-T is {delta_t:.1f}°C "
+                                f"(expected ≥ 5°C). Possible heat exchanger issue."
+                            ),
+                        })
+                except (ValueError, TypeError):
+                    pass
+
+        # ── Default factor if none found ──────────────────────────────────────
         if not factors:
-            factors.append(
-                {
-                    "factor": "Health Monitoring",
-                    "weight": 0.5,
-                    "description": "Detected through automated health monitoring",
-                }
-            )
+            factors.append({
+                "factor": "Health Monitoring",
+                "weight": 0.5,
+                "description": "Detected through automated health monitoring",
+            })
 
         return factors
 

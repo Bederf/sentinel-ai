@@ -227,7 +227,7 @@ class EquipmentIDConverter:
                 return {"floor": floor, "zone": zone}
 
         # Pattern 4: Vendor-agnostic fallback — find floor code anywhere in a
-        # hyphen/dot-separated ID. Handles Niagara (site-005-UMH-AHU-L3-ICU),
+        # hyphen/dot-separated ID. Handles Niagara (site-003-UMH-AHU-L3-ICU),
         # Desigo, Schneider, etc. Looks for L##, B##, G, R as a standalone segment.
         segments = re.split(r"[-.]", normalized)
         for i, seg in enumerate(segments):

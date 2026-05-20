@@ -45,6 +45,10 @@ interface UseSpeechRecognitionOptions {
   onResult?: (transcript: string) => void;
   /** BCP-47 language tag (default: en-ZA) */
   language?: string;
+  /** If true, recognition stays on after final transcript (for continuous mode). Default: false */
+  continuousMode?: boolean;
+  /** Callback fired on interim transcript updates (live while speaking) */
+  onInterim?: (transcript: string) => void;
 }
 
 interface UseSpeechRecognitionReturn {
@@ -78,7 +82,7 @@ function getSpeechRecognitionConstructor(): (new () => SpeechRecognitionInstance
 export function useSpeechRecognition(
   options: UseSpeechRecognitionOptions = {}
 ): UseSpeechRecognitionReturn {
-  const { onResult, language = "en-ZA" } = options;
+  const { onResult, onInterim, language = "en-ZA", continuousMode = false } = options;
 
   const [isSupported] = useState(() => getSpeechRecognitionConstructor() !== null);
   const [isListening, setIsListening] = useState(false);
@@ -88,8 +92,11 @@ export function useSpeechRecognition(
 
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const onResultRef = useRef(onResult);
+  const onInterimRef = useRef(onInterim);
   // eslint-disable-next-line react-hooks/refs
   onResultRef.current = onResult;
+  // eslint-disable-next-line react-hooks/refs
+  onInterimRef.current = onInterim;
 
   // Cleanup on unmount
   useEffect(() => {
@@ -122,7 +129,7 @@ export function useSpeechRecognition(
 
     const recognition = new Ctor();
     recognition.lang = language;
-    recognition.continuous = false;
+    recognition.continuous = continuousMode;
     recognition.interimResults = true;
     recognitionRef.current = recognition;
 
@@ -147,8 +154,10 @@ export function useSpeechRecognition(
         setFinalTranscript(final_);
         setTranscript(final_);
         onResultRef.current?.(final_);
+        onInterimRef.current?.(final_);
       } else {
         setTranscript(interim);
+        onInterimRef.current?.(interim);
       }
     };
 

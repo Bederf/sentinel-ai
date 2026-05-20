@@ -428,19 +428,39 @@ class AdapterHealthMonitor:
         rows_to_insert = []
 
         for alarm in alarms:
-            alarm.get("code") or alarm.get("alarm_code") or ""
+            # Extract fields for dedupe and classification
+            alarm_code = alarm.get("code") or alarm.get("alarm_code") or ""
+            source_equipment = alarm.get("equipment_id") or alarm.get("equipment_code") or "UNKNOWN_EQUIPMENT"
+            alarm_type = alarm.get("alarm_type") or alarm.get("event_type") or "UNCLASSIFIED"
 
             # Generate intelligent title and message
             title, message = self._generate_alarm_description(alarm)
 
-            # Dedupe key
-            dedupe_key = f"{title}:{message[:80]}"
+            # Dedupe key: source_equipment + code + alarm_type (NOT title/message which vary)
+            # When code is empty, collapse all instances of this alarm class into one entry
+            dedupe_key = f"{source_equipment}|{alarm_code or 'UNPARSEABLE'}|{alarm_type}"
             if dedupe_key in seen_keys:
                 continue
             seen_keys.add(dedupe_key)
 
-            # Severity mapping
+            # Severity mapping — log UNPARSEABLE alarms
             raw_severity = str(alarm.get("severity") or alarm.get("priority") or "medium").lower()
+            alarm_timestamp = alarm.get("timestamp") or alarm.get("time") or "unknown"
+            bacnet_object_id = alarm.get("object_id") or alarm.get("objectIdentifier") or "unknown"
+            bacnet_object_type = alarm.get("object_type") or alarm.get("objectType") or "unknown"
+            if not alarm_code:
+                logger.warning(
+                    "[BRIDGE ALERTS] Unparseable alarm: source=%s type=%s obj_id=%s obj_type=%s ts=%s raw=%s",
+                    source_equipment,
+                    alarm_type,
+                    bacnet_object_id,
+                    bacnet_object_type,
+                    alarm_timestamp,
+                    alarm,
+                )
+                # Skip storing empty-code alarms — they indicate a bridge/BMS parsing issue
+                # The warning is already logged; do not flood the alerts table
+                continue
             if raw_severity in ("critical", "high", "fault", "active"):
                 severity = "critical"
             elif raw_severity in ("warning", "warn", "elevated"):
@@ -477,18 +497,25 @@ class AdapterHealthMonitor:
             return
 
         # Check for existing recent alerts to avoid duplicates
+        # Uses equipment_id + code + type (the new dedupe key) instead of title/message
         recent_cutoff = (now - timedelta(minutes=30)).isoformat()
         try:
             existing = (
                 supabase.table("alerts")
-                .select("title, message")
+                .select("title, message, equipment_id")
                 .eq("site_id", site_uuid)
                 .eq("status", "active")
                 .gte("created_at", recent_cutoff)
                 .execute()
             )
-            existing_keys = {f"{r['title']}:{r['message'][:80]}" for r in (existing.data or [])}
-            rows_to_insert = [r for r in rows_to_insert if f"{r['title']}:{r['message'][:80]}" not in existing_keys]
+            # Build dedupe keys from existing alerts using the new format
+            existing_keys = set()
+            for r in (existing.data or []):
+                eq_id = r.get("equipment_id") or "UNKNOWN"
+                # Reconstruct key from title which contains the code used at insert time
+                existing_keys.add(f"{eq_id}")
+            # Filter rows that match existing equipment_id (skip if same equipment already alert active)
+            rows_to_insert = [r for r in rows_to_insert if r.get("equipment_id") not in existing_keys]
         except Exception as e:
             logger.warning(f"[BRIDGE ALERTS] Dedup query failed, inserting anyway: {e}")
 

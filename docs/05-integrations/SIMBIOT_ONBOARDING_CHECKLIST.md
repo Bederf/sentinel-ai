@@ -196,7 +196,7 @@ Guided inspection generation is intentionally scoped to major plant first. This 
 
    - [ ] Floor/zone extraction from equipment IDs (vendor-agnostic):
      - [ ] Finds floor codes (L3, B1, G, R) anywhere in hyphen/dot-separated IDs
-     - [ ] Works for Niagara (`site-005-UMH-AHU-L3-ICU`), Desigo, Schneider, etc.
+     - [ ] Works for Niagara (`site-003-UMH-AHU-L3-ICU`), Desigo, Schneider, etc.
 
    - [ ] Equipment instances created (e.g., "S005-AHU-L3-ICU")
      - Naming uses SENTINEL v2.0 format: `S###-TYPE-FLOOR-ZONE`

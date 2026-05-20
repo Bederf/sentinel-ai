@@ -6,23 +6,8 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import {
-  LayoutGrid,
-  Mail,
-  TrendingDown,
-  Focus,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Users,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  DoorOpen,
-  BarChart3,
-  Orbit,
-} from "lucide-react";
+import { ChevronUp, DoorOpen, BarChart3, Orbit, LayoutGrid, Mail, TrendingDown, Focus, RefreshCw, AlertTriangle, CheckCircle2, Clock, Users, XCircle, ChevronDown } from "lucide-react";
+import { MeetingRoomCard } from "./MeetingRoomCard";
 import { gsap } from "gsap";
 
 import { authorizedFetch } from "@/lib/api";
@@ -151,6 +136,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
   const [focusSessions, setFocusSessions] = useState<FocusSession[]>([]);
   const [focusAnalytics, setFocusAnalytics] = useState<FocusAnalytics | null>(null);
   const [hourlyTrends, setHourlyTrends] = useState<HourlyTrend[]>([]);
+  const [meetingRoomOccupied, setMeetingRoomOccupied] = useState<boolean | null>(null);
 
   const siteId = propSiteId || (() => {
     try {
@@ -169,7 +155,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
       const trendsUrl = `/api/occupancy/analytics/hourly-trend?site_id=${encodeURIComponent(siteId)}&days=7`;
 
       const sq = `site_id=${encodeURIComponent(siteId)}`;
-      const [alertsRes, ghostRes, bookingsRes, rightsizingRes, focusRes, analyticsRes, trendsRes] = await Promise.all([
+      const [alertsRes, ghostRes, bookingsRes, rightsizingRes, focusRes, analyticsRes, trendsRes, occupancyRes] = await Promise.all([
         authorizedFetch(`/api/block-bookings/alerts?${sq}`, { headers }),
         authorizedFetch(`/api/space/ghost-findings?${sq}`, { headers }),
         authorizedFetch(`/api/block-bookings/bookings?${sq}`, { headers }),
@@ -177,6 +163,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         authorizedFetch(`/api/space/focus-sessions?${sq}`, { headers }),
         authorizedFetch(`/api/space/focus-analytics?${sq}`, { headers }),
         authorizedFetch(trendsUrl, { headers }),
+        authorizedFetch(`/api/space/room-occupancy?site_id=${encodeURIComponent(siteId)}&room_code=FA2-1Q4-MR27`),
       ]);
       const apiErrors: string[] = [];
 
@@ -232,6 +219,11 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         setHourlyTrends(transformHourlyTrendData(data));
       } else {
         await readApiError("occupancy trends", trendsRes);
+      }
+      if (occupancyRes.ok) {
+        const rooms = await occupancyRes.json() as Array<{ room_code: string; occupied: boolean }>;
+        const mr27 = rooms.find((r) => r.room_code === "FA2-1Q4-MR27");
+        setMeetingRoomOccupied(mr27?.occupied ?? null);
       }
 
       setError(apiErrors.length > 0 ? `Failed to load: ${apiErrors.join("; ")}` : null);
@@ -386,7 +378,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
     { id: "intelligence", label: "Meeting Room Intelligence" },
     { id: "block", label: "Block Bookings" },
     { id: "ghost", label: "Ghost Rooms" },
-    { id: "rightsizing", label: "Right-Sizing" },
+    { id: "rightsizing", label: "Meeting Room Occupancy" },
     { id: "focus", label: "Focus Rooms" },
     { id: "trends", label: "Occupancy Trends" },
   ];
@@ -471,11 +463,11 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         />
         <KpiCard
           icon={<TrendingDown className="h-5 w-5" />}
-          label="Right-Sizing"
-          value={openRightsizing}
-          color={openRightsizing > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)"}
-          bgColor={openRightsizing > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)"}
-          subtitle={openRightsizing > 0 ? "patterns detected" : "well utilized"}
+          label="Meeting Room Occupancy"
+          value={meetingRoomOccupied ? 1 : 0}
+          color={meetingRoomOccupied ? "var(--color-sentinel-red)" : "var(--color-sentinel-green)"}
+          bgColor={meetingRoomOccupied ? "rgba(220, 38, 38, 0.15)" : "rgba(16, 185, 129, 0.15)"}
+          subtitle={meetingRoomOccupied ? "occupied" : "free"}
           onClick={() => setActiveTab("rightsizing")}
           isActive={activeTab === "rightsizing"}
         />
@@ -516,7 +508,7 @@ export function SpaceOptimizationPage({ siteId: propSiteId }: { siteId?: string 
         <GhostRoomsPanel findings={ghostFindings} onSetOutcome={handleGhostOutcome} />
       )}
       {activeTab === "rightsizing" && (
-        <RightsizingPanel findings={rightsizingFindings} onDismiss={handleDismissSpaceFinding} />
+        <MeetingRoomCard siteId="site-002" roomCode="FA2-1Q4-MR27" roomLabel="MR27 – Meeting Room" />
       )}
       {activeTab === "focus" && (
         <FocusRoomsPanel sessions={focusSessions} analytics={focusAnalytics} />

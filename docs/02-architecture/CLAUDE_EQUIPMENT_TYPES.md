@@ -71,19 +71,19 @@ Complete guide to equipment naming conventions and type system.
 
 ## 🏥 Hospital Equipment (Site-005)
 
-**Pattern:** `site-005-UMH-{type}-{floor}-{id}.{point}`
+**Pattern:** `site-003-UMH-{type}-{floor}-{id}.{point}`
 
 **Examples:**
-- `site-005-UMH-AHU-L3-ICU.fan` - ICU HVAC (Level 3), fan point
-- `site-005-UMH-GEN-B1-001.load` - Emergency generator, load point
-- `site-005-UMH-LIFT-L2-001` - Elevator on Level 2
-- `site-005-UMH-MEDGAS-L3-001.o2` - Medical gas (O₂) monitoring
+- `site-003-UMH-AHU-L3-ICU.fan` - ICU HVAC (Level 3), fan point
+- `site-003-UMH-GEN-B1-001.load` - Emergency generator, load point
+- `site-003-UMH-LIFT-L2-001` - Elevator on Level 2
+- `site-003-UMH-MEDGAS-L3-001.o2` - Medical gas (O₂) monitoring
 
 **Features:**
 - Building code (UMH) identifies hospital structure
 - Floor labels show medical areas (L3 = ICU, theatres)
 - Point-level monitoring (.fan, .load, .o2, .hepa, etc.)
-- Type extraction: SUBSTRING(code FROM 'site-005-UMH-([A-Z]+)-') → AHU, GEN, LIFT, etc.
+- Type extraction: SUBSTRING(code FROM 'site-003-UMH-([A-Z]+)-') → AHU, GEN, LIFT, etc.
 
 **Floors at Site-005:**
 - B1 = Basement (emergency power, MEP)
@@ -101,27 +101,27 @@ Complete guide to equipment naming conventions and type system.
 | Type | Count | Sites | Examples |
 |------|-------|-------|----------|
 | CHILLER | 4 | S002, site-012 | Central cooling |
-| AHU | 25 | S002, site-005, site-012 | Air handling unit |
+| AHU | 25 | S002, site-003, site-012 | Air handling unit |
 | FCU | 8 | S002, site-012 | Fan coil unit |
 | VAV | 4 | S002 | Variable air volume |
-| SPLIT | 1 | site-005 | Split system |
-| CT | 8 | S002, site-005 | Cooling tower |
+| SPLIT | 1 | site-003 | Split system |
+| CT | 8 | S002, site-003 | Cooling tower |
 | CRAC | 1 | site-012 | Computer room AC |
-| PUMP | 3 | site-005 | Water circulation |
+| PUMP | 3 | site-003 | Water circulation |
 
 ### Electrical Types (Specialty: electrical)
 | Type | Count | Sites | Examples |
 |------|-------|-------|----------|
-| GEN | 14 | S002, site-005, site-012 | Generator (standby) |
+| GEN | 14 | S002, site-003, site-012 | Generator (standby) |
 | TX | 2 | S002 | Transformer |
-| UPS | 4 | S002, site-005, site-012 | Uninterruptible power |
+| UPS | 4 | S002, site-003, site-012 | Uninterruptible power |
 | ATS | 2 | S002 | Automatic transfer switch |
-| MSB | 3 | S002, site-005 | Main switch board |
-| MTR | 2 | S002, site-005 | Motor/control |
+| MSB | 3 | S002, site-003 | Main switch board |
+| MTR | 2 | S002, site-003 | Motor/control |
 | PFC | 1 | S002 | Power factor correction |
 | FDR | 1 | S002 | Feeder |
 | MV | 1 | S002 | Medium voltage |
-| DB | 2 | S002, site-005 | Distribution board |
+| DB | 2 | S002, site-003 | Distribution board |
 
 ### Lighting Types (Specialty: dali)
 | Type | Count | Sites | Examples |
@@ -132,15 +132,15 @@ Complete guide to equipment naming conventions and type system.
 ### Specialized Types
 | Type | Specialty | Count | Sites | Notes |
 |------|-----------|-------|-------|-------|
-| LIFT | general | 12 | site-005 | Hospital elevators |
-| FIRE | fire | 4 | site-005 | Fire safety systems |
-| ACC | security | 2 | site-005 | Access control |
-| CCTV | security | 2 | site-005 | Surveillance |
-| JACE | general | 10 | site-005 | Building automation controller |
-| COLD | general | 3 | site-005 | Cold storage (pharma) |
-| MEDGAS | general | 1 | site-005 | Medical gas monitoring |
-| BOILER | hvac | 2 | site-005 | Hot water boiler |
-| KEF | general | 2 | site-005 | Kitchen exhaust |
+| LIFT | general | 12 | site-003 | Hospital elevators |
+| FIRE | fire | 4 | site-003 | Fire safety systems |
+| ACC | security | 2 | site-003 | Access control |
+| CCTV | security | 2 | site-003 | Surveillance |
+| JACE | general | 10 | site-003 | Building automation controller |
+| COLD | general | 3 | site-003 | Cold storage (pharma) |
+| MEDGAS | general | 1 | site-003 | Medical gas monitoring |
+| BOILER | hvac | 2 | site-003 | Hot water boiler |
+| KEF | general | 2 | site-003 | Kitchen exhaust |
 
 ---
 
@@ -154,10 +154,10 @@ UPDATE equipment
 SET type = SUBSTRING(code FROM 'S002-([A-Z]+)-')
 WHERE site_id = 'S002' AND type = 'unknown';
 
--- For hospital equipment (site-005-UMH-TYPE-FLOOR)
+-- For hospital equipment (site-003-UMH-TYPE-FLOOR)
 UPDATE equipment
-SET type = SUBSTRING(code FROM 'site-005-UMH-([A-Z]+)-')
-WHERE site_id = 'site-005' AND type = 'unknown';
+SET type = SUBSTRING(code FROM 'site-003-UMH-([A-Z]+)-')
+WHERE site_id = 'site-003' AND type = 'unknown';
 
 -- For other sites (site-NNN-TYPE-LOCATION)
 UPDATE equipment
@@ -191,7 +191,7 @@ def extract_type_from_code(code: str) -> str:
 
 # Examples
 assert extract_type_from_code('S002-VAV-101') == 'VAV'
-assert extract_type_from_code('site-005-UMH-AHU-L3-ICU.fan') == 'AHU'
+assert extract_type_from_code('site-003-UMH-AHU-L3-ICU.fan') == 'AHU'
 assert extract_type_from_code('S002-CHILLER-B1-001') == 'CHILLER'
 ```
 
@@ -267,7 +267,7 @@ EQUIPMENT_TYPE_TO_SPECIALTY = {
 | Site | Name | Total Equipment | Types | ML-Enabled | Key Equipment |
 |------|------|-----------------|-------|-----------|----------------|
 | S002 | Office (Sandton) | 34 | 12 | 21% | VAV, FCU, CHILLER, UPS, DALI |
-| site-005 | Hospital (Umhlanga) | 90 | 15 | 56% | AHU (25), GEN (12), LIFT (12) |
+| site-003 | Hospital (Umhlanga) | 90 | 15 | 56% | AHU (25), GEN (12), LIFT (12) |
 | site-012 | Office (Generic) | 19 | 7 | 79% | AHU, FCU, CHILLER |
 | **TOTAL** | | **142** | **23** | **52%** | |
 

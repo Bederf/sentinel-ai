@@ -66,37 +66,37 @@ function getSeverityConfig(severity: string): {
     case "critical":
       return {
         color: "var(--color-sentinel-red)",
-        bg: "rgba(220, 38, 38, 0.15)",
+        bg: "color-mix(in oklch, var(--color-sentinel-red) 15%, transparent)",
         label: "CRITICAL",
       };
     case "warning":
       return {
         color: "var(--color-sentinel-amber)",
-        bg: "rgba(245, 158, 11, 0.15)",
+        bg: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)",
         label: "WARNING",
       };
     case "high":
       return {
         color: "var(--color-sentinel-amber)",
-        bg: "rgba(245,158,11,0.15)",
+        bg: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)",
         label: "HIGH RISK",
       };
     case "medium":
       return {
         color: "var(--color-sentinel-amber)",
-        bg: "rgba(245, 158, 11, 0.15)",
+        bg: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)",
         label: "ELEVATED",
       };
     case "low":
       return {
         color: "var(--color-sentinel-green)",
-        bg: "rgba(16, 185, 129, 0.15)",
+        bg: "color-mix(in oklch, var(--color-sentinel-green) 15%, transparent)",
         label: "LOW RISK",
       };
     default:
       return {
         color: "var(--color-sentinel-text-secondary)",
-        bg: "rgba(142, 142, 142, 0.15)",
+        bg: "color-mix(in oklch, var(--color-sentinel-text-disabled) 15%, transparent)",
         label: "UNKNOWN",
       };
   }
@@ -534,7 +534,13 @@ export function PredictionCard({ prediction, onClick }: PredictionCardProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span
-              className="text-xs font-medium px-1.5 py-0.5 rounded bg-sky-900/30 text-sky-300 border border-sky-800/40"
+              className="text-xs font-medium px-1.5 py-0.5 rounded"
+              style={{
+                background: "color-mix(in oklch, var(--color-sentinel-blue) 15%, transparent)",
+                color: "var(--color-sentinel-blue)",
+                border: "1px solid color-mix(in oklch, var(--color-sentinel-blue) 30%, transparent)",
+              }}
+              aria-label="AI-generated prediction"
             >
               AI
             </span>

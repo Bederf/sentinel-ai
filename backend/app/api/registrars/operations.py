@@ -44,6 +44,7 @@ from app.api import (
     event_bus_monitor,
     event_intelligence,
     graph_webhook_endpoint,
+    telegram_webhook,
     health_config,
     health_rating,
     inspection,
@@ -124,6 +125,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(concept.router, tags=["concept-cafm"])
     app.include_router(sentry_webhooks.router, tags=["sentry"])
     app.include_router(whatsapp_webhooks.router, tags=["whatsapp"])
+    app.include_router(telegram_webhook.router, tags=["telegram"])
     app.include_router(graph_webhook_endpoint.router, tags=["graph_webhook"])
 
     # Module registry and configuration

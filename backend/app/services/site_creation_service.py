@@ -80,7 +80,7 @@ class SiteCreationService:
         Create a new site record.
 
         Args:
-            site_name: Display name (e.g., "Busamed Gateway Hospital")
+            site_name: Display name (e.g., "Example Hospital")
             building_type: Type (office, retail, hospital, etc.)
             location: Physical address or city
             gross_floor_area: Square metres

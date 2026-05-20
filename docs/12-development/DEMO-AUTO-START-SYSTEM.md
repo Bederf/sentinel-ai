@@ -589,7 +589,7 @@ Expected result: X% savings vs baseline
 ## Future Expansion Ideas
 
 1. **Regional Demos**: Different scenarios per geographic region
-2. **Industry Demos**: Hospital (site-005), retail, office, industrial
+2. **Industry Demos**: Hospital (site-003), retail, office, industrial
 3. **Feature Demos**: Highlight specific capabilities (3D viz, chat, MFA, etc.)
 4. **Performance Demos**: Compare optimization strategies (HVAC vs Solar vs Water)
 5. **Customizable Demos**: Admin-configurable scenarios per client

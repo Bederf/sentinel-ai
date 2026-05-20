@@ -12,9 +12,9 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Plus, Trash2 } from 'lucide-react';
-import type { ZoneConfig, DeskConfig } from '@/lib/api/zone_ingestion';
-import { zoneIngestionApi } from '@/lib/api/zone_ingestion';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Upload, FileCheck } from 'lucide-react';
+import type { ZoneConfig, DeskConfig, BuildingConfigResponse } from '@/lib/api/zone_ingestion';
+import { zoneIngestionApi, floorPlanApi } from '@/lib/api/zone_ingestion';
 
 interface ZoneIngestionWizardProps {
   siteId: string;
@@ -51,6 +51,8 @@ interface IngestionWizardState {
   errors: Record<string, string>;
   loading: boolean;
   success: boolean;
+  extractedConfig: BuildingConfigResponse | null;
+  uploadingFloorPlan: boolean;
 }
 
 export function ZoneIngestionWizard({
@@ -68,6 +70,8 @@ export function ZoneIngestionWizard({
     errors: {},
     loading: false,
     success: false,
+    extractedConfig: null,
+    uploadingFloorPlan: false,
   });
 
   // Validate zone data
@@ -105,6 +109,64 @@ export function ZoneIngestionWizard({
 
     return null;
   }, [state.desks]);
+
+  const handleFloorPlanUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setState((s) => ({ ...s, uploadingFloorPlan: true, errors: {} }));
+
+    try {
+      let config: BuildingConfigResponse;
+      if (file.name.toLowerCase().endsWith('.pdf')) {
+        config = await floorPlanApi.extractFromPdf(file, siteId, siteName, 3);
+      } else if (file.name.toLowerCase().endsWith('.dxf')) {
+        config = await floorPlanApi.extractFromDxf(file, siteId, siteName);
+      } else {
+        setState((s) => ({ ...s, errors: { floorPlan: 'Unsupported file type. Use PDF or DXF.' }, uploadingFloorPlan: false }));
+        return;
+      }
+
+      setState((s) => ({
+        ...s,
+        extractedConfig: config,
+        uploadingFloorPlan: false,
+        errors: {},
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Extraction failed';
+      setState((s) => ({ ...s, errors: { floorPlan: message }, uploadingFloorPlan: false }));
+    }
+  }, [siteId, siteName]);
+
+  const applyExtractedConfig = useCallback(() => {
+    if (!state.extractedConfig) return;
+
+    const extractedZones: ZoneConfig[] = state.extractedConfig.zones.map((z) => ({
+      zone_id: z.zone_id,
+      zone_name: z.zone_id.replace('Zone-', 'Zone ').replace('-', ' '),
+      floor: z.floor,
+      zone_type: z.zone_type || 'open_office',
+    }));
+
+    const extractedDesks: DeskConfig[] = state.extractedConfig.equipment
+      .filter((e) => e.equipment_type === 'fcu' || e.equipment_type === 'vav')
+      .map((e, idx) => ({
+        desk_id: `${idx + 1}`,
+        zone_id: `Zone-${e.floor}-${e.zone || 'A'}`,
+        floor: e.floor,
+        context: 'open_plan' as const,
+        coordinates: { x: e.x, y: 0, z: e.y },
+      }));
+
+    setState((s) => ({
+      ...s,
+      zones: extractedZones,
+      desks: extractedDesks,
+      step: 2,
+      extractedConfig: null,
+    }));
+  }, [state.extractedConfig]);
 
   const addZone = () => {
     const error = validateZone(state.draftZone);
@@ -278,22 +340,65 @@ export function ZoneIngestionWizard({
           {state.step === 1 && (
             <div>
               <h2 className="text-xl font-bold mb-4">Step 1: Floor Plan (Optional)</h2>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                <p className="text-gray-600 mb-4">Upload a floor plan image for reference</p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  id="floor-plan-input"
-                />
-                <label
-                  htmlFor="floor-plan-input"
-                  className="inline-block px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition"
-                >
-                  Choose File
-                </label>
-                <p className="text-sm text-gray-500 mt-4">This step is optional - you can skip it</p>
-              </div>
+
+              {!state.extractedConfig ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <p className="text-gray-600 mb-4">Upload a floor plan to auto-populate zones and equipment</p>
+                  <input
+                    type="file"
+                    accept=".pdf,.dxf,image/*"
+                    className="hidden"
+                    id="floor-plan-input"
+                    onChange={handleFloorPlanUpload}
+                  />
+                  <label
+                    htmlFor="floor-plan-input"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition disabled:opacity-50"
+                  >
+                    {state.uploadingFloorPlan ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Extracting...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        Choose File
+                      </>
+                    )}
+                  </label>
+                  <p className="text-sm text-gray-500 mt-4">PDF or DXF floor plan · Click Next to skip</p>
+                  {state.errors.floorPlan && (
+                    <p className="text-red-600 mt-2 text-sm">{state.errors.floorPlan}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
+                    <FileCheck className="w-5 h-5 text-green-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="font-medium text-green-900">Floor plan extracted</p>
+                      <p className="text-sm text-green-700 mt-1">
+                        {state.extractedConfig.zones.length} zones, {state.extractedConfig.equipment.length} equipment found
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={applyExtractedConfig}
+                      className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
+                    >
+                      Apply to Zone Configuration
+                    </button>
+                    <button
+                      onClick={() => setState((s) => ({ ...s, extractedConfig: null }))}
+                      className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg font-medium hover:bg-gray-300 transition"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

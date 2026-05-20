@@ -26,9 +26,8 @@ export function PageLoading({ message = "Loading…", compact = false }: PageLoa
     <div
       className="flex flex-col items-center justify-center gap-4 p-6"
       style={{
-        flex: 1,
+        minHeight: "100dvh",
         background: "var(--color-sentinel-bg-canvas)",
-        minHeight: compact ? 120 : 240,
       }}
     >
       <div style={{ position: "relative", width: size, height: size }}>

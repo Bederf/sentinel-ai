@@ -32,7 +32,7 @@ export function SortableKPICard({ id, ...props }: SortableKPICardProps) {
     transform: CSS.Transform.toString(transform),
     transition: isDragging
       ? 'none'
-      : transition || 'transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1)', // Spring-like snap effect
+      : transition || 'transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)', // ease-out-quart
     opacity: isDragging ? 0.5 : 1,
     cursor: isDragging ? 'grabbing' : 'grab',
     backdropFilter: isDragging ? 'none' : undefined,

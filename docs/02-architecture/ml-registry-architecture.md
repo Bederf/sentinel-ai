@@ -259,8 +259,8 @@ Extraction: parts[1].upper() = "CHILLER"
 
 **Format 3: Hospital Format (Site 005)**
 ```
-site-005-UMH-AHU-B1-LAUN.fan
-├─ site-005: Site prefix
+site-003-UMH-AHU-B1-LAUN.fan
+├─ site-003: Site prefix
 ├─ UMH: Hospital code
 ├─ AHU: Equipment type (INDEX 3)
 ├─ B1: Location
@@ -286,7 +286,7 @@ BEGIN
       END IF;
     END IF;
 
-    -- Format 3: site-005-UMH-TYPE-... → index 4 (1-indexed)
+    -- Format 3: site-003-UMH-TYPE-... → index 4 (1-indexed)
     IF parts[1] = 'site' AND array_length(parts, 1) >= 4 THEN
       RETURN UPPER(parts[4]);
     END IF;
@@ -343,7 +343,7 @@ Outcome: ✅ RECOMMENDATION SHOWN
 
 ### Scenario 2: Equipment without Trained Model
 ```
-Equipment: site-005-UMH-LIFT-B1-001
+Equipment: site-003-UMH-LIFT-B1-001
 Type: LIFT (patient transport elevator)
 
 Query: registry.get_model("lift")

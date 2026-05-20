@@ -3,13 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -26,271 +23,180 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "up{job=\"sentinel-backend\"}",
-          "legendFormat": "{{instance}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "type": "value", "options": { "0": { "text": "Down", "color": "#ef4444" } } }, { "type": "value", "options": { "1": { "text": "Up", "color": "#10b981" } } }],
+          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.15)" }
         }
       }
     },
     {
       "id": 2,
-      "title": "Total Energy Cost (ZAR)",
+      "title": "Total Cost",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 5, "x": 4, "y": 0 },
+      "gridPos": { "h": 4, "w": 5, "x": 3, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(sentinel_energy_cost_zar) or vector(0)",
-          "legendFormat": "Current period"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_energy_cost_zar) or vector(0)", "legendFormat": "Current period" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 10000 },
-              { "color": "red", "value": 50000 }
-            ]
-          },
-          "unit": "currencyZAR"
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 10000 }, { "color": "#ef4444", "value": 50000 }] },
+          "color": { "mode": "thresholds" },
+          "unit": "currencyZAR",
+          "decimals": 0,
+          "sparkline": { "displayMode": "area", "lineColor": "#ef4444", "fillColor": "rgba(239, 68, 68, 0.1)" }
         }
       }
     },
     {
       "id": 3,
-      "title": "Current Demand (kW)",
+      "title": "Current Demand",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 5, "x": 9, "y": 0 },
+      "gridPos": { "h": 4, "w": 5, "x": 8, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(sentinel_energy_demand_kw) or vector(0)",
-          "legendFormat": "kW"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_energy_demand_kw) or vector(0)", "legendFormat": "kW" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 200 },
-              { "color": "red", "value": 500 }
-            ]
-          },
-          "unit": "kwatth"
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 200 }, { "color": "#ef4444", "value": 500 }] },
+          "color": { "mode": "thresholds" },
+          "unit": "kwatth",
+          "decimals": 1,
+          "sparkline": { "displayMode": "area", "lineColor": "#f59e0b", "fillColor": "rgba(245, 158, 11, 0.1)" }
         }
       }
     },
     {
       "id": 4,
-      "title": "Tariff Optimization Savings (ZAR)",
+      "title": "Tariff Savings",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 5, "x": 14, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 13, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(sentinel_energy_tariff_optimization_savings_zar) or vector(0)",
-          "legendFormat": "Savings"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_energy_tariff_optimization_savings_zar) or vector(0)", "legendFormat": "Savings" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 500 }
-            ]
-          },
-          "unit": "currencyZAR"
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 500 }] },
+          "color": { "mode": "thresholds" },
+          "unit": "currencyZAR",
+          "decimals": 0,
+          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.12)" }
         }
       }
     },
     {
       "id": 5,
-      "title": "Total Consumption (kWh)",
+      "title": "Consumption Over Time",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_energy_total_kwh",
-          "legendFormat": "{{site_id}} {{period}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_total_kwh", "legendFormat": "{{site_id}} {{period}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 20, "gradientMode": "opacity" },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
         }
       }
     },
     {
       "id": 6,
-      "title": "Demand (kW) Over Time",
+      "title": "Demand Profile",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_energy_demand_kw",
-          "legendFormat": "{{site_id}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_demand_kw", "legendFormat": "{{site_id}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 20 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 2
         }
       }
     },
     {
       "id": 7,
-      "title": "Energy Cost (ZAR)",
+      "title": "Cost Breakdown",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 11 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_energy_cost_zar",
-          "legendFormat": "{{site_id}} {{period}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_cost_zar", "legendFormat": "{{site_id}} {{period}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "currencyZAR",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 28 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 0
         }
       }
     },
     {
       "id": 8,
-      "title": "Peak Demand (kW)",
+      "title": "Peak Demand",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 11 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_energy_peak_demand_kw",
-          "legendFormat": "{{site_id}} {{month}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_peak_demand_kw", "legendFormat": "{{site_id}} {{month}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 28 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 2
         }
       }
     },
     {
       "id": 9,
-      "title": "HVAC % of Total Energy",
+      "title": "HVAC Load",
       "type": "gauge",
-      "gridPos": { "h": 7, "w": 4, "x": 16, "y": 11 },
+      "gridPos": { "h": 7, "w": 4, "x": 16, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "avg(sentinel_energy_hvac_percent) or vector(0)",
-          "legendFormat": "Avg HVAC%"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "avg(sentinel_energy_hvac_percent) or vector(0)", "legendFormat": "Avg HVAC%" }],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 40 },
-              { "color": "red", "value": 60 }
-            ]
-          },
           "min": 0,
-          "max": 100
+          "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 40 }, { "color": "#ef4444", "value": 60 }] },
+          "color": { "mode": "thresholds" },
+          "decimals": 1
         }
       }
     },
     {
       "id": 10,
-      "title": "Lighting kWh",
+      "title": "Lighting",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 4, "x": 20, "y": 11 },
+      "gridPos": { "h": 7, "w": 4, "x": 20, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_energy_lighting_kwh",
-          "legendFormat": "{{site_id}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_lighting_kwh", "legendFormat": "{{site_id}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 28 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
         }
       }
     },
     {
       "id": 11,
-      "title": "Carbon Emissions (kg CO2)",
+      "title": "Carbon Emissions",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 19 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_energy_carbon_kg",
-          "legendFormat": "{{site_id}} {{period}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_carbon_kg", "legendFormat": "{{site_id}} {{period}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 28 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 0
         }
       }
     }
@@ -299,19 +205,11 @@
   "tags": ["energy", "sentinel", "building"],
   "templating": {
     "list": [
-      {
-        "name": "site",
-        "type": "query",
-        "query": "label_values(sentinel_energy_total_kwh, site_id)",
-        "multi": true
-      }
+      { "name": "site", "type": "query", "query": "label_values(sentinel_energy_total_kwh, site_id)", "multi": true }
     ]
   },
-  "time": {
-    "from": "now-24h",
-    "to": "now"
-  },
-  "title": "SENTINEL Energy Dashboard",
+  "time": { "from": "now-24h", "to": "now" },
+  "title": "SENTINEL — Energy",
   "uid": "sentinel-energy",
-  "version": 1
+  "version": 2
 }

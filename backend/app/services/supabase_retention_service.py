@@ -15,6 +15,7 @@ Retention schedules:
 - adapter_health_alerts: 7 days (ML training data, POPIA S14(1))
 - space_occupancy_events: 7 days (ML training data, POPIA S14(1))
 - equipment_sensor_readings: 7 days (raw telemetry, POPIA S14(1))
+- alerts: 7 days (raw fault events — noise, not decisions, POPIA S14(1))
 - asset_health_snapshots: 30 days (operational snapshots, POPIA S14(1))
 - system_health_snapshots: 30 days (operational snapshots, POPIA S14(1))
 - recommendations: 5 years (audit trail, POPIA S14(2))
@@ -115,6 +116,13 @@ ML_TRAINING_SCHEDULES: list[RetentionSchedule] = [
         tier="ML_TRAINING",
         date_column="recorded_at",
         description="Raw sensor telemetry — delete after aggregation (POPIA S14(1))",
+    ),
+    RetentionSchedule(
+        table_name="alerts",
+        retention_days=7,
+        tier="ML_TRAINING",
+        date_column="created_at",
+        description="Raw fault events — noise, not decisions (POPIA S14(1))",
     ),
 ]
 

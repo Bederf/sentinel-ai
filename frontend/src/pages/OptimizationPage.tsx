@@ -333,10 +333,10 @@ export function OptimizationPage({ onError }: OptimizationPageProps) {
             </div>
             <div>
               <h1 className="text-2xl font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                Energy Control
+                AI Optimisation
               </h1>
               <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                Optimisation &amp; Cost Management
+                Optimisation &amp; Recommendations
               </p>
             </div>
           </div>

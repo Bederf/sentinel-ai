@@ -581,10 +581,10 @@ class BackgroundSchedulerService:
                                 confidence="0.7",
                                 confidence_score=0.7,
                                 profile=optimization_result.profile or "",
-                                source="ai_optimizer",
-                                source_type="ml_model",
+                                source="health_engine",
+                                source_type="rule_based",
                                 status=RecommendationStatus.PENDING,
-                                requires_approval=True,
+                                requires_approval=False,
                             )
                             loop.run_until_complete(recommendation_repo.create(rec))
                             created_count += 1
@@ -779,6 +779,7 @@ class BackgroundSchedulerService:
                             source_type="ml_model",
                             status=RecommendationStatus.PENDING,
                             requires_approval=True,
+                            shadow_mode=(current_stage == "shadow_live"),
                             metadata={
                                 "group_recommendation": is_grouped,
                                 "affected_equipment": affected,
@@ -792,6 +793,13 @@ class BackgroundSchedulerService:
                         try:
                             loop.run_until_complete(recommendation_repo.create(rec))
                             created_count += 1
+                            if current_stage == "shadow_live":
+                                logger.info(
+                                    "[AI-OPT] Stored shadow recommendation evidence for %s; "
+                                    "no UI event or Telegram notification emitted",
+                                    rec.target_equipment,
+                                )
+                                continue
                             # Emit SSE toast event for new AI recommendation
                             try:
                                 from app.services.event_emitter import get_event_emitter
@@ -811,27 +819,48 @@ class BackgroundSchedulerService:
                             except Exception as emit_err:
                                 logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
 
-                            # Send Telegram notification for AI optimization recs
+                            # Send Telegram notification for AI optimization recs.
+                            # Work-order creation remains gated by the maintenance module;
+                            # advisory sites get acknowledgement only.
                             try:
                                 if self._is_sendable_ai_recommendation(rec):
                                     from app.config.settings import settings as _app_settings
+                                    from app.models.module_registry import ModuleType
                                     from app.services.notification_service import NotificationService
+                                    from app.services.module_registry_service import module_registry
 
                                     _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
                                         _app_settings, "sentry_fm_chat_id", None
                                     )
                                     if _chat_id:
-                                        _msg = self._format_advisory_notification(rec)
+                                        maintenance_active = module_registry.is_module_active(
+                                            site_id,
+                                            ModuleType.MAINTENANCE,
+                                        )
+                                        _msg = self._format_advisory_notification(
+                                            rec,
+                                            can_create_work_order=maintenance_active,
+                                        )
                                         _svc = NotificationService()
-                                        loop.run_until_complete(
-                                            _svc.send_certified(
+                                        if maintenance_active:
+                                            send_result = _svc.send_certified(
+                                                site_id=site_id,
+                                                recipient_telegram_id=str(_chat_id),
+                                                title=rec.reason or "SENTINEL Advisory",
+                                                message=_msg,
+                                                reference_id=rec.id,
+                                                action_label="🛠 Create Work Order",
+                                                callback_action="wo",
+                                            )
+                                        else:
+                                            send_result = _svc.send_certified(
                                                 site_id=site_id,
                                                 recipient_telegram_id=str(_chat_id),
                                                 title=rec.reason or "SENTINEL Advisory",
                                                 message=_msg,
                                                 reference_id=rec.target_equipment,
                                             )
-                                        )
+                                        loop.run_until_complete(send_result)
                                         logger.info(f"[NOTIFY] Advisory notification sent for {rec.target_equipment}")
                             except Exception as notify_err:
                                 logger.warning(f"Failed to send Telegram notification: {notify_err}")
@@ -870,6 +899,7 @@ class BackgroundSchedulerService:
             (created_count, deduped_count)
         """
         from app.database.supabase_client import get_supabase_client
+        from app.models.onboarding_phase import phase_allows
         from app.services.equipment_alert_service import get_equipment_alert_service
         from app.services.health_threshold_service import get_health_thresholds
 
@@ -904,10 +934,12 @@ class BackgroundSchedulerService:
         for site_id in site_ids:
             try:
                 # Get site UUID
-                site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+                site_resp = sb.table("sites").select("id, onboarding_phase").eq("code", site_id).execute()
                 if not site_resp.data:
                     continue
                 site_uuid = site_resp.data[0]["id"]
+                site_phase = site_resp.data[0].get("onboarding_phase") or "commissioning"
+                recommendations_visible = phase_allows(site_phase, "recommendations_ui")
 
                 # Get degraded equipment (below healthy threshold)
                 eq_resp = (
@@ -930,6 +962,20 @@ class BackgroundSchedulerService:
                 )
                 existing_eq_ids: set[str] = {r["equipment_id"] for r in existing_active.data}
 
+                # Fetch previous health from last resolved prediction for transition detection
+                last_resolved = (
+                    sb.table("predictions")
+                    .select("equipment_id, evidence")
+                    .eq("site_id", site_uuid)
+                    .in_("status", ["resolved", "acknowledged", "work_order_raised"])
+                    .execute()
+                )
+                prev_health: dict[str, float | None] = {}
+                for r in last_resolved.data:
+                    ev = r.get("evidence") or {}
+                    if isinstance(ev, dict):
+                        prev_health[r["equipment_id"]] = ev.get("current_health")
+
                 for eq in eq_resp.data:
                     eq_uuid = eq["id"]
                     code = eq["code"]
@@ -943,6 +989,30 @@ class BackgroundSchedulerService:
                         severity = "warning"
                     else:
                         continue  # Between warning and healthy — monitor only
+
+                    # Transition detection — only notify on H→W or W→C changes
+                    prev = prev_health.get(eq_uuid)
+                    is_transition = False
+                    if prev is not None:
+                        # healthy→warning: crossed below healthy threshold
+                        is_H_to_W = prev >= t_healthy and health < t_healthy
+                        # warning→critical: crossed below critical threshold
+                        is_W_to_C = prev >= t_warning and prev < t_critical and health < t_critical
+                        is_transition = is_H_to_W or is_W_to_C
+                        if not is_transition:
+                            logger.info(
+                                f"[HEALTH-PRED] {code}: health={health}% — no transition (prev={prev}%), "
+                                "skipping notification, still creating prediction"
+                            )
+                        else:
+                            transition_label = "H→W" if is_H_to_W else "W→C"
+                            logger.warning(f"[HEALTH-PRED] {code}: {transition_label} transition ({prev}%→{health}%)")
+                    else:
+                        # No history — treat as first detection, don't notify (can't confirm transition)
+                        logger.info(
+                            f"[HEALTH-PRED] {code}: first detection health={health}%, "
+                            "no transition notification"
+                        )
 
                     action_info = ACTIONS[severity]
 
@@ -984,6 +1054,14 @@ class BackgroundSchedulerService:
                         logger.warning(
                             f"[HEALTH-PRED] {code}: health={health}% [{severity.upper()}] — prediction created"
                         )
+                        if not recommendations_visible:
+                            logger.info(
+                                "[HEALTH-PRED] Stored shadow prediction for %s in phase=%s; "
+                                "no UI event or Telegram notification emitted",
+                                code,
+                                site_phase,
+                            )
+                            continue
                         # Emit SSE event for maintenance panel (reads from predictions)
                         try:
                             from app.services.event_emitter import get_event_emitter
@@ -1010,35 +1088,36 @@ class BackgroundSchedulerService:
                     except Exception as e:
                         logger.warning(f"[HEALTH-PRED] Failed to persist for {code}: {e}")
 
-                    # === DASHBOARD ALERT + SENTRY/TELEGRAM NOTIFICATION ===
-                    try:
-                        alert_svc = get_equipment_alert_service()
-                        if severity == "critical":
-                            threshold_msg = f"<{t_critical}% CRITICAL"
-                        else:
-                            threshold_msg = f"<{t_warning}% WARNING"
-                        alert_msg = (
-                            f"Health score {health}% (threshold: "
-                            f"{threshold_msg}). "
-                            f"{action_info['action'].replace('_', ' ').title()} recommended."
-                        )
-                        result = alert_svc.create_alert_for_equipment(
-                            equipment_id=code,
-                            site_id=site_id,
-                            severity=severity,
-                            message=alert_msg,
-                            alert_type="health_maintenance",
-                            notify_telegram=True,
-                        )
-                        if result.get("error"):
-                            logger.warning(f"[HEALTH-PRED] Alert creation failed for {code}: {result['error']}")
-                        else:
-                            tg_status = "sent" if result.get("telegram_sent") else "skipped"
-                            logger.warning(
-                                f"[HEALTH-PRED] Alert created for {code} [{severity.upper()}], telegram={tg_status}"
+                    # === DASHBOARD ALERT + SENTRY/TELEGRAM NOTIFICATION — transition only ===
+                    if is_transition:
+                        try:
+                            alert_svc = get_equipment_alert_service()
+                            if severity == "critical":
+                                threshold_msg = f"<{t_critical}% CRITICAL"
+                            else:
+                                threshold_msg = f"<{t_warning}% WARNING"
+                            alert_msg = (
+                                f"Health score {health}% (threshold: "
+                                f"{threshold_msg}). "
+                                f"{action_info['action'].replace('_', ' ').title()} recommended."
                             )
-                    except Exception as e:
-                        logger.warning(f"[HEALTH-PRED] Notification failed for {code}: {e}")
+                            result = alert_svc.create_alert_for_equipment(
+                                equipment_id=code,
+                                site_id=site_id,
+                                severity=severity,
+                                message=alert_msg,
+                                alert_type="health_maintenance",
+                                notify_telegram=True,
+                            )
+                            if result.get("error"):
+                                logger.warning(f"[HEALTH-PRED] Alert creation failed for {code}: {result['error']}")
+                            else:
+                                tg_status = "sent" if result.get("telegram_sent") else "skipped"
+                                logger.warning(
+                                    f"[HEALTH-PRED] Alert created for {code} [{severity.upper()}], telegram={tg_status}"
+                                )
+                        except Exception as e:
+                            logger.warning(f"[HEALTH-PRED] Notification failed for {code}: {e}")
 
             except Exception as e:
                 logger.warning(f"[HEALTH-PRED] Error for {site_id}: {e}")
@@ -1590,6 +1669,12 @@ class BackgroundSchedulerService:
                             resolver_id = f"site-{site_code[1:]}"
                         if resolver_id not in generation_site_ids:
                             continue
+                    else:
+                        resolver_id = site_code
+                        if site_code.startswith("S") and site_code[1:].isdigit():
+                            resolver_id = f"site-{site_code[1:]}"
+
+                    is_shadow_site = resolver_id in shadow_site_ids
 
                     # Get recent alerts for this equipment (last 30 days)
                     alerts_response = (
@@ -1787,7 +1872,8 @@ class BackgroundSchedulerService:
                         resolved=False,
                     )
 
-                    module_registry.add_recommendation(site_code, ai_rec)
+                    if not is_shadow_site:
+                        module_registry.add_recommendation(site_code, ai_rec)
 
                     # Persist to recommendations table for Cockpit UI
                     try:
@@ -1826,7 +1912,7 @@ class BackgroundSchedulerService:
                                 "multi_objective_score": 0.0,
                                 "status": RecommendationStatus.PENDING.value,
                                 "requires_approval": True,
-                                "shadow_mode": False,
+                                "shadow_mode": is_shadow_site,
                             }
                         ).execute()
                     except Exception as e:
@@ -1868,7 +1954,7 @@ class BackgroundSchedulerService:
             return False
         return True
 
-    def _format_advisory_notification(self, rec) -> str:
+    def _format_advisory_notification(self, rec, can_create_work_order: bool = False) -> str:
         """Format AI optimization notification with holistic building view."""
         metadata = rec.metadata or {}
         adjustments = metadata.get("all_adjustments", [])
@@ -1888,20 +1974,20 @@ class BackgroundSchedulerService:
             recd = adj.get("recommended_value", "")
             unit = adj.get("unit", "")
             if curr:
-                adj_lines.append(f"\u2022 `{equip}`: {point} {curr}{unit} \u2192 {recd}{unit}")
+                adj_lines.append(f"\u2022 `{equip}`: {point} {curr}{unit} -> {recd}{unit}")
             else:
                 adj_lines.append(f"\u2022 `{equip}`: Set {point} to {recd}{unit}")
         if len(adjustments) > 5:
             adj_lines.append(f"\u2022 ...and {len(adjustments) - 5} more zones")
 
         lines = [
-            "\xe2\x9a\x99\xef\xb8\x8f *SENTINEL Advisory \u2014 Sandton City Office Tower*",
+            "⚡ SENTINEL Advisory — Sandton City Office Tower",
             "",
-            f"*{title}*",
+            f"<b>{title}</b>",
             "",
         ]
         if building_assessment:
-            lines.extend(["*Building state:*", f"{building_assessment}", ""])
+            lines.extend(["<b>Building state:</b>", f"{building_assessment}", ""])
         # Truncate reason at sentence boundary, not mid-word
         _MAX_REASON = 350
         if len(reason) > _MAX_REASON:
@@ -1910,13 +1996,16 @@ class BackgroundSchedulerService:
             last_newline = truncated.rfind("\n")
             cutoff = max(last_period, last_newline)
             reason = truncated[: cutoff + 1] if cutoff > 150 else truncated.rstrip() + "…"
-        lines.extend(["*Adjustments needed:*", *adj_lines, "", "*Why:*", reason, "", f"*Goal:* {profile}"])
+        lines.extend(["<b>Adjustments needed:</b>", *adj_lines, "", "<b>Why:</b>", reason, "", f"<b>Goal:</b> {profile}"])
         if saving:
-            lines.append(f"*Saving:* {saving}")
+            lines.append(f"<b>Saving:</b> {saving}")
         if confidence > 0:
             basis = f" ({confidence_basis})" if confidence_basis else ""
-            lines.append(f"*Confidence:* {round(confidence * 100)}%{basis}")
-        lines.extend(["", "\u2192 Acknowledge once all adjustments are made"])
+            lines.append(f"<b>Confidence:</b> {round(confidence * 100)}%{basis}")
+        if can_create_work_order:
+            lines.extend(["", "-> Create a work order if this adjustment needs technician action"])
+        else:
+            lines.extend(["", "-> Acknowledge once reviewed"])
         return "\n".join(lines)
 
     def add_recommendation_digest_job(self):
@@ -5165,15 +5254,27 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             if not chat_id:
                 return
 
+            ADVISORY_TYPES = {"ai_optimization"}
+            ai_recs = [r for r in pending if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES]
+            if not ai_recs:
+                header = (
+                    f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest \u2014 {site_id.upper()}*\n"
+                    "No AI optimization recommendations pending.\n"
+                    "Building status: Optimal\n"
+                    "Next AI-OPT cycle: 09:00 SAST"
+                )
+                await sender.send_text(str(chat_id), header, parse_mode="HTML")
+                return
+
             header = (
                 f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest \u2014 {site_id.upper()}*\n"
-                f"{len(pending)} recommendations pending approval:\n"
+                f"{len(ai_recs)} AI recommendations pending approval:\n"
             )
             await sender.send_text(str(chat_id), header, parse_mode="HTML")
 
             from app.services.telegram_message_sender import InlineButton, InlineKeyboard
 
-            for rec in pending[:5]:
+            for rec in ai_recs[:5]:
                 eq = rec.target_equipment or rec.action_type or "unknown"
                 reason = rec.reason[:70] if rec.reason else ""
                 sev = rec.risk_level.value if hasattr(rec.risk_level, "value") else rec.risk_level or "info"

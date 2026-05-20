@@ -50,6 +50,9 @@ export interface EmailClusterRaw {
 export interface CockpitSiteSummary {
   siteId: string
   siteName: string
+  gpsLat?: number | null
+  gpsLon?: number | null
+  orientationDegrees?: number | null
   onboardingPhase?: 'shadow' | 'advisory' | 'supervised' | 'auto'
   posture?: string | null
   activeAlerts: number
@@ -664,6 +667,9 @@ export function mapCockpitState(
     site: {
       id: summary.siteId,
       name: summary.siteName,
+      latitude: summary.gpsLat ?? null,
+      longitude: summary.gpsLon ?? null,
+      orientationDegrees: summary.orientationDegrees ?? null,
       onboardingPhase,
       posture: formatPostureLabel(payload.building_posture),
       mode: isShadowPhase ? 'watch' : payload.operator_guidance.mode,

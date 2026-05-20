@@ -14,6 +14,24 @@ import {
   ChevronRight,
   ChevronLeft,
   Info,
+  Activity,
+  Brain,
+  Bell,
+  Plug,
+  Cpu,
+  FileText,
+  Wrench,
+  Thermometer,
+  Zap,
+  Lightbulb,
+  Sun,
+  Droplets,
+  Flame,
+  Shield,
+  Box,
+  Gauge,
+  DollarSign,
+  Leaf,
 } from "lucide-react";
 import { useModules } from "../contexts/ModuleHooks";
 import {
@@ -111,7 +129,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
           `}
           style={{
             background: isActive
-              ? "rgba(245, 158, 11, 0.15)"
+              ? 'color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)'
               : "transparent",
             borderLeft: isActive
               ? "4px solid var(--color-sentinel-amber)"
@@ -119,11 +137,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
             color: isActive
               ? "var(--color-sentinel-text-primary)"
               : "var(--color-sentinel-text-secondary)",
-            ...(isActive ? {
-              boxShadow: isMobile
-                ? "0 0 20px rgba(245, 158, 11, 0.3), inset 0 0 12px rgba(245, 158, 11, 0.1)"
-                : "inset 0 0 8px rgba(245, 158, 11, 0.15)",
-            } : {}),
+            boxShadow: isActive
+              ? "0 0 20px color-mix(in oklch, var(--color-sentinel-amber) 25%, transparent), inset 0 0 12px color-mix(in oklch, var(--color-sentinel-amber) 10%, transparent)"
+              : "none",
           }}
           aria-current={isActive ? "page" : undefined}
         >
@@ -136,7 +152,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
                 ? "var(--color-sentinel-amber)"
                 : "var(--color-sentinel-text-secondary)",
               filter: isActive
-                ? "brightness(1.2) drop-shadow(0 0 4px rgba(245, 158, 11, 0.5))"
+                ? "brightness(1.2) drop-shadow(0 0 4px color-mix(in oklch, var(--color-sentinel-amber) 50%, transparent))"
                 : "brightness(1.1)",
             }}
           />
@@ -168,34 +184,34 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
     );
   };
 
-  // Module emoji mapping for About section
-  const moduleEmojis: Record<string, string> = {
-    kpi: "\uD83D\uDCCA",
-    ml: "\uD83E\uDDE0",
-    notifications: "\uD83D\uDD14",
-    integrations: "\uD83D\uDCE1",
-    simbiot: "\uD83D\uDD0C",
-    logging: "\uD83D\uDCDD",
-    assets: "\uD83D\uDD27",
-    hvac: "\u2744",
-    energy: "\u26A1",
-    lighting: "\uD83D\uDCA1",
-    solar: "\u2600\uFE0F",
-    water: "\uD83D\uDCA7",
-    fire: "\uD83D\uDD25",
-    security: "\uD83D\uDD12",
-    digital_twin: "\uD83D\uDDBC",
-    hvac_control: "\u2744",
-    energy_control: "\u26A1",
-    lighting_control: "\uD83D\uDCA1",
-    solar_control: "\u2600\uFE0F",
-    water_control: "\uD83D\uDCA7",
-    security_control: "\uD83D\uDD12",
-    digital_twin_control: "\uD83D\uDDBC",
-    maintenance: "\uD83D\uDD27",
-    financial: "\uD83D\uDCB0",
-    compliance: "\uD83C\uDF3F",
-    fleet_ml: "\uD83E\uDDE0",
+  // Module icon mapping for About section \u2014 Lucide icons with aria-label text equivalents
+  const moduleIcons: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string }> = {
+    kpi:               { icon: Activity,    label: "KPI" },
+    ml:                { icon: Brain,       label: "ML" },
+    notifications:     { icon: Bell,        label: "Notifications" },
+    integrations:      { icon: Plug,        label: "Integrations" },
+    simbiot:           { icon: Cpu,         label: "SIMBIOT" },
+    logging:           { icon: FileText,    label: "Logging" },
+    assets:            { icon: Wrench,      label: "Assets" },
+    hvac:              { icon: Thermometer, label: "HVAC" },
+    energy:            { icon: Zap,         label: "Energy" },
+    lighting:          { icon: Lightbulb,   label: "Lighting" },
+    solar:             { icon: Sun,         label: "Solar" },
+    water:             { icon: Droplets,    label: "Water" },
+    fire:              { icon: Flame,       label: "Fire" },
+    security:          { icon: Shield,       label: "Security" },
+    digital_twin:      { icon: Box,         label: "Digital Twin" },
+    hvac_control:      { icon: Thermometer, label: "HVAC Control" },
+    energy_control:    { icon: Zap,         label: "Energy Control" },
+    lighting_control:  { icon: Lightbulb,   label: "Lighting Control" },
+    solar_control:     { icon: Sun,         label: "Solar Control" },
+    water_control:     { icon: Droplets,    label: "Water Control" },
+    security_control:  { icon: Shield,       label: "Security Control" },
+    digital_twin_control: { icon: Box,      label: "Digital Twin Control" },
+    maintenance:       { icon: Wrench,      label: "Maintenance" },
+    financial:         { icon: DollarSign,  label: "Financial" },
+    compliance:        { icon: Leaf,        label: "Compliance" },
+    fleet_ml:          { icon: Brain,       label: "Fleet ML" },
   };
 
   return (
@@ -217,7 +233,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
       {isMobileOpen && (
         <div
           className="md:hidden fixed inset-0 z-30 animate-in fade-in duration-200"
-          style={{ background: "rgba(0, 0, 0, 0.75)" }}
+          style={{ background: "color-mix(in oklch, #000 75%, transparent)" }}
           onClick={() => setIsMobileOpen(false)}
           aria-hidden="true"
         />
@@ -273,17 +289,17 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
             aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             <span
-              className="inline-flex items-center justify-center h-8 w-8 rounded-full
-                border border-white/10
-                bg-gradient-to-br from-cyan-500/20 via-emerald-500/10 to-amber-500/20
-                shadow-[0_0_12px_rgba(34,211,238,0.35)]
-                transition-all duration-200 hover:scale-110 hover:brightness-125"
-              style={{ borderColor: "var(--glass-border)" }}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-full transition-all duration-200 hover:scale-110 hover:brightness-125"
+              style={{
+                background: 'color-mix(in oklch, var(--color-sentinel-amber) 12%, transparent)',
+                border: '1px solid color-mix(in oklch, var(--color-sentinel-amber) 35%, transparent)',
+                color: 'var(--color-sentinel-text-secondary)',
+              }}
             >
               {isCollapsed ? (
-                <ChevronRight className="h-4 w-4" style={{ color: "var(--color-sentinel-text-primary)" }} />
+                <ChevronRight className="h-4 w-4" />
               ) : (
-                <ChevronLeft className="h-4 w-4" style={{ color: "var(--color-sentinel-text-primary)" }} />
+                <ChevronLeft className="h-4 w-4" />
               )}
             </span>
           </button>
@@ -384,12 +400,17 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
                               key={mod.module_type}
                               className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
                               style={{
-                                background: "rgba(245, 158, 11, 0.15)",
-                                border: "1px solid rgba(245, 158, 11, 0.3)",
-                                color: "var(--color-sentinel-amber)",
+                                background: 'color-mix(in oklch, var(--color-sentinel-amber) 12%, transparent)',
+                                border: '1px solid color-mix(in oklch, var(--color-sentinel-amber) 30%, transparent)',
+                                color: 'var(--color-sentinel-amber)',
                               }}
+                              aria-label={moduleIcons[mod.module_type]?.label ?? mod.module_type}
                             >
-                              <span>{moduleEmojis[mod.module_type] || "\u2699\uFE0F"}</span>
+                              {(() => {
+                                const entry = moduleIcons[mod.module_type] ?? { icon: Gauge, label: mod.module_type };
+                                const Icon = entry.icon;
+                                return <Icon className="w-3 h-3" aria-hidden="true" />;
+                              })()}
                               {mod.module_type.toUpperCase()}
                             </span>
                           ))

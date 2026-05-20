@@ -125,7 +125,7 @@ export function SplashScreen({ onComplete, minDisplayTime = 8500 }: SplashScreen
         {/* Loading text below video */}
         <div
           className="mt-8 text-sm tracking-widest animate-pulse"
-          style={{ color: "#1A2B4C" }}
+          style={{ color: "var(--color-sentinel-text-primary, #e2e8f0)" }}
         >
           INITIALIZING
         </div>

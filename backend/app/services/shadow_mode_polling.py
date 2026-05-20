@@ -121,6 +121,8 @@ class ShadowModePollingService:
         bridge_token: str | None = None,
     ):
         self.site_id = site_id
+        # Derive equipment code prefix from site_id: "site-002" → "S002"
+        self._site_prefix = site_id.replace("site-", "S").upper()
         self._override_bridge_url = bridge_url
         self._override_bridge_token = bridge_token
         self._poll_count = 0
@@ -320,7 +322,7 @@ class ShadowModePollingService:
                 zone_id: str = z.get("zone_id", "")
                 parts = zone_id.split("-")
                 zone_num = parts[1] if len(parts) == 2 else zone_id
-                equip_code = f"S002-FCU-{zone_num}"
+                equip_code = f"{self._site_prefix}-FCU-{zone_num}"
 
                 temp = z.get("temperature_c")
                 co2 = z.get("co2_ppm")
@@ -392,7 +394,7 @@ class ShadowModePollingService:
                 agg_readings["pressure_bar"] = float(pressure_bar)
 
             if agg_readings:
-                agg_states["S002-CHILLER-AGG"] = {
+                agg_states[f"{self._site_prefix}-CHILLER-AGG"] = {
                     "type": "site_aggregate",
                     "sensor_readings": agg_readings,
                 }
@@ -408,7 +410,7 @@ class ShadowModePollingService:
                 water_readings["total_consumption_m3"] = float(total_m3)
 
             if water_readings:
-                agg_states["S002-WATER-MTR-001"] = {
+                agg_states[f"{self._site_prefix}-WATER-MTR-001"] = {
                     "type": "water_meter",
                     "sensor_readings": water_readings,
                 }
@@ -431,7 +433,7 @@ class ShadowModePollingService:
                 if val is not None:
                     chiller_readings[op_key] = float(val)
             if chiller_readings:
-                agg_states["S002-CHILLER-B1-001"] = {
+                agg_states[f"{self._site_prefix}-CHILLER-B1-001"] = {
                     "type": "chiller",
                     "sensor_readings": chiller_readings,
                 }
@@ -439,7 +441,7 @@ class ShadowModePollingService:
             # Map cooling tower fan speed from chiller block
             ct_fan = chiller_data.get("cooling_tower_fan_speed_pct")
             if ct_fan is not None:
-                agg_states["S002-CT-R-001"] = {
+                agg_states[f"{self._site_prefix}-CT-R-001"] = {
                     "type": "cooling_tower",
                     "sensor_readings": {"fan_speed_pct": float(ct_fan)},
                 }
@@ -448,9 +450,9 @@ class ShadowModePollingService:
             # Bridge telemetry ahu1/ahu2/ahu3 maps to zone-code format in Supabase
             ahu_data = data.get("ahu", {})
             ahu_map = {
-                "ahu1": "S002-AHU-001",  # Basement AHU
-                "ahu2": "S002-AHU-002",  # Rooftop AHU
-                "ahu3": "S002-AHU-201",  # Level 2 AHU
+                "ahu1": f"{self._site_prefix}-AHU-001",  # Basement AHU
+                "ahu2": f"{self._site_prefix}-AHU-002",  # Rooftop AHU
+                "ahu3": f"{self._site_prefix}-AHU-201",  # Level 2 AHU
             }
             ahu_field_map = {
                 "supply_temp_c": "supply_air_temp",
@@ -474,7 +476,7 @@ class ShadowModePollingService:
             zone_count = data.get("zone_count", 0)
             equip_online = equip_summary.get("online", 0)
             if zone_count or equip_online:
-                agg_states["S002-SITE-AGG"] = {
+                agg_states[f"{self._site_prefix}-SITE-AGG"] = {
                     "type": "site_aggregate",
                     "sensor_readings": {
                         "zone_count": float(zone_count),
@@ -498,7 +500,7 @@ class ShadowModePollingService:
                     security_readings["forced_door_count"] = float(forced_door)
 
                 if security_readings:
-                    agg_states["S002-CCURE-SVR"] = {
+                    agg_states[f"{self._site_prefix}-CCURE-SVR"] = {
                         "type": "access_control_server",
                         "sensor_readings": security_readings,
                     }
@@ -521,10 +523,10 @@ class ShadowModePollingService:
             occ = repo.get_occupancy(self.site_id)
             total_occ = occ.get("total_occupancy", 0)
 
-            if "S002-SITE-AGG" in agg_states:
-                agg_states["S002-SITE-AGG"]["sensor_readings"]["total_occupancy"] = float(total_occ)
-                agg_states["S002-SITE-AGG"]["sensor_readings"]["occupied_zones"] = 0.0
-                agg_states["S002-SITE-AGG"]["sensor_readings"]["peak_zone_density"] = 0.0
+            if f"{self._site_prefix}-SITE-AGG" in agg_states:
+                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["total_occupancy"] = float(total_occ)
+                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["occupied_zones"] = 0.0
+                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["peak_zone_density"] = 0.0
             result["occupancy_fetched"] = True
         except Exception as e:
             logger.debug(f"[SHADOW] Occupancy poll skipped: {e}")
@@ -630,7 +632,7 @@ class ShadowModePollingService:
                 water_point_resp = await client.get(
                     f"{base}/api/sites/{self.site_id}/points",
                     headers=headers,
-                    params={"equipment_id": "S002-WATER-MTR-001"},
+                    params={"equipment_id": f"{self._site_prefix}-WATER-MTR-001"},
                 )
                 water_point_resp.raise_for_status()
                 water_points_data = water_point_resp.json()
@@ -660,10 +662,10 @@ class ShadowModePollingService:
 
                 if water_detailed_readings:
                     # Merge with existing water meter readings or create new entry
-                    if "S002-WATER-MTR-001" in agg_states:
-                        agg_states["S002-WATER-MTR-001"]["sensor_readings"].update(water_detailed_readings)
+                    if f"{self._site_prefix}-WATER-MTR-001" in agg_states:
+                        agg_states[f"{self._site_prefix}-WATER-MTR-001"]["sensor_readings"].update(water_detailed_readings)
                     else:
-                        agg_states["S002-WATER-MTR-001"] = {
+                        agg_states[f"{self._site_prefix}-WATER-MTR-001"] = {
                             "type": "water_meter",
                             "sensor_readings": water_detailed_readings,
                         }
@@ -1167,30 +1169,31 @@ class ShadowModePollingService:
         object catalog and zone→AHU mapping.
 
         Examples:
-          "Zone-001-temp"     → "S002-FCU-001", "room_temp"
-          "CH-1-ChwSupplyTemp" → "S002-CHILLER-B1-001", "chw_supply_temp"
-          "S002-AHU-B1-001-supply_air_temp" → "S002-AHU-B1-001", "supply_temp"
+          "Zone-001-temp"     → "S{num}-FCU-001", "room_temp"
+          "CH-1-ChwSupplyTemp" → "S{num}-CHILLER-B1-001", "chw_supuply_temp"
+          "S{num}-AHU-B1-001-supply_air_temp" → "S{num}-AHU-B1-001", "supply_temp"
         """
-        # Zone temperature: Zone-001-temp → S002-FCU-001
+        # Zone temperature: Zone-001-temp → S{num}-FCU-001
+        prefix = self._site_prefix  # e.g. "S002"
         if sensor_code.startswith("Zone-") and "-temp" in sensor_code:
             parts = sensor_code.replace("-temp", "").split("-")
             if len(parts) == 2:
                 zone_num = parts[1]
-                return f"S002-FCU-{zone_num}", "room_temp"
+                return f"{prefix}-FCU-{zone_num}", "room_temp"
             return None, None
 
-        # Chiller supply temp: CH-1-ChwSupplyTemp → S002-CHILLER-B1-001
+        # Chiller supply temp: CH-1-ChwSupplyTemp → S{num}-CHILLER-B1-001
         if "ChwSupplyTemp" in sensor_code:
             # "CH-1-ChwSupplyTemp" → rsplit gives ["CH-1", "ChwSupplyTemp"]
             chiller_id = sensor_code.rsplit("-", 1)[0]  # "CH-1"
             chiller_map = {
-                "CH-1": "S002-CHILLER-B1-001",
-                "CH-2": "S002-CHILLER-B1-002",
+                "CH-1": f"{prefix}-CHILLER-B1-001",
+                "CH-2": f"{prefix}-CHILLER-B1-002",
             }
-            equip_code = chiller_map.get(chiller_id, f"S002-CHILLER-B1-{chiller_id}")
+            equip_code = chiller_map.get(chiller_id, f"{prefix}-CHILLER-B1-{chiller_id}")
             return equip_code, "chw_supply_temp"
 
-        # AHU sensors: S002-AHU-B1-001-supply_air_temp
+        # AHU sensors: S{num}-AHU-B1-001-supply_air_temp
         if "AHU-" in sensor_code:
             parts = sensor_code.split("-")
             if len(parts) >= 5:
@@ -1199,11 +1202,11 @@ class ShadowModePollingService:
                 reading_name = self._ahu_point_to_reading(point)
                 return equip_code, reading_name
 
-        # Weather: SITE002-WEATHER-outdoor_temperature
+        # Weather: SITE{num}-WEATHER-outdoor_temperature
         if "WEATHER" in sensor_code and "outdoor_temp" in sensor_code.lower():
-            return "S002-SITE-AGG", "outdoor_temp"
+            return f"{prefix}-SITE-AGG", "outdoor_temp"
         if "WEATHER" in sensor_code and "humidity" in sensor_code.lower():
-            return "S002-SITE-AGG", "outdoor_humidity"
+            return f"{prefix}-SITE-AGG", "outdoor_humidity"
 
         return None, None
 
@@ -1395,7 +1398,7 @@ class ShadowModePollingService:
             dali_states: dict[str, dict[str, Any]] = {}
             meter_states: dict[str, dict[str, Any]] = {}
             for code, info in equip_status_map.items():
-                if code.startswith("S002-DALI-"):
+                if code.startswith(f"{self._site_prefix}-DALI-"):
                     # DALI controller: status + updated_at as sensor readings
                     dali_states[code] = {
                         "type": "dali",
@@ -1403,7 +1406,7 @@ class ShadowModePollingService:
                             "controller_status": 1.0 if info.get("status") in ("online", "normal", "ok") else 0.0,
                         },
                     }
-                elif code.startswith("S002-MTR-"):
+                elif code.startswith(f"{self._site_prefix}-MTR-"):
                     # Power meter: active_power_kw (e.g. S002-MTR-B1-LIGHT)
                     readings: dict[str, float] = {}
                     if (ap := info.get("active_power_kw")) is not None:
@@ -1441,10 +1444,10 @@ class ShadowModePollingService:
             db_full_codes = [eq.get("code") for eq in all_equipment]
 
             def _normalise(code: str) -> str:
-                """Strip S002- prefix and replace underscores with hyphens for matching."""
+                """Strip site prefix (e.g. S002-) and replace underscores with hyphens for matching."""
                 c = code.replace("_", "-")
-                if c.startswith("S002-"):
-                    c = c[5:]
+                if c.startswith(f"{self._site_prefix}-"):
+                    c = c[len(self._site_prefix) + 1:]
                 return c
 
             def _letter_zone_to_numeric(code: str) -> str | None:
@@ -1562,7 +1565,7 @@ class ShadowModePollingService:
                     # B1-001 → B01, R-XXX → R01, L{N}-{LETTER} → {N*100+ZONE}
                     bcode_norm = _normalise(bcode)
                     conv = _letter_zone_to_numeric(bcode_norm)
-                    canonical_code = f"S002-{conv}" if conv else bcode
+                    canonical_code = f"{self._site_prefix}-{conv}" if conv else bcode
                     # If canonical code already exists in DB, update it instead of creating duplicate
                     if canonical_code != bcode:
                         existing = eq_repo.get_by_id(canonical_code)

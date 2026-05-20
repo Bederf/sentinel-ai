@@ -34,7 +34,7 @@ class SiteAdapterManager:
         Return all enabled adapter instances for a site.
 
         Args:
-            site_id: Site code (e.g., "site-002", "site-005")
+            site_id: Site code (e.g., "site-002", "site-003")
 
         Returns:
             List of connected BmsAdapter instances. Empty list if none succeed.
@@ -161,7 +161,7 @@ class SiteAdapterManager:
         Called by the SIMBIOT wizard on approval step.
 
         Args:
-            site_id: Site code (e.g., "site-005")
+            site_id: Site code (e.g., "site-003")
             protocol: Protocol name ("bacnet", "obix", "modbus", "bridge")
             connection_config: Connection details dict (host, token, credentials, etc.)
             enabled: Whether the adapter is active

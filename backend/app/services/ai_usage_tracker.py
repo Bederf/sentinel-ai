@@ -614,74 +614,100 @@ class AiUsageTracker:
             self._flush_daily_to_db(key, entry)
 
     def _get_cache_stats(self, days: int = 30) -> dict:
-        """Calculate cache efficiency metrics from JSON storage."""
-        data = self._read_file()
-        daily = data.get("daily", {})
-
-        today_dt = date.today()
-        cutoff = today_dt - timedelta(days=days)
-
-        total_input = 0
-        total_cache_read = 0
-        total_output = 0
-
-        for day_str, entries in daily.items():
-            try:
-                day_date = date.fromisoformat(day_str)
-            except ValueError:
-                continue
-            if day_date < cutoff:
-                continue
-
-            for key, entry in entries.items():
-                if str(key).startswith("_"):
+        """Calculate cache efficiency metrics from Supabase (primary store)."""
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        try:
+            result = self._supabase.table("ai_usage_daily").select(
+                "input_tokens,cache_read_tokens,output_tokens"
+            ).gte("date", cutoff).execute()
+            total_input = 0
+            total_cache_read = 0
+            total_output = 0
+            for row in result.data:
+                total_input += row.get("input_tokens", 0) or 0
+                total_cache_read += row.get("cache_read_tokens", 0) or 0
+                total_output += row.get("output_tokens", 0) or 0
+            cache_hit_rate = (total_cache_read / total_input) if total_input > 0 else 0
+            return {
+                "total_input_tokens": total_input,
+                "total_output_tokens": total_output,
+                "cache_read_tokens": total_cache_read,
+                "cache_hit_rate": round(cache_hit_rate, 4),
+                "cache_hit_pct": round(cache_hit_rate * 100, 2),
+            }
+        except Exception as exc:
+            logger.warning("Failed to get cache stats from DB, falling back to JSON: %s", exc)
+            # Fallback to JSON for backwards compatibility
+            data = self._read_file()
+            daily = data.get("daily", {})
+            today_dt = date.today()
+            cutoff_dt = today_dt - timedelta(days=days)
+            total_input = 0
+            total_cache_read = 0
+            total_output = 0
+            for day_str, entries in daily.items():
+                try:
+                    day_date = date.fromisoformat(day_str)
+                except ValueError:
                     continue
-                total_input += entry.get("input_tokens", 0)
-                total_cache_read += entry.get("cache_read_tokens", 0)
-                total_output += entry.get("output_tokens", 0)
-
-        cache_hit_rate = (total_cache_read / total_input) if total_input > 0 else 0
-
-        return {
-            "total_input_tokens": total_input,
-            "total_output_tokens": total_output,
-            "cache_read_tokens": total_cache_read,
-            "cache_hit_rate": round(cache_hit_rate, 4),
-            "cache_hit_pct": round(cache_hit_rate * 100, 2),
-        }
-
-    def _group_by_feature(self) -> dict:
-        """Group usage by feature (RAG, recommendation, email, etc.)."""
-        data = self._read_file()
-        daily = data.get("daily", {})
-
-        today_dt = date.today()
-        cutoff = today_dt - timedelta(days=30)
-
-        by_feature: dict = {}
-
-        for day_str, entries in daily.items():
-            try:
-                day_date = date.fromisoformat(day_str)
-            except ValueError:
-                continue
-            if day_date < cutoff:
-                continue
-
-            for key, entry in entries.items():
-                if str(key).startswith("_"):
+                if day_date < cutoff_dt:
                     continue
+                for key, entry in entries.items():
+                    if str(key).startswith("_"):
+                        continue
+                    total_input += entry.get("input_tokens", 0)
+                    total_cache_read += entry.get("cache_read_tokens", 0)
+                    total_output += entry.get("output_tokens", 0)
+            cache_hit_rate = (total_cache_read / total_input) if total_input > 0 else 0
+            return {
+                "total_input_tokens": total_input,
+                "total_output_tokens": total_output,
+                "cache_read_tokens": total_cache_read,
+                "cache_hit_rate": round(cache_hit_rate, 4),
+                "cache_hit_pct": round(cache_hit_rate * 100, 2),
+            }
 
-                feature = entry.get("feature", "unknown")
-
+    def _group_by_feature(self, days: int = 30) -> dict:
+        """Group usage by feature from Supabase (primary store)."""
+        cutoff = (date.today() - timedelta(days=days)).isoformat()
+        try:
+            result = self._supabase.table("ai_usage_daily").select(
+                "feature,calls,input_tokens,output_tokens,cost_usd"
+            ).gte("date", cutoff).execute()
+            by_feature: dict = {}
+            for row in result.data:
+                feature = row.get("feature") or "unknown"
                 if feature not in by_feature:
                     by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
-
-                by_feature[feature]["calls"] += entry.get("calls", 0)
-                by_feature[feature]["tokens"] += entry.get("input_tokens", 0) + entry.get("output_tokens", 0)
-                by_feature[feature]["cost_usd"] += entry.get("cost_usd", 0)
-
-        return by_feature
+                by_feature[feature]["calls"] += row.get("calls", 0) or 0
+                by_feature[feature]["tokens"] += (row.get("input_tokens", 0) or 0) + (row.get("output_tokens", 0) or 0)
+                by_feature[feature]["cost_usd"] += row.get("cost_usd", 0.0) or 0.0
+            return by_feature
+        except Exception as exc:
+            logger.warning("Failed to get feature stats from DB, falling back to JSON: %s", exc)
+            # Fallback to JSON for backwards compatibility
+            data = self._read_file()
+            daily = data.get("daily", {})
+            today_dt = date.today()
+            cutoff_dt = today_dt - timedelta(days=days)
+            by_feature: dict = {}
+            for day_str, entries in daily.items():
+                try:
+                    day_date = date.fromisoformat(day_str)
+                except ValueError:
+                    continue
+                if day_date < cutoff_dt:
+                    continue
+                for key, entry in entries.items():
+                    if str(key).startswith("_"):
+                        continue
+                    feature = entry.get("feature", "unknown")
+                    if feature not in by_feature:
+                        by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+                    by_feature[feature]["calls"] += entry.get("calls", 0)
+                    by_feature[feature]["tokens"] += entry.get("input_tokens", 0) + entry.get("output_tokens", 0)
+                    by_feature[feature]["cost_usd"] += entry.get("cost_usd", 0.0)
+            return by_feature
 
     def flush(self):
         """Public flush — call on shutdown."""

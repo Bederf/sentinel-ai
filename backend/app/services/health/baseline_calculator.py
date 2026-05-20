@@ -69,7 +69,7 @@ def _confidence_score(age_years: float) -> float:
         return base          # moderate variance
     else:
         return base - 0.05   # high variance in older equipment
-    
+
 
 def calculate_baseline_health(
     commissioning_date: date | str,

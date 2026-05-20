@@ -115,7 +115,7 @@ export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStat
   };
 
   return (
-    <div className="glass-panel overflow-hidden">
+    <div className="glass-panel flat overflow-hidden">
       <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>

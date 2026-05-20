@@ -169,15 +169,15 @@ export default function QuoteGenerator({
   if (quote) {
     return (
       <div className="space-y-4">
-        <Card className="bg-green-50 border border-green-200">
+        <Card style={{ background: "rgba(16, 185, 129, 0.1)", border: "1px solid rgba(16, 185, 129, 0.3)" }}>
           <div className="flex items-start gap-3">
-            <CheckCircle2 className="h-5 w-5 text-green-600 mt-1 flex-shrink-0" />
+            <CheckCircle2 className="h-5 w-5 mt-1 flex-shrink-0" style={{ color: "var(--color-sentinel-green)" }} />
             <div className="flex-1">
-              <Title className="text-green-900">Quote Generated</Title>
-              <Text className="text-green-800">
+              <Title style={{ color: "var(--color-sentinel-green)" }}>Quote Generated</Title>
+              <Text style={{ color: "var(--color-sentinel-green)" }}>
                 Quote ID: {quote.request_id}
               </Text>
-              <Text className="text-green-700 text-sm mt-1">
+              <Text className="text-sm mt-1" style={{ color: "rgba(16, 185, 129, 0.7)" }}>
                 Valid until: {new Date(quote.valid_until).toLocaleDateString()}
               </Text>
             </div>
@@ -295,12 +295,12 @@ export default function QuoteGenerator({
   // Show error state
   if (error) {
     return (
-      <Card className="bg-red-50 border border-red-200">
+      <Card style={{ background: "rgba(220, 38, 38, 0.1)", border: "1px solid rgba(220, 38, 38, 0.3)" }}>
         <div className="flex items-start gap-3">
-          <AlertCircle className="h-5 w-5 text-red-600 mt-1 flex-shrink-0" />
+          <AlertCircle className="h-5 w-5 mt-1 flex-shrink-0" style={{ color: "var(--color-sentinel-red)" }} />
           <div className="flex-1">
-            <Title className="text-red-900">Error</Title>
-            <Text className="text-red-800">{error}</Text>
+            <Title style={{ color: "var(--color-sentinel-red)" }}>Error</Title>
+            <Text style={{ color: "var(--color-sentinel-red)" }}>{error}</Text>
             <Button
               variant="secondary"
               onClick={() => {
@@ -362,12 +362,16 @@ export default function QuoteGenerator({
                   <Badge
                     key={code}
                     icon={Zap}
-                    className="bg-blue-100 text-blue-800"
+                    className="text-sm"
+                    style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }}
                   >
                     {code}
                     <button
                       onClick={() => handleEquipmentChange(code)}
-                      className="ml-1 hover:text-blue-600"
+                      className="ml-1"
+                      style={{ color: "var(--color-sentinel-blue)" }}
+                      onMouseEnter={e => (e.currentTarget.style.color = "var(--color-sentinel-amber)")}
+                      onMouseLeave={e => (e.currentTarget.style.color = "var(--color-sentinel-blue)")}
                     >
                       ×
                     </button>

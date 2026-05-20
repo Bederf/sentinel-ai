@@ -281,7 +281,7 @@ Seed energy consumption data for demo purposes.
 {
   "success": true,
   "message": "Seeded 2700 energy consumption records",
-  "buildings": ["site-002", "site-005", "site-012"],
+  "buildings": ["site-002", "site-003", "site-012"],
   "days": 90,
   "date_range": "2024-10-16 to 2025-01-15"
 }

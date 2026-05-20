@@ -313,7 +313,7 @@ threshold = await registry.get_confidence_threshold("VAV")
 - ✅ Update models without redeploying
 - ✅ Retrain without code changes
 - ✅ Equipment types auto-extracted from codes
-- ✅ Multi-site support (S002, site-005, site-012)
+- ✅ Multi-site support (S002, site-003, site-012)
 
 ## Data Flow Example: Equipment Fault → Resolution
 

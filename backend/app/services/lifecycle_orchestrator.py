@@ -286,7 +286,7 @@ class LifecycleOrchestrator:
         # Cycle tracking for completion
         self.max_cycles: int = 1  # How many full cycles before completing
         self.completed_cycles: int = 0
-        self._site_prefix: str = normalize_site_id(self.site_id, to_supabase=True).upper()  # site-005 → S005
+        self._site_prefix: str = normalize_site_id(self.site_id, to_supabase=True).upper()  # site-003 → S003
 
         # Energy tracking
         self.total_energy_kwh: float = 0.0  # Cumulative energy consumption
@@ -427,7 +427,7 @@ class LifecycleOrchestrator:
 
     @property
     def site_prefix(self) -> str:
-        """Derive equipment code prefix from site_id: 'site-005' -> 'S005'."""
+        """Derive equipment code prefix from site_id: 'site-003' -> 'S003'."""
         return self._site_prefix
 
     # Normalize DB type names (e.g. GEN, MTR, INV) to internal names

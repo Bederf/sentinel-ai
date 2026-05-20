@@ -1114,6 +1114,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           <OverviewCockpitHost
             siteId={siteId}
             siteName={site.name}
+            gpsLat={site.latitude ?? null}
+            gpsLon={site.longitude ?? null}
+            orientationDegrees={site.orientation_degrees ?? null}
             onboardingPhase={sitePhase}
             activeAlerts={alerts.length}
             predictionsCount={predictions.length}

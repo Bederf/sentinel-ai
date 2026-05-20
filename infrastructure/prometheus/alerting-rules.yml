@@ -37,7 +37,7 @@ groups:
     interval: 30s
     rules:
       - alert: SentinelModelDriftPersistent
-        expr: sentinel_model_drift_alerts{source="supabase", data_sufficient="true"} > 0
+        expr: sentinel_model_drift_alerts{source="supabase", data_sufficient="true", data_quality="sufficient"} > 0
         for: 1h
         labels:
           severity: warning
@@ -153,14 +153,14 @@ groups:
           action: "Check if service is running and network connectivity."
 
       - alert: SentinelMLGateCleared
-        expr: sentinel_ml_hours_ingested{site_id="site-002"} >= 72
+        expr: sentinel_ml_hours_ingested >= 72
         for: 5m
         labels:
           severity: info
           category: ml-ops
         annotations:
-          summary: "S002 ML gate cleared — phase flip to Supervised now eligible"
-          description: "ml_hours_ingested={{ $value }}h. Execute phase flip via PATCH /api/sites/site-002/phase"
+          summary: "{{ $labels.site_id }} ML gate cleared — phase flip eligible"
+          description: "{{ $labels.site_id }}: ml_hours_ingested={{ $value }}h. Execute phase flip via PATCH /api/sites/{{ $labels.site_id }}/phase"
           action: "ML training gate has crossed 72h threshold. Site is eligible to advance from advisory to supervised phase."
 
       - alert: HighErrorRate

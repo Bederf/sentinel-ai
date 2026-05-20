@@ -240,7 +240,7 @@ describe('useEquipmentByType Hook', () => {
       ];
 
       const mockEquipment2: Equipment[] = [
-        { ...mockEquipment, site_code: 'site-005' },
+        { ...mockEquipment, site_code: 'site-003' },
       ];
 
       mockApiFetch
@@ -253,7 +253,7 @@ describe('useEquipmentByType Hook', () => {
       );
 
       const { result: result2 } = renderHook(
-        () => useEquipmentByType('site-005', 'CHILLER'),
+        () => useEquipmentByType('site-003', 'CHILLER'),
         { wrapper: createWrapper(queryClient) }
       );
 
@@ -518,7 +518,7 @@ describe('useEquipmentByType Hook', () => {
       );
 
       renderHook(
-        () => useEquipmentByType('site-005', 'CHILLER'),
+        () => useEquipmentByType('site-003', 'CHILLER'),
         { wrapper: createWrapper(queryClient) }
       );
 

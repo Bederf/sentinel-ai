@@ -271,11 +271,41 @@ sentinel_quality_gate_rule_evaluations_total = Counter(
     registry=REGISTRY,
 )
 
-# 26. Model drift score per model (supplements #6 which is alert count)
-sentinel_model_drift_score = Gauge(
-    "sentinel_model_drift_score",
-    "Current drift score per model (0.0-1.0, higher = more drift)",
-    labelnames=["model_id", "model_type", "source", "data_sufficient"],
+# Drift detection gates
+MIN_BASELINE_HOURS = 72  # Absolute minimum — below this, don't run at all
+MIN_BASELINE_AGE_HOURS = 168  # 7 days for production-grade signal
+
+
+def _assess_drift_data_sufficiency(
+    baseline_span_seconds: float,
+    features_checked: int,
+) -> tuple[str, str]:
+    """
+    Two-tier gate for drift detection data quality.
+
+    Returns (data_quality, data_sufficient).
+    data_quality drives Grafana styling and alert filtering.
+    data_sufficient is the legacy label kept for alert backward compatibility.
+    """
+    hours_of_data = baseline_span_seconds / 3600
+
+    if features_checked < 30:
+        return "insufficient_samples", "false"
+
+    if hours_of_data < MIN_BASELINE_HOURS:
+        return "insufficient_timespan", "false"
+
+    if hours_of_data < MIN_BASELINE_AGE_HOURS:
+        return "provisional", "true"
+
+    return "sufficient", "true"
+
+
+# 5b. Drift baseline temporal span (hours of data available for comparison)
+sentinel_drift_baseline_hours = Gauge(
+    "sentinel_drift_baseline_hours",
+    "Hours of baseline data available for drift detection",
+    ["model_id", "site_id", "data_quality"],
     registry=REGISTRY,
 )
 
@@ -494,16 +524,28 @@ def _collect_drift_metrics() -> None:
                 cfg = EQUIPMENT_TO_SENSORS.get(eq_type, {})
                 uses_real_data = cfg.get("uses_real_data", False)
 
-                # Synthetic data: emit with source="synthetic", data_sufficient="true"
-                # (seeded distributions always have enough samples)
+                # Synthetic data: emit with source="synthetic", data_quality="sufficient"
+                # (seeded distributions always have enough samples — no temporal gate needed)
                 if not uses_real_data:
                     score = 0.0  # synthetic fallback score — not real drift
                     sentinel_model_drift_score.labels(
-                        model_id=eq_type, model_type=eq_type.upper(), source="synthetic", data_sufficient="true"
+                        model_id=eq_type,
+                        model_type=eq_type.upper(),
+                        source="synthetic",
+                        data_sufficient="true",
+                        data_quality="sufficient",
                     ).set(score)
                     sentinel_model_drift_alerts.labels(
-                        site_id="site-002", model_type=eq_type.upper(), source="synthetic", data_sufficient="true"
+                        site_id="site-002",
+                        model_type=eq_type.upper(),
+                        source="synthetic",
+                        data_sufficient="true",
                     ).set(0)
+                    sentinel_drift_baseline_hours.labels(
+                        model_id=eq_type,
+                        site_id="site-002",
+                        data_quality="sufficient",
+                    ).set(720)  # synthetic baseline is always "old enough"
                     if client is not None:
                         with contextlib.suppress(Exception):
                             client.table("drift_detection_log").insert(
@@ -518,7 +560,31 @@ def _collect_drift_metrics() -> None:
                             ).execute()
                     continue
 
-                # Real Supabase data path: use the occupancy-aware drift detector
+                # Real Supabase data path: query baseline timespan directly from sensor data
+                cfg_equipment_ids = cfg.get("equipment_ids", [])
+                cfg_features = cfg.get("features", [])
+                baseline_span_seconds = 0.0
+
+                if client is not None and cfg_equipment_ids and cfg_features:
+                    try:
+                        min_resp = (
+                            client.table("equipment_sensor_readings")
+                            .select("recorded_at")
+                            .in_("equipment_id", cfg_equipment_ids)
+                            .in_("sensor_type", cfg_features)
+                            .order("recorded_at", desc=False)
+                            .limit(1)
+                            .execute()
+                        )
+                        if min_resp.data:
+                            oldest = datetime.fromisoformat(
+                                min_resp.data[0]["recorded_at"].replace("Z", "+00:00")
+                            )
+                            baseline_span_seconds = (datetime.now(UTC) - oldest).total_seconds()
+                    except Exception:
+                        pass
+
+                # Run drift detection
                 from ml.monitoring.drift import get_drift_detector
 
                 detector = get_drift_detector()
@@ -532,16 +598,29 @@ def _collect_drift_metrics() -> None:
                 features_drifted = result.get("features_drifted", 0) or 0
                 score = features_drifted / features_checked if features_checked > 0 else 0.0
 
-                # Only emit "data_sufficient=true" when the detector actually ran
-                # (features_checked > 0 means it found enough same-mode samples)
-                data_sufficient = "true" if features_checked > 0 else "false"
+                # Two-tier gate: check temporal span, not just sample count
+                data_quality, data_sufficient = _assess_drift_data_sufficiency(
+                    baseline_span_seconds, features_checked
+                )
 
                 sentinel_model_drift_score.labels(
-                    model_id=eq_type, model_type=eq_type.upper(), source="supabase", data_sufficient=data_sufficient
+                    model_id=eq_type,
+                    model_type=eq_type.upper(),
+                    source="supabase",
+                    data_sufficient=data_sufficient,
+                    data_quality=data_quality,
                 ).set(score)
                 sentinel_model_drift_alerts.labels(
-                    site_id="site-002", model_type=eq_type.upper(), source="supabase", data_sufficient=data_sufficient
+                    site_id="site-002",
+                    model_type=eq_type.upper(),
+                    source="supabase",
+                    data_sufficient=data_sufficient,
                 ).set(1 if result.get("drift_detected") and data_sufficient == "true" else 0)
+                sentinel_drift_baseline_hours.labels(
+                    model_id=eq_type,
+                    site_id="site-002",
+                    data_quality=data_quality,
+                ).set(round(baseline_span_seconds / 3600, 2))
 
                 if client is not None:
                     try:

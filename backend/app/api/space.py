@@ -354,3 +354,66 @@ async def focus_room_analytics(
     from app.services.focus_room_session_service import get_focus_room_analytics
 
     return get_focus_room_analytics(site_id)
+
+
+# ---------------------------------------------------------------------------
+# Room current occupancy
+# ---------------------------------------------------------------------------
+
+
+class RoomOccupancyStatus(BaseModel):
+    room_code: str
+    sensor_id: str
+    occupied: bool
+    last_seen: datetime
+
+
+@router.get("/room-occupancy", response_model=list[RoomOccupancyStatus])
+async def get_room_occupancy(
+    site_id: str = Depends(require_any_site),
+    room_code: str | None = None,
+) -> list[dict[str, Any]]:
+    """
+    Get current occupancy state for rooms on a site.
+    Returns latest event per room from space_occupancy_events.
+
+    Args:
+        site_id: Site ID (e.g. site-002)
+        room_code: Optional filter for a specific room
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+
+    if room_code:
+        resp = (
+            client.table("space_occupancy_events")
+            .select("room_code, sensor_id, occupied, timestamp")
+            .eq("site_id", site_id)
+            .eq("room_code", room_code)
+            .order("timestamp", desc=True)
+            .limit(1)
+            .execute()
+        )
+    else:
+        # Get all rooms with their latest event
+        resp = client.table("space_occupancy_events").select(
+            "room_code, sensor_id, occupied, timestamp"
+        ).eq("site_id", site_id).execute()
+
+    # Deduplicate to latest per room
+    seen: dict[str, dict] = {}
+    for r in resp.data:
+        rc = r.get("room_code")
+        if rc and (rc not in seen or r.get("timestamp") > seen[rc].get("timestamp")):
+            seen[rc] = r
+
+    return [
+        {
+            "room_code": v["room_code"],
+            "sensor_id": v["sensor_id"],
+            "occupied": v["occupied"],
+            "last_seen": v["timestamp"],
+        }
+        for v in seen.values()
+    ]

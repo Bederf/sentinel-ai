@@ -51,7 +51,7 @@ async def create_site(request: CreateSiteRequest):
 
     POST /api/simbiot/sites
     {
-        "site_name": "Busamed Gateway Hospital",
+        "site_name": "Example Hospital",
         "building_type": "hospital",
         "location": "Umhlanga, Durban",
         "gross_floor_area": 12000
@@ -61,7 +61,7 @@ async def create_site(request: CreateSiteRequest):
     {
         "site_code": "S006",
         "site_id": "uuid...",
-        "site_name": "Busamed Gateway Hospital",
+        "site_name": "Example Hospital",
         "message": "Site S006 created successfully"
     }
     """
@@ -117,7 +117,7 @@ async def save_adapter_config(
     PUT /api/simbiot/sites/{site_id}/adapters/{protocol}/config
 
     Path params:
-        site_id:   Site code (e.g., "site-002", "site-005")
+        site_id:   Site code (e.g., "site-002", "site-003")
         protocol: Protocol name (bacnet, obix, modbus, bridge)
 
     Body (example for bridge):
@@ -135,7 +135,7 @@ async def save_adapter_config(
         }
 
     Response:
-        { "status": "success", "message": "Saved bridge config for site-005" }
+        { "status": "success", "message": "Saved bridge config for site-003" }
     """
     manager = SiteAdapterManager()
 

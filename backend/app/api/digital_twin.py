@@ -9,6 +9,7 @@ import contextlib
 import logging
 import uuid
 from datetime import datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import StreamingResponse
@@ -80,6 +81,58 @@ class BuildingConfigResponse(BaseModel):
 # ============= Router =============
 
 router = APIRouter(prefix="/digital-twin", tags=["digital-twin"])
+
+
+@router.get(
+    "/geocode",
+    summary="Geocode a building address + get GPS orientation",
+    responses={200: {"description": "Site details with lat, lon, orientation"}, 400: {"description": "Not found"}},
+)
+async def geocode_site(
+    address: str = Query(..., description="Building name or address (e.g. 'Sandton City, Johannesburg')"),
+) -> dict[str, Any]:
+    """
+    Geocode a building address and optionally derive GPS orientation from OSM building footprint.
+
+    Returns lat/lon, normalized address, and building orientation (longest axis bearing).
+    Use this during onboarding to auto-fill site location before scanning BMS.
+
+    Args:
+        address: Building name or address query string
+
+    Returns:
+        {
+          "lat": -26.109,
+          "lon": 28.052,
+          "display_name": "Sandton City, Sandton Drive, ...",
+          "orientation_degrees": 45.2,   # clockwise from North
+          "type": "office",
+          "address": { "road": ..., "city": ..., "province": ... }
+        }
+    """
+    from app.services.geocoding_service import get_geocoding_service
+
+    service = get_geocoding_service()
+
+    result = service.geocode(address)
+    if not result:
+        raise HTTPException(status_code=404, detail=f"Address not found: {address}")
+
+    lat, lon = result["lat"], result["lon"]
+    orientation = None
+
+    polygon = service.get_building_polygon(lat, lon)
+    if polygon:
+        orientation = service.calculate_orientation(polygon)
+
+    return {
+        "lat": lat,
+        "lon": lon,
+        "display_name": result["display_name"],
+        "orientation_degrees": orientation,
+        "type": result.get("type", "unknown"),
+        "address": result.get("address", {}),
+    }
 
 
 @router.post(
@@ -189,6 +242,111 @@ async def extract_from_image(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Extraction failed: {e!s}",
+        )
+
+
+@router.post(
+    "/extract-from-pdf",
+    response_model=BuildingConfigResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Extract building config from PDF floor plan",
+    responses={
+        400: {"description": "Invalid PDF or parameters"},
+        500: {"description": "Extraction failed"},
+    },
+)
+async def extract_from_pdf(
+    file: UploadFile = File(..., description="PDF floor plan upload"),
+    site_code: str = ...,
+    site_name: str = "",
+    floors_count: int = 3,
+    skip_sanitization: bool = False,
+) -> BuildingConfigResponse:
+    """
+    Extract building configuration from PDF floor plan.
+
+    Converts the first page of the PDF to a PNG image, then processes it
+    through the same extraction pipeline as extract-from-image.
+
+    Args:
+        file: PDF file upload
+        site_code: Building identifier (e.g., "site-002")
+        site_name: Building display name (optional)
+        floors_count: Expected number of floors (default 3)
+        skip_sanitization: If False, sanitize before API (recommended for production)
+
+    Returns:
+        Building configuration with floors, equipment, zones
+    """
+    import base64
+    import io
+
+    try:
+        if not file.filename.lower().endswith(".pdf"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid file type. Only .pdf files are supported.",
+            )
+
+        pdf_bytes = await file.read()
+
+        if len(pdf_bytes) > 50 * 1024 * 1024:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="PDF file too large (max 50MB)",
+            )
+
+        import fitz
+
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        if doc.page_count == 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="PDF has no pages",
+            )
+
+        page = doc[0]
+        mat = fitz.Matrix(2.0, 2.0)
+        pix = page.get_pixmap(matrix=mat, alpha=False)
+        img_bytes = pix.tobytes("png")
+        doc.close()
+
+        image_base64 = base64.b64encode(img_bytes).decode()
+
+        service = get_digital_twin_service()
+        config = await service.extract_from_image(
+            image_base64=image_base64,
+            site_code=site_code,
+            site_name=site_name or site_code,
+            floors_count=floors_count,
+            skip_sanitization=skip_sanitization,
+        )
+
+        if not config or "equipment" not in config:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="No equipment extracted from PDF",
+            )
+
+        return BuildingConfigResponse(
+            site_code=config.get("site_code", site_code),
+            site_name=config.get("site_name", site_name),
+            floors=[FloorDefinition(**f) for f in config.get("floors", [])],
+            equipment=[EquipmentLocation(**e) for e in config.get("equipment", [])],
+            zones=[ZoneDefinition(**z) for z in config.get("zones", [])],
+            extraction_metadata=config.get(
+                "extraction_metadata",
+                {"method": "pdf_vision", "equipment_count": len(config.get("equipment", []))},
+            ),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Extract from PDF failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDF extraction failed: {e!s}",
         )
 
 

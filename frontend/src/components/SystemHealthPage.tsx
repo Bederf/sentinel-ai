@@ -218,13 +218,13 @@ export default function SystemHealthPage() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'healthy':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
+        return <CheckCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-green)" }} />;
       case 'degraded':
-        return <AlertCircle className="w-5 h-5 text-yellow-500" />;
+        return <AlertCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-amber)" }} />;
       case 'critical':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
+        return <AlertCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-red)" }} />;
       default:
-        return <Clock className="w-5 h-5 text-gray-500" />;
+        return <Clock className="w-5 h-5" style={{ color: "var(--color-sentinel-text-disabled)" }} />;
     }
   };
 
@@ -259,8 +259,8 @@ export default function SystemHealthPage() {
       <div className="p-6">
         <div className="rounded-lg p-4 glass-panel" style={{ border: "1px solid rgba(220, 38, 38, 0.35)" }}>
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-red-500" />
-            <p className="text-red-500">Error: {error}</p>
+            <AlertCircle className="w-5 h-5" style={{ color: "var(--color-sentinel-red)" }} />
+            <p style={{ color: "var(--color-sentinel-red)" }}>Error: {error}</p>
           </div>
         </div>
       </div>
@@ -563,19 +563,19 @@ export default function SystemHealthPage() {
                 <div className="flex items-center gap-2 mt-2">
                   {history.metrics?.trend === 'improving' && (
                     <>
-                      <TrendingUp className="w-5 h-5 text-green-500" />
+                      <TrendingUp className="w-5 h-5" style={{ color: "var(--color-sentinel-green)" }} />
                       <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.35)", color: "var(--color-sentinel-green)" }}>Improving</span>
                     </>
                   )}
                   {history.metrics?.trend === 'degrading' && (
                     <>
-                      <TrendingDown className="w-5 h-5 text-red-500" />
+                      <TrendingDown className="w-5 h-5" style={{ color: "var(--color-sentinel-red)" }} />
                       <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(220, 38, 38, 0.15)", border: "1px solid rgba(220, 38, 38, 0.35)", color: "var(--color-sentinel-red)" }}>Degrading</span>
                     </>
                   )}
                   {history.metrics?.trend === 'stable' && (
                     <>
-                      <Clock className="w-5 h-5 text-gray-500" />
+                      <Clock className="w-5 h-5" style={{ color: "var(--color-sentinel-text-disabled)" }} />
                       <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(148, 163, 184, 0.15)", border: "1px solid rgba(148, 163, 184, 0.35)", color: "var(--color-sentinel-text-secondary)" }}>Stable</span>
                     </>
                   )}

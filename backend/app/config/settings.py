@@ -466,6 +466,7 @@ class Settings(BaseSettings):
     telegram_alert_chat_id: str = Field(
         default="", validation_alias=AliasChoices("SENTRY_FM_CHAT_ID", "TELEGRAM_ALERT_CHAT_ID")
     )
+    telegram_secret_token: str = Field(default="", validation_alias="TELEGRAM_SECRET_TOKEN")
 
     # Fuel Tank MQTT Ingestion (Phase 148)
     fuel_mqtt_enabled: bool = False

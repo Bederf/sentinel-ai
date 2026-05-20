@@ -81,7 +81,7 @@ export function AiRuntimePolicySettings({
   };
 
   return (
-    <div className="glass-panel overflow-visible">
+    <div className="glass-panel flat overflow-visible">
       <div className="p-4 border-b rounded-t-lg" style={{ borderColor: "var(--color-sentinel-border)" }}>
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }}>

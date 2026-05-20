@@ -71,9 +71,10 @@ export function ContextPanel({
       data-slot="context-panel"
       style={{
         position: "absolute",
-        right: open ? 0 : "-320px",
+        right: open ? 0 : "calc(min(300px, -28vw) * -1)",
         top: 0,
-        width: "300px",
+        width: "min(300px, 28vw)",
+        minWidth: "200px",
         height: "100%",
         background: "var(--color-sentinel-bg-panel, #0a0a0f)",
         borderLeft: "1px solid var(--color-sentinel-border, rgba(255,255,255,0.08))",

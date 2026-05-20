@@ -46,7 +46,7 @@ class TestEventIntelligenceSchedulerWiring:
 
         with patch(
             "app.core.site_resolver.get_registered_site_ids",
-            return_value=["site-002", "site-005"],
+            return_value=["site-002", "site-003"],
         ), patch(
             "app.services.event_intelligence_service.get_event_intelligence_service",
             return_value=mock_ei_svc,
@@ -55,7 +55,7 @@ class TestEventIntelligenceSchedulerWiring:
 
             assert mock_ei_svc.process_site.call_count == 2
             mock_ei_svc.process_site.assert_any_call("site-002")
-            mock_ei_svc.process_site.assert_any_call("site-005")
+            mock_ei_svc.process_site.assert_any_call("site-003")
 
     @pytest.mark.asyncio
     async def test_event_intelligence_handles_no_sites(self):
@@ -92,7 +92,7 @@ class TestEventIntelligenceSchedulerWiring:
 
         with patch(
             "app.core.site_resolver.get_registered_site_ids",
-            return_value=["site-002", "site-005"],
+            return_value=["site-002", "site-003"],
         ), patch(
             "app.services.event_intelligence_service.get_event_intelligence_service",
             return_value=mock_ei_svc,

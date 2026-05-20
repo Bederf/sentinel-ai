@@ -158,7 +158,7 @@ Before diving into details, check these 4 things:
    ```sql
    -- Temporarily disable some equipment from recommendations
    UPDATE equipment SET status = 'offline'
-   WHERE code LIKE 'site-005%';
+   WHERE code LIKE 'site-003%';
 
    -- Recommendations job will skip offline equipment
    ```
@@ -184,7 +184,7 @@ Before diving into details, check these 4 things:
    cd /opt/bms-intelligence/backend
    python3 scripts/run_equipment_discovery_site002.py site-002
    # For other sites:
-   python3 scripts/run_equipment_discovery_site002.py site-005
+   python3 scripts/run_equipment_discovery_site002.py site-003
    ```
 
 2. **Check if metadata exists:**

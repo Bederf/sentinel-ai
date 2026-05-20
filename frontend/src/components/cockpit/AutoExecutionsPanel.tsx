@@ -100,12 +100,12 @@ export function AutoExecutionsPanel({ state }: AutoExecutionsPanelProps) {
         className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-white/4 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Zap size={12} className="text-amber-400" />
+          <Zap size={12} style={{ color: "var(--color-sentinel-amber)" }} />
           <span className="text-[10px] uppercase tracking-[0.22em] text-slate-400">
             Auto-Exécutions
           </span>
           {decisions.length > 0 && (
-            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-0.5 text-[9px] text-amber-300">
+            <span className="rounded-full border px-1.5 py-0.5 text-[9px]" style={{ borderColor: 'rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.1)', color: 'var(--color-sentinel-amber)' }}>
               {decisions.length}
             </span>
           )}
@@ -161,7 +161,7 @@ export function AutoExecutionsPanel({ state }: AutoExecutionsPanelProps) {
                         </span>
                       )}
                       {d.rolled_back && (
-                        <span className="rounded border border-amber-400/40 bg-amber-400/10 px-1 py-0.5 text-[9px] uppercase tracking-widest text-amber-300">
+                        <span className="rounded border px-1 py-0.5 text-[9px] uppercase tracking-widest" style={{ borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: 'var(--color-sentinel-amber)' }}>
                           Rolled back
                         </span>
                       )}
@@ -193,7 +193,10 @@ export function AutoExecutionsPanel({ state }: AutoExecutionsPanelProps) {
                             }
                           })
                         }}
-                        className="flex items-center gap-1 rounded border border-amber-400/40 bg-amber-400/10 px-2 py-1 text-[9px] uppercase tracking-widest text-amber-300 transition-colors hover:border-amber-400/70 hover:bg-amber-400/20 disabled:opacity-40"
+                        className="flex items-center gap-1 rounded border px-2 py-1 text-[9px] uppercase tracking-widest transition-colors"
+                        style={{ borderColor: 'rgba(251,191,36,0.4)', background: 'rgba(251,191,36,0.1)', color: 'var(--color-sentinel-amber)' }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.7)'; e.currentTarget.style.background = 'rgba(251,191,36,0.2)' }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(251,191,36,0.4)'; e.currentTarget.style.background = 'rgba(251,191,36,0.1)' }}
                       >
                         <RefreshCw size={8} className={rollingBack === d.recommendation_id ? 'animate-spin' : ''} />
                         Rollback

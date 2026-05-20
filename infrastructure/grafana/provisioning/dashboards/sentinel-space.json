@@ -3,13 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -26,19 +23,35 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "green", "value": 1 }] } } }
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "type": "value", "options": { "0": { "text": "Down", "color": "#ef4444" } } }, { "type": "value", "options": { "1": { "text": "Up", "color": "#10b981" } } }],
+          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.15)" }
+        }
+      }
     },
     {
       "id": 2,
-      "title": "Avg Occupancy %",
+      "title": "Avg Occupancy",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+      "gridPos": { "h": 4, "w": 5, "x": 3, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [{ "refId": "A", "expr": "avg(sentinel_space_occupancy_percent) or vector(0)", "legendFormat": "Avg %" }],
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "thresholds": { "mode": "absolute", "steps": [{ "color": "red", "value": null }, { "color": "yellow", "value": 30 }, { "color": "green", "value": 60 }] } } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 30 }, { "color": "#10b981", "value": 60 }] },
+          "color": { "mode": "thresholds" },
+          "decimals": 1
+        }
+      }
     },
     {
       "id": 3,
@@ -47,37 +60,69 @@
       "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [{ "refId": "A", "expr": "sum(sentinel_space_occupied_desks) or vector(0)", "legendFormat": "Occupied" }],
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "green", "value": null }, { "color": "yellow", "value": 20 }, { "color": "red", "value": 50 }] } } }
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 20 }, { "color": "#ef4444", "value": 50 }] },
+          "color": { "mode": "thresholds" },
+          "decimals": 0,
+          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.12)" }
+        }
+      }
     },
     {
       "id": 4,
-      "title": "Occupancy % by Zone",
+      "title": "Occupancy by Zone",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [{ "refId": "A", "expr": "sentinel_space_occupancy_percent", "legendFormat": "{{area_name}} ({{site_id}})" }],
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 1, "fillOpacity": 20 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
+        }
+      }
     },
     {
       "id": 5,
-      "title": "Utilization % by Zone",
+      "title": "Utilization by Zone",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [{ "refId": "A", "expr": "sentinel_space_utilization_percent", "legendFormat": "{{zone_id}}" }],
-      "fieldConfig": { "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "lineWidth": 1, "fillOpacity": 20 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
+        }
+      }
     },
     {
       "id": 6,
-      "title": "Bookable vs Occupied Desks by Floor",
+      "title": "Bookable vs Occupied by Floor",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 12 },
+      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
       "targets": [
         { "refId": "A", "expr": "sentinel_space_bookable_desks", "legendFormat": "Bookable {{floor}}" },
         { "refId": "B", "expr": "sentinel_space_occupied_desks", "legendFormat": "Occupied {{floor}}" }
       ],
-      "fieldConfig": { "defaults": { "unit": "none", "custom": { "lineWidth": 2, "fillOpacity": 30 } } }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "custom": { "lineWidth": 1, "fillOpacity": 25 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 0
+        }
+      }
     }
   ],
   "refresh": "30s",
@@ -88,7 +133,7 @@
     ]
   },
   "time": { "from": "now-8h", "to": "now" },
-  "title": "SENTINEL Space Optimization Dashboard",
+  "title": "SENTINEL — Space Optimization",
   "uid": "sentinel-space",
-  "version": 1
+  "version": 2
 }

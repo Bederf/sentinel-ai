@@ -173,7 +173,7 @@ If no bill has been uploaded:
 - Database query returns NULL
 - Coordinator falls back to seeded defaults:
   - S002: 6,000 kVA
-  - site-005: 8,000 kVA
+  - site-003: 8,000 kVA
 - Status shows: `"nmd_source": "fallback"`
 
 ### Example: Bill Upload with NMD Extraction

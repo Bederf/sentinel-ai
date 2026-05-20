@@ -39,24 +39,30 @@ export function DecisionMoment({
     switch (decision.tier) {
       case 3: // CRITICAL
         return {
-          bg: 'bg-red-50 dark:bg-red-950',
-          border: 'border-red-200 dark:border-red-800',
-          badge: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-100',
-          icon: 'text-red-600 dark:text-red-400',
+          bg: 'rgba(var(--color-sentinel-red-rgb), 0.08)',
+          border: 'rgba(var(--color-sentinel-red-rgb), 0.25)',
+          badgeBg: 'rgba(var(--color-sentinel-red-rgb), 0.15)',
+          badgeColor: 'var(--color-sentinel-red)',
+          iconColor: 'var(--color-sentinel-red)',
+          labelColor: 'var(--color-sentinel-red)',
         }
       case 2: // HIGH
         return {
-          bg: 'bg-orange-50 dark:bg-orange-950',
-          border: 'border-orange-200 dark:border-orange-800',
-          badge: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-100',
-          icon: 'text-orange-600 dark:text-orange-400',
+          bg: 'rgba(var(--color-sentinel-amber-rgb), 0.08)',
+          border: 'rgba(var(--color-sentinel-amber-rgb), 0.25)',
+          badgeBg: 'rgba(var(--color-sentinel-amber-rgb), 0.15)',
+          badgeColor: 'var(--color-sentinel-amber)',
+          iconColor: 'var(--color-sentinel-amber)',
+          labelColor: 'var(--color-sentinel-amber)',
         }
       default: // MEDIUM
         return {
-          bg: 'bg-yellow-50 dark:bg-yellow-950',
-          border: 'border-yellow-200 dark:border-yellow-800',
-          badge: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100',
-          icon: 'text-yellow-600 dark:text-yellow-400',
+          bg: 'rgba(var(--color-sentinel-amber-rgb), 0.05)',
+          border: 'rgba(var(--color-sentinel-amber-rgb), 0.2)',
+          badgeBg: 'rgba(var(--color-sentinel-amber-rgb), 0.1)',
+          badgeColor: 'var(--color-sentinel-amber)',
+          iconColor: 'var(--color-sentinel-amber)',
+          labelColor: 'var(--color-sentinel-amber)',
         }
     }
   }
@@ -82,94 +88,75 @@ export function DecisionMoment({
     [decision.created_at]
   )
 
+  const panelBg = 'var(--color-sentinel-bg-secondary)'
+  const labelStyle = { color: 'var(--color-sentinel-text-secondary)' }
+  const valueStyle = { color: 'var(--color-sentinel-text-primary)' }
+
   return (
     <Card
-      className={`
-        p-6 rounded-lg border-2
-        ${tierColor.bg} ${tierColor.border}
-        space-y-4
-      `}
+      className="p-6 rounded-lg border-2 space-y-4"
+      style={{ background: tierColor.bg, borderColor: tierColor.border }}
     >
       {/* Header: Title and Tier */}
       <div className="flex items-start justify-between">
         <div className="flex items-start gap-3">
-          <AlertCircle className={`w-6 h-6 flex-shrink-0 mt-0.5 ${tierColor.icon}`} />
+          <AlertCircle className="w-6 h-6 flex-shrink-0 mt-0.5" style={{ color: tierColor.iconColor }} />
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            <h3 className="text-lg font-semibold" style={valueStyle}>
               Pending Approval
             </h3>
-            <p className="text-sm text-gray-600 dark:text-gray-300 mt-0.5">
+            <p className="text-sm mt-0.5" style={labelStyle}>
               Device control action requires human authorization
             </p>
           </div>
         </div>
         <span
-          className={`
-            px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap
-            ${tierColor.badge}
-          `}
+          className="px-3 py-1 rounded-full text-sm font-semibold whitespace-nowrap"
+          style={{ background: tierColor.badgeBg, color: tierColor.badgeColor }}
         >
           {tierLabel}
         </span>
       </div>
 
       {/* Decision Details */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg p-4 space-y-3">
+      <div className="rounded-lg p-4 space-y-3" style={{ background: panelBg }}>
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Cause
-            </p>
-            <p className="text-sm text-gray-900 dark:text-white mt-1">
-              {cause}
-            </p>
+            <p className="text-xs font-semibold uppercase" style={labelStyle}>Cause</p>
+            <p className="text-sm mt-1" style={valueStyle}>{cause}</p>
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Impact
-            </p>
-            <p className="text-sm text-gray-900 dark:text-white mt-1">
-              {impact}
-            </p>
+            <p className="text-xs font-semibold uppercase" style={labelStyle}>Impact</p>
+            <p className="text-sm mt-1" style={valueStyle}>{impact}</p>
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Time
-            </p>
-            <p className="text-sm text-gray-900 dark:text-white mt-1">
+            <p className="text-xs font-semibold uppercase" style={labelStyle}>Time</p>
+            <p className="text-sm mt-1" style={valueStyle}>
               <span className="font-semibold">{timeMetricLabel}:</span> {timeMetricValue}
             </p>
           </div>
 
           <div>
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-              Action
-            </p>
+            <p className="text-xs font-semibold uppercase" style={labelStyle}>Action</p>
             <div className="flex items-start gap-2 mt-1">
-              <Zap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <p className="text-sm text-gray-900 dark:text-white">{actionSummary}</p>
+              <Zap className="w-4 h-4 mt-0.5" style={{ color: 'var(--color-sentinel-blue)' }} />
+              <p className="text-sm" style={valueStyle}>{actionSummary}</p>
             </div>
           </div>
         </div>
 
         {/* Divider */}
-        <div className="border-t border-gray-200 dark:border-gray-700" />
+        <div className="border-t" style={{ borderColor: 'var(--color-sentinel-border)' }} />
 
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
-            Trade-Off
-          </p>
-          <p className="text-sm text-gray-900 dark:text-white">
-            {tradeoff}
-          </p>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            {expectedOutcome}
-          </p>
+          <p className="text-xs font-semibold uppercase" style={labelStyle}>Trade-Off</p>
+          <p className="text-sm" style={valueStyle}>{tradeoff}</p>
+          <p className="text-sm" style={labelStyle}>{expectedOutcome}</p>
         </div>
 
-        <div className="flex items-center justify-between gap-4 text-sm text-gray-900 dark:text-white">
+        <div className="flex items-center justify-between gap-4 text-sm" style={valueStyle}>
           <div>
             <span className="font-semibold">Age:</span>{' '}
             {ageSeconds < 60 ? `${ageSeconds}s ago` : `${Math.floor(ageSeconds / 60)}m ago`}
@@ -183,19 +170,22 @@ export function DecisionMoment({
         </div>
 
         {/* Decision ID (for audit) */}
-        <div className="text-xs text-gray-500 dark:text-gray-400 space-y-1">
-          <p>
-            <strong>Decision ID:</strong> <span className="font-mono">{decision.id}</span>
-          </p>
-          <p>
-            <strong>Site:</strong> <span className="font-mono">{decision.site_id}</span>
-          </p>
+        <div className="text-xs space-y-1" style={labelStyle}>
+          <p><strong>Decision ID:</strong> <span className="font-mono">{decision.id}</span></p>
+          <p><strong>Site:</strong> <span className="font-mono">{decision.site_id}</span></p>
         </div>
       </div>
 
       {/* Approval Action */}
       <div className="space-y-3">
-        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-sm font-semibold text-orange-800 dark:border-orange-800 dark:bg-orange-950 dark:text-orange-100">
+        <div
+          className="rounded-lg border px-3 py-2 text-sm font-semibold"
+          style={{
+            background: 'rgba(var(--color-sentinel-amber-rgb), 0.08)',
+            borderColor: 'rgba(var(--color-sentinel-amber-rgb), 0.25)',
+            color: 'var(--color-sentinel-amber)',
+          }}
+        >
           [HOLD TO APPROVE]
         </div>
         <ApproveButton
@@ -206,37 +196,40 @@ export function DecisionMoment({
           point={decision.point}
           command_value={decision.command_value}
           disabled={disabled || isRejecting}
-          onApproved={() => {
-            onApproved?.()
-          }}
-          onFailed={(error) => {
-            onFailed?.(error)
-          }}
-          onTimeout={() => {
-            onFailed?.('Verification timeout')
-          }}
+          onApproved={() => { onApproved?.() }}
+          onFailed={(error) => { onFailed?.(error) }}
+          onTimeout={() => { onFailed?.('Verification timeout') }}
         />
 
         {/* Reject button */}
         <button
-          onClick={() => {
-            setIsRejecting(true)
-            onRejected?.()
-          }}
+          onClick={() => { setIsRejecting(true); onRejected?.() }}
           disabled={disabled || isRejecting}
-          className="w-full px-4 py-2 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-100 rounded-lg font-medium hover:bg-red-200 dark:hover:bg-red-800 transition-colors disabled:opacity-50"
+          className="w-full px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50"
+          style={{
+            background: 'rgba(var(--color-sentinel-red-rgb), 0.1)',
+            color: 'var(--color-sentinel-red)',
+            border: '1px solid rgba(var(--color-sentinel-red-rgb), 0.25)',
+          }}
         >
           Reject
         </button>
       </div>
 
       {/* Info: What happens next */}
-      <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-200 space-y-1">
+      <div
+        className="rounded-lg p-3 text-xs space-y-1"
+        style={{
+          background: 'rgba(var(--color-sentinel-blue-rgb, 59,130,246), 0.08)',
+          border: '1px solid rgba(var(--color-sentinel-blue-rgb, 59,130,246), 0.2)',
+          color: 'var(--color-sentinel-blue)',
+        }}
+      >
         <div className="flex items-start gap-2">
           <Clock className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <div>
             <p className="font-semibold">Supervised execution keeps instructions off this card.</p>
-            <p className="mt-1">
+            <p className="mt-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
               Operators see cause, impact, time metric, and trade-off here, then use hold-to-approve to trigger the verified control workflow.
             </p>
           </div>

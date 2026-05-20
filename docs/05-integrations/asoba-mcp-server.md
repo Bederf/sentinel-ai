@@ -192,7 +192,7 @@ ASOBA_API_BASE_URL=https://api.asoba.co
 ASOBA_ENABLED=true
 
 # Site ID mapping (Sentinel site_id → Asoba customer_id)
-ASOBA_SITE_MAPPING=site-002:ltm-sandton-001,site-005:ltm-rosebank-001
+ASOBA_SITE_MAPPING=site-002:ltm-sandton-001,site-003:ltm-rosebank-001
 ```
 
 ### Router Registration

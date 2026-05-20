@@ -213,7 +213,7 @@ export function ReviewQueueDashboard({
 
   return (
     <>
-      <div className="glass-panel overflow-hidden">
+      <div className="glass-panel flat overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b" style={borderStyle}>
           <div className="flex items-center justify-between flex-wrap gap-3">

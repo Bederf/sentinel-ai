@@ -8,7 +8,7 @@
 import { type Site } from "@/lib/api";
 import { api } from "@/lib/api";
 import { useSiteSummary } from "@/hooks/useSiteSummary";
-import { Shield, AlertTriangle, TrendingUp, Wifi, WifiOff } from "lucide-react";
+import { Shield, AlertTriangle, TrendingUp, Wifi, WifiOff, AlertOctagon, Siren, ShieldOff } from "lucide-react";
 import { useState, useEffect } from "react";
 
 interface SiteCardProps {
@@ -21,12 +21,12 @@ interface SiteCardProps {
 
 function StatusBadge({ status }: { status: string }) {
   const config: Record<string, { label: string; color: string; bg: string }> = {
-    normal: { label: "Protected", color: "var(--color-sentinel-green)", bg: "rgba(34,197,94,0.15)" },
-    warning: { label: "Elevated", color: "var(--color-sentinel-amber)", bg: "rgba(245,158,11,0.15)" },
-    critical: { label: "Critical", color: "var(--color-sentinel-red)", bg: "rgba(239,68,68,0.15)" },
-    healthy: { label: "Protected", color: "var(--color-sentinel-green)", bg: "rgba(34,197,94,0.15)" },
-    degraded: { label: "Elevated", color: "var(--color-sentinel-amber)", bg: "rgba(245,158,11,0.15)" },
-    at_risk: { label: "Critical", color: "var(--color-sentinel-red)", bg: "rgba(239,68,68,0.15)" },
+    normal:   { label: "Protected", color: "var(--color-sentinel-green)",  bg: "color-mix(in oklch, var(--color-sentinel-green) 15%, transparent)"  },
+    warning:  { label: "Elevated",  color: "var(--color-sentinel-amber)", bg: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)" },
+    critical: { label: "Critical",  color: "var(--color-sentinel-red)",    bg: "color-mix(in oklch, var(--color-sentinel-red) 15%, transparent)"    },
+    healthy:  { label: "Protected", color: "var(--color-sentinel-green)",  bg: "color-mix(in oklch, var(--color-sentinel-green) 15%, transparent)"  },
+    degraded: { label: "Elevated",  color: "var(--color-sentinel-amber)", bg: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)" },
+    at_risk:  { label: "Critical",  color: "var(--color-sentinel-red)",    bg: "color-mix(in oklch, var(--color-sentinel-red) 15%, transparent)"    },
   };
   const cfg = config[status] ?? config.normal;
   return (
@@ -119,6 +119,16 @@ export function SiteCard({
   const safeFraction =
     totalCount > 0 ? `${safeCount}/${totalCount}` : `${site.equipment_count}`;
 
+  const statusBorderColor: Record<string, string> = {
+    normal:  "var(--color-sentinel-green)",
+    warning: "var(--color-sentinel-amber)",
+    critical:"var(--color-sentinel-red)",
+    healthy: "var(--color-sentinel-green)",
+    degraded:"var(--color-sentinel-amber)",
+    at_risk: "var(--color-sentinel-red)",
+  };
+  const borderColor = statusBorderColor[site.status ?? "normal"] ?? "var(--color-grafana-border)";
+
   return (
     <div
       role={onClick ? "button" : undefined}
@@ -128,7 +138,7 @@ export function SiteCard({
       className={onClick ? "cursor-pointer hover:brightness-110 transition-all" : ""}
       style={{
         background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        border: `1.5px solid ${borderColor}`,
         borderRadius: "8px",
         padding: "16px",
         display: "flex",
@@ -222,18 +232,18 @@ export function SiteCard({
               {summary?.safety && (
                 <div className="flex gap-1.5 ml-auto">
                   {summary.safety.warning > 0 && (
-                    <span className="text-xs" style={{ color: "var(--color-sentinel-amber)" }}>
-                      {summary.safety.warning}⚠
+                    <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: "var(--color-sentinel-amber)" }} aria-label={`${summary.safety.warning} warning`}>
+                      {summary.safety.warning}<AlertOctagon className="w-3 h-3" aria-hidden="true" />
                     </span>
                   )}
                   {summary.safety.alarm > 0 && (
-                    <span className="text-xs" style={{ color: "var(--color-sentinel-red)" }}>
-                      {summary.safety.alarm}🔴
+                    <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: "var(--color-sentinel-red)" }} aria-label={`${summary.safety.alarm} alarm`}>
+                      {summary.safety.alarm}<Siren className="w-3 h-3" aria-hidden="true" />
                     </span>
                   )}
                   {summary.safety.blocked > 0 && (
-                    <span className="text-xs" style={{ color: "var(--color-sentinel-purple)" }}>
-                      {summary.safety.blocked}🚫
+                    <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: "var(--color-sentinel-purple)" }} aria-label={`${summary.safety.blocked} blocked`}>
+                      {summary.safety.blocked}<ShieldOff className="w-3 h-3" aria-hidden="true" />
                     </span>
                   )}
                 </div>

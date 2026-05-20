@@ -60,18 +60,19 @@ class PointMatcherService:
     # Maps bare SCADA asset IDs → S002-prefixed equipment codes
     # Used after extraction to normalize bare IDs to their physical zone assignments
     SCADA_NORMALIZATION_MAP = {
-        # AHU: basement (B1), Level 2 (L2), Rooftop (R)
-        "AHU1": "S002-AHU-B1-001",
-        "AHU2": "S002-AHU-L2-001",
-        "AHU3": "S002-AHU-R-001",
-        # CHILLER: basement B1
-        "CHILLER": "S002-CHILLER-B1-001",
-        "CHILLER1": "S002-CHILLER-B1-001",
-        "CHILLER2": "S002-CHILLER-B1-002",
-        # Cooling tower: basement B1
-        "CT": "S002-CT-B1-001",
-        "CT1": "S002-CT-B1-001",
-        "CT2": "S002-CT-R-001",
+        # AHU: basement (B01), Level 2 (201), Rooftop (R01)
+        # Note: codes must match equipment table (site-002)
+        "AHU1": "S002-AHU-B01",
+        "AHU2": "S002-AHU-201",
+        "AHU3": "S002-AHU-R01",
+        # CHILLER: basement B01
+        "CHILLER": "S002-CHILLER-B01",
+        "CHILLER1": "S002-CHILLER-B01",
+        "CHILLER2": "S002-CHILLER-B01",
+        # Cooling tower: basement B01, rooftop R01
+        "CT": "S002-CT-B01",
+        "CT1": "S002-CT-B01",
+        "CT2": "S002-CT-R01",
     }
 
     # FCU zone mapping: FCU## → S002-FCU-{zone}{seq:03d}

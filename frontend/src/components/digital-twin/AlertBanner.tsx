@@ -49,7 +49,7 @@ export function AlertBanner({ equipment }: AlertBannerProps) {
         className="px-2 py-1 flex-none text-xs font-bold transition-colors"
         style={{
           background: 'rgba(239, 68, 68, 0.2)',
-          color: '#EF4444',
+          color: 'var(--color-sentinel-red)',
           border: '1px solid rgba(239, 68, 68, 0.5)',
           borderRadius: 0,
           fontSize: '14px',

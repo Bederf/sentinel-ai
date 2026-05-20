@@ -3,13 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": {
-          "type": "grafana",
-          "uid": "-- Grafana --"
-        },
+        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -26,24 +23,15 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "up{job=\"sentinel-backend\"}",
-          "legendFormat": "{{instance}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1 }
-            ]
-          }
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
+          "color": { "mode": "thresholds" },
+          "mappings": [{ "type": "value", "options": { "0": { "text": "Down", "color": "#ef4444" } } }, { "type": "value", "options": { "1": { "text": "Up", "color": "#10b981" } } }],
+          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.15)" }
         }
       }
     },
@@ -51,151 +39,100 @@
       "id": 2,
       "title": "Thermal Runway Warnings",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 0 },
+      "gridPos": { "h": 4, "w": 4, "x": 3, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(sentinel_hvac_thermal_runway_warnings) or vector(0)",
-          "legendFormat": "Zones in warning"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_hvac_thermal_runway_warnings) or vector(0)", "legendFormat": "Zones in warning" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 3 }
-            ]
-          },
-          "unit": "none"
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 1 }, { "color": "#ef4444", "value": 3 }] },
+          "color": { "mode": "thresholds" },
+          "unit": "none",
+          "sparkline": { "displayMode": "area", "lineColor": "#f59e0b", "fillColor": "rgba(245, 158, 11, 0.12)" }
         }
       }
     },
     {
       "id": 3,
-      "title": "HVAC Savings (ZAR)",
+      "title": "HVAC Savings",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 0 },
+      "gridPos": { "h": 4, "w": 5, "x": 7, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum(sentinel_hvac_savings_zar) or vector(0)",
-          "legendFormat": "Monthly savings"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sum(sentinel_hvac_savings_zar) or vector(0)", "legendFormat": "Monthly savings" }],
       "fieldConfig": {
         "defaults": {
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "red", "value": null },
-              { "color": "green", "value": 1000 }
-            ]
-          },
-          "unit": "currencyZAR"
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1000 }] },
+          "color": { "mode": "thresholds" },
+          "unit": "currencyZAR",
+          "decimals": 0,
+          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.12)" }
         }
       }
     },
     {
       "id": 4,
-      "title": "Zone Temperatures",
+      "title": "Zone Temperature — Actual vs Setpoint",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 3 },
+      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_hvac_zone_temp_celsius",
-          "legendFormat": "{{zone_name}} ({{site_id}})"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_hvac_zone_temp_celsius", "legendFormat": "{{zone_name}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "celsius",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 20
-          }
-        }
+          "custom": { "lineWidth": 1, "fillOpacity": 18, "gradientMode": "hue", "axisCenteredZero": false },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
+        },
+        "overrides": [
+          { "matcher": { "id": "byRegexp", "options": "Lobby|Ground Floor| Reception" }, "properties": [{ "id": "custom.lineWidth", "value": 2 }] }
+        ]
       }
     },
     {
       "id": 5,
-      "title": "Temperature Deviation from Setpoint",
+      "title": "Temp Deviation (°C)",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 3 },
+      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 4 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_hvac_zone_temp_deviation_celsius",
-          "legendFormat": "{{zone_id}}"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_hvac_zone_temp_deviation_celsius", "legendFormat": "{{zone_id}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "celsius",
-          "custom": {
-            "lineWidth": 2
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 1 },
-              { "color": "red", "value": 3 }
-            ]
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 12, "showLines": true },
+          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 1 }, { "color": "#ef4444", "value": 3 }] },
+          "color": { "mode": "thresholds" },
+          "decimals": 2
         }
       }
     },
     {
       "id": 6,
-      "title": "Cooling Energy (kWh)",
+      "title": "Cooling Energy",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 11 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(sentinel_hvac_cooling_kwh[1h]) * 1000",
-          "legendFormat": "Cooling kWh/h"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "rate(sentinel_hvac_cooling_kwh[1h]) * 1000", "legendFormat": "Cooling kW/h" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 25 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
         }
       }
     },
     {
       "id": 7,
-      "title": "Heating Energy (kWh)",
+      "title": "Heating Energy",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 11 },
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(sentinel_hvac_heating_kwh[1h]) * 1000",
-          "legendFormat": "Heating kWh/h"
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "rate(sentinel_hvac_heating_kwh[1h]) * 1000", "legendFormat": "Heating kW/h" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": {
-            "lineWidth": 2,
-            "fillOpacity": 30
-          }
+          "custom": { "lineWidth": 1, "fillOpacity": 25 },
+          "color": { "mode": "palette-classic" },
+          "decimals": 1
         }
       }
     },
@@ -203,45 +140,32 @@
       "id": 8,
       "title": "AHU Status",
       "type": "table",
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 11 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sentinel_hvac_ahu_status",
-          "format": "table",
-          "legendFormat": ""
-        }
-      ],
+      "targets": [{ "refId": "A", "expr": "sentinel_hvac_ahu_status", "format": "table", "legendFormat": "" }],
       "fieldConfig": {
         "defaults": {
           "mappings": [
-            { "type": "value", "options": { "0": { "text": "Offline", "color": "red" } } },
-            { "type": "value", "options": { "1": { "text": "Healthy", "color": "green" } } },
-            { "type": "value", "options": { "2": { "text": "Degraded", "color": "yellow" } } },
-            { "type": "value", "options": { "3": { "text": "Critical", "color": "red" } } }
-          ]
+            { "type": "value", "options": { "0": { "text": "Offline", "color": "#ef4444" } } },
+            { "type": "value", "options": { "1": { "text": "Healthy", "color": "#10b981" } } },
+            { "type": "value", "options": { "2": { "text": "Degraded", "color": "#f59e0b" } } },
+            { "type": "value", "options": { "3": { "text": "Critical", "color": "#ef4444" } } }
+          ],
+          "custom": { "align": "left", "filterable": true }
         }
-      }
+      },
+      "options": { "showHeader": true, "sortBy": [{ "displayName": "Value", "desc": false }] }
     }
   ],
   "refresh": "10s",
   "tags": ["hvac", "sentinel", "building"],
   "templating": {
     "list": [
-      {
-        "name": "site",
-        "type": "query",
-        "query": "label_values(sentinel_hvac_zone_temp_celsius, site_id)",
-        "multi": true
-      }
+      { "name": "site", "type": "query", "query": "label_values(sentinel_hvac_zone_temp_celsius, site_id)", "multi": true }
     ]
   },
-  "time": {
-    "from": "now-6h",
-    "to": "now"
-  },
-  "title": "SENTINEL HVAC Dashboard",
+  "time": { "from": "now-6h", "to": "now" },
+  "title": "SENTINEL — HVAC",
   "uid": "sentinel-hvac",
-  "version": 1
+  "version": 2
 }

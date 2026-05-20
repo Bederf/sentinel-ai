@@ -103,7 +103,7 @@ def get_registered_site_ids() -> list[str]:
     Convenience wrapper to avoid repeated list comprehensions in callers.
 
     Returns:
-        List of site code strings, e.g. ['site-002', 'site-005'].
+        List of site code strings, e.g. ['site-002', 'site-003'].
     """
     sites = get_registered_sites()
     return [s["code"] for s in sites if s.get("code")]

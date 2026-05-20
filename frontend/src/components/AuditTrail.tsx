@@ -78,15 +78,15 @@ function getRelativeTime(timestamp: string): string {
 function getResultColor(result: string): string {
   switch (result.toLowerCase()) {
     case "success":
-      return "text-green-400";
+      return "var(--color-sentinel-green)";
     case "warning":
-      return "text-yellow-400";
+      return "var(--color-sentinel-amber)";
     case "blocked":
-      return "text-orange-400";
+      return "var(--color-sentinel-amber)";
     case "failed":
-      return "text-red-400";
+      return "var(--color-sentinel-red)";
     default:
-      return "text-gray-400";
+      return "var(--color-sentinel-text-secondary)";
   }
 }
 
@@ -288,7 +288,7 @@ export default function AuditTrail({
   };
 
   /**
-   * Export logs as CSV
+   * Export logs as CSV with proper escaping for injection prevention
    */
   const handleExportCSV = () => {
     const headers = [
@@ -303,25 +303,35 @@ export default function AuditTrail({
       "Error Message",
     ];
 
+    const escapeCSV = (val: string): string => {
+      if (val == null) return "";
+      const str = String(val);
+      // Escape fields containing commas, quotes, or newlines — wrap in double quotes
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
     const csvRows = [
       headers.join(","),
       ...logs.map((log) =>
         [
-          `"${log.timestamp}"`,
-          `"${log.action}"`,
-          `"${log.user}"`,
-          `"${log.device_id || ""}"`,
-          `"${log.point_name || ""}"`,
-          `"${log.old_value || ""}"`,
-          `"${log.new_value || ""}"`,
-          `"${log.result}"`,
-          `"${log.error_message || ""}"`,
+          escapeCSV(log.timestamp),
+          escapeCSV(log.action),
+          escapeCSV(log.user),
+          escapeCSV(log.device_id || ""),
+          escapeCSV(log.point_name || ""),
+          escapeCSV(log.old_value ?? ""),
+          escapeCSV(log.new_value ?? ""),
+          escapeCSV(log.result),
+          escapeCSV(log.error_message || ""),
         ].join(",")
       ),
     ];
 
     const csvContent = csvRows.join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -559,10 +569,12 @@ export default function AuditTrail({
                     </div>
                   </td>
                   <td className="py-3 px-3">
-                    <div className="text-sm text-gray-300">{log.user}</div>
+                    <div className="text-sm text-gray-300 truncate max-w-[120px]" title={log.user}>
+                      {log.user}
+                    </div>
                   </td>
                   <td className="py-3 px-3">
-                    <div className="text-sm text-gray-300">
+                    <div className="text-sm text-gray-300 truncate max-w-[120px]" title={log.device_id || "System"}>
                       {log.device_id || "System"}
                     </div>
                     {log.point_name && (
@@ -573,9 +585,8 @@ export default function AuditTrail({
                   </td>
                   <td className="py-3 px-3">
                     <div
-                      className={`flex items-center gap-1 text-sm ${getResultColor(
-                        log.result
-                      )}`}
+                      className="flex items-center gap-1 text-sm"
+                      style={{ color: getResultColor(log.result) }}
                     >
                       {getResultIcon(log.result)}
                       <span className="capitalize">{log.result}</span>

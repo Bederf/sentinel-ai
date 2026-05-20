@@ -79,16 +79,9 @@ class SiteScheduleResponse(BaseModel):
 def get_site_name(site_id: str) -> str:
     """Get site name from site ID."""
     site_names = {
-        "site-001": "Gateway Theatre",
         "site-002": "Sandton City",
         "site-003": "Centurion Mall",
         "site-004": "Tygervalley",
-        "site-005": "Canal Walk",
-        "site-006": "East Rand Mall",
-        "site-007": "Pavilion",
-        "site-008": "N1 City",
-        "site-009": "Blue Route",
-        "site-010": "Cresta",
     }
     return site_names.get(site_id, f"Site {site_id}")
 

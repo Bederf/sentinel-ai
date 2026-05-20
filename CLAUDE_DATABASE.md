@@ -7,10 +7,10 @@ Database schema, migrations, repositories, and Supabase patterns.
 ### Core Tables
 
 ```sql
--- Buildings (site-002, site-005, site-012)
+-- Buildings (site-002, site-003, site-012)
 buildings (
   id UUID PRIMARY KEY,
-  code TEXT UNIQUE,           -- "site-002", "site-005"
+  code TEXT UNIQUE,           -- "site-002", "site-003"
   name VARCHAR,
   address TEXT,
   type VARCHAR,

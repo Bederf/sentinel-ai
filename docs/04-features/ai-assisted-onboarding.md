@@ -678,7 +678,7 @@ For best results, always specify the `bms_vendor` when you know the system.
 The classifier uses a metadata-first approach that works with any BMS vendor:
 
 1. **Tier 1 — Metadata (preferred):** When equipment JSON files provide `_equipment_id`, `_equipment_type`, `_point_type`, they are used directly with HIGH confidence. No regex needed.
-2. **Tier 2 — ID extraction:** When metadata says `equipment_type: "unknown"`, the type code is extracted from the equipment ID segments (e.g., `COLD` from `site-005-UMH-COLD-B1-001`).
+2. **Tier 2 — ID extraction:** When metadata says `equipment_type: "unknown"`, the type code is extracted from the equipment ID segments (e.g., `COLD` from `site-003-UMH-COLD-B1-001`).
 3. **Tier 3 — Regex fallback:** Pattern matching for raw BACnet points without metadata.
 
 ### Supported Equipment Types (30+)
@@ -700,10 +700,10 @@ Floor codes are extracted from any position in hyphen/dot-separated equipment ID
 
 | Pattern | Example ID | Extracted Floor |
 |---------|-----------|-----------------|
-| L## | `site-005-UMH-AHU-L3-ICU` | L3 |
-| B## | `site-005-UMH-GEN-B1-001` | B1 |
+| L## | `site-003-UMH-AHU-L3-ICU` | L3 |
+| B## | `site-003-UMH-GEN-B1-001` | B1 |
 | G | `S002-AHU-G-01` | G |
-| R | `site-005-UMH-CT-R-001` | R (Roof) |
+| R | `site-003-UMH-CT-R-001` | R (Roof) |
 
 Works for Niagara, Desigo, Schneider, Honeywell, Trend, and generic BACnet naming.
 

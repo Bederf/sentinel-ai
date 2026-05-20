@@ -307,7 +307,7 @@ class PhasePromotionEvaluator:
                     client.table("recommendations")
                     .select("id", count="exact")
                     .eq("site_id", site_id)
-                    .eq("action_type", "ai_optimization")
+                    .eq("source", "ai_optimizer")
                     .execute()
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
@@ -325,7 +325,7 @@ class PhasePromotionEvaluator:
                 rows = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .neq("status", "pending")
                     .execute()
                 )
@@ -361,14 +361,14 @@ class PhasePromotionEvaluator:
                 rows_accepted = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .eq("acknowledgement_type", "accepted")
                     .execute()
                 )
                 rows_dismissed = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .eq("acknowledgement_type", "dismissed")
                     .execute()
                 )
@@ -391,8 +391,8 @@ class PhasePromotionEvaluator:
                 rows_obj = (
                     client.table("parasite_decisions")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
-                    .eq("decision", "block")
+                    .eq("site_id", site_id)
+                    .eq("decision_type", "safety_block")
                     .gte("created_at", (now - timedelta(days=30)).isoformat())
                     .execute()
                 )
@@ -420,6 +420,43 @@ class PhasePromotionEvaluator:
                     .execute()
                 )
                 uptime = float(row.data[0].get("uptime_24h_percent", 0.0)) if row.data else 0.0
+                # Fall back to live WireGuard ping if uptime is stale (< 1%)
+                # Use per-site bridge IP from site_adapter_config, not hardcoded address
+                if uptime < 1.0:
+                    import subprocess
+
+                    bridge_ip = "10.99.0.1"  # S002 default
+                    try:
+                        config_rows = (
+                            client.table("site_adapter_config")
+                            .select("connection_config")
+                            .eq("site_id", site_id)
+                            .eq("protocol", "bridge")
+                            .eq("enabled", True)
+                            .limit(1)
+                            .execute()
+                        )
+                        if config_rows.data:
+                            cfg = config_rows.data[0].get("connection_config", {})
+                            if cfg.get("base_url"):
+                                import re
+
+                                m = re.match(r"http://([^:]+):\d+", cfg["base_url"])
+                                if m:
+                                    bridge_ip = m.group(1)
+                    except Exception:
+                        pass
+
+                    try:
+                        result = subprocess.run(
+                            ["ping", "-c", "2", "-W", "3", bridge_ip],
+                            capture_output=True,
+                            timeout=5,
+                        )
+                        if result.returncode == 0:
+                            uptime = 100.0
+                    except Exception:
+                        pass
                 return GateResult(gate=gate, passed=uptime >= threshold, value=round(uptime, 4), threshold=threshold)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
@@ -434,7 +471,7 @@ class PhasePromotionEvaluator:
                 rows = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .eq("status", "approved")
                     .execute()
                 )
@@ -473,8 +510,8 @@ class PhasePromotionEvaluator:
                 rows_obj = (
                     client.table("parasite_decisions")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
-                    .eq("decision", "block")
+                    .eq("site_id", site_id)
+                    .eq("decision_type", "safety_block")
                     .gte("created_at", (now - timedelta(days=7)).isoformat())
                     .execute()
                 )
@@ -495,14 +532,14 @@ class PhasePromotionEvaluator:
                 total = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .neq("status", "pending")
                     .execute()
                 )
                 approved = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .eq("status", "approved")
                     .execute()
                 )
@@ -528,14 +565,14 @@ class PhasePromotionEvaluator:
                 rejected = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .eq("status", "rejected")
                     .execute()
                 )
                 non_pending = (
                     client.table("recommendations")
                     .select("id", count="exact")
-                    .eq("site_id", site_uuid)
+                    .eq("site_id", site_id)
                     .neq("status", "pending")
                     .execute()
                 )

@@ -343,8 +343,8 @@ class TestSingleton:
 
         mod._instances.clear()
         svc1 = get_hybrid_query_service("site-002")
-        svc2 = get_hybrid_query_service("site-005")
+        svc2 = get_hybrid_query_service("site-003")
         assert svc1 is not svc2
         assert svc1.site_id == "site-002"
-        assert svc2.site_id == "site-005"
+        assert svc2.site_id == "site-003"
         mod._instances.clear()

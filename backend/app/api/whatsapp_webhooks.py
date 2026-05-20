@@ -118,6 +118,7 @@ async def handle_whatsapp_message(
         from_number = message.get("from")
         message_id = message.get("id")
         message_type = message.get("type", "text")
+        waba_id = value.get("metadata", {}).get("phone_number_id", "")
 
         if not from_number:
             logger.warning("WhatsApp message missing sender identifier")
@@ -180,6 +181,7 @@ async def handle_whatsapp_message(
             message_type,
             message_id,
             reply_to_message_id=reply_to_message_id,
+            waba_id=waba_id,
         )
 
         return {"status": "ok"}
@@ -190,7 +192,11 @@ async def handle_whatsapp_message(
 
 
 def _normalise_whatsapp_number(value: str) -> str:
-    return value.replace("whatsapp:", "").replace(" ", "").strip()
+    """Normalize to E.164 format: +27XXXXXXXXX."""
+    digits = value.replace("whatsapp:", "").replace("+", "").replace(" ", "").strip()
+    if not digits.startswith("27"):
+        digits = "27" + digits.lstrip("0")
+    return "+" + digits
 
 
 def _verify_twilio_signature(request_url: str, params: dict[str, str], signature: str | None) -> bool:
@@ -237,6 +243,7 @@ async def handle_twilio_whatsapp_message(
         "text",
         MessageSid,
         reply_to_message_id=OriginalRepliedMessageSid or None,
+        waba_id=os.getenv("TWILIO_WHATSAPP_FROM", ""),
     )
     return {"status": "ok"}
 
@@ -248,6 +255,7 @@ async def route_incoming_message(
     message_id: str,
     *,
     reply_to_message_id: str | None = None,
+    waba_id: str = "",
 ) -> None:
     """
     Route incoming WhatsApp message to appropriate handler.
@@ -258,11 +266,77 @@ async def route_incoming_message(
     - "WO-XXXXX" → Show work order details
     - "Status" or "Summary" → Show facility status
     - "Help" or "?" → Show available commands
-    - Other text → Send help message
+    - Unknown sender → /start onboarding (name + location)
     """
     try:
-        # Log interaction
-        logger.debug(f"Routing message from {from_number}: {content}")
+        # Normalise
+        normalized_phone = _normalise_whatsapp_number(from_number)
+
+        # --- WhatsApp onboarding flow ---
+        from app.services.whatsapp_conversation_manager import get_whatsapp_conversation_manager
+        from app.database.repositories.occupant_repository import SiteOccupantRepository
+
+        occupant_repo = SiteOccupantRepository()
+        mgr = get_whatsapp_conversation_manager()
+
+        # Check if already registered
+        occupant = await occupant_repo.get_by_phone(normalized_phone)
+        if not occupant:
+            session = mgr.get_session(normalized_phone)
+            if session:
+                # Active onboarding session — advance step
+                step = session.step
+                if step == 0:
+                    # Received name
+                    session.name = content.strip()
+                    session.step = 1
+                    await whatsapp_service.send_text_message(
+                        normalized_phone,
+                        f"📍 Thanks {session.name}! Now tell me your location at the building.\n"
+                        f"(e.g. Shop G123, Bay 4, Reception, Level 2)",
+                    )
+                    return
+                elif step == 1:
+                    # Received location — finalize registration
+                    session.location = content.strip()
+                    await occupant_repo.create(
+                        site_id=session.site_id,
+                        phone=normalized_phone,
+                        name=session.name,
+                        location=session.location,
+                    )
+                    mgr.end_session(normalized_phone)
+                    await whatsapp_service.send_text_message(
+                        normalized_phone,
+                        f"✅ You're all set, {session.name}!\n\n"
+                        f"Location: {session.location}\n\n"
+                        f"Report any issues anytime — just send me a message. 👋",
+                    )
+                    return
+            else:
+                # No active session — look up site by WABA ID
+                site = occupant_repo._resolve_site_by_whatsapp(waba_id=waba_id)
+                if not site:
+                    await whatsapp_service.send_text_message(
+                        normalized_phone,
+                        "👋 Welcome! This number isn't linked to a building yet.\n"
+                        "Contact your facilities team to get set up.",
+                    )
+                    return
+
+                # Create onboarding session for this site
+                session = mgr.create_session(
+                    phone=normalized_phone,
+                    site_id=site["id"],
+                    flow="onboarding",
+                )
+                await whatsapp_service.send_text_message(
+                    normalized_phone,
+                    "👋 <b>Welcome!</b>\n\n"
+                    "You're messaging the facilities team.\n\n"
+                    "First, what's your name?",
+                )
+                return
 
         # --- Ghost-room concierge reply ---
         try:

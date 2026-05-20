@@ -9,7 +9,7 @@
         },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -37,24 +37,24 @@
         }
       ],
       "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#ef4444", "value": 0 },
+              { "color": "#10b981", "value": 1 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "Value" },
             "properties": [
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    { "color": "red", "value": 0 },
-                    { "color": "green", "value": 1 }
-                  ]
-                }
-              }
+              { "id": "custom.displayMode", "value": "color-background" }
             ]
           }
         ]
@@ -79,24 +79,24 @@
         }
       ],
       "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#ef4444", "value": 0 },
+              { "color": "#10b981", "value": 1 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        },
         "overrides": [
           {
             "matcher": { "id": "byName", "options": "Value" },
             "properties": [
-              {
-                "id": "custom.displayMode",
-                "value": "color-background"
-              },
-              {
-                "id": "thresholds",
-                "value": {
-                  "mode": "absolute",
-                  "steps": [
-                    { "color": "red", "value": 0 },
-                    { "color": "green", "value": 1 }
-                  ]
-                }
-              }
+              { "id": "custom.displayMode", "value": "color-background" }
             ]
           }
         ]
@@ -108,9 +108,103 @@
     },
     {
       "id": 3,
-      "title": "Tab Activity (Count of Active Tabs)",
+      "title": "Active Tabs — Count",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 16 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_building_tab_active)",
+          "legendFormat": "Active Tabs"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#ef4444", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#10b981", "value": 10 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "title": "Visible Cards — Count",
+      "type": "stat",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_building_card_visible)",
+          "legendFormat": "Visible Cards"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#ef4444", "value": null },
+              { "color": "#f59e0b", "value": 10 },
+              { "color": "#10b981", "value": 25 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "title": "Active Tabs by Site",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
@@ -119,16 +213,31 @@
           "legendFormat": "{{site_id}}"
         }
       ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area"
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 1 },
+              { "color": "#ef4444", "value": 3 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
       }
     },
     {
-      "id": 4,
-      "title": "Card Visibility (Count of Visible Cards)",
-      "type": "stat",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 16 },
+      "id": 6,
+      "title": "Visible Cards by Site",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "${datasource}" },
       "targets": [
         {
@@ -137,9 +246,24 @@
           "legendFormat": "{{site_id}}"
         }
       ],
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area"
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 12
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 1 },
+              { "color": "#ef4444", "value": 3 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
       }
     }
   ],
@@ -166,7 +290,11 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SENTINEL Building Page UI Metrics",
+  "title": "SENTINEL — Building UI",
   "uid": "sentinel-building-ui-metrics",
-  "version": 1
+  "version": 2,
+  "weekStart": "",
+  "style": "dark",
+  "fiscalYearStartMonth": 0,
+  "links": []
 }

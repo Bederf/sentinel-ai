@@ -34,3 +34,21 @@ datasources:
           matcherRegex: "correlation_id=([\\w-]+)"
           name: correlation_id
           url: "/explore?left=[\"now-1h\",\"now\",\"Loki\",{\"expr\":\"{correlation_id=\\\"${__value.raw}\\\"}\"}]"
+
+  # Supabase PostgreSQL — direct query access for forensic dashboards
+  - name: Supabase
+    type: postgres
+    access: proxy
+    url: supabase_db_bms-intelligence:5432
+    user: supabase_admin
+    secureJsonData:
+      password: postgres
+    database: postgres
+    isDefault: false
+    editable: false
+    jsonData:
+      sslmode: disable
+      timescaledb: false
+      maxOpenConns: 5
+      maxIdleConns: 2
+      connMaxLifetime: 3600

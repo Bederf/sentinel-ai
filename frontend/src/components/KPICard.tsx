@@ -35,6 +35,8 @@ export interface KPICardProps {
   onClick?: () => void;
   /** Accent color for the card */
   accentColor?: "green" | "orange" | "red" | "blue" | "purple" | "cyan";
+  /** Visual style variant — flat (default) or glass (opt-in) */
+  variant?: "flat" | "glass";
   /** Unit suffix displayed after the value (e.g. "kW", "%") */
   unit?: string;
   /** Optional progress bar (0–100), renders below the value */
@@ -60,6 +62,7 @@ export function KPICard({
   progress,
   accent,
   density = "default",
+  variant = "flat",
 }: KPICardProps) {
   const isCompact = density === "compact";
   const isPositive = delta !== undefined && delta > 0;
@@ -69,14 +72,14 @@ export function KPICard({
   const isGood = isInverseTrend ? isNegative : isPositive;
   const isBad = isInverseTrend ? isPositive : isNegative;
 
-  // Color mapping for SENTINEL accents
+  // Color mapping for SENTINEL accents — all design token references
   const accentColors: Record<string, string> = {
-    green: "var(--color-sentinel-green)",
+    green:  "var(--color-sentinel-green)",
     orange: "var(--color-sentinel-amber)",
-    red: "var(--color-sentinel-red)",
-    blue: "var(--color-sentinel-blue)",
-    purple: "#a78bfa",
-    cyan: "#22d3ee",
+    red:    "var(--color-sentinel-red)",
+    blue:   "var(--color-sentinel-blue)",
+    purple: "var(--color-sentinel-purple)",
+    cyan:   "var(--color-sentinel-cyan)",
   };
 
   // Format delta value
@@ -87,10 +90,15 @@ export function KPICard({
 
   return (
     <div
-      className={`relative overflow-hidden glass-card glass-highlight ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
-      style={{
-        minHeight: isCompact ? "100px" : "140px",
-        maxHeight: isCompact ? "130px" : "180px",
+      className={`relative overflow-hidden ${variant === "glass" ? "glass-card glass-highlight" : "border rounded-lg"} ${onClick ? "cursor-pointer hover:brightness-110" : ""}`}
+      style={variant === "flat" ? {
+        minHeight: isCompact ? "6.25rem" : "8.75rem",
+        maxHeight: isCompact ? "8.125rem" : "11.25rem",
+        background: "var(--color-sentinel-bg-panel)",
+        borderColor: "var(--color-sentinel-border)",
+      } : {
+        minHeight: isCompact ? "6.25rem" : "8.75rem",
+        maxHeight: isCompact ? "8.125rem" : "11.25rem",
       }}
       onClick={onClick}
       title={tooltip}
@@ -165,10 +173,10 @@ export function KPICard({
               className="flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium"
               style={{
                 background: isGood
-                  ? "rgba(16, 185, 129, 0.15)"
+                  ? "color-mix(in oklch, var(--color-sentinel-green) 15%, transparent)"
                   : isBad
-                    ? "rgba(220, 38, 38, 0.15)"
-                    : "rgba(142, 142, 142, 0.15)",
+                    ? "color-mix(in oklch, var(--color-sentinel-red) 15%, transparent)"
+                    : "color-mix(in oklch, var(--color-sentinel-text-disabled) 15%, transparent)",
                 color: isGood
                   ? "var(--color-sentinel-green)"
                   : isBad

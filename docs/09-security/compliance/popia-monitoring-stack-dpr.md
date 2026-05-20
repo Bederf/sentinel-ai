@@ -2,9 +2,9 @@
 title: "POPIA Data Processing Record - Monitoring Stack"
 type: "compliance-document"
 status: "active"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-05-18"
-updated: "2026-05-18"
+updated: "2026-05-19"
 author: "SENTINEL Compliance Team"
 tags: ["popia", "compliance", "monitoring", "data-processing", "retention"]
 domain: "compliance"
@@ -27,17 +27,13 @@ This Data Processing Record (DPR) documents the processing of personal informati
 
 | Field | Value |
 |-------|-------|
-| **Data Controller** | **[PENDING - CONFIRM WITH BEDERF]** |
-| **Registration Number** | (To be completed - confirm matches CIPC) |
+| **Data Controller** | Asikhwele Building Projects (Pty) Ltd |
+| **Registration Number** | 2015/010878/07 |
 | **Physical Address** | Johannesburg, South Africa |
 | **Information Officer** | To be appointed per Section 55 |
 | **DPO Contact** | dpo@sentinel-ai.co.za |
 
-> **⚠️ CRITICAL - ACTION REQUIRED:**
-> Bederf to confirm actual registered entity name (check CIPC registration certificate).
-> Options may include: PWVR Projects, SENTINEL AI (Pty) Ltd, or other entity.
->
-> **Cannot submit to FNB without correct legal entity name.**
+> **Verified:** CoR 14.3 CIPC certificate confirmed. Entity: Asikhwele Building Projects (Pty) Ltd, reg 2015/010878/07, director Petrus Wilhelm Van Rooyen.
 
 ---
 
@@ -232,6 +228,7 @@ SENTINEL does not sell, trade, or rent personal information to third parties.
 
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
+| 1.1.0 | 2026-05-19 | Compliance Team | Confirmed legal entity: Asikhwele Building Projects (Pty) Ltd, reg 2015/010878/07 |
 | 1.0.0 | 2026-05-18 | Compliance Team | Initial DPR for Monitoring Stack |
 
 ### 12.1 Approval

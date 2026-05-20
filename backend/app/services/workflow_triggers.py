@@ -21,6 +21,9 @@ from pydantic import BaseModel, Field
 from app.database.repositories.workflow_event_repository import (
     get_workflow_event_repository,
 )
+from app.database.repositories.work_order_repository import (
+    get_work_order_repository,
+)
 from app.services.feedback_collection_service import (
     get_feedback_collection_service,
 )
@@ -41,6 +44,7 @@ class TriggerType(StrEnum):
     CRITICAL_DEFICIENCY = "critical_deficiency"
     REPAIR_COMPLETED = "repair_completed"
     REPAIR_VALIDATION = "repair_validation"
+    PREDICTION_CRITICAL = "prediction_critical"
 
 
 class TriggerPriority(StrEnum):
@@ -203,10 +207,12 @@ class WorkflowTriggerEngine:
             TriggerType.ML_ANOMALY: timedelta(hours=6),
             TriggerType.BASELINE_DEVIATION: timedelta(hours=6),
             TriggerType.CRITICAL_DEFICIENCY: timedelta(hours=12),
+            TriggerType.PREDICTION_CRITICAL: timedelta(hours=12),
         }
 
         # Workflow events log
         self._event_repository = get_workflow_event_repository()
+        self._work_order_repo = get_work_order_repository()
 
         # Configuration
         self.baseline_deviation_threshold = 15.0  # Percentage
@@ -636,6 +642,199 @@ class WorkflowTriggerEngine:
     # ========================================================================
     # Trigger 4: Repair Completion → Post-Repair Inspection
     # ========================================================================
+
+    async def on_prediction_critical(
+        self,
+        equipment_id: str,
+        prediction_id: str,
+        prediction_code: str,
+        health_score: float,
+        probability_percent: float,
+        equipment_code: str | None = None,
+    ) -> TriggerResult:
+        """
+        Handle critical prediction detection.
+
+        Auto-creates a work order when a prediction with probability >= 65%
+        or health_score < 50 is generated. Persists to Supabase via WorkOrderRepository.
+        Deduplicates against existing open work orders for the same equipment.
+        """
+        logger.info(
+            f"Prediction critical trigger: equipment={equipment_id} "
+            f"health={health_score} prob={probability_percent}%"
+        )
+
+        try:
+            # 0. Dedupe guard
+            is_duplicate, dedupe_details = self._is_duplicate_trigger(
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                reference_id=prediction_code,
+            )
+            if is_duplicate:
+                result = TriggerResult(
+                    success=True,
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    action_taken="duplicate_suppressed",
+                    details={"prediction_code": prediction_code, **dedupe_details},
+                )
+                await self._record_event(
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    success=True,
+                )
+                self._trigger_history.append(result)
+                return result
+
+            # 1. Check for existing open work orders (dedupe by equipment)
+            if equipment_code:
+                open_wos = await self._work_order_repo.get_open_work_orders_for_equipment(equipment_code)
+                if open_wos:
+                    result = TriggerResult(
+                        success=True,
+                        trigger_type=TriggerType.PREDICTION_CRITICAL,
+                        equipment_id=equipment_id,
+                        action_taken="open_work_order_exists",
+                        details={
+                            "prediction_code": prediction_code,
+                            "open_work_orders": [wo.get("code") for wo in open_wos],
+                        },
+                        follow_up_scheduled=True,
+                    )
+                    self._mark_trigger(
+                        trigger_type=TriggerType.PREDICTION_CRITICAL,
+                        equipment_id=equipment_id,
+                        reference_id=prediction_code,
+                    )
+                    await self._record_event(
+                        trigger_type=TriggerType.PREDICTION_CRITICAL,
+                        equipment_id=equipment_id,
+                        action_taken=result.action_taken,
+                        details=result.details,
+                        success=True,
+                    )
+                    self._trigger_history.append(result)
+                    return result
+
+            # 2. Determine priority
+            if probability_percent >= 80 or health_score < 35:
+                priority = "urgent"
+            elif probability_percent >= 65 or health_score < 50:
+                priority = "high"
+            else:
+                priority = "medium"
+
+            # 3. Build description
+            severity_label = "CRITICAL" if probability_percent >= 80 or health_score < 35 else "HIGH"
+            description = (
+                f"Auto-generated from prediction {prediction_code}\n\n"
+                f"Trigger reason: "
+                f"failure probability {probability_percent:.0f}% "
+                f"{'>= 65% threshold' if probability_percent >= 65 else ''}"
+                f"{' / ' if probability_percent >= 65 and health_score < 50 else ''}"
+                f"{'health score ' + str(health_score) + '% (< 50%)' if health_score < 50 else ''}\n\n"
+                f"Equipment: {equipment_id}\n"
+                f"Prediction code: {prediction_code}\n"
+                f"Generated by: SENTINEL ML Prediction Engine"
+            )
+
+            # 4. Persist work order to Supabase
+            work_order_data = {
+                "title": f"[{severity_label}] Predictive Maintenance: {equipment_id}",
+                "description": description,
+                "priority": priority,
+                "status": "scheduled",
+                "equipment_id": equipment_id,
+                "created_by": "SENTINEL_PREDICTION",
+                "milestone_status": "assigned",
+            }
+            created_wo = await self._work_order_repo.create_work_order(work_order_data)
+
+            if created_wo is None:
+                logger.error(f"Failed to persist work order for prediction {prediction_code}")
+                return TriggerResult(
+                    success=False,
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    action_taken="persistence_failed",
+                    details={"prediction_code": prediction_code},
+                )
+
+            work_order_id = created_wo.get("id")
+            work_order_code = created_wo.get("code", "UNKNOWN")
+
+            # 5. Audit log
+            await self._audit_log(
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                action="created_work_order_from_prediction",
+                details={
+                    "prediction_id": prediction_id,
+                    "prediction_code": prediction_code,
+                    "work_order_id": work_order_id,
+                    "work_order_code": work_order_code,
+                    "health_score": health_score,
+                    "probability_percent": probability_percent,
+                },
+            )
+
+            # 6. Send alert
+            await self._send_alert(
+                f"Critical prediction ({probability_percent:.0f}%) for {equipment_id}. "
+                f"Work order {work_order_code} created automatically."
+            )
+
+            result = TriggerResult(
+                success=True,
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                action_taken="created_work_order",
+                details={
+                    "prediction_id": prediction_id,
+                    "prediction_code": prediction_code,
+                    "work_order_id": work_order_id,
+                    "work_order_code": work_order_code,
+                    "priority": priority,
+                    "health_score": health_score,
+                    "probability_percent": probability_percent,
+                },
+                follow_up_scheduled=True,
+            )
+            self._mark_trigger(
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                reference_id=prediction_code,
+            )
+            await self._record_event(
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                action_taken=result.action_taken,
+                details=result.details,
+                work_order_id=work_order_id,
+                success=True,
+            )
+            self._trigger_history.append(result)
+            return result
+
+        except Exception as e:
+            logger.error(f"Error in prediction critical trigger: {e}")
+            await self._record_event(
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                action_taken="error",
+                details={"error": str(e), "prediction_code": prediction_code},
+                success=False,
+            )
+            return TriggerResult(
+                success=False,
+                trigger_type=TriggerType.PREDICTION_CRITICAL,
+                equipment_id=equipment_id,
+                action_taken="error",
+                details={"error": str(e)},
+            )
 
     async def on_repair_completed(
         self, work_order_id: str, equipment_id: str, completion_data: dict[str, Any]

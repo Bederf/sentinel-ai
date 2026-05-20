@@ -66,7 +66,7 @@ function LiveDot() {
       background: theme.teal, marginRight: 8, verticalAlign: "middle",
       boxShadow: pulse ? `0 0 12px ${theme.teal}` : `0 0 4px rgba(46,134,171,0.3)`,
       opacity: pulse ? 1 : 0.6,
-      transition: "all 1.4s ease-in-out",
+      transition: "opacity 1.4s ease-in-out, box-shadow 1.4s ease-in-out",
     }} />
   );
 }

@@ -113,12 +113,12 @@ describe('useSitePredictions Hook', () => {
       mockApiFetch.mockResolvedValueOnce(mockPredictions);
 
       renderHook(
-        () => useSitePredictions('site-005'),
+        () => useSitePredictions('site-003'),
         { wrapper: createWrapper(queryClient) }
       );
 
       await waitFor(() => {
-        expect(mockApiFetch).toHaveBeenCalledWith('/api/sites/site-005/predictions');
+        expect(mockApiFetch).toHaveBeenCalledWith('/api/sites/site-003/predictions');
       });
     });
 
@@ -221,7 +221,7 @@ describe('useSitePredictions Hook', () => {
       );
 
       const { result: result2 } = renderHook(
-        () => useSitePredictions('site-005'),
+        () => useSitePredictions('site-003'),
         { wrapper: createWrapper(queryClient) }
       );
 
@@ -553,7 +553,7 @@ describe('useSitePredictions Hook', () => {
       );
 
       const { result: result2 } = renderHook(
-        () => useSitePredictions('site-005'),
+        () => useSitePredictions('site-003'),
         { wrapper: createWrapper(queryClient) }
       );
 
@@ -597,7 +597,7 @@ describe('useSitePredictions Hook', () => {
       );
 
       const { result: result2 } = renderHook(
-        () => useSitePredictions('site-005'),
+        () => useSitePredictions('site-003'),
         { wrapper: createWrapper(queryClient) }
       );
 

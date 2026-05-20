@@ -11,6 +11,7 @@
  */
 
 import { useState, useEffect } from "react";
+import { fetchApi } from "@/lib/api/client";
 import {
   Brain,
   TrendingUp,
@@ -76,13 +77,7 @@ export function OptimizationInfoCard({
       try {
         // Add timestamp to bypass cache
         const timestamp = Date.now();
-        const response = await fetch(`/api/optimization/status/${siteId}?_t=${timestamp}`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('sentinel_token') || ''}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        const status = await response.json();
+        const status = await fetchApi<Record<string, unknown>>(`/api/optimization/status/${siteId}?_t=${timestamp}`);
         console.log('[OptimizationInfoCard] API Response:', {
           mode: status.optimization_settings?.mode,
           control_tier: status.optimization_settings?.control_tier,

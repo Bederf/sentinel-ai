@@ -52,7 +52,7 @@ export function SimbiotBridgeSettings({
   const isDisabled = loading || bridgeEnabled === null || toggling || readOnly;
 
   return (
-    <div className="glass-panel overflow-hidden">
+    <div className="glass-panel flat overflow-hidden">
       <div
         className="p-4 border-b"
         style={{ borderColor: "var(--color-sentinel-border)" }}

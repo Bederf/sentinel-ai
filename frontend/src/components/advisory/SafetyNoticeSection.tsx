@@ -9,18 +9,38 @@ interface SafetyNoticeSectionProps {
 }
 
 export function SafetyNoticeSection({ message }: SafetyNoticeSectionProps) {
+  const noticeStyle = {
+    outer: {
+      background: 'rgba(var(--color-sentinel-amber-rgb, 245,158,11), 0.08)',
+      borderColor: 'rgba(var(--color-sentinel-amber-rgb, 245,158,11), 0.25)',
+    },
+    header: {
+      background: 'rgba(var(--color-sentinel-amber-rgb, 245,158,11), 0.15)',
+      borderColor: 'rgba(var(--color-sentinel-amber-rgb, 245,158,11), 0.25)',
+    },
+    iconColor: 'var(--color-sentinel-amber)',
+    labelColor: 'var(--color-sentinel-amber)',
+    bodyColor: 'var(--color-sentinel-text-primary)',
+  }
+
   return (
-    <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 overflow-hidden">
-      <div className="px-4 py-3 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800">
+    <div
+      className="rounded-lg border overflow-hidden"
+      style={{ background: noticeStyle.outer.background, borderColor: noticeStyle.header.borderColor }}
+    >
+      <div
+        className="px-4 py-3 border-b"
+        style={{ background: noticeStyle.header.background, borderColor: noticeStyle.header.borderColor }}
+      >
         <div className="flex items-center gap-2">
-          <AlertTriangle className="w-4 h-4 text-amber-700 dark:text-amber-400" />
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+          <AlertTriangle className="w-4 h-4" style={{ color: noticeStyle.iconColor }} />
+          <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: noticeStyle.labelColor }}>
             Safety Notice
           </p>
         </div>
       </div>
       <div className="px-4 py-3">
-        <p className="text-sm text-amber-900 dark:text-amber-200">{message}</p>
+        <p className="text-sm" style={{ color: noticeStyle.bodyColor }}>{message}</p>
       </div>
     </div>
   )

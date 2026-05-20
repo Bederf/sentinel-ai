@@ -63,7 +63,7 @@ function NotificationTabButton({
 
 function NotificationUnauthenticatedState() {
   return (
-    <div className="glass-panel overflow-hidden">
+    <div className="glass-panel flat overflow-hidden">
       <NotificationPanelHeader detail="Sign in again to manage multi-channel notifications and SENTRY bot preferences." />
     </div>
   );
@@ -81,7 +81,7 @@ function NotificationTabbedContent({
   const [notifTab, setNotifTab] = useState<"sentry" | "channels">("channels");
 
   return (
-    <div className="glass-panel overflow-hidden">
+    <div className="glass-panel flat overflow-hidden">
       <NotificationPanelHeader detail="Configure multi-channel notifications and SENTRY bot preferences" />
       <div className="p-4">
         <div className="flex gap-2 border-b mb-6" style={{ borderColor: "var(--color-sentinel-border)" }}>

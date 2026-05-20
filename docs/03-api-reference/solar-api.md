@@ -531,7 +531,7 @@ NMD limit is extracted from municipal electricity bills and stored in `buildings
 
 **Fallback (No Bill Available):**
 - S002: 6,000 kVA (default)
-- site-005: 8,000 kVA (default)
+- site-003: 8,000 kVA (default)
 
 **See also:** [Municipal Billing API](municipal-billing.md) - Bill ingestion and NMD extraction
 

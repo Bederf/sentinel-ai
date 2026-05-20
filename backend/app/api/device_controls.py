@@ -278,7 +278,7 @@ async def recommend_control(
     if not equipment:
         raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
 
-    # Determine site_id from equipment (format: S002-XXX, site-005-XXX, etc.)
+    # Determine site_id from equipment (format: S002-XXX, site-003-XXX, etc.)
     # Extract site prefix from equipment code
     parts = equipment_code.split("-")
     site_id = f"{parts[0]}-{parts[1]}" if len(parts) >= 2 and parts[0] == "site" else parts[0]

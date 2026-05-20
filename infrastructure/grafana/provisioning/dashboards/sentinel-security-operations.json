@@ -6,7 +6,7 @@
         "datasource": { "type": "grafana", "uid": "-- Grafana --" },
         "enable": true,
         "hide": true,
-        "iconColor": "rgba(0, 211, 255, 1)",
+        "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
       }
@@ -20,9 +20,9 @@
   "links": [],
   "panels": [
     {
-      "title": "Security Overview (24h)",
+      "title": "Security Overview — 24h",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 0 },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -31,21 +31,45 @@
           "refId": "A"
         }
       ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 10 },
+              { "color": "#ef4444", "value": 50 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0,
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.15)"
+          }
+        }
+      },
       "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["sum"],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
-        "colorMode": "value",
-        "graphMode": "area"
+        "textMode": "auto"
       }
     },
     {
-      "title": "Failed Login Rate by IP",
+      "title": "Failed Login Rate — by IP",
       "description": "Failed authentication attempts grouped by source IP. Alert threshold: >5 in 5 minutes.",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "gridPos": { "h": 8, "w": 18, "x": 6, "y": 0 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -61,27 +85,42 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "bars",
             "fillOpacity": 60,
+            "lineWidth": 0,
             "stacking": { "mode": "normal" }
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 3 },
-              { "color": "red", "value": 5 }
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 3 },
+              { "color": "#ef4444", "value": 5 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Total (journal)" },
+            "properties": [
+              { "id": "color", "value": { "fixedColor": "#f59e0b", "mode": "fixed" } },
+              { "id": "custom.drawStyle", "value": "line" },
+              { "id": "custom.fillOpacity", "value": 20 },
+              { "id": "custom.lineWidth", "value": 2 }
             ]
           }
-        }
+        ]
       }
     },
     {
       "title": "Suspicious User Agent Frequency",
       "description": "Requests from automated tools and scanners (sqlmap, burp, nikto, curl with suspicious patterns).",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 4 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -91,31 +130,44 @@
         },
         {
           "expr": "sum(count_over_time({job=\"sentinel-security\", event_type=\"SUSPICIOUS_PATH\"} [15m]))",
-          "legendFormat": "Suspicious Paths (SQLi/Traversal)",
+          "legendFormat": "Suspicious Paths",
           "refId": "B"
         },
         {
           "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"SUSPICIOUS\" [15m]))",
-          "legendFormat": "Total Suspicious (journal)",
+          "legendFormat": "Total Suspicious",
           "refId": "C"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "bars",
             "fillOpacity": 50,
+            "lineWidth": 0,
             "stacking": { "mode": "normal" }
           },
-          "color": { "mode": "palette-classic" }
-        }
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Total Suspicious" },
+            "properties": [
+              { "id": "custom.drawStyle", "value": "line" },
+              { "id": "custom.fillOpacity", "value": 15 },
+              { "id": "custom.lineWidth", "value": 2 }
+            ]
+          }
+        ]
       }
     },
     {
-      "title": "Device Control Rate by User",
-      "description": "BMS device control actions grouped by user identity. Unusual spikes may indicate unauthorized activity.",
+      "title": "Device Control Rate — by User",
+      "description": "BMS device control actions grouped by user identity.",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 4 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -125,25 +177,39 @@
         },
         {
           "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BMS_CONTROL_ACTION\" [1h]))",
-          "legendFormat": "Total Controls (journal)",
+          "legendFormat": "Total Controls",
           "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "bars",
             "fillOpacity": 40,
+            "lineWidth": 0,
             "stacking": { "mode": "normal" }
+          },
+          "unit": "none",
+          "decimals": 0
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Total Controls" },
+            "properties": [
+              { "id": "custom.drawStyle", "value": "line" },
+              { "id": "custom.fillOpacity", "value": 15 },
+              { "id": "custom.lineWidth", "value": 2 }
+            ]
           }
-        }
+        ]
       }
     },
     {
       "title": "API Error Spikes (5xx)",
-      "description": "Backend error rate. Alert threshold: >10 errors in 5 minutes (1% of traffic).",
+      "description": "Backend error rate. Alert threshold: >10 errors in 5 minutes.",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -159,27 +225,170 @@
       ],
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
             "fillOpacity": 20,
             "pointSize": 5,
-            "showPoints": "auto"
+            "showPoints": "auto",
+            "lineWidth": 2
           },
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 10 }
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 10 }
             ]
-          }
+          },
+          "unit": "none",
+          "decimals": 0
         }
       }
     },
     {
-      "title": "Failed Login Events (Detail)",
+      "title": "BOLA Denials Over Time",
+      "description": "Broken Object Level Authorization denials — users accessing resources outside their site scope.",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_SITE_DENIED\" [10m]))",
+          "legendFormat": "Site Denials",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_EQUIPMENT_DENIED\" [10m]))",
+          "legendFormat": "Equipment Denials",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 60,
+            "lineWidth": 0,
+            "stacking": { "mode": "normal" }
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 10 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "title": "Top BOLA Attacking IPs",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (source_ip) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_\" | json | source_ip != \"\" [1h])))",
+          "legendFormat": "{{source_ip}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 20 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "title": "Top BOLA Targeted Endpoints",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (endpoint) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_\" | json | endpoint != \"\" [1h])))",
+          "legendFormat": "{{endpoint}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 20 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "title": "Top BOLA Targeted Sites",
+      "type": "table",
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 20 },
+      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "targets": [
+        {
+          "expr": "topk(10, sum by (target_site) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_SITE_DENIED\" | json | target_site != \"\" [1h])))",
+          "legendFormat": "{{target_site}}",
+          "refId": "A",
+          "instant": true
+        }
+      ],
+      "transformations": [
+        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#10b981", "value": null },
+              { "color": "#f59e0b", "value": 5 },
+              { "color": "#ef4444", "value": 20 }
+            ]
+          },
+          "unit": "none",
+          "decimals": 0
+        }
+      }
+    },
+    {
+      "title": "Failed Login Events",
       "type": "logs",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -199,7 +408,7 @@
     {
       "title": "Suspicious Request Detail",
       "type": "logs",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 28 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
       "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
       "targets": [
         {
@@ -215,108 +424,17 @@
         "enableLogDetails": true,
         "sortOrder": "Descending"
       }
-    },
-    {
-      "title": "BOLA Denials Over Time",
-      "description": "Broken Object Level Authorization denials — users attempting to access resources outside their site scope.",
-      "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 36 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_SITE_DENIED\" [10m]))",
-          "legendFormat": "Site Denials",
-          "refId": "A"
-        },
-        {
-          "expr": "sum(count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_EQUIPMENT_DENIED\" [10m]))",
-          "legendFormat": "Equipment Denials",
-          "refId": "B"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "drawStyle": "bars",
-            "fillOpacity": 60,
-            "stacking": { "mode": "normal" }
-          },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "yellow", "value": 5 },
-              { "color": "red", "value": 10 }
-            ]
-          }
-        }
-      }
-    },
-    {
-      "title": "Top BOLA Attacking IPs",
-      "description": "Source IPs with the most BOLA denials in the last hour.",
-      "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 36 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "topk(10, sum by (source_ip) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_\" | json | source_ip != \"\" [1h])))",
-          "legendFormat": "{{source_ip}}",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
-      ]
-    },
-    {
-      "title": "Top BOLA Targeted Endpoints",
-      "description": "Most frequently targeted endpoints in BOLA denial events.",
-      "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 44 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "topk(10, sum by (endpoint) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_\" | json | endpoint != \"\" [1h])))",
-          "legendFormat": "{{endpoint}}",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
-      ]
-    },
-    {
-      "title": "Top BOLA Targeted Sites",
-      "description": "Sites most frequently probed by unauthorized users.",
-      "type": "table",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 44 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
-      "targets": [
-        {
-          "expr": "topk(10, sum by (target_site) (count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"BOLA_SITE_DENIED\" | json | target_site != \"\" [1h])))",
-          "legendFormat": "{{target_site}}",
-          "refId": "A",
-          "instant": true
-        }
-      ],
-      "transformations": [
-        { "id": "sortBy", "options": { "fields": {}, "sort": [{ "field": "Value", "desc": true }] } }
-      ]
     }
   ],
   "refresh": "30s",
   "schemaVersion": 39,
   "tags": ["sentinel", "security", "observability"],
-  "templating": {
-    "list": []
-  },
+  "templating": { "list": [] },
   "time": { "from": "now-24h", "to": "now" },
   "timepicker": {},
   "timezone": "Africa/Johannesburg",
-  "title": "SENTINEL Security Operations",
+  "title": "SENTINEL — Security Operations",
   "uid": "sentinel-security-operations",
-  "version": 2
+  "version": 3,
+  "weekStart": ""
 }

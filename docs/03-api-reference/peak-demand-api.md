@@ -43,7 +43,7 @@ The Peak Demand Management system monitors real-time demand against contractual 
 - `buildings.tariff_band` - Current TOU band (off-peak, standard, peak)
 
 **Fallback (Seeded Defaults):**
-- If NMD not in database: 6,000 kVA (S002), 8,000 kVA (site-005)
+- If NMD not in database: 6,000 kVA (S002), 8,000 kVA (site-003)
 - If demand data unavailable: Last known value + forecast model
 
 **Real-Time:**
@@ -60,7 +60,7 @@ Get current demand status with NMD headroom, trend analysis, and available reduc
 **Parameters:**
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
-| `site_id` | string | Yes | Building code (e.g., `S002`, `site-005`) |
+| `site_id` | string | Yes | Building code (e.g., `S002`, `site-003`) |
 
 **Response:**
 ```json
@@ -456,7 +456,7 @@ curl -X PATCH http://localhost:9095/api/buildings/S002 \
 
 If NMD not in database, coordinator uses seeded defaults:
 - S002 (Sandton Office): 6,000 kVA
-- site-005 (Hospital): 8,000 kVA
+- site-003 (Hospital): 8,000 kVA
 - Other sites: 6,000 kVA (default)
 
 ---

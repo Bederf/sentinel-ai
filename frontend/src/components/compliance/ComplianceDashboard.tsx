@@ -30,7 +30,7 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
   if (!siteCode) {
     return (
       <div className="p-6">
-        <p className="text-gray-500">Select a site to view compliance data</p>
+        <p style={{ color: "var(--color-sentinel-text-disabled)" }}>Select a site to view compliance data</p>
       </div>
     )
   }
@@ -38,7 +38,7 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
   if (statusLoading) {
     return (
       <div className="p-6">
-        <p className="text-gray-500">Loading compliance data...</p>
+        <p style={{ color: "var(--color-sentinel-text-disabled)" }}>Loading compliance data...</p>
       </div>
     )
   }
@@ -66,13 +66,13 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
         </Card>
         <Card>
           <Title>Critical Issues</Title>
-          <div className={`text-3xl font-bold mt-2 ${(statusData?.critical_issues_count || 0) > 0 ? 'text-red-600' : 'text-green-600'}`}>
+          <div className="text-3xl font-bold mt-2" style={{ color: (statusData?.critical_issues_count || 0) > 0 ? "var(--color-sentinel-red)" : "var(--color-sentinel-green)" }}>
             {statusData?.critical_issues_count || 0}
           </div>
         </Card>
         <Card>
           <Title>Expiring Soon (30 days)</Title>
-          <div className={`text-3xl font-bold mt-2 ${(statusData?.items_expiring_30days || 0) > 0 ? 'text-yellow-600' : 'text-green-600'}`}>
+          <div className="text-3xl font-bold mt-2" style={{ color: (statusData?.items_expiring_30days || 0) > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)" }}>
             {statusData?.items_expiring_30days || 0}
           </div>
         </Card>
@@ -139,19 +139,18 @@ export function ComplianceDashboard({ siteCode }: ComplianceDashboardProps) {
             </thead>
             <tbody>
               {auditsData.audits.slice(0, 5).map((audit) => (
-                <tr key={audit.id} className="border-b hover:bg-gray-50">
+                <tr key={audit.id} className="border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
                   <td className="py-2">{audit.compliance_type}</td>
                   <td className="py-2">
                     <span
-                      className={`px-2 py-1 rounded text-xs font-semibold
-                      ${
+                      className="px-2 py-1 rounded text-xs font-semibold"
+                      style={
                         audit.status === 'closed'
-                          ? 'bg-green-100 text-green-800'
+                          ? { background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }
                           : audit.status === 'approved'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-yellow-100 text-yellow-800'
+                            ? { background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)" }
+                            : { background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }
                       }
-                    `}
                     >
                       {audit.status}
                     </span>

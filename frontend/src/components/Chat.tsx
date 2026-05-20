@@ -9,7 +9,7 @@
  * - Loading state during AI response
  */
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { Send, MessageSquare, Bot, Mic, MicOff, Trash2, BookOpen, Volume2, VolumeX } from "lucide-react";
 import { ChatMessage } from "./ChatMessage";
@@ -19,6 +19,9 @@ import api, { isExpectedApiError, streamChat } from '@/lib/api';
 import type { Site } from '@/lib/api';
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
+import { useVAD } from "@/hooks/useVAD";
+import { useVoicePipeline } from "@/hooks/useVoicePipeline";
+import { useStreamingTTS } from "@/hooks/useStreamingTTS";
 
 interface Message {
   id: string;
@@ -26,6 +29,9 @@ interface Message {
   content: string;
   isStreaming?: boolean;
 }
+
+// Voice mode state machine for interruptible real-time voice
+type VoiceState = "idle" | "user_speaking" | "ai_speaking" | "interrupted";
 
 export function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -36,6 +42,7 @@ export function Chat() {
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
   const [includeSystemDocs, setIncludeSystemDocs] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false); // Auto-summarised voice playback
+  const [voiceState, setVoiceState] = useState<VoiceState>("idle"); // Voice mode state machine
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -51,9 +58,32 @@ export function Chat() {
     return id;
   });
 
-  // Speech-to-text and text-to-speech hooks
+  // Speech-to-text, text-to-speech, and VAD hooks
   const stt = useSpeechRecognition();
   const tts = useTextToSpeech();
+  const vad = useVAD({
+    onSpeechStart: () => setVoiceState("user_speaking"),
+    onSpeechEnd: (_audioBlob, _transcript) => {
+      // VAD detected end of speech — transcript sent via STT
+      setVoiceState("ai_speaking");
+    },
+  });
+
+  // Streaming voice pipeline for continuous capture
+  const voicePipeline = useVoicePipeline({
+    onTranscript: (transcript) => {
+      if (transcript) {
+        sendMessage(transcript);
+      }
+    },
+    onInterim: (transcript) => {
+      // Live transcript preview — update input field
+      setInput(transcript);
+    },
+  });
+
+  // Streaming TTS for progressive audio playback
+  const streamingTTS = useStreamingTTS();
 
   // Fetch sites on mount
   useEffect(() => {
@@ -136,7 +166,52 @@ export function Chat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stt.finalTranscript, isLoading]);
 
-  // No auto-greet — chat opens clean every time
+  // Interrupt handler — user pressed mic while AI was speaking
+  const interruptVoice = useCallback(() => {
+    // Stop TTS playback
+    tts.stop();
+    streamingTTS.stop(); // Stop progressive TTS
+    // Stop voice pipeline if running
+    if (voicePipeline.isRecording) {
+      voicePipeline.interrupt();
+    }
+    // Stop old STT if running
+    if (stt.isListening) {
+      stt.stopListening();
+    }
+    // If in ai_speaking state, transition to interrupted → user_speaking
+    if (voiceState === "ai_speaking" || voiceState === "interrupted") {
+      setVoiceState("interrupted");
+      // Start new listening session (voice pipeline if docs mode)
+      if (includeSystemDocs) {
+        voicePipeline.startCapture();
+      } else {
+        stt.startListening();
+      }
+    }
+  }, [tts, stt, voicePipeline, voiceState, includeSystemDocs, streamingTTS]);
+
+  // Handle mic toggle with state awareness
+  const handleMicToggle = useCallback(() => {
+    if (voiceState === "ai_speaking" || voiceState === "interrupted") {
+      interruptVoice();
+    } else if (includeSystemDocs) {
+      // Use continuous voice pipeline in docs mode
+      if (voicePipeline.isRecording) {
+        voicePipeline.stopCapture();
+      } else {
+        setVoiceState("user_speaking");
+        voicePipeline.startCapture();
+      }
+    } else {
+      // Use old single-utterance STT
+      if (stt.isListening) {
+        stt.stopListening();
+      } else {
+        stt.startListening();
+      }
+    }
+  }, [stt, voicePipeline, voiceState, includeSystemDocs, interruptVoice]);
 
   // Generate unique ID for messages
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -156,8 +231,14 @@ export function Chat() {
   };
 
   // Core send logic shared by form submit and command clicks
+  // voiceState-aware: transitions to ai_speaking when sending
   const sendMessage = async (text: string) => {
     if (!text || isLoading) return;
+
+    // Transition to ai_speaking when we start waiting for response
+    if (voiceMode || includeSystemDocs) {
+      setVoiceState("ai_speaking");
+    }
 
     const userMessage: Message = {
       id: generateId(),
@@ -186,6 +267,11 @@ export function Chat() {
             m.id === assistantId ? { ...m, content: fullResponse } : m
           )
         );
+        // Progressive TTS: send each chunk to TTS for immediate audio
+        // Only in docs mode with voice — sends complete sentences
+        if (includeSystemDocs && voiceMode) {
+          streamingTTS.speakChunk(chunk);
+        }
       }, selectedSiteId, includeSystemDocs);
 
       // Mark streaming complete (same message, no unmount/remount)
@@ -198,6 +284,7 @@ export function Chat() {
       );
     } catch (error) {
       console.error("Chat error:", error);
+      streamingTTS.stop();
       setMessages((prev) =>
         prev.map((m) =>
           m.id === assistantId
@@ -211,15 +298,21 @@ export function Chat() {
       inputRef.current?.focus();
 
       // Auto-play summarised voice if voice mode is on
-      if (voiceMode && fullResponse && tts.isAvailable) {
+      // Skip if we already did progressive TTS during streaming (includeSystemDocs)
+      if (voiceMode && fullResponse && tts.isAvailable && !includeSystemDocs) {
         try {
           const { audio_url } = await api.voiceSummary(fullResponse);
           // Play directly from data URI — no blob fetch needed
           const audio = new Audio(audio_url);
+          audio.onended = () => setVoiceState("idle");
           await audio.play();
         } catch {
           // Voice summary failed — text is already shown, no action needed
+          setVoiceState("idle");
         }
+      } else {
+        // If not using TTS, go back to idle
+        setVoiceState("idle");
       }
     }
   };
@@ -334,6 +427,30 @@ export function Chat() {
             <BookOpen className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">Platform docs</span>
           </button>
+
+          {/* Voice state indicator — shows when in voice mode */}
+          {voiceState !== "idle" && (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded text-xs">
+              {voiceState === "user_speaking" && (
+                <span className="flex items-center gap-1" style={{ color: "var(--color-sentinel-red)" }}>
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--color-sentinel-red)" }} />
+                  Listening...
+                </span>
+              )}
+              {voiceState === "ai_speaking" && (
+                <span className="flex items-center gap-1" style={{ color: "var(--color-sentinel-orange)" }}>
+                  <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--color-sentinel-orange)" }} />
+                  Speaking...
+                </span>
+              )}
+              {voiceState === "interrupted" && (
+                <span className="flex items-center gap-1" style={{ color: "var(--color-grafana-yellow)" }}>
+                  <span className="w-2 h-2 rounded-full" style={{ background: "var(--color-grafana-yellow)" }} />
+                  Interrupted
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Building selector */}
           <BuildingSelector
@@ -469,23 +586,53 @@ export function Chat() {
           {stt.isSupported && (
             <button
               type="button"
-              onClick={stt.toggleListening}
+              onClick={handleMicToggle}
               disabled={isLoading}
               className="px-3 py-2 rounded flex items-center transition-all hover:brightness-110 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: stt.isListening
-                  ? "rgba(255, 68, 68, 0.2)"
-                  : "var(--color-grafana-bg-panel)",
-                border: stt.isListening
-                  ? "1px solid var(--color-sentinel-red)"
-                  : "1px solid var(--color-grafana-border)",
-                color: stt.isListening
-                  ? "var(--color-sentinel-red)"
-                  : "var(--color-grafana-text-secondary)",
-                animation: stt.isListening ? "pulse 1.5s ease-in-out infinite" : undefined,
+                background:
+                  voiceState === "user_speaking" || voiceState === "interrupted"
+                    ? "rgba(255, 68, 68, 0.2)"
+                    : voiceState === "ai_speaking"
+                    ? "rgba(255, 136, 0, 0.15)"
+                    : includeSystemDocs
+                    ? "rgba(50, 116, 217, 0.15)"
+                    : "var(--color-grafana-bg-panel)",
+                border:
+                  voiceState === "user_speaking" || voiceState === "interrupted"
+                    ? "1px solid var(--color-sentinel-red)"
+                    : voiceState === "ai_speaking"
+                    ? "1px solid rgba(255,136,0,0.6)"
+                    : includeSystemDocs
+                    ? "1px solid var(--color-grafana-blue)"
+                    : "1px solid var(--color-grafana-border)",
+                color:
+                  voiceState === "user_speaking" || voiceState === "interrupted"
+                    ? "var(--color-sentinel-red)"
+                    : voiceState === "ai_speaking"
+                    ? "var(--color-sentinel-orange)"
+                    : "var(--color-grafana-text-secondary)",
+                animation:
+                  voiceState === "user_speaking" || voiceState === "interrupted"
+                    ? "pulse 1.5s ease-in-out infinite"
+                    : voiceState === "ai_speaking"
+                    ? "pulse 2s ease-in-out infinite"
+                    : undefined,
               }}
-              aria-label={stt.isListening ? "Stop listening" : "Start voice input"}
-              title={stt.isListening ? "Stop listening" : "Voice input"}
+              aria-label={
+                voiceState === "ai_speaking"
+                  ? "Interrupt AI response"
+                  : stt.isListening
+                  ? "Stop listening"
+                  : "Start voice input"
+              }
+              title={
+                voiceState === "ai_speaking"
+                  ? "Interrupt — press to stop AI and speak"
+                  : stt.isListening
+                  ? "Stop listening"
+                  : "Voice input"
+              }
             >
               {stt.isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>

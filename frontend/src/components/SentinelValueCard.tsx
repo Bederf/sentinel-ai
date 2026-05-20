@@ -98,7 +98,7 @@ export function SentinelValueCard({
       >
         <div className="flex items-center gap-3">
           <div className="p-2 rounded" style={{ background: 'rgba(34, 197, 94, 0.15)' }}>
-            <Icon className="h-5 w-5" style={{ color: '#22C55E' }} />
+            <Icon className="h-5 w-5" style={{ color: 'var(--color-sentinel-green)' }} />
           </div>
           <div>
             <h3 className="font-medium" style={{ color: 'var(--color-sentinel-text-primary)' }}>

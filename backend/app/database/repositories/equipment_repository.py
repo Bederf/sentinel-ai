@@ -210,6 +210,22 @@ class EquipmentRepository:
         CacheInvalidation.on_equipment_change(site_id=equipment_data.get("site_id"))
         return result
 
+    def upsert_many(self, equipment_list: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Insert or update multiple equipment records.
+
+        Args:
+            equipment_list: List of equipment data dicts
+
+        Returns:
+            List of upserted equipment
+        """
+        if not equipment_list:
+            return []
+        response = self.client.table("equipment").upsert(equipment_list, on_conflict="code").execute()
+        if equipment_list:
+            CacheInvalidation.on_equipment_change(site_id=equipment_list[0].get("site_id"))
+        return response.data
+
     def update(self, equipment_id: str, equipment_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update equipment.
 

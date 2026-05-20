@@ -111,7 +111,7 @@ Automatically triggered when advancing from Step 1. Calls `POST /api/niagara/dis
 2. Point enumeration reads all BACnet objects from each device
 3. **Vendor-agnostic 3-tier classification:**
    - **Tier 1 — Metadata:** When equipment JSON files provide `_equipment_id`, `_equipment_type`, `_point_type`, the classifier uses them directly (100% high confidence, any BMS vendor)
-   - **Tier 2 — ID extraction:** For points with unknown type, extracts the type code from equipment ID segments (e.g., `COLD`, `LIFT`, `JACE` from `site-005-UMH-COLD-B1-001`)
+   - **Tier 2 — ID extraction:** For points with unknown type, extracts the type code from equipment ID segments (e.g., `COLD`, `LIFT`, `JACE` from `site-003-UMH-COLD-B1-001`)
    - **Tier 3 — Regex fallback:** Haystack/Brick ontology pattern matching for raw BACnet points without metadata
 4. Points are grouped into equipment models (30+ types: AHU, Chiller, FCU, Lift, JACE, Cold Room, MEDGAS, etc.)
 5. Equipment IDs converted to SENTINEL v2.0 format (`S###-TYPE-FLOOR-ZONE`) with vendor-agnostic floor extraction

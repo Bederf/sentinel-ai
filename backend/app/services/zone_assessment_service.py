@@ -91,7 +91,9 @@ class ZoneAssessmentService:
         desk_data = self._get_desk_data(desk_id) if desk_id else {}
 
         # 2. Resolve all equipment IDs in this zone
-        equipment_ids = self._resolve_zone_equipment(zone_data)
+        # site_code sourced from zone_data (zone records carry site_id from bridge-processed BMS data,
+        # so the SENTINEL naming convention is already applied by the bridge)
+        equipment_ids = self._resolve_zone_equipment(zone_data, site_code=zone_data.get("site_id"))
 
         # 3. Fetch equipment health + alerts + predictions in parallel
         equipment_statuses = self._fetch_equipment_statuses(equipment_ids)
@@ -199,16 +201,48 @@ class ZoneAssessmentService:
     # Step 2: Resolve zone → equipment IDs
     # -------------------------------------------------------------------------
 
-    def _resolve_zone_equipment(self, zone_data: dict[str, Any]) -> dict[str, str | None]:
-        """Extract all equipment IDs from a zone record."""
+    def _resolve_zone_equipment(
+        self, zone_data: dict[str, Any], site_code: str | None = None
+    ) -> dict[str, str | None]:
+        """Extract equipment IDs from zone record, deriving from naming convention if not stored.
+
+        Equipment naming convention: S{site_prefix}-{TYPE}-{ZONE_CODE}
+        e.g. Zone-203 -> S002-FCU-203, S002-VAV-203, S002-AHU-203
+        """
+        # First try stored values
+        fcu_id = zone_data.get("fcu_id")
+        vav_id = zone_data.get("vav_id")
+        ahu_id = zone_data.get("ahu_id")
+        lighting_id = zone_data.get("lighting_id")
+        temp_sensor = zone_data.get("temp_sensor")
+        co2_sensor = zone_data.get("co2_sensor")
+        stored_site_id = zone_data.get("site_id")
+
+        # Derive from naming convention if not stored
+        if site_code and not (fcu_id and vav_id and ahu_id):
+            # zone_id format: "Zone-NNN" e.g. "Zone-203"
+            zone_id = zone_data.get("zone_id", "")
+            zone_code = zone_id.replace("Zone-", "") if zone_id.startswith("Zone-") else zone_id
+
+            # site_code format: "site-002" -> extract numeric suffix "002"
+            site_num = site_code.replace("site-", "") if site_code.startswith("site-") else site_code
+            prefix = f"S{site_num.upper()}"
+
+            if not fcu_id:
+                fcu_id = f"{prefix}-FCU-{zone_code}"
+            if not vav_id:
+                vav_id = f"{prefix}-VAV-{zone_code}"
+            if not ahu_id:
+                ahu_id = f"{prefix}-AHU-{zone_code}"
+
         return {
-            "fcu_id": zone_data.get("fcu_id"),
-            "vav_id": zone_data.get("vav_id"),
-            "ahu_id": zone_data.get("ahu_id"),
-            "lighting_id": zone_data.get("lighting_id"),
-            "temp_sensor": zone_data.get("temp_sensor"),
-            "co2_sensor": zone_data.get("co2_sensor"),
-            "site_id": zone_data.get("site_id"),
+            "fcu_id": fcu_id,
+            "vav_id": vav_id,
+            "ahu_id": ahu_id,
+            "lighting_id": lighting_id,
+            "temp_sensor": temp_sensor,
+            "co2_sensor": co2_sensor,
+            "site_id": stored_site_id,
         }
 
     # -------------------------------------------------------------------------

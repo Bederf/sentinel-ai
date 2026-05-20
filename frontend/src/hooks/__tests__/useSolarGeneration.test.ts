@@ -374,7 +374,7 @@ describe('useSolarGeneration Hook (via useSolarOverview)', () => {
 
     it('should refetch when site ID changes', async () => {
       const mockData1 = createMockSolarOverview({ site_id: 'site-002' });
-      const mockData2 = createMockSolarOverview({ site_id: 'site-005' });
+      const mockData2 = createMockSolarOverview({ site_id: 'site-003' });
 
       mockFetchSolarOverview
         .mockResolvedValueOnce(mockData1)
@@ -395,10 +395,10 @@ describe('useSolarGeneration Hook (via useSolarOverview)', () => {
       expect(result.current.data?.site_id).toBe('site-002');
 
       // Change site ID
-      rerender({ siteId: 'site-005' });
+      rerender({ siteId: 'site-003' });
 
       await waitFor(() => {
-        expect(result.current.data?.site_id).toBe('site-005');
+        expect(result.current.data?.site_id).toBe('site-003');
       });
 
       expect(mockFetchSolarOverview).toHaveBeenCalledTimes(2);

@@ -67,31 +67,31 @@ function getSeverityConfig(severity: Alert["severity"]): {
     case "critical":
       return {
         color: "var(--color-status-error)",
-        bg: "rgba(242, 73, 92, 0.1)",
+        bg: "color-mix(in oklch, var(--color-sentinel-red) 10%, transparent)",
         label: "CRITICAL",
       };
     case "high":
       return {
         color: "var(--color-status-warning)",
-        bg: "rgba(255, 152, 48, 0.1)",
+        bg: "color-mix(in oklch, var(--color-sentinel-amber) 10%, transparent)",
         label: "HIGH",
       };
     case "medium":
       return {
         color: "var(--color-grafana-yellow)",
-        bg: "rgba(242, 204, 12, 0.1)",
+        bg: "color-mix(in oklch, var(--color-sentinel-amber) 10%, transparent)",
         label: "MEDIUM",
       };
     case "low":
       return {
         color: "var(--color-grafana-blue)",
-        bg: "rgba(50, 116, 217, 0.1)",
+        bg: "color-mix(in oklch, var(--color-sentinel-blue) 10%, transparent)",
         label: "LOW",
       };
     default:
       return {
         color: "var(--color-grafana-text-secondary)",
-        bg: "rgba(142, 142, 142, 0.1)",
+        bg: "color-mix(in oklch, var(--color-sentinel-text-disabled) 10%, transparent)",
         label: "INFO",
       };
   }
@@ -302,7 +302,7 @@ export function AlertFeed({
         <div className="flex items-center gap-3">
           <div
             className="p-2 rounded"
-            style={{ background: "rgba(255, 152, 48, 0.15)" }}
+            style={{ background: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)" }}
           >
             <Bell className="h-5 w-5" style={{ color: "var(--color-grafana-orange)" }} />
           </div>
@@ -318,7 +318,7 @@ export function AlertFeed({
                 <span
                   className="text-xs px-1.5 py-0.5 rounded"
                   style={{
-                    background: "rgba(242, 73, 92, 0.15)",
+                    background: "color-mix(in oklch, var(--color-sentinel-red) 15%, transparent)",
                     color: "var(--color-status-error)",
                   }}
                 >
@@ -329,7 +329,7 @@ export function AlertFeed({
                 <span
                   className="text-xs px-1.5 py-0.5 rounded"
                   style={{
-                    background: "rgba(255, 152, 48, 0.15)",
+                    background: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)",
                     color: "var(--color-status-warning)",
                   }}
                 >
@@ -373,8 +373,8 @@ export function AlertFeed({
         <div
           className="mx-4 mt-4 p-3 rounded"
           style={{
-            background: "rgba(242, 73, 92, 0.1)",
-            border: "1px solid rgba(242, 73, 92, 0.3)",
+            background: "color-mix(in oklch, var(--color-sentinel-red) 10%, transparent)",
+            border: "1px solid color-mix(in oklch, var(--color-sentinel-red) 30%, transparent)",
             color: "var(--color-status-error)",
           }}
         >

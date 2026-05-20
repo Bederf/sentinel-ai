@@ -10,9 +10,8 @@ interface ProfileSettingsProps {
 // Matches BuildingConfigEditor OPTIMIZATION_PROFILES naming
 const PROFILE_OPTIONS = [
   { value: 'cost_saving', label: 'Cost Saving', desc: 'Minimize energy spend' },
-  { value: 'comfort_first', label: 'Comfort First', desc: 'Prioritize occupant comfort' },
+  { value: 'comfort', label: 'Comfort First', desc: 'Prioritize occupant comfort' },
   { value: 'balanced', label: 'Balanced', desc: 'Balance cost and comfort' },
-  { value: 'sweat_assets', label: 'Asset Sweating', desc: 'Protect building assets' },
 ]
 
 const CONTROL_TIER_LABELS: Record<string, string> = {

@@ -13,13 +13,19 @@ export interface SiteProfileConfig {
 
 export interface Recommendation {
   id: string
+  recommendation_id?: string
   site_id: string
+  source_module?: string
+  recommendation_type?: string
   action_type: string
   risk_level: string
+  priority?: string
   target_equipment: string
+  title?: string
+  description?: string
   reason: string
   expected_impact: Record<string, number>
-  confidence: string
+  confidence: string | number
   profile: string
   multi_objective_score: number
   status: string

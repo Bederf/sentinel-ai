@@ -1,5 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { Edges, Line, OrbitControls, useTexture } from '@react-three/drei'
+import { useQuery } from '@tanstack/react-query'
 import type { MutableRefObject } from 'react'
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
@@ -8,6 +9,9 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import type { CockpitState } from './types'
 import { cockpitFloorPalette, cockpitFlowColor, cockpitToneKey } from './cockpitTwinTheme'
 import { motionReduced } from './motionPreference'
+import { fetchApi } from '@/lib/api/client'
+import type { BuildingEquipmentResponse } from '@/lib/api/sites'
+import { useHealthThresholds } from '@/hooks/useHealthThresholds'
 
 interface CockpitBuildingThreeProps {
   state: CockpitState
@@ -64,11 +68,9 @@ function GroundPlane() {
       <planeGeometry args={[32, 32]} />
       <meshStandardMaterial
         map={map}
-        color="#020617"
+        color="#ffffff"
         metalness={0.05}
         roughness={0.95}
-        opacity={0.45}
-        transparent
       />
     </mesh>
   )
@@ -79,6 +81,7 @@ type SlabInfo = {
   intensity: number
   isManaged: boolean
   riskLevel: string
+  equipmentHealth?: 'healthy' | 'degraded' | 'critical' | null
 }
 
 /** Local Y bounds (pre-scale) for Sentinel-managed slabs only */
@@ -100,6 +103,27 @@ function managedLocalYRange(floors: CockpitState['visualTwin']['floors']): { min
   }
   if (!Number.isFinite(minY)) return null
   return { minY, maxY }
+}
+
+function EquipmentHealthDot({ x, y, z, health }: { x: number; y: number; z: number; health: 'critical' | 'degraded' }) {
+  const ref = useRef<THREE.Mesh>(null)
+  const color = health === 'critical' ? '#ef4444' : '#facc15'
+  useFrame(() => {
+    if (!ref.current) return
+    const t = performance.now() * 0.001
+    ref.current.scale.setScalar(1 + Math.sin(t * 3) * 0.18)
+  })
+  return (
+    <mesh ref={ref} position={[x, y, z]}>
+      <sphereGeometry args={[0.09, 8, 8]} />
+      <meshStandardMaterial
+        color={color}
+        emissive={color}
+        emissiveIntensity={1.2}
+        toneMapped={false}
+      />
+    </mesh>
+  )
 }
 
 function ManagedSlab({
@@ -152,6 +176,10 @@ function ManagedSlab({
         />
         <Edges color={pal.edge} threshold={12} />
       </mesh>
+      {/* Equipment health dot: critical=red, degraded=amber at top-corner of slab */}
+      {floor.equipmentHealth && floor.equipmentHealth !== 'healthy' && (
+        <EquipmentHealthDot x={w * 0.38} y={h * 0.6} z={d * 0.38} health={floor.equipmentHealth} />
+      )}
     </group>
   )
 }
@@ -205,28 +233,102 @@ function BuildingStack({
   const calm = !waiting && state.primaryMetric.value === 'Stable'
   const breath = Math.max(0.12, Math.min(1, state.visualTwin.breathingIntensity || 0.2))
 
+  // Use the same health thresholds configured in Settings → Health Threshold panel
+  const { thresholds } = useHealthThresholds()
+
+  // Fetch equipment per site so we can show health indicators on floors
+  const { data: equipmentData } = useQuery({
+    queryKey: ['cockpit-equipment', state.site.id],
+    queryFn: () => fetchApi<BuildingEquipmentResponse>(`/api/buildings/${state.site.id}/equipment`),
+    enabled: state.site.id !== '',
+    staleTime: 30_000,
+  })
+
+  // Build a floorId → worst equipment health map
+  const floorEquipmentHealth = useMemo(() => {
+    if (!equipmentData?.equipment) return new Map<string, 'healthy' | 'degraded' | 'critical' | null>()
+    const map = new Map<string, 'healthy' | 'degraded' | 'critical' | null>()
+    for (const eq of equipmentData.equipment) {
+      const code = ((eq as { code?: string }).code || eq.id || '').toString()
+      // Floor is 3rd segment e.g. S002-AHU-204 → floor L2 (office: 200-299 = floor N, zone = last 2)
+      // or S002-AHU-L1-042 → floor L1 (hospital: explicit floor + zone)
+      // or S002-FCU-B01 → floor B1 (basement)
+      // or S002-INV-R01 → floor R (roof)
+      const parts = code.split('-')
+      let floorId = ''
+      if (parts.length >= 3) {
+        const thirdPart = parts[2]
+        // Office 3-digit: 200-299 → L{floor}, e.g. 204 → L2
+        const num = parseInt(thirdPart, 10)
+        if (!isNaN(num) && num >= 200 && num <= 299) {
+          floorId = `L${Math.floor(num / 100)}`
+        }
+        // Office 3-digit: 001-099 → L0 (ground floor)
+        else if (!isNaN(num) && num >= 1 && num <= 99) {
+          floorId = 'L0'
+        }
+        // Hospital: L{n}-ZZZ pattern, e.g. L1-042 → L1, L2-001 → L2
+        else if (/^L\d+$/.test(thirdPart)) {
+          floorId = thirdPart
+        }
+        // Basement: B01, B1, B2 → B1, B2
+        else if (/^B\d+$/.test(thirdPart)) {
+          floorId = `B${parseInt(thirdPart.slice(1), 10) || 1}`
+        }
+        // Roof: R01, ROOF → R
+        else if (/^R\d*$/i.test(thirdPart) || thirdPart.toUpperCase() === 'ROOF') {
+          floorId = 'R'
+        }
+      }
+      if (!floorId) continue
+      // Use thresholds from Settings → Health Score Thresholds panel
+      const score = (eq as { health_score?: number }).health_score ?? 100
+      const health: 'healthy' | 'degraded' | 'critical' =
+        score >= thresholds.healthy ? 'healthy'
+        : score >= thresholds.critical ? 'degraded'
+        : 'critical'
+      const worst = map.get(floorId)
+      if (!worst) {
+        map.set(floorId, health)
+      } else if (worst !== 'critical' && health === 'critical') {
+        map.set(floorId, 'critical')
+      } else if (worst !== 'critical' && worst !== 'degraded' && health === 'degraded') {
+        map.set(floorId, 'degraded')
+      }
+    }
+    return map
+  }, [equipmentData, thresholds])
+
   const slabs: SlabInfo[] = useMemo(() => {
+    // When no floors from backend, render 5 generic placeholder slabs.
+    // isManaged is driven by backend payload — all returned floors are occupied
+    // tenant spaces (equipment-only floors like B1/R are excluded by the backend).
     const source = floors.length === 0
       ? Array.from({ length: 5 }).map((_, i) => ({
           id: `default-${i}`,
           intensity: 0.25,
-          isManaged: OCCUPIED_FLOOR_IDS.has(`L${i}`),
+          isManaged: true,
           riskLevel: 'stable',
         }))
       : floors.map((f) => ({
           id: f.id,
           intensity: f.intensity,
-          // isManaged drives amber glow — only occupied tenant floors qualify.
-          // Equipment-only floors (B1, R) are host mass regardless of their
-          // risk level in the payload.
-          isManaged: OCCUPIED_FLOOR_IDS.has(f.id),
+          isManaged: f.isManaged !== false,  // backend: false means equipment-only floor
           riskLevel: f.level,
         }))
     // Never render more than MAX_FLOORS slabs
     return source.slice(0, MAX_FLOORS)
-  }, [floors])
+  }, [floors, floorEquipmentHealth])
 
-  const reversed = [...slabs].reverse()
+  // Derive slabs with equipment health attached
+  const slabsWithEquipment: SlabInfo[] = useMemo(() => {
+    return slabs.map((s) => ({
+      ...s,
+      equipmentHealth: floorEquipmentHealth.get(s.id),
+    }))
+  }, [slabs, floorEquipmentHealth])
+
+  const reversed = [...slabsWithEquipment].reverse()
   const totalHeight = reversed.length * SLAB_HEIGHT
 
   // Compute cumulative Y positions for each floor (before render)
@@ -603,7 +705,7 @@ function SceneR3F({
 
       <GridHelperMemo />
 
-      <group scale={[modelScale, modelScale, modelScale]}>
+      <group scale={[modelScale, modelScale, modelScale]} rotation={[0, THREE.MathUtils.degToRad(state.site.orientationDegrees ?? 0), 0]}>
         <BuildingStack state={state} tone={tone} />
         <DriftPath state={state} tone={tone} targetOpacity={hvacTarget} yRange={yRange} />
         <AnimatedTracer tone={tone} yRange={yRange} active={showFlow} speed={tracerSpeed} opacity={hvacTarget} />

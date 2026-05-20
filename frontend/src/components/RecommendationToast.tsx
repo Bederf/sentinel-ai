@@ -205,7 +205,7 @@ export function RecommendationCard({
             AI Recommendation
           </span>
         </div>
-        <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors">
+        <button onClick={onClose} className="p-1 rounded hover:bg-white/10 transition-colors" aria-label="Dismiss recommendation">
           <X className="h-4 w-4" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
         </button>
       </div>

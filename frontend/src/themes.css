@@ -17,6 +17,36 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
+/* SENTINEL THEME — Default theme class (matches :root base)       */
+/* Applied via .sentinel-theme class on <html> or data-theme="sentinel" */
+/* ═══════════════════════════════════════════════════════════════ */
+
+.sentinel-theme,
+[data-theme="sentinel"] {
+  /* Explicitly re-declare all sentinel tokens so the class mechanism
+     is consistent with the other 4 themes (matrix, ops, glass, teal).
+     This ensures theme switching via class add/remove works uniformly. */
+  --color-sentinel-bg-canvas: #0d1117;
+  --color-sentinel-bg-primary: #161b22;
+  --color-sentinel-bg-secondary: #1c2128;
+  --color-sentinel-bg-panel: #21262d;
+  --color-sentinel-border: #30363d;
+  --color-sentinel-border-strong: #484f58;
+  --color-sentinel-text-primary: #e6edf3;
+  --color-sentinel-text-secondary: #8b949e;
+  --color-sentinel-text-disabled: #7d8590;
+  --color-sentinel-text-link: #58a6ff;
+  --color-sentinel-amber: #F59E0B;
+  --color-sentinel-amber-light: #FBBF24;
+  --color-sentinel-amber-dark: #D97706;
+  --color-sentinel-green: #10B981;
+  --color-sentinel-red: #DC2626;
+  --color-sentinel-blue: #3B82F6;
+  --radius-panel: 6px;
+  --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
 /* MATRIX THEME — Cyberpunk Terminal with Neon Green HUD          */
 /* Applied via .matrix-theme class on <html> or data-theme="matrix" */
 /* ═══════════════════════════════════════════════════════════════ */
@@ -29,39 +59,39 @@
   --color-sentinel-bg-primary: #0a1520;
   --color-sentinel-bg-secondary: #0f1a2e;
   --color-sentinel-bg-panel: #060e18;
-  --color-sentinel-border: #00ff41;
-  --color-sentinel-border-strong: #00ff41;
+  --color-sentinel-border: var(--color-matrix-green);
+  --color-sentinel-border-strong: var(--color-matrix-green);
 
   /* Override text colors — Matrix green text on dark background */
-  --color-sentinel-text-primary: #00ff41;
-  --color-sentinel-text-secondary: #66b366;
-  --color-sentinel-text-disabled: #336633;
-  --color-sentinel-text-link: #00ff41;
+  --color-sentinel-text-primary: var(--color-matrix-green);
+  --color-sentinel-text-secondary: color-mix(in oklch, var(--color-matrix-green) 55%, transparent);
+  --color-sentinel-text-disabled: color-mix(in oklch, var(--color-matrix-green) 33%, transparent);
+  --color-sentinel-text-link: var(--color-matrix-green);
 
   /* Override accent — Neon green replaces Amber */
-  --color-sentinel-amber: #00ff41;
-  --color-sentinel-amber-light: #33ff66;
-  --color-sentinel-amber-dark: #00cc33;
+  --color-sentinel-amber: var(--color-matrix-green);
+  --color-sentinel-amber-light: color-mix(in oklch, var(--color-matrix-green) 80%, white);
+  --color-sentinel-amber-dark: color-mix(in oklch, var(--color-matrix-green) 75%, black);
 
   /* Chart palette — Matrix green variations */
-  --color-chart-1: #00ff41;
-  --color-chart-2: #33ff66;
-  --color-chart-3: #00cc33;
+  --color-chart-1: var(--color-matrix-green);
+  --color-chart-2: color-mix(in oklch, var(--color-matrix-green) 80%, white);
+  --color-chart-3: color-mix(in oklch, var(--color-matrix-green) 75%, black);
   --color-chart-4: #ff3300;
   --color-chart-5: #ffff00;
   --color-chart-6: #ff6600;
 
   /* Matrix panel styling */
   --radius-panel: 0px;
-  --shadow-panel: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+  --shadow-panel: 0 0 10px var(--color-matrix-green-dim), inset 0 0 10px var(--color-matrix-green-dim);
 
   /* Glass overrides for matrix */
   --glass-bg: rgba(6, 14, 24, 0.85);
   --glass-bg-light: rgba(6, 14, 24, 0.6);
   --glass-bg-heavy: rgba(6, 14, 24, 0.95);
-  --glass-border: rgba(0, 255, 65, 0.3);
-  --glass-border-strong: rgba(0, 255, 65, 0.6);
-  --glass-shadow: 0 0 16px rgba(0, 255, 65, 0.2);
+  --glass-border: color-mix(in oklch, var(--color-matrix-green) 30%, transparent);
+  --glass-border-strong: color-mix(in oklch, var(--color-matrix-green) 60%, transparent);
+  --glass-shadow: 0 0 16px var(--color-matrix-green-dim);
   --radius-glass: 0px;
 
   /* Matrix-specific font */
@@ -72,30 +102,30 @@
   --sentinel-bg-primary: #0a1520;
   --sentinel-bg-secondary: #0f1a2e;
   --sentinel-bg-panel: #060e18;
-  --sentinel-border: #00ff41;
-  --sentinel-border-strong: #00ff41;
-  --sentinel-text-primary: #00ff41;
-  --sentinel-text-secondary: #66b366;
-  --sentinel-text-disabled: #336633;
-  --sentinel-text-link: #00ff41;
-  --sentinel-amber: #00ff41;
-  --sentinel-amber-light: #33ff66;
-  --sentinel-amber-dark: #00cc33;
-  --sentinel-chart-1: #00ff41;
-  --sentinel-chart-2: #33ff66;
-  --sentinel-chart-3: #00cc33;
+  --sentinel-border: var(--color-matrix-green);
+  --sentinel-border-strong: var(--color-matrix-green);
+  --sentinel-text-primary: var(--color-matrix-green);
+  --sentinel-text-secondary: color-mix(in oklch, var(--color-matrix-green) 55%, transparent);
+  --sentinel-text-disabled: color-mix(in oklch, var(--color-matrix-green) 33%, transparent);
+  --sentinel-text-link: var(--color-matrix-green);
+  --sentinel-amber: var(--color-matrix-green);
+  --sentinel-amber-light: color-mix(in oklch, var(--color-matrix-green) 80%, white);
+  --sentinel-amber-dark: color-mix(in oklch, var(--color-matrix-green) 75%, black);
+  --sentinel-chart-1: var(--color-matrix-green);
+  --sentinel-chart-2: color-mix(in oklch, var(--color-matrix-green) 80%, white);
+  --sentinel-chart-3: color-mix(in oklch, var(--color-matrix-green) 75%, black);
   --sentinel-chart-4: #ff3300;
   --sentinel-chart-5: #ffff00;
   --sentinel-chart-6: #ff6600;
   --sentinel-glass-bg: rgba(6, 14, 24, 0.85);
   --sentinel-glass-bg-light: rgba(6, 14, 24, 0.6);
   --sentinel-glass-bg-heavy: rgba(6, 14, 24, 0.95);
-  --sentinel-glass-border: rgba(0, 255, 65, 0.3);
-  --sentinel-glass-border-strong: rgba(0, 255, 65, 0.6);
-  --sentinel-glass-shadow: 0 0 16px rgba(0, 255, 65, 0.2);
+  --sentinel-glass-border: color-mix(in oklch, var(--color-matrix-green) 30%, transparent);
+  --sentinel-glass-border-strong: color-mix(in oklch, var(--color-matrix-green) 60%, transparent);
+  --sentinel-glass-shadow: 0 0 16px var(--color-matrix-green-dim);
   --sentinel-radius-md: 0px;
   --sentinel-radius-xl: 0px;
-  --sentinel-shadow-panel: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+  --sentinel-shadow-panel: 0 0 10px var(--color-matrix-green-dim), inset 0 0 10px var(--color-matrix-green-dim);
   --sentinel-font-body: 'Share Tech Mono', 'JetBrains Mono', monospace;
   --sentinel-font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
 }
@@ -107,9 +137,9 @@
   [data-theme="matrix"] .panel,
   [data-theme="matrix"] .card {
     background: rgba(6, 14, 24, 0.85);
-    border: 1px solid #00ff41;
+    border: 1px solid var(--color-matrix-green);
     border-radius: 0;
-    box-shadow: 0 0 10px rgba(0, 255, 65, 0.3), inset 0 0 10px rgba(0, 255, 65, 0.1);
+    box-shadow: var(--sentinel-shadow-panel);
     position: relative;
     overflow: hidden;
   }
@@ -125,10 +155,10 @@
     left: -8px;
     width: 20px;
     height: 20px;
-    border-left: 2px solid #00ff41;
-    border-top: 2px solid #00ff41;
+    border-left: 2px solid var(--color-matrix-green);
+    border-top: 2px solid var(--color-matrix-green);
     border-radius: 2px 0 0 0;
-    box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 8px var(--color-matrix-green-glow);
     pointer-events: none;
   }
 
@@ -143,32 +173,32 @@
     right: -8px;
     width: 20px;
     height: 20px;
-    border-right: 2px solid #00ff41;
-    border-top: 2px solid #00ff41;
+    border-right: 2px solid var(--color-matrix-green);
+    border-top: 2px solid var(--color-matrix-green);
     border-radius: 0 2px 0 0;
-    box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 8px var(--color-matrix-green-glow);
     pointer-events: none;
   }
 
   /* Matrix sidebar active — neon green */
   .matrix-theme .sidebar-item-active,
   [data-theme="matrix"] .sidebar-item-active {
-    background: rgba(0, 255, 65, 0.1);
-    border-left-color: #00ff41;
+    background: var(--color-matrix-green-dim);
+    border-left-color: var(--color-matrix-green);
   }
 
   .matrix-theme .sidebar-item-active:hover,
   [data-theme="matrix"] .sidebar-item-active:hover {
-    background: rgba(0, 255, 65, 0.15);
-    box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+    background: color-mix(in oklch, var(--color-matrix-green) 15%, transparent);
+    box-shadow: 0 0 8px var(--color-matrix-green-dim);
   }
 
   /* Matrix tab active — neon green underline */
   .matrix-theme .tab-item-active,
   [data-theme="matrix"] .tab-item-active {
-    color: #00ff41;
-    border-bottom-color: #00ff41;
-    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+    color: var(--color-matrix-green);
+    border-bottom-color: var(--color-matrix-green);
+    text-shadow: 0 0 8px var(--color-matrix-green-glow);
   }
 
   /* Matrix metric values — terminal font */
@@ -177,8 +207,8 @@
     font-family: 'Share Tech Mono', monospace;
     font-variant-numeric: tabular-nums;
     letter-spacing: 0.05em;
-    color: #00ff41;
-    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+    color: var(--color-matrix-green);
+    text-shadow: 0 0 4px var(--color-matrix-green-dim);
   }
 
   /* Matrix metric labels — uppercase */
@@ -187,7 +217,7 @@
     font-size: 10px;
     letter-spacing: 0.15em;
     text-transform: uppercase;
-    color: #66b366;
+    color: color-mix(in oklch, var(--color-matrix-green) 55%, transparent);
     font-family: 'Orbitron', monospace;
   }
 
@@ -195,30 +225,30 @@
   .matrix-theme .btn-primary,
   [data-theme="matrix"] .btn-primary {
     background: transparent;
-    color: #00ff41;
-    border: 1px solid #00ff41;
+    color: var(--color-matrix-green);
+    border: 1px solid var(--color-matrix-green);
     font-weight: 600;
     border-radius: 0;
-    box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+    box-shadow: 0 0 8px var(--color-matrix-green-dim);
   }
 
   .matrix-theme .btn-primary:hover,
   [data-theme="matrix"] .btn-primary:hover {
-    background: rgba(0, 255, 65, 0.1);
-    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6), inset 0 0 8px rgba(0, 255, 65, 0.1);
-    text-shadow: 0 0 8px rgba(0, 255, 65, 0.4);
+    background: var(--color-matrix-green-dim);
+    box-shadow: 0 0 16px var(--color-matrix-green-glow), inset 0 0 8px var(--color-matrix-green-dim);
+    text-shadow: 0 0 8px var(--color-matrix-green-glow);
   }
 
   /* Matrix status dots — glowing */
   .matrix-theme .status-dot-success,
   [data-theme="matrix"] .status-dot-success {
-    box-shadow: 0 0 12px rgba(0, 255, 65, 0.8);
-    background: #00ff41;
+    box-shadow: 0 0 12px var(--color-matrix-green-glow);
+    background: var(--color-matrix-green);
   }
 
   .matrix-theme .status-dot-error,
   [data-theme="matrix"] .status-dot-error {
-    box-shadow: 0 0 12px rgba(255, 51, 0, 0.8);
+    box-shadow: 0 0 12px rgba(239, 68, 68, 0.8);
   }
 
   .matrix-theme .status-dot-warning,
@@ -230,75 +260,75 @@
   .matrix-theme .tooltip,
   [data-theme="matrix"] .tooltip {
     background: rgba(6, 14, 24, 0.95);
-    border: 1px solid #00ff41;
+    border: 1px solid var(--color-matrix-green);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     border-radius: 0;
-    box-shadow: 0 0 16px rgba(0, 255, 65, 0.3);
+    box-shadow: 0 0 16px var(--color-matrix-green-dim);
   }
 
   /* Matrix data table — neon headers */
   .matrix-theme .data-table th,
   [data-theme="matrix"] .data-table th {
-    background: rgba(0, 255, 65, 0.05);
+    background: var(--color-matrix-green-dim);
     font-size: 10px;
     letter-spacing: 0.1em;
-    color: #00ff41;
-    border-bottom-color: #00ff41;
+    color: var(--color-matrix-green);
+    border-bottom-color: var(--color-matrix-green);
     font-family: 'Orbitron', monospace;
-    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+    text-shadow: 0 0 4px var(--color-matrix-green-dim);
   }
 
   .matrix-theme .data-table td,
   [data-theme="matrix"] .data-table td {
-    border-bottom-color: rgba(0, 255, 65, 0.2);
+    border-bottom-color: var(--color-matrix-green-dim);
     font-variant-numeric: tabular-nums;
   }
 
   .matrix-theme .data-table tr:hover td,
   [data-theme="matrix"] .data-table tr:hover td {
-    background: rgba(0, 255, 65, 0.05);
+    background: var(--color-matrix-green-dim);
   }
 
   /* Matrix badge — neon green info */
   .matrix-theme .badge-info,
   [data-theme="matrix"] .badge-info {
-    background: rgba(0, 255, 65, 0.1);
-    color: #00ff41;
-    border: 1px solid rgba(0, 255, 65, 0.5);
-    text-shadow: 0 0 4px rgba(0, 255, 65, 0.3);
+    background: var(--color-matrix-green-dim);
+    color: var(--color-matrix-green);
+    border: 1px solid color-mix(in oklch, var(--color-matrix-green) 50%, transparent);
+    text-shadow: 0 0 4px var(--color-matrix-green-dim);
   }
 
   /* Matrix input — dark with green border */
   .matrix-theme .input-dark,
   [data-theme="matrix"] .input-dark {
     background: rgba(6, 14, 24, 0.6);
-    border-color: rgba(0, 255, 65, 0.3);
+    border-color: var(--color-matrix-green-dim);
     border-radius: 0;
   }
 
   .matrix-theme .input-dark:focus,
   [data-theme="matrix"] .input-dark:focus {
-    border-color: #00ff41;
-    box-shadow: 0 0 12px rgba(0, 255, 65, 0.3), inset 0 0 4px rgba(0, 255, 65, 0.1);
+    border-color: var(--color-matrix-green);
+    box-shadow: 0 0 12px var(--color-matrix-green-dim), inset 0 0 4px var(--color-matrix-green-dim);
   }
 
   /* Matrix glow effects */
   .matrix-theme .glow-green,
   [data-theme="matrix"] .glow-green {
-    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 16px var(--color-matrix-green-glow);
   }
 
   .matrix-theme .glow-blue,
   [data-theme="matrix"] .glow-blue {
-    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 16px var(--color-matrix-green-glow);
   }
 
   .matrix-theme .glow-amber,
   .matrix-theme .glow-orange,
   [data-theme="matrix"] .glow-amber,
   [data-theme="matrix"] .glow-orange {
-    box-shadow: 0 0 16px rgba(0, 255, 65, 0.6);
+    box-shadow: 0 0 16px var(--color-matrix-green-glow);
   }
 }
 
@@ -307,7 +337,7 @@
 .matrix-theme .recharts-cartesian-grid-vertical line,
 [data-theme="matrix"] .recharts-cartesian-grid-horizontal line,
 [data-theme="matrix"] .recharts-cartesian-grid-vertical line {
-  stroke: rgba(0, 255, 65, 0.2) !important;
+  stroke: var(--color-matrix-green-dim) !important;
 }
 
 /* Matrix body background — deep dark with subtle glow */
@@ -315,21 +345,21 @@
 [data-theme="matrix"] body {
   background: #060e18;
   background-image:
-    radial-gradient(ellipse at 20% 50%, rgba(0, 255, 65, 0.02) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 20%, rgba(0, 255, 65, 0.01) 0%, transparent 50%);
+    radial-gradient(ellipse at 20% 50%, color-mix(in oklch, var(--color-matrix-green) 2%, transparent) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, color-mix(in oklch, var(--color-matrix-green) 1%, transparent) 0%, transparent 50%);
 }
 
 /* Matrix scrollbar — neon green */
 .matrix-theme ::-webkit-scrollbar-thumb,
 [data-theme="matrix"] ::-webkit-scrollbar-thumb {
-  background: rgba(0, 255, 65, 0.3);
-  box-shadow: 0 0 8px rgba(0, 255, 65, 0.3);
+  background: var(--color-matrix-green-dim);
+  box-shadow: 0 0 8px var(--color-matrix-green-dim);
 }
 
 .matrix-theme ::-webkit-scrollbar-thumb:hover,
 [data-theme="matrix"] ::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 255, 65, 0.6);
-  box-shadow: 0 0 12px rgba(0, 255, 65, 0.5);
+  background: var(--color-matrix-green-glow);
+  box-shadow: 0 0 12px var(--color-matrix-green-glow);
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -340,7 +370,7 @@
 /* Ops Theme — CSS Variable Overrides */
 .ops-theme,
 [data-theme="ops"] {
-  /* Override SENTINEL base colors */
+  /* Background/border — reference sentinel base, dark canvas */
   --color-sentinel-bg-canvas: #0a0f1a;
   --color-sentinel-bg-primary: #0f1422;
   --color-sentinel-bg-secondary: #111827;
@@ -348,18 +378,18 @@
   --color-sentinel-border: #1e2d42;
   --color-sentinel-border-strong: #2a3a55;
 
-  /* Override text colors */
+  /* Text — same slate palette, no change needed from sentinel base */
   --color-sentinel-text-primary: #e2e8f0;
   --color-sentinel-text-secondary: #64748b;
   --color-sentinel-text-disabled: #475569;
   --color-sentinel-text-link: #00d2ff;
 
-  /* Override accent — Cyan replaces Amber as primary accent */
+  /* Accent — CYAN replaces amber (the one meaningful visual difference) */
   --color-sentinel-amber: #00d2ff;
   --color-sentinel-amber-light: #33ddff;
   --color-sentinel-amber-dark: #0099cc;
 
-  /* Chart palette — Ops-specific vibrant set */
+  /* Chart palette — ops signature: cyan/green/yellow/red/purple/orange */
   --color-chart-1: #00d2ff;
   --color-chart-2: #00e676;
   --color-chart-3: #ffd700;
@@ -380,7 +410,7 @@
   --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
   --radius-glass: 12px;
 
-  /* ── SENTINEL canonical token overrides (ops) ── */
+  /* ── SENTINEL canonical token overrides (ops) — reference base tokens ── */
   --sentinel-bg-canvas: #0a0f1a;
   --sentinel-bg-primary: #0f1422;
   --sentinel-bg-secondary: #111827;
@@ -735,6 +765,8 @@
 /* Teal (#00A89D) + Amber (#F5A623) on charcoal (#1E2A2A)         */
 /* Fonts: Syne (headings/UI) + DM Mono (data/labels)              */
 /* Applied via .teal-theme class on <html> or data-theme="teal"   */
+/* NOTE: Teal is a deliberate brand departure from sentinel base  */
+/* — surface/border/accent colors are intentionally distinct.     */
 /* ═══════════════════════════════════════════════════════════════ */
 
 .teal-theme,

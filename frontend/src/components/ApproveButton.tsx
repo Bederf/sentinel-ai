@@ -59,6 +59,28 @@ export function ApproveButton({
       },
     })
 
+  const tierColor = (() => {
+    switch (tier) {
+      case 3: // CRITICAL
+        return 'var(--color-sentinel-red)'
+      case 2: // HIGH
+        return 'var(--color-sentinel-amber)'
+      default: // MEDIUM or LOW
+        return 'var(--color-sentinel-green)'
+    }
+  })()
+
+  const tierBg = (() => {
+    switch (tier) {
+      case 3:
+        return 'rgba(var(--color-sentinel-red-rgb), 0.15)'
+      case 2:
+        return 'rgba(var(--color-sentinel-amber-rgb), 0.15)'
+      default:
+        return 'rgba(var(--color-sentinel-green-rgb), 0.15)'
+    }
+  })()
+
   /**
    * Start hold timer when mouse down
    */
@@ -112,27 +134,14 @@ export function ApproveButton({
   }, [holdProgress])
 
   /**
-   * Tier-based styling
-   */
-  const getTierColor = () => {
-    switch (tier) {
-      case 3: // CRITICAL
-        return 'bg-red-600 hover:bg-red-700'
-      case 2: // HIGH
-        return 'bg-orange-600 hover:bg-orange-700'
-      default: // MEDIUM or LOW
-        return 'bg-green-600 hover:bg-green-700'
-    }
-  }
-
-  /**
    * Show loading state while executing
    */
   if (isExecuting) {
     return (
       <button
         disabled
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium flex items-center justify-center gap-2 opacity-75"
+        className="px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 opacity-75"
+        style={{ background: 'var(--color-sentinel-blue)', color: 'white' }}
       >
         <Clock className="w-4 h-4 animate-spin" />
         Dispatching...
@@ -147,7 +156,8 @@ export function ApproveButton({
     return (
       <button
         disabled
-        className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+        className="px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+        style={{ background: 'var(--color-sentinel-green)', color: 'white' }}
       >
         <Check className="w-4 h-4" />
         Verified
@@ -163,12 +173,13 @@ export function ApproveButton({
       <div className="space-y-1">
         <button
           disabled
-          className="w-full px-4 py-2 bg-red-600 text-white rounded-lg font-medium flex items-center justify-center gap-2"
+          className="w-full px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2"
+          style={{ background: 'var(--color-sentinel-red)', color: 'white' }}
         >
           <X className="w-4 h-4" />
           {isTimeout ? 'Timeout' : 'Failed'}
         </button>
-        {error && <p className="text-xs text-red-600 text-center">{error}</p>}
+        {error && <p className="text-xs text-center" style={{ color: 'var(--color-sentinel-red)' }}>{error}</p>}
       </div>
     )
   }
@@ -185,14 +196,12 @@ export function ApproveButton({
         onTouchStart={handleMouseDown}
         onTouchEnd={handleMouseUp}
         disabled={disabled}
-        className={`
-          w-full px-4 py-3 text-white rounded-lg font-semibold
-          flex items-center justify-center gap-2 transition-all
-          disabled:opacity-50 disabled:cursor-not-allowed
-          ${isHolding ? 'opacity-75' : ''}
-          ${getTierColor()}
-          select-none active:scale-95
-        `}
+        className="w-full px-4 py-3 rounded-lg font-semibold flex items-center justify-center gap-2 transition-all select-none active:scale-95 disabled:opacity-50"
+        style={{
+          background: tierColor,
+          color: 'white',
+          opacity: isHolding ? 0.75 : 1,
+        }}
       >
         <Check className="w-5 h-5" />
         {isHolding ? `Hold (${Math.round(holdProgress)}%)` : 'Hold to Approve'}
@@ -200,21 +209,23 @@ export function ApproveButton({
 
       {/* Progress bar under button */}
       {isHolding && (
-        <div className="w-full h-1 bg-gray-200 rounded-full overflow-hidden">
+        <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'var(--color-sentinel-border)' }}>
           <div
-            className={`h-full transition-all duration-50 ${getTierColor()}`}
-            style={{ width: `${holdProgress}%` }}
+            className="h-full transition-all duration-50"
+            style={{ width: `${holdProgress}%`, background: tierColor }}
           />
         </div>
       )}
 
       {/* Tier and device info */}
-      <div className="text-xs text-gray-600 text-center space-y-1">
+      <div className="text-xs text-center space-y-1" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
         <p>
-          <strong>Tier {tier}:</strong> {device_id} / {point}
+          <strong style={{ color: 'var(--color-sentinel-text-primary)' }}>Tier {tier}:</strong>{' '}
+          <span style={{ fontFamily: 'monospace' }}>{device_id} / {point}</span>
         </p>
         <p>
-          <strong>Command:</strong> {typeof command_value === 'boolean' ? (command_value ? 'ON' : 'OFF') : command_value}
+          <strong style={{ color: 'var(--color-sentinel-text-primary)' }}>Command:</strong>{' '}
+          {typeof command_value === 'boolean' ? (command_value ? 'ON' : 'OFF') : command_value}
         </p>
       </div>
     </div>

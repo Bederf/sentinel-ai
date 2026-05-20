@@ -9,6 +9,33 @@ interface RecommendationsDashboardProps {
   siteId: string
 }
 
+function isOptimizationRecommendation(rec: Recommendation): boolean {
+  const markers = [
+    rec.action_type,
+    rec.recommendation_type,
+    rec.source_module,
+    rec.title,
+    rec.description,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase()
+
+  if (/(maintenance|required maintenance|work order|service queue|failure probability|health score)/.test(markers)) {
+    return false
+  }
+
+  if (/(ai_)?optimization|optimisation|setpoint|energy|load shedding|pre-?cool|tariff|demand/.test(markers)) {
+    return true
+  }
+
+  return Boolean(
+    rec.expected_impact?.cost_zar ||
+    rec.expected_impact?.energy_kwh ||
+    rec.expected_impact?.comfort_delta != null
+  )
+}
+
 export const RecommendationsDashboard: React.FC<
   RecommendationsDashboardProps
 > = ({ siteId }) => {
@@ -38,8 +65,13 @@ export const RecommendationsDashboard: React.FC<
     try {
       setLoading(true)
       setError(null)
-      const data = await optimizationApi.getPending(siteId)
-      setRecommendations(Array.isArray(data) ? data : (data as { recommendations: Recommendation[] }).recommendations)
+      const data = await optimizationApi.getPending(siteId, 100)
+      const pending = Array.isArray(data) ? data : (data as { recommendations: Recommendation[] }).recommendations
+      const normalized = (pending || []).map((rec) => ({
+        ...rec,
+        id: rec.id || rec.recommendation_id || '',
+      }))
+      setRecommendations(normalized.filter((rec) => rec.id && isOptimizationRecommendation(rec)))
     } catch (error) {
       console.error('Failed to load recommendations:', error)
       setError('Failed to load recommendations')
@@ -154,21 +186,21 @@ export const RecommendationsDashboard: React.FC<
                 className="text-base font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {rec.recommendation_type?.replace(/_/g, " ") || "Recommendation"}
+                {(rec.recommendation_type || rec.action_type || "Recommendation").replace(/_/g, " ")}
               </h3>
               <p
                 className="text-sm"
                 style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
-                {rec.title?.split(":")[0]?.trim() || rec.title || "--"}
+                {rec.title?.split(":")[0]?.trim() || rec.target_equipment || "--"}
               </p>
             </div>
             <div className="flex gap-2">
               <span
                 className="px-3 py-1 rounded text-sm font-medium"
-                style={getRiskBadgeStyles(rec.priority || "low")}
+                style={getRiskBadgeStyles(rec.priority || rec.risk_level || "low")}
               >
-                {rec.priority || "low"}
+                {rec.priority || rec.risk_level || "low"}
               </span>
               <span
                 className="px-3 py-1 rounded text-sm font-medium"
@@ -194,7 +226,7 @@ export const RecommendationsDashboard: React.FC<
               className="text-sm"
               style={{ color: "var(--color-sentinel-text-primary)" }}
             >
-              {rec.description || rec.title || "--"}
+              {rec.description || rec.reason || rec.title || "--"}
             </p>
           </div>
 

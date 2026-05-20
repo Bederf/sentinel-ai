@@ -96,7 +96,7 @@ Zone-005 = L0, Zone E   |  Zone-104 = L1, Zone E   |  Zone-204 = L2, Zone E
 
 ## Site-005 Hospital Naming System (Floor-Based with Point Monitoring)
 
-**Context:** Busamed Gateway Private Hospital (Umhlanga) - 25,000 sqm, 9 levels, 90 equipment items
+**Context:** Example Hospital Private Hospital (Umhlanga) - 25,000 sqm, 9 levels, 90 equipment items
 
 **Pattern:** `site-005-UMH-{TYPE}-{FLOOR}-{ID}.{POINT}` (site-005 preserves hospital naming for multi-campus systems)
 

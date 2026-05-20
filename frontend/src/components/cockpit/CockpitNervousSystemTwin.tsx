@@ -82,25 +82,25 @@ export function CockpitNervousSystemTwin({ state, onZoneSelect: _onZoneSelect }:
             When a systemFilter is active, highlight that system and dim others. */}
         <div className="pointer-events-none absolute right-3 top-14 flex flex-col gap-1.5 text-[9px] uppercase tracking-[0.12em]">
           {modules.lighting || state.systemFilter === 'lighting' ? (
-            <span className={state.systemFilter === 'lighting' ? 'text-amber-200 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-amber-200/90'}>Lighting trace</span>
+            <span style={state.systemFilter === 'lighting' ? { color: 'var(--color-sentinel-amber)' } : state.systemFilter ? { color: 'var(--color-sentinel-text-disabled)' } : { color: 'rgba(251,191,36,0.9)' }}>Lighting trace</span>
           ) : null}
           {modules.water || state.systemFilter === 'water' ? (
-            <span className={state.systemFilter === 'water' ? 'text-sky-300 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-sky-300/90'}>Water spine</span>
+            <span style={state.systemFilter === 'water' ? { color: 'rgba(56,189,248,1)' } : state.systemFilter ? { color: 'var(--color-sentinel-text-disabled)' } : { color: 'rgba(56,189,248,0.9)' }}>Water spine</span>
           ) : null}
           {modules.fire || state.systemFilter === 'fire' ? (
-            <span className={state.systemFilter === 'fire' ? 'text-rose-300 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-rose-300/90'}>Fire watch</span>
+            <span style={state.systemFilter === 'fire' ? { color: 'rgba(251,113,133,1)' } : state.systemFilter ? { color: 'var(--color-sentinel-text-disabled)' } : { color: 'rgba(251,113,133,0.9)' }}>Fire watch</span>
           ) : null}
           {modules.security || state.systemFilter === 'security' ? (
-            <span className={state.systemFilter === 'security' ? 'text-cyan-200 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-cyan-200/90'}>Security mesh</span>
+            <span style={state.systemFilter === 'security' ? { color: 'rgba(103,232,249,1)' } : state.systemFilter ? { color: 'var(--color-sentinel-text-disabled)' } : { color: 'rgba(103,232,249,0.9)' }}>Security mesh</span>
           ) : null}
           {modules.occupancy || state.systemFilter === 'lighting' ? (
-            <span className={state.systemFilter === 'lighting' ? 'text-violet-200 font-semibold' : state.systemFilter ? 'text-slate-600' : 'text-violet-200/90'}>Occupancy</span>
+            <span style={state.systemFilter === 'lighting' ? { color: 'rgba(167,139,250,1)' } : state.systemFilter ? { color: 'var(--color-sentinel-text-disabled)' } : { color: 'rgba(167,139,250,0.9)' }}>Occupancy</span>
           ) : null}
           {state.systemFilter === 'hvac' ? (
-            <span className="text-cyan-300 font-semibold">HVAC trace</span>
+            <span style={{ color: state.systemFilter === 'hvac' ? 'rgba(103,232,249,1)' : 'rgba(103,232,249,0.9)' }}>HVAC trace</span>
           ) : null}
           {state.systemFilter === 'energy' ? (
-            <span className="text-orange-300 font-semibold">Energy pulse</span>
+            <span style={{ color: 'var(--color-sentinel-amber)' }}>Energy pulse</span>
           ) : null}
           {state.systemFilter === 'solar_bess' ? (
             <span className="text-yellow-300 font-semibold">Solar & BESS</span>

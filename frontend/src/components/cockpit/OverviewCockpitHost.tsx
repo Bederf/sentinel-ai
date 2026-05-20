@@ -9,6 +9,9 @@ import type { CockpitTwinZoneSignal, ModelReadiness } from './types'
 interface OverviewCockpitHostProps {
   siteId: string
   siteName: string
+  gpsLat?: number | null
+  gpsLon?: number | null
+  orientationDegrees?: number | null
   onboardingPhase?: 'shadow' | 'advisory' | 'supervised' | 'auto'
   activeAlerts: number
   predictionsCount: number
@@ -117,6 +120,9 @@ function buildCockpitSummary(
   return {
     siteId: props.siteId,
     siteName: props.siteName,
+    gpsLat: props.gpsLat ?? null,
+    gpsLon: props.gpsLon ?? null,
+    orientationDegrees: props.orientationDegrees ?? null,
     onboardingPhase: props.onboardingPhase,
     posture: props.posture,
     activeAlerts: props.activeAlerts,
@@ -129,6 +135,9 @@ function buildCockpitSummary(
 export function OverviewCockpitHost({
   siteId,
   siteName,
+  gpsLat,
+  gpsLon,
+  orientationDegrees,
   onboardingPhase,
   activeAlerts,
   predictionsCount,
@@ -200,11 +209,11 @@ export function OverviewCockpitHost({
 
   const state = useMemo(() => {
     const summary = buildCockpitSummary(
-      { siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount },
+      { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount },
       lastUpdatedAt,
     )
     return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter)
-  }, [siteId, siteName, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter])
+  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter])
 
   return (
     <CockpitView

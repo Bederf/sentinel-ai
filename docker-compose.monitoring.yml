@@ -187,3 +187,5 @@ volumes:
 networks:
   sentinel-network:
     external: true
+  supabase_network_bms-intelligence:
+    external: true

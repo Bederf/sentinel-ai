@@ -500,7 +500,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
           onDragEnd={handleKPIDragEnd}
         >
           <SortableContext items={kpiOrder} strategy={horizontalListSortingStrategy}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-6">
               {kpiOrder.map((kpiId) => {
                 const cardProps = kpiCards[kpiId];
                 if (!cardProps) return null;
@@ -529,7 +529,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                   className="text-xs px-2 py-1 rounded"
                   style={{
                     background:
-                      warningSites > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(34, 197, 94, 0.15)",
+                      warningSites > 0 ? "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)" : "color-mix(in oklch, var(--color-sentinel-green) 15%, transparent)",
                     color:
                       warningSites > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)",
                   }}
@@ -541,7 +541,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                     <span
                       className="text-xs px-2 py-1 rounded"
                       style={{
-                        background: "rgba(148, 163, 184, 0.15)",
+                        background: "color-mix(in oklch, var(--color-sentinel-text-disabled) 15%, transparent)",
                         color: "var(--color-sentinel-text-secondary)",
                       }}
                     >
@@ -551,7 +551,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                       type="button"
                       className="text-xs px-2 py-1 rounded transition-colors"
                       style={{
-                        background: "rgba(59, 130, 246, 0.15)",
+                        background: "color-mix(in oklch, var(--color-sentinel-blue) 15%, transparent)",
                         color: "var(--color-sentinel-blue)",
                       }}
                       onClick={restoreAllHiddenSiteCards}
@@ -576,9 +576,9 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                   type="button"
                   className="text-xs px-3 py-1.5 rounded transition-colors"
                   style={{
-                    background: "rgba(59, 130, 246, 0.15)",
+                    background: "color-mix(in oklch, var(--color-sentinel-blue) 15%, transparent)",
                     color: "var(--color-sentinel-blue)",
-                    border: "1px solid rgba(59, 130, 246, 0.35)",
+                    border: "1px solid color-mix(in oklch, var(--color-sentinel-blue) 35%, transparent)",
                   }}
                   onClick={restoreAllHiddenSiteCards}
                 >
@@ -597,7 +597,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                       type="button"
                       className="absolute top-2 right-2 z-10 p-1.5 rounded transition-colors"
                       style={{
-                        background: "rgba(148, 163, 184, 0.15)",
+                        background: "color-mix(in oklch, var(--color-sentinel-text-disabled) 15%, transparent)",
                         color: "var(--color-sentinel-text-secondary)",
                         border: "1px solid var(--color-sentinel-border)",
                       }}
@@ -679,12 +679,17 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
 
                   {/* Time Period Tabs */}
                   <div
+                    role="radiogroup"
+                    aria-label="Select time period"
                     className="flex rounded overflow-hidden"
                     style={{ border: "1px solid var(--color-sentinel-border)" }}
                   >
                     {TIME_PERIODS.map((period) => (
                       <button
                         key={period}
+                        role="radio"
+                        aria-checked={selectedDays === period}
+                        aria-label={`Show last ${period} days`}
                         onClick={() => setSelectedDays(period)}
                         className="px-3 py-1.5 text-xs font-medium transition-colors"
                         style={{

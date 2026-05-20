@@ -174,6 +174,7 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
         setIsLoading(true);
 
         // Add delay to prevent concurrent requests hitting rate limiter on initial load
+        // TODO: Remove once backend rate-limit is fixed (see P2 #11)
         await new Promise((resolve) => setTimeout(resolve, 800));
         // Fetch core data first, then predictions to reduce request burst on mount
         // Use equipment endpoint (Supabase) instead of device abstraction (empty in island mode)
@@ -579,7 +580,8 @@ export function ControlDashboard({ onError, siteId: propSiteId }: ControlDashboa
       {/* Main Content */}
       <div className="flex-1 overflow-hidden flex">
       {/* Left Column: Device List */}
-      <div className="w-80 flex flex-col border-r" style={{ borderColor: "var(--color-sentinel-border)" }}>
+      {/* TODO: Remove once backend rate-limit is fixed (see P2 #11) */}
+      <div className="flex-none flex flex-col border-r shrink-0" style={{ width: "min(288px, 28vw)", minWidth: "200px", borderColor: "var(--color-sentinel-border)" }}>
         {/* Site Selector Dropdown */}
         <div
           className="flex-none p-3 border-b"

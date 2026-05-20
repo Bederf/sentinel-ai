@@ -818,7 +818,7 @@ SITE_CODE_MAP: dict[str, str] = {
     "site-002": "STC",  # Sandton City
     "site-003": "RSB",  # Rosebank
     "site-004": "UMH",  # uMhlanga Private Hospital
-    "site-005": "GWT",  # Gateway Theatre
+    "site-005": "SIM",  # Simulator placeholder
     "site-006": "MCS",  # Mediclinic Sandton
 }
 

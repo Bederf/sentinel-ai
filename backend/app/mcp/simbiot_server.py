@@ -2211,6 +2211,7 @@ async def get_site_config_tool(site_id: str) -> dict[str, Any]:
 async def add_site_zones_tool(
     site_id: str,
     zones: list[dict[str, Any]],
+    floor_grid: dict[str, dict[str, float]] | None = None,
 ) -> dict[str, Any]:
     """
     Add HVAC zones to a site with equipment mappings.
@@ -2229,6 +2230,15 @@ async def add_site_zones_tool(
     - setpoint: Temperature setpoint (default 22.0)
     - current_temp: Current temperature (default 22.0)
     - status: Zone status (default "running")
+
+    floor_grid (optional): Per-floor spatial grid for auto-zone assignment.
+        Format: {
+            "L0": {"x_min": 0.0, "x_max": 20.0, "zones": 5},
+            "L1": {"x_min": 0.0, "x_max": 20.0, "zones": 5},
+            ...
+        }
+        When provided, stored in zones.json and used by add_site_desks_tool
+        to derive zone_id from desk x_coord when zone_id is omitted.
     """
     import json
     import uuid
@@ -2328,9 +2338,9 @@ async def add_site_zones_tool(
         else:
             existing_zones.append(zone)
 
-    # Save zones
+    # Save zones + floor grid
     with open(zones_file, "w") as f:
-        json.dump(existing_zones, f, indent=2)
+        json.dump({"zones": existing_zones, "floor_grid": floor_grid or {}}, f, indent=2)
 
     # Reload site data
     loader = get_site_loader()
@@ -2358,7 +2368,7 @@ async def add_site_desks_tool(
 
     Each desk should include:
     - desk_id: Unique desk identifier (e.g., "201", "L12-D001")
-    - zone_id: HVAC zone the desk belongs to
+    - zone_id: HVAC zone the desk belongs to (auto-derived from x_coord if omitted)
     - floor: Floor identifier
     - near_window: Boolean - near exterior window
     - orientation: N/S/E/W/NE/NW/SE/SW - for solar analysis
@@ -2371,6 +2381,9 @@ async def add_site_desks_tool(
     - sensor_id: PIR occupancy sensor ID
     - luminaire_ids: List of luminaire IDs serving desk
     - dali_controller: Tridonic Scenecom controller ID
+
+    If zone_id is omitted but x_coord is provided, zone is derived from the
+    floor_grid stored in zones.json (set by add_site_zones_tool).
     """
     import json
     from pathlib import Path
@@ -2378,12 +2391,23 @@ async def add_site_desks_tool(
     sites_path = Path(__file__).parent.parent / "data" / "sites"
     site_path = sites_path / site_id
     desks_file = site_path / "desks.json"
+    zones_file = site_path / "zones.json"
 
     if not site_path.exists():
         return {
             "success": False,
             "error": f"Site '{site_id}' not found. Create it first with create_site.",
         }
+
+    # Load floor_grid for auto-zone derivation
+    floor_grid: dict[str, dict[str, float]] = {}
+    if zones_file.exists():
+        with open(zones_file) as f:
+            zones_data = json.load(f)
+            # Support both new dict format ({"zones": [...], "floor_grid": {...}})
+            # and legacy list format ([{zone_id, ...}, ...])
+            if isinstance(zones_data, dict):
+                floor_grid = zones_data.get("floor_grid", {})
 
     # Validate and normalize desk data
     normalized_desks = []
@@ -2415,6 +2439,22 @@ async def add_site_desks_tool(
             "luminaire_ids": desk.get("luminaire_ids"),
             "dali_controller": desk.get("dali_controller"),
         }
+        # Auto-derive zone_id from x_coord if missing and floor_grid is available
+        if not normalized["zone_id"] and normalized.get("x_coord") is not None and floor_grid:
+            floor = normalized["floor"]
+            if floor in floor_grid:
+                grid = floor_grid[floor]
+                x_min = grid.get("x_min", 0.0)
+                x_max = grid.get("x_max", 20.0)
+                zones_count = int(grid.get("zones", 5))
+                zone_width = (x_max - x_min) / zones_count if zones_count > 0 else 4.0
+                x = float(normalized["x_coord"])
+                zone_idx = int((x - x_min) / zone_width) if zone_width > 0 else 0
+                zone_idx = max(0, min(zone_idx, zones_count - 1))
+                zone_num = zone_idx + 1
+                # Zone-NNN format: floor_index*100 + zone_num (L2=2 -> 200 + zone_num)
+                floor_num = int(floor.lstrip("L")) if floor.startswith("L") and floor[1:].isdigit() else 0
+                normalized["zone_id"] = f"Zone-{floor_num * 100 + zone_num}"
         normalized_desks.append(normalized)
 
     supabase_written = False
@@ -2574,7 +2614,36 @@ async def add_site_devices_tool(
         else:
             existing_devices.append(device)
 
-    # Save devices
+    supabase_written = False
+
+    # 1. Try to write equipment to Supabase
+    try:
+        from app.config.settings import settings
+        if settings.supabase_url and settings.supabase_service_role_key:
+            from app.database.repositories import EquipmentRepository, HVACZoneRepository
+            eq_repo = EquipmentRepository()
+            zone_repo = HVACZoneRepository()
+            site_uuid = zone_repo.get_site_uuid(site_id)
+            if site_uuid:
+                supabase_equipment = []
+                for dev in new_devices:
+                    supabase_equipment.append({
+                        "code": dev["device_id"],
+                        "site_id": site_uuid,
+                        "name": dev.get("name", dev["device_id"]),
+                        "type": dev.get("device_type", "").upper(),
+                        "status": dev.get("status", "online"),
+                        "location": dev.get("location", site_id),
+                        "device_info": dev.get("metadata", {}),
+                        "operating_data": dev.get("points", {}),
+                    })
+                eq_repo.upsert_many(supabase_equipment)
+                supabase_written = True
+                logger.info(f"Wrote {len(supabase_equipment)} equipment to Supabase for {site_id}")
+    except Exception as e:
+        logger.warning(f"Supabase equipment write failed, will use JSON only: {e}")
+
+    # 2. Always write to JSON files (backup + offline mode)
     with open(devices_file, "w") as f:
         json.dump(existing_devices, f, indent=2)
 
@@ -2586,6 +2655,7 @@ async def add_site_devices_tool(
         "devices_added": len(new_devices),
         "total_devices": len(existing_devices),
         "device_ids": [d["device_id"] for d in new_devices],
+        "storage": "supabase+json" if supabase_written else "json",
         "message": f"Added {len(new_devices)} devices for '{site_id}'",
     }
 

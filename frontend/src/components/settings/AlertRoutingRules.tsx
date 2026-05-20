@@ -122,7 +122,7 @@ export function AlertRoutingRules({ siteId, onError, onSuccess, readOnly = false
   };
 
   return (
-    <div className="glass-panel overflow-hidden">
+    <div className="glass-panel flat overflow-hidden">
       <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -237,10 +237,10 @@ export function AlertRoutingRules({ siteId, onError, onSuccess, readOnly = false
                 </div>
                 {!readOnly && (
                   <div className="flex items-center gap-1">
-                    <button type="button" onClick={() => void handleToggle(rule.id, rule.enabled)} className="p-1" style={{ color: rule.enabled ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)" }}>
+                    <button type="button" onClick={() => void handleToggle(rule.id, rule.enabled)} className="p-1" style={{ color: rule.enabled ? "var(--color-sentinel-green)" : "var(--color-sentinel-text-secondary)" }} aria-label={rule.enabled ? "Disable rule" : "Enable rule"}>
                       {rule.enabled ? <ToggleRight className="h-4 w-4" /> : <ToggleLeft className="h-4 w-4" />}
                     </button>
-                    <button type="button" onClick={() => void handleDelete(rule.id)} className="p-1" style={{ color: "var(--color-sentinel-red)" }}>
+                    <button type="button" onClick={() => void handleDelete(rule.id)} className="p-1" style={{ color: "var(--color-sentinel-red)" }} aria-label="Delete rule">
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
