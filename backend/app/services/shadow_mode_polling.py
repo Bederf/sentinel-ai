@@ -24,7 +24,7 @@ from typing import Any
 
 import httpx
 
-from app.core.site_resolver import normalize_site_id
+from app.core.site_resolver import normalize_site_id  # noqa: F401
 
 # ─── Equipment display name formatters ──────────────────────────────────────────
 
@@ -663,7 +663,9 @@ class ShadowModePollingService:
                 if water_detailed_readings:
                     # Merge with existing water meter readings or create new entry
                     if f"{self._site_prefix}-WATER-MTR-001" in agg_states:
-                        agg_states[f"{self._site_prefix}-WATER-MTR-001"]["sensor_readings"].update(water_detailed_readings)
+                        agg_states[f"{self._site_prefix}-WATER-MTR-001"]["sensor_readings"].update(
+                            water_detailed_readings
+                        )
                     else:
                         agg_states[f"{self._site_prefix}-WATER-MTR-001"] = {
                             "type": "water_meter",
@@ -697,7 +699,7 @@ class ShadowModePollingService:
             if alarms:
                 from app.services.sentinel_data_sync import get_sentinel_data_sync
 
-                sync = get_sentinel_data_sync(site_id=normalize_site_id(self.site_id, to_supabase=True))
+                sync = get_sentinel_data_sync(site_id=self.site_id)
 
                 # Recency filter — only alarms within alarm_recency_window_minutes are current signal
 
@@ -919,7 +921,7 @@ class ShadowModePollingService:
         try:
             from app.services.sentinel_data_sync import get_sentinel_data_sync
 
-            sync = get_sentinel_data_sync(site_id=normalize_site_id(self.site_id, to_supabase=True))
+            sync = get_sentinel_data_sync(site_id=self.site_id)
             await sync.ingest_equipment_states(equipment_states, now, data_source="bridge_poll")
             result["equipment_states"] = len(equipment_states)
             result["ml_hours_ingested"] = sync.ml_feeder.hours_ingested
@@ -1447,7 +1449,7 @@ class ShadowModePollingService:
                 """Strip site prefix (e.g. S002-) and replace underscores with hyphens for matching."""
                 c = code.replace("_", "-")
                 if c.startswith(f"{self._site_prefix}-"):
-                    c = c[len(self._site_prefix) + 1:]
+                    c = c[len(self._site_prefix) + 1 :]
                 return c
 
             def _letter_zone_to_numeric(code: str) -> str | None:

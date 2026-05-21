@@ -113,12 +113,7 @@ class SentinelDataSync:
             sites_resp = client.table("sites").select("id").eq("code", site_code_for_query).execute()
             if sites_resp.data:
                 site_uuid = sites_resp.data[0]["id"]
-                sources_resp = (
-                    client.table("log_sources")
-                    .select("last_sync_at")
-                    .eq("site_id", site_uuid)
-                    .execute()
-                )
+                sources_resp = client.table("log_sources").select("last_sync_at").eq("site_id", site_uuid).execute()
                 if sources_resp.data and sources_resp.data[0].get("last_sync_at"):
                     from datetime import timezone as tz
 
@@ -128,15 +123,21 @@ class SentinelDataSync:
                     if sync_time.tzinfo is None:
                         sync_time = sync_time.replace(tzinfo=tz.utc)
                     data_freshness_hours = (now - sync_time).total_seconds() / 3600
-                    logger.info(f"[ML FEEDER] Freshness check: site_id={self.site_id} site_code={site_code_for_query} last_sync={sync_at} freshness_hours={data_freshness_hours:.2f}")
+                    logger.info(
+                        f"[ML FEEDER] Freshness check: site_id={self.site_id} site_code={site_code_for_query} last_sync={sync_at} freshness_hours={data_freshness_hours:.2f}"
+                    )
         except Exception as e:
             logger.warning(f"[ML FEEDER] Freshness check error for site_id={self.site_id}: {e}")
             data_freshness_hours = 9999.0  # Block ML ingest if freshness check fails
         else:
-            logger.info(f"[ML FEEDER] Freshness check: no log_sources entry for site_id={self.site_id} site_code={site_code_for_query}")
+            logger.info(
+                f"[ML FEEDER] Freshness check: no log_sources entry for site_id={self.site_id} site_code={site_code_for_query}"
+            )
 
         if data_freshness_hours > freshness_threshold:
-            logger.warning(f"[ML FEEDER] Freshness gate rejected: site_id={self.site_id} data_freshness_hours={data_freshness_hours:.1f} threshold_hours={freshness_threshold}")
+            logger.warning(
+                f"[ML FEEDER] Freshness gate rejected: site_id={self.site_id} data_freshness_hours={data_freshness_hours:.1f} threshold_hours={freshness_threshold}"
+            )
             audit_structured_logger.warning(
                 f"event=data_freshness_violation "
                 f"site_id={self.site_id} "
@@ -170,7 +171,9 @@ class SentinelDataSync:
                 try:
                     import psycopg2
 
-                    database_url = os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+                    database_url = (
+                        os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+                    )
                     if not database_url:
                         raise ValueError("DATABASE_URL not set")
                     conn = psycopg2.connect(database_url)
@@ -185,7 +188,9 @@ class SentinelDataSync:
                     )
                     cur.close()
                     conn.close()
-                    logger.info(f"[ML FEEDER] Persisted ml_hours_ingested={persisted_hours:.1f} (counter={self.ml_feeder.hours_ingested}) for site {self.site_id}")
+                    logger.info(
+                        f"[ML FEEDER] Persisted ml_hours_ingested={persisted_hours:.1f} (counter={self.ml_feeder.hours_ingested}) for site {self.site_id}"
+                    )
                 except Exception as e:
                     logger.warning(f"[ML FEEDER] Could not persist ml_hours_ingested: {e}")
 
@@ -232,12 +237,7 @@ class SentinelDataSync:
 
                             client = get_supabase_client()
                             codes = list(equipment_states.keys())
-                            resp = (
-                                client.table("equipment")
-                                .select("id, code")
-                                .in_("code", codes)
-                                .execute()
-                            )
+                            resp = client.table("equipment").select("id, code").in_("code", codes).execute()
                             equip_code_to_id = {r["code"]: r["id"] for r in (resp.data or [])}
 
                         model_ver = getattr(self.ml_feeder, "model_version", None) or "sentinel-v1"
@@ -312,6 +312,7 @@ class SentinelDataSync:
 
         # Initialize health calculator for computing scores from sensors
         from app.services.health_rating_calculator import HealthRatingCalculator
+
         health_calc = HealthRatingCalculator()
 
         # Get equipment metadata from DB for health calculations
@@ -319,8 +320,14 @@ class SentinelDataSync:
         equipment_meta = {}
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
-            resp = client.table("equipment").select("id, code, type, age_years, runtime_hours, operating_data").in_("code", equipment_codes).execute()
+            resp = (
+                client.table("equipment")
+                .select("id, code, type, age_years, runtime_hours, operating_data")
+                .in_("code", equipment_codes)
+                .execute()
+            )
             if resp.data:
                 equipment_meta = {eq["code"]: eq for eq in resp.data}
         except Exception as e:
@@ -338,7 +345,9 @@ class SentinelDataSync:
                 try:
                     eq_meta = equipment_meta.get(code, {})
                     # Get existing operating_data for anomaly scores
-                    existing_op = eq_meta.get("operating_data", {}) if isinstance(eq_meta.get("operating_data"), dict) else {}
+                    existing_op = (
+                        eq_meta.get("operating_data", {}) if isinstance(eq_meta.get("operating_data"), dict) else {}
+                    )
 
                     health_score = await health_calc.calculate_from_sensors(
                         equipment_id=code,
@@ -441,15 +450,17 @@ class SentinelDataSync:
             equip_id = equipment_code_to_id.get(code)
             if not equip_id:
                 continue
-            rows.append({
-                "equipment_id": equip_id,
-                "site_id": site_uuid,
-                "anomaly_score": score,
-                "lstm_anomaly_score": lstm_scores.get(code),
-                "autoencoder_anomaly_score": ae_scores.get(code),
-                "model_version": model_version,
-                "scored_at": simulated_time,
-            })
+            rows.append(
+                {
+                    "equipment_id": equip_id,
+                    "site_id": site_uuid,
+                    "anomaly_score": score,
+                    "lstm_anomaly_score": lstm_scores.get(code),
+                    "autoencoder_anomaly_score": ae_scores.get(code),
+                    "model_version": model_version,
+                    "scored_at": simulated_time,
+                }
+            )
 
         if not rows:
             return 0
@@ -684,9 +695,10 @@ _sentinel_sync_instances: dict[str, SentinelDataSync] = {}
 def get_sentinel_data_sync(site_id: str | None = None) -> SentinelDataSync:
     # Per-site cache — prevents singleton poisoning when different callers
     # pass different site_id formats (site-002 vs S002) for the same site.
-    from app.core.site_resolver import get_primary_site_code
+    from app.core.site_resolver import get_primary_site_code, normalize_site_id
 
-    key = site_id or get_primary_site_code() or "unknown"
+    # Normalize to internal format so both "site-002" and "S002" resolve to same key
+    key = normalize_site_id(site_id or get_primary_site_code() or "unknown", to_supabase=False)
     if key not in _sentinel_sync_instances:
         _sentinel_sync_instances[key] = SentinelDataSync(site_id=key)
     return _sentinel_sync_instances[key]
