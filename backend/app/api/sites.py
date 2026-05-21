@@ -373,8 +373,9 @@ def db_to_site_dict(
     }
 
     # Derive site status from equipment_status and alert_count
+    # Critical = actual critical equipment. Warning = equipment warnings OR active predictions.
     if equipment_status:
-        if equipment_status.get("critical", 0) > 0 or alert_count > 5:
+        if equipment_status.get("critical", 0) > 0:
             result["status"] = "critical"
         elif equipment_status.get("warning", 0) > 0 or alert_count > 0:
             result["status"] = "warning"
@@ -925,6 +926,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
     try:
         if policy_src.exists():
             import shutil
+
             shutil.copy2(policy_src, policy_dst)
             # Patch site_id in the copied policy
             with open(policy_dst, "r") as f:
@@ -1097,11 +1099,6 @@ def _generate_compliance_annex(site_id: str, request: CreateSiteRequest) -> None
         est_annual_kwh = sqm * 150
         est_monthly_kwh = est_annual_kwh / 12
         leu_status = "NOT LEU" if est_monthly_kwh < 400_000 else "LEU"
-        leu_status_note = (
-            f"NOT LEU ({est_monthly_kwh:,.0f} kWh/mo vs 400,000 kWh/mo threshold — {est_monthly_kwh/400000*100:.1f}%)"
-            if est_monthly_kwh < 400_000
-            else f"LEU ({est_monthly_kwh:,.0f} kWh/mo — register with DoE within 30 days)"
-        )
 
         # Green Star / EDGE eligibility based on building type
         gs_eligible = "Yes" if request.type in ("office", "retail", "hotel", "mixed-use") else "EDGE only"
@@ -1125,14 +1122,14 @@ def _generate_compliance_annex(site_id: str, request: CreateSiteRequest) -> None
         zone_rows = ""
         zone_types = ["office_floor", "meeting_room", "lobby", "server_room", "plant_room", "basement"]
         for i, ztype in enumerate(zone_types, 1):
-            zone_rows += (
-                f"| __ZONE_CODE_{i}__ | {ztype} | 1.0 | 800 | 1000 | 4 | __ZONE_MON_{i}__ |\n"
-            )
+            zone_rows += f"| __ZONE_CODE_{i}__ | {ztype} | 1.0 | 800 | 1000 | 4 | __ZONE_MON_{i}__ |\n"
 
         # Site-specific risk placeholder rows
         risk_rows = ""
         for i in range(1, 4):
-            risk_rows += f"| __RISK_{i}__ | __RISK_{i}_LIK__ | __RISK_{i}_IMP__ | __RISK_{i}_MIT__ | __RISK_{i}_OWNER__ |\n"
+            risk_rows += (
+                f"| __RISK_{i}__ | __RISK_{i}_LIK__ | __RISK_{i}_IMP__ | __RISK_{i}_MIT__ | __RISK_{i}_OWNER__ |\n"
+            )
 
         replacements = {
             "__CREATED_DATE__": now,
@@ -1148,7 +1145,9 @@ def _generate_compliance_annex(site_id: str, request: CreateSiteRequest) -> None
             "__EST_MONTHLY_KWH__": f"{est_monthly_kwh:,.0f}",
             "__LEU_STATUS__": leu_status,
             "__LEU_DATE__": f"{now} (estimated)",
-            "__LEU_OBLIGATION__": "Not applicable — NOT LEU" if leu_status == "NOT LEU" else "Register with DoE within 30 days",
+            "__LEU_OBLIGATION__": "Not applicable — NOT LEU"
+            if leu_status == "NOT LEU"
+            else "Register with DoE within 30 days",
             "__GS_ELIGIBLE__": gs_eligible,
             "__EDGE_ELIGIBLE__": edge_eligible,
             "__GS_PATHWAY__": "Office Performance" if gs_eligible == "Yes" else "N/A",
@@ -1207,7 +1206,9 @@ def _generate_compliance_annex(site_id: str, request: CreateSiteRequest) -> None
             "__LEGIONELLA_STATUS__": "not_required" if not has_cooling_tower else "pending",
             "__LEGIONELLA_LAST__": "__LEGIONELLA_LAST__",
             "__LEGIONELLA_NEXT__": "__LEGIONELLA_NEXT__",
-            "__LEGIONELLA_NOTES__": "No cooling tower identified at onboarding" if not has_cooling_tower else "__LEGIONELLA_NOTES__",
+            "__LEGIONELLA_NOTES__": "No cooling tower identified at onboarding"
+            if not has_cooling_tower
+            else "__LEGIONELLA_NOTES__",
             "__ELEC_APPLICABLE__": "Yes",
             "__ELEC_STATUS__": "pending",
             "__ELEC_LAST__": "__ELEC_LAST__",
@@ -1537,6 +1538,24 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                     "message": detail_msg,
                 },
             )
+
+        # Phase 191 gate: require confirmed building profile before shadow/advisory
+        if requested in ("shadow_live", "advisory"):
+            from app.services.site_profile_service import SiteProfileService
+
+            profile_service = SiteProfileService()
+            if not profile_service.has_confirmed_profile(site_id):
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "error": "profile_required",
+                        "message": (
+                            "A confirmed building profile is required before activating shadow mode. "
+                            "Complete profiling via POST /api/site-profiles/{site_id} first."
+                        ),
+                        "site_id": site_id,
+                    },
+                )
 
         # Supabase write — the authoritative storage
         try:

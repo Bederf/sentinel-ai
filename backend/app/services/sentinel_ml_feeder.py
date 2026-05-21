@@ -166,9 +166,10 @@ class SentinelMLFeeder:
         results = self.ml_feeder.train_if_ready()
     """
 
-    def __init__(self, min_hours: int = MIN_LSTM_TRAINING_HOURS):
+    def __init__(self, min_hours: int = MIN_LSTM_TRAINING_HOURS, site_profile: dict | None = None):
         self.min_hours = min_hours
         self._hours_ingested = 0
+        self.site_profile = site_profile
 
         # Per equipment-type time series: {equip_type: {feature_name: [values]}}
         self._buffers: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
@@ -181,6 +182,65 @@ class SentinelMLFeeder:
         # Fault event buffer — accumulates BACnet EventNotification records
         # from /alarms endpoint. When 500+ events are buffered, Fault Classifier trains.
         self._fault_events: list[dict[str, Any]] = []
+
+    @property
+    def has_profile(self) -> bool:
+        """True if a confirmed building profile was provided at construction."""
+        return self.site_profile is not None
+
+    def _feature_weights(self, equip_type: str) -> dict[str, float]:
+        """Return per-feature weights adjusted for the site's primary objective.
+
+        Weights are relative multipliers — features with higher weights contribute
+        more to the anomaly score. Unlisted features default to 1.0.
+        """
+        if not self.site_profile:
+            return {}
+
+        primary_objective = self.site_profile.get("primary_objective", "balanced")
+        clinical = self.site_profile.get("clinical_zones_present", False)
+
+        comfort_weights = {
+            "room_temp": 2.0,
+            "supply_temp": 1.8,
+            "return_temp": 1.5,
+            "co2_ppm": 1.5,
+            "chw_supply_temp": 1.5,
+            "chw_return_temp": 1.2,
+        }
+        cost_weights = {
+            "active_power_kw": 2.0,
+            "compressor_current": 1.8,
+            "motor_current": 1.6,
+            "fan_current": 1.3,
+            "total_kw": 1.5,
+            "hvac_kw": 1.5,
+            "lighting_kw": 1.2,
+        }
+        compliance_weights = {
+            "room_temp": 2.0,
+            "supply_temp": 2.0,
+            "co2_ppm": 2.5,
+            "chw_supply_temp": 1.8,
+            "soc_pct": 1.5,
+            "oil_pressure": 1.5,
+            "coolant_temp": 1.5,
+        }
+
+        weights = {
+            "comfort": comfort_weights,
+            "cost": cost_weights,
+            "compliance": compliance_weights,
+            "balanced": {},
+        }.get(primary_objective, {})
+
+        if clinical and primary_objective != "compliance":
+            weights = dict(weights)
+            weights["co2_ppm"] = max(weights.get("co2_ppm", 1.0), 2.0)
+            weights["room_temp"] = max(weights.get("room_temp", 1.0), 1.8)
+            weights["supply_temp"] = max(weights.get("supply_temp", 1.0), 1.8)
+
+        return weights
 
     @property
     def fault_event_count(self) -> int:
@@ -317,7 +377,8 @@ class SentinelMLFeeder:
                     continue
 
                 max_z = 0.0
-                for _feature, values in buf.items():
+                feature_weights = self._feature_weights(equip_type)
+                for feature, values in buf.items():
                     if len(values) < 12:  # Need at least 12 readings for a meaningful mean/std
                         continue
                     # Use last 72 readings as rolling window
@@ -330,8 +391,10 @@ class SentinelMLFeeder:
                         continue
                     latest = values[-1]
                     z = abs((latest - mean) / std)
-                    if z > max_z:
-                        max_z = z
+                    # Apply objective-based weighting before comparing to max
+                    weighted_z = z * feature_weights.get(feature, 1.0)
+                    if weighted_z > max_z:
+                        max_z = weighted_z
 
                 # Normalise: z > 3 is extreme; clamp to [0, 1]
                 anomaly_score = min(max_z / 3.0, 1.0)
@@ -393,6 +456,10 @@ class SentinelMLFeeder:
                 if len(values) < 24:
                     continue
 
+                # Apply objective-based weighting to the primary feature
+                feature_weights = self._feature_weights(equip_type)
+                feature_weight = feature_weights.get(primary_feature, 1.0)
+
                 # Simple autoregressive error: predict next = current
                 # Compute errors over the last 72 readings (72h window)
                 window = values[-72:]
@@ -408,13 +475,16 @@ class SentinelMLFeeder:
                 # Latest prediction error
                 latest_error = abs(values[-1] - values[-2]) if len(values) >= 2 else 0.0
 
+                # Apply objective-based weight before normalising
+                weighted_error = latest_error * feature_weight
+
                 # Min-max normalise: use mean + 2*std as the "high anomaly" threshold
                 if std_err < 1e-6:
                     # Constant signal — no anomaly possible
                     lstm_anomaly_score = 0.0
                 else:
                     # z-score of latest error against the error distribution
-                    z = (latest_error - mean_err) / std_err
+                    z = (weighted_error - mean_err) / std_err
                     lstm_anomaly_score = min(max(z / 3.0, 0.0), 1.0)
 
                 scores[code] = round(lstm_anomaly_score, 4)
@@ -547,6 +617,7 @@ class SentinelMLFeeder:
                 X = vectorizer.fit_transform(texts).toarray()
             except Exception as exc:
                 import traceback
+
                 logger.error(f"[ML FEEDER] Fault Classifier vectorization failed: {exc}\n{traceback.format_exc()}")
                 X = np.zeros((len(texts), 0))
 

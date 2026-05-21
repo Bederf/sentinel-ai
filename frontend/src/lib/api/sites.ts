@@ -254,3 +254,72 @@ export const sitesApi = {
       body: JSON.stringify(request),
     }),
 };
+
+// ============= Site Profile API (Phase 191) =============
+
+export interface ObjectiveWeights {
+  cost: number;
+  comfort: number;
+}
+
+export interface OperatingSchedule {
+  weekday_start: string;
+  weekday_end: string;
+  saturday_start?: string;
+  saturday_end?: string;
+  sunday_active: boolean;
+  timezone: string;
+  is_24_7: boolean;
+}
+
+export interface OnSiteGeneration {
+  solar_kwp: number;
+  bess_kwh: number;
+  generator: boolean;
+}
+
+export interface SiteProfileRequest {
+  building_type: string;
+  primary_objective: string;
+  objective_weights?: ObjectiveWeights;
+  operating_schedule?: OperatingSchedule;
+  tariff_structure?: string;
+  on_site_generation?: OnSiteGeneration;
+  temp_band_min_c?: number;
+  temp_band_max_c?: number;
+  clinical_zones_present?: boolean;
+  regulatory_frameworks?: string[];
+}
+
+export interface SiteProfileResponse extends SiteProfileRequest {
+  id: string;
+  site_id: string;
+  confirmed_at: string | null;
+  confirmed_by: string | null;
+  profile_version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SiteProfileStatus {
+  site_id: string;
+  has_profile: boolean;
+  confirmed_at: string | null;
+}
+
+export const siteProfileApi = {
+  /** Create or update a building profile (called after wizard confirms scraped data) */
+  create: (siteId: string, data: SiteProfileRequest) =>
+    fetchApi<SiteProfileResponse>(`/api/site-profiles/${encodeURIComponent(siteId)}`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  /** Get the building profile for a site */
+  get: (siteId: string) =>
+    fetchApi<SiteProfileResponse>(`/api/site-profiles/${encodeURIComponent(siteId)}`),
+
+  /** Lightweight status check (has profile? confirmed?) */
+  getStatus: (siteId: string) =>
+    fetchApi<SiteProfileStatus>(`/api/site-profiles/${encodeURIComponent(siteId)}/status`),
+};

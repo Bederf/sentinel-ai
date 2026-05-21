@@ -36,6 +36,7 @@ from app.api import (
     occupancy_analytics,
     occupancy_energy_correlation,
     sensors,
+    site_profiles,
     simbiot_capabilities,
     sites_3d,
     zone_ingestion,
@@ -107,6 +108,9 @@ def register_site_routers(app: FastAPI) -> None:
 
     # Module management (module registry, status, access control)
     app.include_router(modules.router, prefix="/api", tags=["modules"])
+
+    # Site profiles (building profile for onboarding gating — Phase 191)
+    app.include_router(site_profiles.router, prefix="/api", tags=["site-profiles"])
 
     # Space Occupancy POC (5-room sensor pipeline)
     app.include_router(space_occupancy_router, tags=["space-occupancy"])

@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
 from app.services.site_adapter_manager import SiteAdapterManager
@@ -38,8 +38,6 @@ class SaveAdapterConfigRequest(BaseModel):
     enabled: bool = True
     poll_interval_seconds: int = 300
 
-
-from fastapi import APIRouter
 
 router = APIRouter(prefix="/api/simbiot", tags=["simbiot"])
 
@@ -84,6 +82,13 @@ async def create_site(request: CreateSiteRequest):
     except Exception as exc:
         logger.error("[SIMBIOT] Failed to create site: %s", exc)
         raise HTTPException(500, detail=str(exc)) from exc
+
+
+# PHASE 191 GATE: Shadow mode requires confirmed building profile.
+# Before transitioning any new site to shadow, call:
+#   POST /api/site-profiles/{site_id}
+# Gate enforced at PATCH /api/sites/{site_id}/phase.
+# See SiteProfileService.has_confirmed_profile() for gate implementation.
 
 
 @router.get("/sites/next-id")

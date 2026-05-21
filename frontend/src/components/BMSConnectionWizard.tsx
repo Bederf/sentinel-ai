@@ -23,6 +23,7 @@ import type {
 } from '@/lib/api';
 import { sitesApi } from '@/lib/api/sites';
 import { siteGeocodeApi } from '@/lib/api/zone_ingestion';
+import { siteProfileApi } from '@/lib/api/sites';
 import { api, niagaraApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
@@ -74,6 +75,7 @@ interface WizardState {
   siteType: string;
   siteFloors: string;  // Comma-separated list
   siteSqm: number;
+  primaryObjective: string;  // cost | comfort | compliance | balanced
   // Geocoded location
   latitude: number | null;
   longitude: number | null;
@@ -321,6 +323,7 @@ export function BMSConnectionWizard({
     siteType: "office",
     siteFloors: "G, L1, L2",
     siteSqm: 5000,
+    primaryObjective: "balanced",
     // BMS connection
     bmsVendor: "niagara",
     host: "",
@@ -394,16 +397,39 @@ export function BMSConnectionWizard({
         .map((floor) => floor.trim())
         .filter(Boolean),
       sqm: state.siteSqm,
-    }).then((siteResult) => {
+    }).then(async (siteResult) => {
       siteIdRef.current = siteResult.id;
       dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
+      // Phase 191: create building profile after site exists
+      // Building type mapping: wizard values → API values
+      const BUILDING_TYPE_MAP: Record<string, string> = {
+        office: "commercial_office",
+        retail: "retail",
+        hospital: "hospital",
+        private_hospital: "hospital",
+        industrial: "industrial",
+        warehouse: "industrial",
+        data_centre: "commercial_office",
+        mixed_use: "mixed_use",
+      };
+      await siteProfileApi.create(siteResult.id, {
+        building_type: BUILDING_TYPE_MAP[state.siteType] ?? state.siteType,
+        primary_objective: state.primaryObjective,
+        operating_schedule: {
+          weekday_start: "08:00",
+          weekday_end: "18:00",
+          sunday_active: false,
+          timezone: "Africa/Johannesburg",
+          is_24_7: false,
+        },
+      });
       return siteResult.id;
     }).finally(() => {
       createSitePromiseRef.current = null;
     });
 
     return createSitePromiseRef.current;
-  }, [state.siteAddress, state.siteFloors, state.siteId, state.siteName, state.siteRegion, state.siteSqm, state.siteType]);
+  }, [state.siteAddress, state.siteFloors, state.siteId, state.siteName, state.siteRegion, state.siteSqm, state.siteType, state.primaryObjective]);
 
   // ---------- Step 1: Test Connection ----------
   const handleTestConnection = useCallback(async () => {
@@ -815,6 +841,30 @@ export function BMSConnectionWizard({
               {SITE_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
               ))}
+            </select>
+          </div>
+
+          {/* Primary Objective */}
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Optimisation Goal
+            </label>
+            <select
+              value={state.primaryObjective}
+              onChange={(e) =>
+                dispatch({
+                  type: "SET_FIELD",
+                  field: "primaryObjective",
+                  value: e.target.value,
+                })
+              }
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            >
+              <option value="balanced">Balanced (cost + comfort)</option>
+              <option value="cost">Cost minimisation</option>
+              <option value="comfort">Occupant comfort</option>
+              <option value="compliance">Regulatory compliance</option>
             </select>
           </div>
 
