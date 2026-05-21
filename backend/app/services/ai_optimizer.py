@@ -1670,32 +1670,93 @@ If no action needed, return empty recommendations array.
                 next_change = str(next_entry)
 
         intents = {
-            "cost_saving": f"""
-Optimise for minimum energy cost.
-Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
-Next tariff change: {next_change}
-{f"Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA" if demand_charge else ""}
-Every recommendation must include ZAR saving estimate.
-Comfort may be relaxed within safe bounds.
-Equipment health is secondary unless failure is imminent.
+            "cost_saving": """
+## INTENT: Cost Minimisation
+**Goal:** Reduce energy spend, especially during peak and standard TOU periods.
+**Primary lever:** HVAC (typically 50-80% of site load), followed by lighting and BESS dispatch.
+
+### TRIGGER CONDITIONS — ALWAYS act when these are met:
+- HVAC > 75% of site load during standard/peak tariff → recommend HVAC optimisation
+- HVAC > 85% of site load at any time → recommend urgent load shift or setpoint relaxation
+- Current tariff is peak period and HVAC > 50% → recommend immediate setpoint relaxation
+- BESS SOC > 80% during off-peak → dispatch opportunity (sell to grid or shift to peak)
+- Demand charge accruing (> 80% of NMD) → recommend load shedding
+- Zone temps within 1°C of occupied setpoint → free cooling / setpoint relaxation opportunity
+- Outdoor temp within 5°C of zone setpoint → direct airside economiser opportunity
+
+### Suppress action only when:
+- Building is unoccupied AND HVAC is already at setback setpoints
+- All TOU periods are off-peak AND site load < 40% of baseline
+- Active fault/invalid data prevents confident recommendation
+
+### Comfort guardrail:
+Comfort may be relaxed within safe bounds. Do not exceed ±2°C from occupied setpoint without flagging as critical.
 """,
             "comfort": """
-Optimise for occupant comfort.
-Maintain setpoints within tight tolerance.
-Energy cost is secondary.
-Do not recommend setpoint relaxation unless building is empty.
+## INTENT: Occupant Comfort
+**Goal:** Maintain tight environmental conditions for occupant wellbeing.
+**Primary lever:** HVAC setpoints, zone-level overrides, IAQ management.
+
+### TRIGGER CONDITIONS — ALWAYS act when these are met:
+- Zone temp > 25°C during occupied hours → recommend cooling setpoint reduction
+- Zone temp < 20°C during occupied hours → recommend heating setpoint increase
+- Zone humidity > 65% during occupied hours → recommend dehumidification
+- Zone CO2 > 900 ppm (IAQ threshold) → recommend outdoor air damper increase
+- Any zone > 1.5°C outside setpoint during peak occupancy → urgent setpoint correction
+- VAV box zone temp variance > 3°C across floors → recommend rebalancing
+
+### Suppress action only when:
+- Zone is within ±0.5°C of setpoint AND CO2 < 800 ppm AND humidity < 60%
+- Building is unoccupied (switch to setback mode instead)
+- Outdoor conditions exceed HVAC capacity (heat wave, extreme humidity)
+
+### Cost guardrail:
+Energy cost is secondary to comfort. Recommend setpoint changes without hesitation during occupied hours.
 """,
-            "asset_preservation": f"""
-Optimise for equipment longevity.
-Reduce unnecessary runtime on degraded equipment.
-Flag any equipment operating outside safe parameters.
-Current TOU: R{current_rate:.2f}/kWh — cost context only.
+            "asset_preservation": """
+## INTENT: Equipment Longevity
+**Goal:** Reduce unnecessary runtime, prevent premature failure, flag degraded equipment.
+**Primary lever:** Runtime optimisation, staging, sequencing, degraded equipment bypass.
+
+### TRIGGER CONDITIONS — ALWAYS act when these are met:
+- Any equipment > 85% running hours vs design life → recommend runtime reduction
+- Compressor starts > 8/hour on any AHU → recommend staging review
+- Supply temp > 7°C from setpoint on any chiller → recommend service call
+- Motor current > 110% of nameplate → recommend inspection
+- Bearing temp > 80°C or rising trend on any rotating equipment → recommend immediate service
+- Oil pressure below manufacturer spec → recommend urgent service
+- Equipment in manual override for > 4 hours → recommend returning to auto
+
+### Suppress action only when:
+- Equipment is operating within 90% of design parameters
+- Building is unoccupied AND no degraded equipment is in critical state
+
+### Cost guardrail:
+Cost is context only. Always flag equipment outside safe parameters, regardless of energy impact.
 """,
-            "balanced": f"""
-Balance cost, comfort, and asset health equally.
-Current TOU: R{current_rate:.2f}/kWh ({band.upper()})
-{f"Demand charge: R{demand_charge:.2f}/kVA/month · NMD: {nmd} kVA" if demand_charge else ""}
-Prioritise actions that improve multiple dimensions simultaneously.
+            "balanced": """
+## INTENT: Balanced (Cost + Comfort + Asset Health)
+**Goal:** Equal weighting of efficiency, occupant comfort, and equipment longevity.
+**Primary lever:** Actions that improve multiple dimensions simultaneously.
+
+### TRIGGER CONDITIONS — ALWAYS act when these are met:
+- HVAC > 75% of site load during standard/peak tariff → HVAC optimisation
+- Zone temp > 1°C outside setpoint during occupied hours → setpoint correction
+- Zone humidity > 65% or CO2 > 900 ppm during occupied hours → IAQ management
+- Any equipment > 90% design load → asset review
+- BESS SOC > 80% during off-peak → dispatch opportunity
+- Demand > 80% of NMD → load management
+- Zone temps within 1°C of setpoint AND HVAC < 60% → free cooling opportunity
+
+### Suppress action only when:
+- ALL trigger conditions are false (building is genuinely optimal)
+- Invalid sensor data prevents confident assessment
+
+### Priority when multiple triggers fire:
+1. Safety/compliance (IAQ, extreme temps, equipment fault)
+2. Cost (peak tariff avoidance)
+3. Comfort (occupied hours)
+4. Asset health (degraded equipment runtime)
 """,
         }
 
@@ -1853,13 +1914,18 @@ RULES:
 - adjustments array can contain multiple equipment items — this is ONE coordinated recommendation
 - reason MUST reference actual telemetry values (temperatures, kW, tariff rate)
 - reason MUST reference shadow learning when available
-- If no adjustment needed — return empty recommendations with no_action_reasons explaining WHY
 - NEVER generate more than 3 recommendations per cycle — consolidate if you have more
 - NEVER generate a recommendation without specific adjustments
 - Each adjustment must have equipment_id, point, current_value, recommended_value
 
+DEFAULT IS ACTION — efficiency opportunities almost always exist.
+Prove no action is needed by checking every trigger condition listed in your INTENT profile.
+If all triggers are false AND the building is genuinely optimal, explain exactly which
+conditions you checked and why each one does not apply. Do NOT use generic reasons like
+"building is running optimally" without referencing specific values from the telemetry.
+
 If the building is already running optimally for {profile},
-state specifically why — reference actual values, not generic statements.
+list the specific trigger conditions that are not met — this is your no_action_reasons.
 
 If you need additional data to improve recommendations, list in:
 {{"data_requests": ["occupancy_schedule", "nmd_limit"]}}
@@ -2124,6 +2190,7 @@ Provide ONLY the JSON response, no additional text."""
         # Inject valid equipment codes into prompt so AI never hallucinates
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
+
             eq_repo = EquipmentRepository()
             site_resp = self.sites().get(site_id)
             if site_resp:
@@ -2908,7 +2975,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         Returns:
             Valid equipment code, or None if no match found (recommendation should be dropped).
         """
-        import re
 
         if not generated_code:
             return None
@@ -2939,6 +3005,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         # Get all equipment for site and find prefix matches
         try:
             from app.database.supabase_client import get_supabase_client
+
             sb = get_supabase_client()
             site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
             if site_resp.data:
@@ -2988,7 +3055,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         # e.g. S002-FCU-L1-001 → S002-FCU-101 (1*100 + 1)
         # e.g. S002-AHU-L2-001 → S002-AHU-201 (2*100 + 1)
         # e.g. S002-FCU-L0-001 → S002-FCU-001 (ground floor, no zone letter)
-        match = re.match(r'^(S\d+)-(\w+)-L(\d+)-(\d+)$', code)
+        match = re.match(r"^(S\d+)-(\w+)-L(\d+)-(\d+)$", code)
         if match:
             site, equip_type, floor, seq = match.groups()
             numeric_floor = int(floor)
@@ -3000,21 +3067,21 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         # Pattern: S002-TYPE-B{num}-{seq} → S002-TYPE-B{num_basin} (basement with 2-digit pad)
         # e.g. S002-AHU-B1-001 → S002-AHU-B01
-        match = re.match(r'^(S\d+)-(\w+)-B(\d+)-(\d+)$', code)
+        match = re.match(r"^(S\d+)-(\w+)-B(\d+)-(\d+)$", code)
         if match:
             site, equip_type, basement, seq = match.groups()
             return f"{site}-{equip_type}-B{basement.zfill(2)}"
 
         # Pattern: S002-TYPE-G-{seq} → S002-TYPE-{seq} (ground floor, no zone letter)
         # e.g. S002-LTG-G-001 → S002-LTG-001
-        match = re.match(r'^(S\d+)-(\w+)-G-(\d+)$', code)
+        match = re.match(r"^(S\d+)-(\w+)-G-(\d+)$", code)
         if match:
             site, equip_type, seq = match.groups()
             return f"{site}-{equip_type}-{seq.zfill(3)}"
 
         # Pattern: S002-TYPE-R-{seq} → S002-TYPE-R{seq_basin} (rooftop, 2-digit seq)
         # e.g. S002-CT-R-001 → S002-CT-R01
-        match = re.match(r'^(S\d+)-(\w+)-R-(\d+)$', code)
+        match = re.match(r"^(S\d+)-(\w+)-R-(\d+)$", code)
         if match:
             site, equip_type, seq = match.groups()
             return f"{site}-{equip_type}-R{int(seq):02d}"
@@ -3029,12 +3096,12 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         S002-FCU-L1-001 → S002-FCU-L
         S002-AHU-201 → S002-AHU-2
         """
-        parts = code.split('-')
+        parts = code.split("-")
         if len(parts) >= 3:
             # e.g. S002-AHU-B01 → S002-AHU-B
             # e.g. S002-FCU-101 → S002-FCU-1
-            return '-'.join(parts[:2]) + '-' + parts[2][0]
-        return '-'.join(parts[:2]) + '-'
+            return "-".join(parts[:2]) + "-" + parts[2][0]
+        return "-".join(parts[:2]) + "-"
 
     def _format_zone_context(self, hvac_devices: list[Device]) -> str:
         """Format zone context for Claude prompt."""
@@ -4263,7 +4330,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                             asyncio.to_thread(equip_repo.get_by_site_code, site_id),
                             timeout=5.0,
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         logger.error(
                             f"[AI-OPT] validate_recommendation DB timeout for {site_id} "
                             f"— allowing recommendation through with reduced confidence"
