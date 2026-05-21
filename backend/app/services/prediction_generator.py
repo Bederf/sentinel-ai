@@ -14,6 +14,7 @@ from typing import Any
 
 from app.database.repositories.prediction_repository import PredictionRepository
 from app.database.supabase_client import get_supabase_client
+from app.services.equipment_alert_service import EquipmentAlertService
 from app.services.health_threshold_service import get_health_status, get_health_thresholds
 from app.services.prediction_taxonomy import (
     FORMULA_VERSION_STATIC,
@@ -22,9 +23,6 @@ from app.services.prediction_taxonomy import (
     urgency_from_severity,
 )
 from app.services.workflow_triggers import get_trigger_engine
-from app.services.equipment_alert_service import EquipmentAlertService
-from app.services.notification_service import NotificationService
-from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
@@ -168,9 +166,7 @@ class PredictionGeneratorService:
             pass
         return 0.0
 
-    async def _trigger_prediction_work_order(
-        self, equipment: dict[str, Any], prediction: dict[str, Any]
-    ) -> bool:
+    async def _trigger_prediction_work_order(self, equipment: dict[str, Any], prediction: dict[str, Any]) -> bool:
         """
         Trigger a PREDICTION_CRITICAL work order if conditions are met.
 
@@ -236,9 +232,16 @@ class PredictionGeneratorService:
 
         try:
             sb = get_supabase_client()
-            result = sb.table("notification_delivery_log").select("id").eq("site_id", site_id).eq(
-                "reference_type", "prediction"
-            ).eq("severity", severity).gt("sent_at", cutoff.isoformat()).limit(1).execute()
+            result = (
+                sb.table("notification_delivery_log")
+                .select("id")
+                .eq("site_id", site_id)
+                .eq("reference_type", "prediction")
+                .eq("severity", severity)
+                .gt("sent_at", cutoff.isoformat())
+                .limit(1)
+                .execute()
+            )
             return len(result.data or []) == 0
         except Exception:
             return True  # Allow notification if check fails
@@ -268,7 +271,7 @@ class PredictionGeneratorService:
             f"<b>Repair Cost:</b> R{repair_cost:,.0f}",
             f"<b>Risk Exposure:</b> R{potential_loss:,.0f}",
             "",
-            f"<b>Recommended Action:</b>",
+            "<b>Recommended Action:</b>",
             f"{prediction.get('recommended_action', 'Inspect equipment')}",
         ]
         if factors:
@@ -331,7 +334,7 @@ class PredictionGeneratorService:
         if severity in ("warning", "critical"):
             try:
                 from app.config.settings import settings as _app_settings
-                from app.services.telegram_message_sender import get_telegram_sender, InlineButton, InlineKeyboard
+                from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
                 chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
                     _app_settings, "sentry_fm_chat_id", None
@@ -351,18 +354,20 @@ class PredictionGeneratorService:
                     # Log delivery for dedup tracking
                     try:
                         sb = get_supabase_client()
-                        sb.table("notification_delivery_log").insert({
-                            "id": str(uuid.uuid4()),
-                            "site_id": site_id,
-                            "notification_type": "prediction",
-                            "severity": severity,
-                            "reference_type": "prediction",
-                            "equipment_id": equipment.get("id"),
-                            "channel_type": "telegram",
-                            "status": "sent",
-                            "provider": "telegram",
-                            "sent_at": datetime.utcnow().isoformat(),
-                        }).execute()
+                        sb.table("notification_delivery_log").insert(
+                            {
+                                "id": str(uuid.uuid4()),
+                                "site_id": site_id,
+                                "notification_type": "prediction",
+                                "severity": severity,
+                                "reference_type": "prediction",
+                                "equipment_id": equipment.get("id"),
+                                "channel_type": "telegram",
+                                "status": "sent",
+                                "provider": "telegram",
+                                "sent_at": datetime.utcnow().isoformat(),
+                            }
+                        ).execute()
                     except Exception as log_err:
                         logger.warning(f"[PRED-NOTIFY] Failed to log delivery: {log_err}")
             except Exception as e:
@@ -383,10 +388,11 @@ class PredictionGeneratorService:
         site_code: str,
     ) -> None:
         """Send email escalation for critical predictions."""
-        from app.services.visitor_email_service import _smtp_config
         import smtplib
-        from email.mime.text import MIMEText
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        from app.services.visitor_email_service import _smtp_config
 
         smtp = _smtp_config()
         if not smtp.get("host"):
@@ -401,14 +407,14 @@ class PredictionGeneratorService:
 
         body_html = f"""
         <html><body>
-        <h2 style="color:{'#dc2626' if severity == 'critical' else '#d97706'}">
+        <h2 style="color:{"#dc2626" if severity == "critical" else "#d97706"}">
             SENTINEL {severity.upper()} Prediction — {site_code.upper()}
         </h2>
         <table style="border-collapse:collapse;width:100%">
         <tr><td style="padding:8px;border:1px solid #ddd"><b>Equipment</b></td>
-            <td style="padding:8px;border:1px solid #ddd">{equipment.get('code','UNKNOWN')}</td></tr>
+            <td style="padding:8px;border:1px solid #ddd">{equipment.get("code", "UNKNOWN")}</td></tr>
         <tr><td style="padding:8px;border:1px solid #ddd"><b>Type</b></td>
-            <td style="padding:8px;border:1px solid #ddd">{equipment.get('type','equipment')}</td></tr>
+            <td style="padding:8px;border:1px solid #ddd">{equipment.get("type", "equipment")}</td></tr>
         <tr><td style="padding:8px;border:1px solid #ddd"><b>Health Score</b></td>
             <td style="padding:8px;border:1px solid #ddd">{health:.0f}%</td></tr>
         <tr><td style="padding:8px;border:1px solid #ddd"><b>Failure Probability</b></td>
@@ -419,8 +425,8 @@ class PredictionGeneratorService:
             <td style="padding:8px;border:1px solid #ddd">R{potential_loss:,.0f}</td></tr>
         </table>
         <h3>Recommended Action</h3>
-        <p>{prediction.get('recommended_action', 'Inspect equipment.')}</p>
-        {'<h3>Contributing Factors</h3><ul>' + ''.join(f"<li>{f.get('factor','Unknown')}: {f.get('value','Unknown')}" for f in factors[:3]) + '</ul>' if factors else ''}
+        <p>{prediction.get("recommended_action", "Inspect equipment.")}</p>
+        {"<h3>Contributing Factors</h3><ul>" + "".join(f"<li>{f.get('factor', 'Unknown')}: {f.get('value', 'Unknown')}" for f in factors[:3]) + "</ul>" if factors else ""}
         </body></html>
         """
 
@@ -445,20 +451,21 @@ class PredictionGeneratorService:
             return False
         try:
             from app.database.supabase_client import get_supabase_client
-            from app.models.onboarding_phase import phase_allows
             from app.models.module_registry import ModuleType
+            from app.models.onboarding_phase import phase_allows
             from app.services.module_registry_service import module_registry
 
             try:
                 sb = get_supabase_client()
                 result = sb.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
-                site_phase = (result.data[0].get("onboarding_phase") or "commissioning") if result.data else "commissioning"
+                site_phase = (
+                    (result.data[0].get("onboarding_phase") or "commissioning") if result.data else "commissioning"
+                )
             except Exception:
                 site_phase = "commissioning"
 
-            return (
-                phase_allows(site_phase, "recommendations_ui")
-                and module_registry.is_module_active(site_id, ModuleType.MAINTENANCE)
+            return phase_allows(site_phase, "recommendations_ui") and module_registry.is_module_active(
+                site_id, ModuleType.MAINTENANCE
             )
         except Exception as e:
             logger.warning("Maintenance module gate check failed for %s: %s", site_id, e)
@@ -535,7 +542,7 @@ class PredictionGeneratorService:
                             logger.info(
                                 "Prediction work-order trigger gated off for site=%s equipment=%s "
                                 "(maintenance module inactive)",
-                                site_id,
+                                equipment_site_id,
                                 equipment.get("code") or equipment.get("id"),
                             )
 
@@ -785,49 +792,29 @@ class PredictionGeneratorService:
             except Exception:
                 pass
 
-        # Query fault events for alarm frequency (last 60 days)
+        # Query fault events for alarm frequency (last 60 days) — equipment-scoped only
         eq_code = equipment.get("code", "")
-        site_id_val = equipment.get("site_id", "")
-        if eq_code or site_id_val:
+        if eq_code:
             try:
                 from app.database.supabase_client import get_supabase_client
 
                 supabase = get_supabase_client()
                 lookback = (datetime.now() - timedelta(days=60)).isoformat()
 
-                faults = None
-                # Try exact match on equipment_code
-                if eq_code:
-                    faults = (
-                        supabase.table("equipment_fault_events")
-                        .select("alarm_code")
-                        .eq("equipment_code", eq_code)
-                        .gte("recorded_at", lookback)
-                        .limit(100)
-                        .execute()
-                    )
-                # Fallback: site-level top alarms (bridge codes differ from catalog)
-                if not faults or not faults.data:
-                    if site_id_val:
-                        # Fault events use S002 format (not site-002), alarm_code is always null
-                        bridge_site_id = site_id_val.replace("site-", "S").upper()
-                        faults = (
-                            supabase.table("equipment_fault_events")
-                            .select("event_type")
-                            .eq("site_id", bridge_site_id)
-                            .gte("recorded_at", lookback)
-                            .limit(100)
-                            .execute()
-                        )
-
+                faults = (
+                    supabase.table("equipment_fault_events")
+                    .select("alarm_code")
+                    .eq("equipment_code", eq_code)
+                    .gte("recorded_at", lookback)
+                    .limit(100)
+                    .execute()
+                )
                 if faults and faults.data:
                     from collections import Counter
 
                     key = "alarm_code" if faults.data[0].get("alarm_code") else "event_type"
                     freq = Counter(f[key] for f in faults.data)
                     evidence["alarm_frequency"] = dict(freq.most_common(10))
-            except Exception:
-                pass
             except Exception:
                 pass
 
@@ -891,16 +878,19 @@ class PredictionGeneratorService:
 
         # ── 1. Health Score Factor (always present if below threshold) ─────────
         if health_score < 70:
-            factors.append({
-                "factor": "Low Health Score",
-                "weight": 0.4,
-                "description": f"Equipment health at {health_score}%, below acceptable threshold",
-            })
+            factors.append(
+                {
+                    "factor": "Low Health Score",
+                    "weight": 0.4,
+                    "description": f"Equipment health at {health_score}%, below acceptable threshold",
+                }
+            )
 
         # ── 2. Equipment Age Factor ──────────────────────────────────────────
         # Use config expected_life_years (critical threshold = 80% of expected life)
         try:
             from app.api.health_config import load_config
+
             config = load_config()
             type_config = config.get(equipment_type.lower(), {})
             expected_life_years = float(type_config.get("expected_life_years", 15))
@@ -914,17 +904,20 @@ class PredictionGeneratorService:
                 install_str = install_date.replace("Z", "+00:00").replace("+00:00", "")
                 age_years = (datetime.now() - datetime.fromisoformat(install_str)).days / 365.25
                 if age_years > age_critical_years:
-                    factors.append({
-                        "factor": "Equipment Age",
-                        "weight": 0.3,
-                        "description": f"Equipment is {age_years:.1f} years old (expected life: {expected_life_years:.0f} years)",
-                    })
+                    factors.append(
+                        {
+                            "factor": "Equipment Age",
+                            "weight": 0.3,
+                            "description": f"Equipment is {age_years:.1f} years old (expected life: {expected_life_years:.0f} years)",
+                        }
+                    )
             except Exception:
                 pass
 
         # ── 3. High Runtime Factor ───────────────────────────────────────────
         try:
             from app.api.health_config import load_config
+
             config = load_config()
             type_config = config.get(equipment_type.lower(), {})
             runtime_thresholds = type_config.get("thresholds", {})
@@ -934,15 +927,18 @@ class PredictionGeneratorService:
 
         runtime = operating_data.get("total_runtime_hours", 0)
         if runtime > runtime_critical:
-            factors.append({
-                "factor": "High Runtime",
-                "weight": 0.2,
-                "description": f"Equipment has {runtime:,} operating hours (critical threshold: {runtime_critical:,})",
-            })
+            factors.append(
+                {
+                    "factor": "High Runtime",
+                    "weight": 0.2,
+                    "description": f"Equipment has {runtime:,} operating hours (critical threshold: {runtime_critical:,})",
+                }
+            )
 
         # ── 4. Service Overdue Factor ────────────────────────────────────────
         try:
             from app.api.health_config import load_config
+
             config = load_config()
             type_config = config.get(equipment_type.lower(), {})
             service_interval_days = type_config.get("service_interval_days", 90)
@@ -956,24 +952,28 @@ class PredictionGeneratorService:
                 last_service_str = last_service.replace("Z", "+00:00").replace("+00:00", "")
                 days_since_service = (datetime.now() - datetime.fromisoformat(last_service_str)).days
                 if days_since_service > overdue_critical_days:
-                    factors.append({
-                        "factor": "Service Overdue",
-                        "weight": 0.25,
-                        "description": (
-                            f"Last service {days_since_service} days ago "
-                            f"(critical threshold: {overdue_critical_days} days, "
-                            f"interval: {service_interval_days} days)"
-                        ),
-                    })
+                    factors.append(
+                        {
+                            "factor": "Service Overdue",
+                            "weight": 0.25,
+                            "description": (
+                                f"Last service {days_since_service} days ago "
+                                f"(critical threshold: {overdue_critical_days} days, "
+                                f"interval: {service_interval_days} days)"
+                            ),
+                        }
+                    )
                 elif days_since_service > service_interval_days * 0.8:
-                    factors.append({
-                        "factor": "Service Approaching Overdue",
-                        "weight": 0.15,
-                        "description": (
-                            f"Last service {days_since_service} days ago "
-                            f"(warning threshold: {int(service_interval_days * 0.8)} days)"
-                        ),
-                    })
+                    factors.append(
+                        {
+                            "factor": "Service Approaching Overdue",
+                            "weight": 0.15,
+                            "description": (
+                                f"Last service {days_since_service} days ago "
+                                f"(warning threshold: {int(service_interval_days * 0.8)} days)"
+                            ),
+                        }
+                    )
             except Exception:
                 pass
 
@@ -987,23 +987,27 @@ class PredictionGeneratorService:
                 try:
                     deviation = abs(float(supply_temp) - float(setpoint))
                     if deviation > 5.0:
-                        factors.append({
-                            "factor": "Supply Temperature Deviation",
-                            "weight": 0.3,
-                            "description": (
-                                f"Supply temperature {float(supply_temp):.1f}°C deviates "
-                                f"{deviation:.1f}°C from setpoint {float(setpoint):.1f}°C"
-                            ),
-                        })
+                        factors.append(
+                            {
+                                "factor": "Supply Temperature Deviation",
+                                "weight": 0.3,
+                                "description": (
+                                    f"Supply temperature {float(supply_temp):.1f}°C deviates "
+                                    f"{deviation:.1f}°C from setpoint {float(setpoint):.1f}°C"
+                                ),
+                            }
+                        )
                     elif deviation > 2.0:
-                        factors.append({
-                            "factor": "Supply Temperature Deviation",
-                            "weight": 0.2,
-                            "description": (
-                                f"Supply temperature {float(supply_temp):.1f}°C deviates "
-                                f"{deviation:.1f}°C from setpoint {float(setpoint):.1f}°C"
-                            ),
-                        })
+                        factors.append(
+                            {
+                                "factor": "Supply Temperature Deviation",
+                                "weight": 0.2,
+                                "description": (
+                                    f"Supply temperature {float(supply_temp):.1f}°C deviates "
+                                    f"{deviation:.1f}°C from setpoint {float(setpoint):.1f}°C"
+                                ),
+                            }
+                        )
                 except (ValueError, TypeError):
                     pass
 
@@ -1013,24 +1017,28 @@ class PredictionGeneratorService:
                 try:
                     delta_t = float(return_temp) - float(supply_temp)
                     if delta_t < 4.0 and equipment_type.lower() in {"chiller", "ct", "cooling_tower"}:
-                        factors.append({
-                            "factor": "Low Temperature Differential",
-                            "weight": 0.25,
-                            "description": (
-                                f"Return-supply delta-T is {delta_t:.1f}°C "
-                                f"(expected ≥ 5°C). Possible heat exchanger issue."
-                            ),
-                        })
+                        factors.append(
+                            {
+                                "factor": "Low Temperature Differential",
+                                "weight": 0.25,
+                                "description": (
+                                    f"Return-supply delta-T is {delta_t:.1f}°C "
+                                    f"(expected ≥ 5°C). Possible heat exchanger issue."
+                                ),
+                            }
+                        )
                 except (ValueError, TypeError):
                     pass
 
         # ── Default factor if none found ──────────────────────────────────────
         if not factors:
-            factors.append({
-                "factor": "Health Monitoring",
-                "weight": 0.5,
-                "description": "Detected through automated health monitoring",
-            })
+            factors.append(
+                {
+                    "factor": "Health Monitoring",
+                    "weight": 0.5,
+                    "description": "Detected through automated health monitoring",
+                }
+            )
 
         return factors
 

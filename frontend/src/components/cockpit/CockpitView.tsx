@@ -289,8 +289,9 @@ function buildForecast(state: CockpitState) {
     ]
   }
 
+  const floorIds = state.visualTwin.floors.filter(f => f.isManaged).map(f => f.id).join(', ')
   return [
-    { label: 'Twin scope', value: state.site.id === 'site-002' ? 'L0-L3 + Roof occupied (host shell neutral)' : 'Occupied levels only' },
+    { label: 'Twin scope', value: floorIds || 'Occupied levels only' },
     { label: 'Guidance', value: `${state.decision.summary} · ${telemetrySnapshot(state)}` },
     {
       label: 'Modules',

@@ -121,15 +121,10 @@ class PredictionCalculator:
             asset_id = alarm.get("asset_id", "")
             if asset_id:
                 alarms_by_asset[asset_id].append(alarm)
-            # Also try to match by equipment name/site (case-insensitive)
-            site_id = alarm.get("site_id", "").upper()  # Normalize to uppercase
-            asset_tag = alarm.get("asset_tag", "")
-            for eq in equipment:
-                eq_site_id = eq.get("site_id", "").upper()  # Normalize to uppercase
-                if eq_site_id == site_id:
-                    eq_name = eq.get("name", "").upper()
-                    if eq_name in asset_tag.upper() or asset_tag.upper() in eq_name:
-                        alarms_by_equipment[eq["id"]].append(alarm)
+            # Match alarms to equipment by equipment_id field if present
+            alarm_eq_id = alarm.get("equipment_id", "") or alarm.get("equipment_id", "")
+            if alarm_eq_id and alarm_eq_id in {eq["id"] for eq in equipment}:
+                alarms_by_equipment[alarm_eq_id].append(alarm)
 
         # Analyze each equipment item (use health score as base)
         thresholds = get_health_thresholds()
