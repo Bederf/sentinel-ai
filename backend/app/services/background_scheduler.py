@@ -996,8 +996,8 @@ class BackgroundSchedulerService:
                     if prev is not None:
                         # healthy→warning: crossed below healthy threshold
                         is_H_to_W = prev >= t_healthy and health < t_healthy
-                        # warning→critical: crossed below critical threshold
-                        is_W_to_C = prev >= t_warning and prev < t_critical and health < t_critical
+                        # warning→critical: was in warning zone (50-89), now below critical
+                        is_W_to_C = prev >= t_critical and prev < t_healthy and health < t_critical
                         is_transition = is_H_to_W or is_W_to_C
                         if not is_transition:
                             logger.info(
@@ -1010,8 +1010,7 @@ class BackgroundSchedulerService:
                     else:
                         # No history — treat as first detection, don't notify (can't confirm transition)
                         logger.info(
-                            f"[HEALTH-PRED] {code}: first detection health={health}%, "
-                            "no transition notification"
+                            f"[HEALTH-PRED] {code}: first detection health={health}%, no transition notification"
                         )
 
                     action_info = ACTIONS[severity]
@@ -1996,7 +1995,9 @@ class BackgroundSchedulerService:
             last_newline = truncated.rfind("\n")
             cutoff = max(last_period, last_newline)
             reason = truncated[: cutoff + 1] if cutoff > 150 else truncated.rstrip() + "…"
-        lines.extend(["<b>Adjustments needed:</b>", *adj_lines, "", "<b>Why:</b>", reason, "", f"<b>Goal:</b> {profile}"])
+        lines.extend(
+            ["<b>Adjustments needed:</b>", *adj_lines, "", "<b>Why:</b>", reason, "", f"<b>Goal:</b> {profile}"]
+        )
         if saving:
             lines.append(f"<b>Saving:</b> {saving}")
         if confidence > 0:
