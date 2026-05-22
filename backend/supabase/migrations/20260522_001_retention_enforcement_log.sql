@@ -19,13 +19,20 @@ CREATE TABLE IF NOT EXISTS public.retention_enforcement_log (
 COMMENT ON TABLE public.retention_enforcement_log IS
     'POPIA S14 audit trail — records each retention enforcement run and its outcomes';
 
--- Retention: 5 years (same as AUDIT_TRAIL tier)
--- This table itself is never deleted by the retention job
-ALTER TABLE public.retention_enforcement_log SET (
-    timescaledb.time_column    = 'executed_at',
-    timescaledb.time_interval  = INTERVAL '1 day'
-);
-
 -- Index for querying recent runs per table/tier
 CREATE INDEX IF NOT EXISTS idx_retention_log_lookup
     ON public.retention_enforcement_log (table_name, tier, executed_at DESC);
+
+-- POPIA S14 retention: service_role needs DELETE on all tier tables
+-- (authenticator already has DELETE; service_role is used by PostgREST REST API)
+GRANT DELETE ON equipment_sensor_readings TO service_role;
+GRANT DELETE ON alerts TO service_role;
+GRANT DELETE ON equipment_fault_events TO service_role;
+GRANT DELETE ON adapter_health TO service_role;
+GRANT DELETE ON adapter_health_current TO service_role;
+GRANT DELETE ON adapter_health_alerts TO service_role;
+GRANT DELETE ON space_occupancy_events TO service_role;
+GRANT DELETE ON asset_health_snapshots TO service_role;
+GRANT DELETE ON system_health_snapshots TO service_role;
+GRANT DELETE ON recommendations TO service_role;
+GRANT DELETE ON parasite_decisions TO service_role;

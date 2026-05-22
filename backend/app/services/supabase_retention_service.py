@@ -35,6 +35,7 @@ import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 
@@ -51,7 +52,9 @@ def _iso(value: datetime) -> str:
 
 # Local Supabase REST endpoint (same as used in stats.py)
 _SUPABASE_REST_URL = "http://127.0.0.1:55321/rest/v1"
-_SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicmlzZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU"
+# Service role JWT — generated with correct JWT_SECRET (super-secret-jwt-token-with-at-least-32-characters-long)
+# Sign with: JWT_SECRET + role=service_role + exp far future
+_SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJleHAiOjIwOTQ4MTcxMjMsImlhdCI6MTc3OTQ1NzEyM30.HoJcHZoRr7uq9PHsmcTsnvY98oNOFyFrtpQvX9OkJDc"
 
 
 def _rest_headers() -> dict[str, str]:
@@ -200,17 +203,17 @@ class SupabaseRetentionService:
         return _rest_headers()
 
     def _count_url(self, table: str, date_column: str, created_at_before: str) -> str:
-        """Build URL to count rows older than cutoff."""
-        return f"{self._rest_url}/{table}?{date_column}=lt.{created_at_before}&{date_column}=gt.1970-01-01&select=id"
+        """Build URL to count rows older than cutoff. Uses date_column to avoid PK issues on tables without id."""
+        return f"{self._rest_url}/{table}?{date_column}=lt.{created_at_before}&select={date_column}"
 
     def _delete_url(self, table: str, date_column: str, created_at_before: str) -> str:
         """Build URL to delete rows older than cutoff."""
         return f"{self._rest_url}/{table}?{date_column}=lt.{created_at_before}"
 
     def _get_cutoff(self, retention_days: int) -> str:
-        """Get ISO cutoff datetime for retention window."""
+        """Get URL-encoded ISO cutoff datetime for retention window."""
         cutoff = _utc_now() - timedelta(days=retention_days)
-        return cutoff.isoformat()
+        return quote(cutoff.isoformat())
 
     def _count_overdue(self, schedule: RetentionSchedule) -> int:
         """Count rows older than retention window."""
