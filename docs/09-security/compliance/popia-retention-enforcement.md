@@ -2,9 +2,9 @@
 title: "POPIA Retention Enforcement"
 type: "procedure"
 status: "active"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-02-23"
-updated: "2026-05-20"
+updated: "2026-05-22"
 author: "SENTINEL Compliance Team"
 tags: ["compliance", "popia", "retention", "privacy"]
 domain: "compliance"
@@ -67,7 +67,51 @@ Implemented in `backend/app/services/supabase_retention_service.py`, wired into 
 | **SNAPSHOT** | `asset_health_snapshots`, `system_health_snapshots` | 30 days | S14(1) — stale operational data |
 | **AUDIT_TRAIL** | `recommendations`, `parasite_decisions` | 5 years | S14(2) — lawful purpose (audit/compliance) |
 
-> **Note (2026-05-10):** Following Phase 208-12 null column cleanup, `recommendations` and `parasite_decisions` retained columns are limited to those with actual data. Execution log is held in-memory by the service (no `retention_execution_log` SQL table — that table was archived in Phase 208-10).
+### 6.4 Audit Trail (POPIA S14 Proof)
+
+Live enforcement writes per-table execution records to the `retention_enforcement_log` SQL table.
+This is the primary POPIA S14 evidence artifact — it records what was deleted, when, and by which tier.
+
+```sql
+-- Table created by backend/supabase/migrations/20260522_001_retention_enforcement_log.sql
+CREATE TABLE IF NOT EXISTS public.retention_enforcement_log (
+    id BIGSERIAL PRIMARY KEY,
+    executed_at TIMESTAMPTZ NOT NULL,
+    dry_run BOOLEAN NOT NULL DEFAULT FALSE,
+    tier TEXT NOT NULL,          -- 'ML_TRAINING' | 'SNAPSHOT' | 'AUDIT_TRAIL'
+    table_name TEXT NOT NULL,
+    date_column TEXT NOT NULL DEFAULT 'created_at',
+    reviewed INTEGER NOT NULL DEFAULT 0,
+    deleted INTEGER NOT NULL DEFAULT 0,
+    errors JSONB DEFAULT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+-- Index for querying recent runs per table/tier
+CREATE INDEX idx_retention_log_lookup ON retention_enforcement_log (table_name, tier, executed_at DESC);
+```
+
+As of 2026-05-22, this table has **22 live enforcement entries** (verified in Supabase local dev).
+Each entry records the tier, table, reviewed count, deleted count, and any errors — providing
+cryptographic proof of continuous POPIA S14 compliance enforcement.
+
+### 6.5 Known Operational Notes
+
+- **adapter_health batch deletion**: The `adapter_health` table can exceed 1.5 M rows. A single
+  DELETE via PostgREST API triggers a statement timeout. The service handles this by relying on
+  PostgREST's default pagination (1000 rows/batch). Nightly scheduled runs will gradually clean
+  overdue rows in compliant batches.
+- **adapter_health_current**: Has no primary key — `_count_url()` uses `select=updated_at` instead
+  of `select=id`.
+- **Date column mapping**: Each table uses its actual date column (`recorded_at`, `timestamp`,
+  `updated_at`, `snapshot_at` as applicable — see tier table above).
+- **JWT encoding**: ISO timestamps use `+` for UTC offset; `urllib.parse.quote()` is required when
+  building the PostgREST filter URL to encode `+` as `%2B`.
+- **service_role DELETE grants**: `GRANT DELETE ON <table> TO service_role` was applied directly to
+  the Supabase DB and added to the migration for all 11 POPIA tier tables.
+
+> **Note (2026-05-22):** `recommendations` and `parasite_decisions` retained columns are limited to
+> those with actual data following Phase 208-12 null column cleanup. Execution log is the
+> `retention_enforcement_log` SQL table.
 
 ### 6.2 SQL Table Endpoints
 
