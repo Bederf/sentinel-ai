@@ -131,14 +131,14 @@ SNAPSHOT_SCHEDULES: list[RetentionSchedule] = [
         table_name="asset_health_snapshots",
         retention_days=30,
         tier="SNAPSHOT",
-        date_column="created_at",
+        date_column="snapshot_at",
         description="Operational snapshots — stale after 30 days (POPIA S14(1))",
     ),
     RetentionSchedule(
         table_name="system_health_snapshots",
         retention_days=30,
         tier="SNAPSHOT",
-        date_column="created_at",
+        date_column="timestamp",
         description="Operational snapshots — stale after 30 days (POPIA S14(1))",
     ),
 ]
@@ -148,7 +148,7 @@ AUDIT_TRAIL_SCHEDULES: list[RetentionSchedule] = [
         table_name="recommendations",
         retention_days=365 * 5,
         tier="AUDIT_TRAIL",
-        date_column="created_at",
+        date_column="timestamp",
         description="AI decision audit trail — keep 5 years (POPIA S14(2))",
     ),
     RetentionSchedule(
@@ -252,17 +252,50 @@ class SupabaseRetentionService:
             logger.error("Delete failed for %s: %s", schedule.table_name, e)
             return reviewed, None
 
+    def _write_enforcement_log(self, run: DeletionRun) -> None:
+        """Write per-table enforcement audit records to retention_enforcement_log."""
+        for result in run.results:
+            payload = {
+                "executed_at": run.executed_at,
+                "dry_run": run.dry_run,
+                "tier": result.tier,
+                "table_name": result.table_name,
+                "date_column": "created_at",
+                "reviewed": result.reviewed,
+                "deleted": result.deleted if not run.dry_run else 0,
+                "errors": [{"error": result.error}] if result.error else None,
+            }
+            try:
+                with httpx.Client(timeout=self._timeout) as client:
+                    resp = client.post(
+                        f"{self._rest_url}/retention_enforcement_log",
+                        headers=self._headers(),
+                        json=payload,
+                    )
+                    resp.raise_for_status()
+            except Exception as exc:
+                logger.warning("Failed to write retention enforcement log for %s: %s", result.table_name, exc)
+
     def run_ml_training_deletion(self, dry_run: bool = True) -> DeletionRun:
         """Delete ML training data older than 7 days. POPIA Section 14(1)."""
-        return self._run_deletion(ML_TRAINING_SCHEDULES, dry_run)
+        run = self._run_deletion(ML_TRAINING_SCHEDULES, dry_run)
+        if not dry_run:
+            self._write_enforcement_log(run)
+        return run
 
     def run_snapshot_deletion(self, dry_run: bool = True) -> DeletionRun:
         """Delete operational snapshots older than 30 days. POPIA Section 14(1)."""
-        return self._run_deletion(SNAPSHOT_SCHEDULES, dry_run)
+        run = self._run_deletion(SNAPSHOT_SCHEDULES, dry_run)
+        if not dry_run:
+            self._write_enforcement_log(run)
+        return run
 
     def run_audit_trail_deletion(self, dry_run: bool = True) -> DeletionRun:
         """Delete audit trail entries older than 5 years. POPIA Section 14(2)."""
-        return self._run_deletion(AUDIT_TRAIL_SCHEDULES, dry_run)
+        run = self._run_deletion(AUDIT_TRAIL_SCHEDULES, dry_run)
+        if not dry_run:
+            self._write_enforcement_log(run)
+        return run
 
     def _run_deletion(self, schedules: list[RetentionSchedule], dry_run: bool) -> DeletionRun:
         """Execute deletion for a list of schedules (synchronous version)."""
