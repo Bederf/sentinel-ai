@@ -99,6 +99,14 @@ sentinel_model_drift_alerts = Gauge(
     registry=REGISTRY,
 )
 
+# 6b. Model drift score (gauge — current drift ratio per model)
+sentinel_model_drift_score = Gauge(
+    "sentinel_model_drift_score",
+    "Model drift score (features_drifted / features_checked) per model",
+    labelnames=["model_id", "model_type", "source", "data_sufficient", "data_quality"],
+    registry=REGISTRY,
+)
+
 # 7. Rollback events
 sentinel_rollback_total = Counter(
     "sentinel_rollback_total",
@@ -188,6 +196,14 @@ sentinel_cache_operations_total = Counter(
 sentinel_cache_hit_rate_percent = Gauge(
     "sentinel_cache_hit_rate_percent",
     "Current cache hit rate percentage",
+    registry=REGISTRY,
+)
+
+# 16b. Backend uptime indicator (1 = up, 0 = down)
+# Updated by the metrics endpoint handler on every scrape
+sentinel_backend_up = Gauge(
+    "sentinel_backend_up",
+    "Backend API health indicator: 1 = up, 0 = down",
     registry=REGISTRY,
 )
 
@@ -577,9 +593,7 @@ def _collect_drift_metrics() -> None:
                             .execute()
                         )
                         if min_resp.data:
-                            oldest = datetime.fromisoformat(
-                                min_resp.data[0]["recorded_at"].replace("Z", "+00:00")
-                            )
+                            oldest = datetime.fromisoformat(min_resp.data[0]["recorded_at"].replace("Z", "+00:00"))
                             baseline_span_seconds = (datetime.now(UTC) - oldest).total_seconds()
                     except Exception:
                         pass
@@ -599,9 +613,7 @@ def _collect_drift_metrics() -> None:
                 score = features_drifted / features_checked if features_checked > 0 else 0.0
 
                 # Two-tier gate: check temporal span, not just sample count
-                data_quality, data_sufficient = _assess_drift_data_sufficiency(
-                    baseline_span_seconds, features_checked
-                )
+                data_quality, data_sufficient = _assess_drift_data_sufficiency(baseline_span_seconds, features_checked)
 
                 sentinel_model_drift_score.labels(
                     model_id=eq_type,
@@ -935,6 +947,9 @@ async def prometheus_metrics(
     Accepts METRICS_BEARER_TOKEN (Bearer) for Prometheus,
     or Supabase JWT tokens for browser/API access.
     """
+    # Signal health to Prometheus/Grafana scraper
+    sentinel_backend_up.set(1)
+
     # Collect live FM metrics from Supabase (media wall dashboard)
     try:
         _collect_fm_metrics()

@@ -1,0 +1,92 @@
+# Grafana Alert Rules — SENTINEL Backend Infrastructure
+# Fires when the backend API is unreachable or returning errors
+# Routes to Telegram via sentinel-telegram contact point
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: SENTINEL Backend Health
+    folder: Infrastructure
+    interval: 30s
+    rules:
+      # ── Backend API is down — immediate Telegram alert ──────────────────────
+      - uid: sentinel-backend-down
+        title: "SENTINEL Backend API is DOWN"
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: "sentinel_backend_up == 0"
+              refId: A
+        for: 1m
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "SENTINEL Backend API is unreachable"
+          description: "The backend API has been down for more than 1 minute. Check systemd status and uvicorn logs."
+          action: |
+            1. Check backend: sudo systemctl status sentinel-backend
+            2. View logs: journalctl -u sentinel-backend -n 50 --no-pager
+            3. Restart if needed: sudo systemctl restart sentinel-backend
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/backend-down"
+
+      # ── Backend is up but returning 5xx errors ─────────────────────────────
+      - uid: sentinel-backend-errors
+        title: "SENTINEL Backend API — Elevated Error Rate"
+        condition: B
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: "rate(sentinel_http_requests_total{status_code=~\"5..\"}[5m]) / rate(sentinel_http_requests_total[5m]) > 0.05"
+              refId: A
+        for: 5m
+        noDataState: OK
+        execErrState: Alerting
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "SENTINEL Backend error rate > 5%"
+          description: "Backend is up but >5% of requests are returning 5xx errors. Check application logs."
+          action: "Check backend logs: journalctl -u sentinel-backend -n 100 --no-pager | grep ERROR"
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/backend-errors"
+
+      # ── Metrics staleness — backend not responding ───────────────────────────
+      - uid: sentinel-backend-stale
+        title: "SENTINEL Metrics Stale — Backend Unreachable"
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 180
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: "(time() - sentinel_metrics_last_updated_timestamp{job=\"sentinel-governance\"}) > 120"
+              refId: A
+        for: 2m
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "SENTINEL metrics have stopped updating"
+          description: "No metrics updates for more than 2 minutes. The backend may be hung or unreachable."
+          action: |
+            1. Check backend process: sudo systemctl status sentinel-backend
+            2. Verify port 9095 is listening: ss -tlnp | grep 9095
+            3. Check Prometheus → backend network path
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/backend-stale"
