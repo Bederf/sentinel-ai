@@ -6,8 +6,9 @@ and stores them in the documents + document_chunks tables for semantic search.
 
 Usage:
     cd backend && source venv/bin/activate
-    python scripts/ingest_system_docs.py
-    python scripts/ingest_system_docs.py --force  # Re-ingest all (deletes existing)
+    python scripts/ingest_system_docs.py                    # Incremental: skip unchanged
+    python scripts/ingest_system_docs.py --force             # Full re-ingest (deletes + re-embeds all)
+    python scripts/ingest_system_docs.py --file=docs/09-security/control-matrix.md  # Single doc
 """
 
 import asyncio
@@ -185,6 +186,10 @@ def content_hash(content: str) -> str:
 async def main():
     """Main ingestion function."""
     force = "--force" in sys.argv
+    single_file = None
+    for arg in sys.argv:
+        if arg.startswith("--file="):
+            single_file = arg[7:]
 
     print("SENTINEL System Documentation RAG Ingestion")
     print("=" * 55)
@@ -200,19 +205,31 @@ async def main():
     print(f"Force re-ingest: {force}")
 
     # Collect all markdown files from docs/
-    md_files = sorted(DOCS_DIR.rglob("*.md"))
-    # Exclude templates directory
-    md_files = [f for f in md_files if "/_templates/" not in str(f)]
+    if single_file:
+        # Target a specific file
+        target = Path(single_file)
+        if not target.is_absolute():
+            target = PROJECT_ROOT / target
+        if target.exists():
+            md_files = [target]
+            print(f"\nTargeting single file: {target}")
+        else:
+            print(f"\nFile not found: {target}")
+            return
+    else:
+        md_files = sorted(DOCS_DIR.rglob("*.md"))
+        # Exclude templates directory
+        md_files = [f for f in md_files if "/_templates/" not in str(f)]
 
-    # Also collect from extra scan directories
-    extra_count = 0
-    for extra_dir in EXTRA_SCAN_DIRS:
-        if extra_dir.exists():
-            extra_files = sorted(extra_dir.rglob("*.md"))
-            md_files.extend(extra_files)
-            extra_count += len(extra_files)
+        # Also collect from extra scan directories
+        extra_count = 0
+        for extra_dir in EXTRA_SCAN_DIRS:
+            if extra_dir.exists():
+                extra_files = sorted(extra_dir.rglob("*.md"))
+                md_files.extend(extra_files)
+                extra_count += len(extra_files)
 
-    print(f"\nFound {len(md_files)} markdown files ({extra_count} from extra scan dirs)")
+        print(f"\nFound {len(md_files)} markdown files ({extra_count} from extra scan dirs)")
 
     if force:
         print("\n[FORCE] Deleting existing system documentation entries...")
@@ -265,65 +282,93 @@ async def main():
         keywords = extract_keywords(content, frontmatter)
         _file_hash = content_hash(content)
 
-        # Check if document already exists
+        # Check if document already exists — incremental update logic
+        do_insert = True
+        doc_id = None
         if not force:
             try:
-                existing = client.table("documents").select("id, summary").eq("code", code).execute()
+                existing = client.table("documents").select("id, full_text").eq("code", code).execute()
                 if existing.data:
-                    # Check if content changed (use summary as proxy for simple hash)
-                    print(f"  SKIP (exists): {relative}")
-                    skipped += 1
-                    continue
+                    existing_text = existing.data[0].get("full_text", "")
+                    if existing_text == text_content:
+                        print(f"  SKIP (unchanged): {relative}")
+                        skipped += 1
+                        continue
+                    else:
+                        # Content changed — update existing record and re-embed
+                        doc_id = existing.data[0]["id"]
+                        client.table("documents").update(
+                            {
+                                "title": title,
+                                "document_type": document_type,
+                                "equipment_type": equipment_type,
+                                "full_text": text_content,
+                                "summary": summary,
+                                "keywords": keywords,
+                                "indexing_status": "pending",
+                            }
+                        ).eq("id", doc_id).execute()
+                        client.table("document_chunks").delete().eq("document_id", doc_id).execute()
+                        print(f"  UPDATE: {relative} (content changed)")
+                        added += 1
+                        do_insert = False
             except Exception:
-                pass
+                do_insert = True
 
-        # Add document with retry logic
-        max_retries = 3
-        for attempt in range(max_retries):
+        # Insert new document if not found
+        if do_insert:
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    doc_data = {
+                        "code": code,
+                        "title": title,
+                        "document_type": document_type,
+                        "equipment_type": equipment_type,
+                        "full_text": text_content,
+                        "source": "system_docs",
+                        "summary": summary,
+                        "keywords": keywords,
+                        "indexing_status": "pending",
+                    }
+
+                    result = client.table("documents").insert(doc_data).execute()
+                    if result.data:
+                        doc_id = result.data[0]["id"]
+                    else:
+                        print(f"  ERROR (no data): {relative}")
+                        errors += 1
+                        continue
+                    break  # Success, exit retry loop
+
+                except Exception as e:
+                    error_msg = str(e)
+                    if "duplicate key" in error_msg:
+                        print(f"  SKIP (duplicate): {relative}")
+                        skipped += 1
+                        break
+                    elif attempt < max_retries - 1:
+                        wait = (attempt + 1) * 2
+                        print(f"  RETRY ({attempt + 1}/{max_retries}): {relative} — waiting {wait}s...")
+                        time.sleep(wait)
+                    else:
+                        print(f"  ERROR: {relative}: {error_msg[:100]}")
+                        errors += 1
+                        continue
+
+        # Chunk and embed — runs for both new inserts and content updates
+        if doc_id:
             try:
-                doc_data = {
-                    "code": code,
-                    "title": title,
-                    "document_type": document_type,
-                    "equipment_type": equipment_type,
-                    "full_text": text_content,
-                    "source": "system_docs",
-                    "summary": summary,
-                    "keywords": keywords,
-                    "indexing_status": "pending",
-                }
-
-                result = client.table("documents").insert(doc_data).execute()
-                if result.data:
-                    doc_id = result.data[0]["id"]
-
-                    # Chunk and embed with section-aware markdown chunking
-                    # + context-enhanced embeddings (title/heading/type prepended)
-                    chunk_count = vector_db.chunk_and_embed_markdown(
-                        doc_id,
-                        doc_title=title,
-                        doc_type=document_type,
-                    )
+                chunk_count = vector_db.chunk_and_embed_markdown(
+                    doc_id,
+                    doc_title=title,
+                    doc_type=document_type,
+                )
+                if do_insert:
                     print(f"  ADD: {relative} ({chunk_count} chunks, type={document_type})")
-                    added += 1
-                else:
-                    print(f"  ERROR (no data): {relative}")
-                    errors += 1
-                break  # Success, exit retry loop
-
             except Exception as e:
-                error_msg = str(e)
-                if "duplicate key" in error_msg:
-                    print(f"  SKIP (duplicate): {relative}")
-                    skipped += 1
-                    break
-                elif attempt < max_retries - 1:
-                    wait = (attempt + 1) * 2
-                    print(f"  RETRY ({attempt + 1}/{max_retries}): {relative} — waiting {wait}s...")
-                    time.sleep(wait)
-                else:
-                    print(f"  ERROR: {relative}: {error_msg[:100]}")
-                    errors += 1
+                print(f"  ERROR (chunking): {relative}: {e}")
+                errors += 1
 
         # Throttle to avoid overwhelming Supabase connection pool
         if (i + 1) % 5 == 0:

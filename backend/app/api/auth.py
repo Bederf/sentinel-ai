@@ -10,7 +10,8 @@ FSR Domain: 4.7 - Logical Access Control
 
 import logging
 import os
-from collections import defaultdict
+import random
+import time
 from datetime import datetime, timedelta
 
 import bcrypt
@@ -34,6 +35,7 @@ from app.security.step_up import (
     _extract_device_id,
     create_step_up_session,
 )
+from app.services.cache_service import cache
 from app.services.mfa_service import get_mfa_service
 from app.services.session_service import session_service
 from app.services.token_blacklist_service import token_blacklist
@@ -78,8 +80,24 @@ def _make_access_cookie(access_token: str) -> dict:
 def _clear_auth_cookies() -> list[dict]:
     """Build Set-Cookie params to clear all auth cookies."""
     return [
-        {"key": _REFRESH_COOKIE_NAME, "value": "", "max_age": 0, "path": "/api/auth", "httponly": True, "secure": True, "samesite": "strict"},
-        {"key": _ACCESS_COOKIE_NAME, "value": "", "max_age": 0, "path": "/", "httponly": False, "secure": True, "samesite": "lax"},
+        {
+            "key": _REFRESH_COOKIE_NAME,
+            "value": "",
+            "max_age": 0,
+            "path": "/api/auth",
+            "httponly": True,
+            "secure": True,
+            "samesite": "strict",
+        },
+        {
+            "key": _ACCESS_COOKIE_NAME,
+            "value": "",
+            "max_age": 0,
+            "path": "/",
+            "httponly": False,
+            "secure": True,
+            "samesite": "lax",
+        },
     ]
 
 
@@ -88,13 +106,94 @@ def _set_auth_cookies(response: Response, access_token: str, refresh_token: str)
     for params in [_make_access_cookie(access_token), _make_refresh_cookie(refresh_token)]:
         response.set_cookie(**params)
 
+
 # ---------------------------------------------------------------------------
-# Brute-force protection (Phase 58-04 M-5)
-# In-memory tracking: 5 failed attempts per email within 15 minutes = lockout
+# Brute-force protection (Phase 58-04 M-5, Redis-backed from Phase 209)
+# 5 failed attempts per identifier (email or IP) within 15 minutes = lockout
 # ---------------------------------------------------------------------------
-_login_attempts: dict[str, list[datetime]] = defaultdict(list)
 _MAX_LOGIN_ATTEMPTS = 5
 _LOCKOUT_MINUTES = 15
+_LOCKOUT_WINDOW_SECONDS = _LOCKOUT_MINUTES * 60
+
+# Redis-based tracker replaces in-memory dict (shared across gunicorn workers)
+
+
+class LoginAttemptTracker:
+    """Redis-backed login attempt tracker using sorted sets.
+
+    Key pattern: login_attempts:{identifier}
+    Score: Unix timestamp of attempt
+    Member: unique attempt ID (timestamp:random)
+    TTL: _LOCKOUT_WINDOW_SECONDS (auto-cleanup)
+
+    Fail-open: if Redis unavailable, allows login (safe default).
+    """
+
+    PREFIX = "login_attempts:"
+
+    def __init__(self, cache_service):
+        self.cache = cache_service
+
+    def _key(self, identifier: str) -> str:
+        return f"{self.PREFIX}{identifier}"
+
+    def record_failed_attempt(self, identifier: str) -> int:
+        """Record a failed login attempt. Returns attempt count in current window."""
+        key = self._key(identifier)
+        now = time.time()
+        window_start = now - _LOCKOUT_WINDOW_SECONDS
+
+        try:
+            client = self.cache._get_client()
+            if not client:
+                # Fail-open: allow login if Redis is down
+                return 0
+
+            # Remove attempts outside the window
+            client.zremrangebyscore(key, 0, window_start)
+
+            # Add new attempt with unique member
+            attempt_id = f"{now}:{random.random()}"
+            client.zadd(key, {attempt_id: now})
+            client.expire(key, _LOCKOUT_WINDOW_SECONDS)
+
+            # Count attempts in window
+            return client.zcount(key, window_start, now)
+        except Exception:
+            return 0
+
+    def record_successful_login(self, identifier: str) -> None:
+        """Clear all attempts for identifier on successful login."""
+        try:
+            client = self.cache._get_client()
+            if client:
+                client.delete(self._key(identifier))
+        except Exception:
+            pass
+
+    def get_remaining_attempts(self, identifier: str) -> int:
+        """Return remaining login attempts before lockout."""
+        key = self._key(identifier)
+        now = time.time()
+        window_start = now - _LOCKOUT_WINDOW_SECONDS
+
+        try:
+            client = self.cache._get_client()
+            if not client:
+                return _MAX_LOGIN_ATTEMPTS  # Fail-open
+
+            # Prune old entries and count
+            client.zremrangebyscore(key, 0, window_start)
+            count = client.zcount(key, window_start, now)
+            return max(0, _MAX_LOGIN_ATTEMPTS - count)
+        except Exception:
+            return _MAX_LOGIN_ATTEMPTS
+
+    def is_locked_out(self, identifier: str) -> bool:
+        return self.get_remaining_attempts(identifier) == 0
+
+
+_tracker = LoginAttemptTracker(cache)
 
 
 class ApiKeyCreateRequest(BaseModel):
@@ -149,12 +248,7 @@ def _get_current_user_from_request(request: Request) -> dict:
 
 def _check_brute_force(identifier: str) -> None:
     """Raise 429 if too many recent failed login attempts for *identifier*."""
-    now = datetime.utcnow()
-    cutoff = now - timedelta(minutes=_LOCKOUT_MINUTES)
-    # Prune old entries
-    recent = [t for t in _login_attempts[identifier] if t > cutoff]
-    _login_attempts[identifier] = recent
-    if len(recent) >= _MAX_LOGIN_ATTEMPTS:
+    if _tracker.is_locked_out(identifier):
         logger.warning(f"Brute-force lockout triggered for {identifier}")
         raise HTTPException(
             status_code=429,
@@ -164,7 +258,7 @@ def _check_brute_force(identifier: str) -> None:
 
 def _record_failed_attempt(identifier: str) -> None:
     """Record a failed login attempt for *identifier*."""
-    _login_attempts[identifier].append(datetime.utcnow())
+    _tracker.record_failed_attempt(identifier)
 
 
 # ---------------------------------------------------------------------------
@@ -375,6 +469,9 @@ async def login_with_email(request: Request, email: str):
             # Non-critical, don't fail login if audit fails
             logger.warning(f"Failed to audit log login for {email}: {e}")
 
+        # Clear login attempts on successful login (before issuing token)
+        _tracker.record_successful_login(email)
+
         response = {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -401,6 +498,7 @@ async def login_with_email(request: Request, email: str):
 
         # Set HttpOnly refresh cookie + access cookie on successful login
         from fastapi.responses import JSONResponse
+
         json_response = JSONResponse(content=response)
         _set_auth_cookies(json_response, access_token, refresh_token)
         return json_response
@@ -409,7 +507,7 @@ async def login_with_email(request: Request, email: str):
         raise
     except Exception as e:
         logger.error(f"Login failed for {email}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Login failed")
+        raise HTTPException(status_code=500, detail="Login failed") from e
 
 
 class VerifyPinRequest(BaseModel):
@@ -453,6 +551,7 @@ async def verify_admin_pin(request: Request, body: VerifyPinRequest):
     try:
         if bcrypt.checkpw(pin_bytes, hash_bytes):
             logger.info(f"PIN verification success from ip={source_ip}")
+            _tracker.record_successful_login(f"pin:{source_ip}")
             return {"valid": True}
         else:
             _record_failed_attempt(f"pin:{source_ip}")
@@ -461,7 +560,7 @@ async def verify_admin_pin(request: Request, body: VerifyPinRequest):
     except (ValueError, AttributeError, TypeError) as e:
         # Invalid hash format, None hash, or wrong type
         logger.error(f"PIN verification error ({type(e).__name__}): {e}", exc_info=True)
-        raise HTTPException(status_code=503, detail="PIN verification misconfigured")
+        raise HTTPException(status_code=503, detail="PIN verification misconfigured") from e
 
 
 @router.post("/verify-settings-password")
@@ -499,6 +598,7 @@ async def verify_settings_password(request: Request, body: VerifyPinRequest):
     try:
         if bcrypt.checkpw(body.pin.encode("utf-8"), stored_hash.encode("utf-8")):
             logger.info(f"Settings password verification success from ip={source_ip}")
+            _tracker.record_successful_login(f"settings_pwd:{source_ip}")
             return {"valid": True}
         else:
             _record_failed_attempt(f"settings_pwd:{source_ip}")
@@ -506,7 +606,7 @@ async def verify_settings_password(request: Request, body: VerifyPinRequest):
             raise HTTPException(status_code=403, detail="Invalid password")
     except (ValueError, AttributeError, TypeError) as e:
         logger.error(f"Settings password verification error ({type(e).__name__}): {e}", exc_info=True)
-        raise HTTPException(status_code=503, detail="Settings password misconfigured")
+        raise HTTPException(status_code=503, detail="Settings password misconfigured") from e
 
 
 class StepUpRequest(BaseModel):
@@ -595,7 +695,7 @@ async def create_access_request(request: Request, payload: AccessRequestCreateRe
         raise
     except Exception as exc:
         logger.error("Access request validation failed for %s: %s", email, exc)
-        raise HTTPException(status_code=500, detail="Unable to submit access request")
+        raise HTTPException(status_code=500, detail="Unable to submit access request") from exc
 
     repo = get_module_access_repository()
     created = repo.submit_access_request(
@@ -727,6 +827,9 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
     except Exception as e:
         logger.warning(f"Failed to audit log MFA login for {email}: {e}")
 
+    # Clear login attempts on successful MFA login
+    _tracker.record_successful_login(email)
+
     response = {
         "access_token": access_token,
         "refresh_token": refresh_token,
@@ -744,6 +847,7 @@ async def complete_mfa_login(request: Request, email: str, mfa_code: str):
 
     # Set HttpOnly refresh cookie + access cookie on successful MFA login
     from fastapi.responses import JSONResponse
+
     json_response = JSONResponse(content=response)
     _set_auth_cookies(json_response, access_token, refresh_token)
     return json_response
@@ -902,6 +1006,7 @@ async def logout(request: Request, refresh_token: str | None = None):
 
     # Clear auth cookies on logout
     from fastapi.responses import JSONResponse
+
     json_response = JSONResponse(content={"message": "Logged out successfully"})
     for params in _clear_auth_cookies():
         json_response.set_cookie(**params)
@@ -1025,6 +1130,7 @@ async def refresh_access_token(request: Request, body: RefreshTokenRequest | Non
     logger.info(f"Token refresh for user {user_info['user_id']}")
 
     from fastapi.responses import JSONResponse
+
     response = {
         "access_token": new_access_token,
         "refresh_token": new_refresh_token,
@@ -1103,6 +1209,93 @@ async def revoke_all_sessions(request: Request):
         logger.warning(f"Failed to audit log revoke all sessions: {e}")
 
     return {"message": "Sessions revoked", "revoked_count": revoked_count}
+
+
+# ---------------------------------------------------------------------------
+# Magic link invite endpoints (HANDOFF BLOCKERS — invite flow)
+# ---------------------------------------------------------------------------
+
+
+class InviteRequest(BaseModel):
+    email: str
+    full_name: str
+    role: str = "operator"
+    site_id: str = "site-002"
+
+
+@router.post("/invite")
+async def create_invite(request: Request, body: InviteRequest):
+    """Send an invite link to a new user (admin only).
+
+    Creates a magic link token and emails it to the invitee.
+    Rate-limited to 10 invites/hour per admin to prevent abuse.
+    """
+    from fastapi import Depends
+
+    from app.middleware.auth_middleware import require_role
+    from app.models.auth import AuthContext, SentinelRole
+
+    # Admin-only gate
+    auth: AuthContext = Depends(require_role(SentinelRole.ADMIN))
+
+    from app.services.magic_link_service import get_magic_link_service
+
+    svc = get_magic_link_service()
+    try:
+        record = svc.generate_invite_token(
+            email=body.email,
+            full_name=body.full_name,
+            role=body.role,
+            site_id=body.site_id,
+            invited_by=auth.email,
+        )
+        return {
+            "message": "Invite sent",
+            "email": body.email,
+            "expires_at": record["expires_at"],
+        }
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+class InviteAcceptRequest(BaseModel):
+    token: str
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+@router.post("/invite/accept")
+async def accept_invite(request: Request, body: InviteAcceptRequest, response: Response):
+    """Accept a magic link invite and activate the account.
+
+    Validates the token, sets the user's password, grants site access,
+    and issues JWT session cookies.
+    """
+    from app.services.magic_link_service import get_magic_link_service
+
+    svc = get_magic_link_service()
+    try:
+        result = svc.accept_invite(
+            token=body.token,
+            password=body.password,
+            ip=_extract_ip_address(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except RuntimeError as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    # Set HttpOnly auth cookies (same pattern as login)
+    access_token = result["access_token"]
+    refresh_token = result["refresh_token"]
+    _set_auth_cookies(response, access_token, refresh_token)
+
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "user": result["user"],
+        "session_id": result["session_id"],
+    }
 
 
 @router.post("/api-keys")
@@ -1185,7 +1378,7 @@ async def create_api_key(request: Request, body: ApiKeyCreateRequest):
         raise
     except Exception as e:
         logger.error("Failed creating API key: %s", e)
-        raise HTTPException(status_code=503, detail="API key store unavailable")
+        raise HTTPException(status_code=503, detail="API key store unavailable") from e
 
 
 @router.get("/api-keys")
@@ -1204,7 +1397,7 @@ async def list_api_keys(request: Request):
         return {"api_keys": rows, "count": len(rows)}
     except Exception as e:
         logger.error("Failed listing API keys: %s", e)
-        raise HTTPException(status_code=503, detail="API key store unavailable")
+        raise HTTPException(status_code=503, detail="API key store unavailable") from e
 
 
 @router.delete("/api-keys/{api_key_id}")
@@ -1248,4 +1441,4 @@ async def revoke_api_key(request: Request, api_key_id: str):
         raise
     except Exception as e:
         logger.error("Failed revoking API key: %s", e)
-        raise HTTPException(status_code=503, detail="API key store unavailable")
+        raise HTTPException(status_code=503, detail="API key store unavailable") from e

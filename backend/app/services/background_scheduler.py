@@ -577,6 +577,7 @@ class BackgroundSchedulerService:
                                     "recommended_value": rec_dict.get("recommended_value"),
                                     "unit": rec_dict.get("unit", ""),
                                     "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+                                    "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
                                 },
                                 confidence="0.7",
                                 confidence_score=0.7,
@@ -771,6 +772,7 @@ class BackgroundSchedulerService:
                                 "recommended_value": action_value,
                                 "unit": unit_value,
                                 "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+                                "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
                             },
                             confidence=str(confidence_num),
                             confidence_score=confidence_num,
@@ -826,8 +828,8 @@ class BackgroundSchedulerService:
                                 if self._is_sendable_ai_recommendation(rec):
                                     from app.config.settings import settings as _app_settings
                                     from app.models.module_registry import ModuleType
-                                    from app.services.notification_service import NotificationService
                                     from app.services.module_registry_service import module_registry
+                                    from app.services.notification_service import NotificationService
 
                                     _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
                                         _app_settings, "sentry_fm_chat_id", None
@@ -1973,9 +1975,9 @@ class BackgroundSchedulerService:
             recd = adj.get("recommended_value", "")
             unit = adj.get("unit", "")
             if curr:
-                adj_lines.append(f"\u2022 `{equip}`: {point} {curr}{unit} -> {recd}{unit}")
+                adj_lines.append(f"\u2022 {equip}: {point} {curr}{unit} -> {recd}{unit}")
             else:
-                adj_lines.append(f"\u2022 `{equip}`: Set {point} to {recd}{unit}")
+                adj_lines.append(f"\u2022 {equip}: Set {point} to {recd}{unit}")
         if len(adjustments) > 5:
             adj_lines.append(f"\u2022 ...and {len(adjustments) - 5} more zones")
 
@@ -2049,6 +2051,32 @@ class BackgroundSchedulerService:
             misfire_grace_time=3600,
         )
         logger.info("daily_health_sweep job registered — 06:00 UTC (08:00 SAST) Mon-Fri")
+
+    def add_rag_doc_sync_job(self, interval_hours: int = 12):
+        """
+        Add a job to incrementally sync changed system docs to the RAG vector store.
+
+        Phase 209: Keeps RAG docs up-to-date by detecting content changes and
+        re-embedding only modified documents. Runs every 12 hours (configurable).
+        Uses the same incremental logic as ingest_system_docs.py -- watches for
+        content changes, updates existing records and re-embeds, skips unchanged.
+
+        Args:
+            interval_hours: How often to run the sync (default: 12 hours)
+        """
+        if self.scheduler.get_job("rag_doc_sync"):
+            self.scheduler.remove_job("rag_doc_sync")
+
+        self.scheduler.add_job(
+            func=_run_rag_doc_sync,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id="rag_doc_sync",
+            name="RAG Documentation Sync",
+            replace_existing=True,
+            misfire_grace_time=3600,
+            max_instances=1,
+        )
+        logger.info(f"rag_doc_sync job registered — every {interval_hours}h")
 
     def add_demand_aware_coordination_job(self, interval_seconds: int = 300):
         """
@@ -5080,6 +5108,158 @@ class BackgroundSchedulerService:
         )
         logger.info("rooms_email_intake_poll job registered — interval=%s min", interval_minutes)
 
+    # -----------------------------------------------------------------
+    # BACnet Discovery Polling — detect equipment changes on site-002
+    # -----------------------------------------------------------------
+
+    def add_bacnet_discovery_polling_job(self, interval_seconds: int = 21600, site_id: str = "site-002"):
+        """Add a job to periodically discover BACnet devices and detect equipment changes.
+
+        Polls the bridge at 10.99.0.1:8080 for the BACnet object catalog, then
+        compares discovered equipment against known records in the database.
+        New devices, missing devices, and metadata changes are logged and tracked.
+
+        Args:
+            interval_seconds: How often to scan (default: 21600 = 6 hours)
+            site_id: Site to scan (default: site-002)
+        """
+        job_id = "bacnet_discovery_polling"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing BACnet discovery polling job")
+
+        first_run = datetime.now() + timedelta(minutes=15)  # give system time to settle
+
+        self.scheduler.add_job(
+            func=self._run_bacnet_discovery,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name=f"BACnet Discovery Polling ({site_id})",
+            args=[site_id],
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(
+            "Added BACnet discovery polling job for %s: every %ds (first run at %s)",
+            site_id,
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    def _run_bacnet_discovery(self, site_id: str = "site-002"):
+        """Query the bridge for BACnet objects and detect equipment changes.
+
+        Fetches the full BACnet object catalog from the bridge at 10.99.0.1:8080,
+        extracts equipment IDs, and compares against known equipment in the DB.
+        Logs new, missing, or changed equipment.
+        """
+        try:
+            import asyncio
+            import os
+
+            import httpx
+
+            token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+            if not token:
+                logger.warning("[BACNET-DISCOVERY] No bridge token configured — skipping")
+                return
+
+            base_url = "http://10.99.0.1:8080"
+            headers = {"Authorization": f"Bearer {token}"}
+
+            async def _fetch_objects() -> list[dict]:
+                async with httpx.AsyncClient(timeout=30.0) as client:
+                    resp = await client.get(
+                        f"{base_url}/api/sites/{site_id}/objects",
+                        headers=headers,
+                        params={"limit": 2000},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    return data.get("objects", [])
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                objects = loop.run_until_complete(_fetch_objects())
+            finally:
+                loop.close()
+
+            if not objects:
+                logger.info("[BACNET-DISCOVERY] No BACnet objects returned from bridge for %s", site_id)
+                return
+
+            bridge_equipment_ids: set[str] = set()
+            object_by_equipment: dict[str, list[dict]] = {}
+            for obj in objects:
+                eq_id = (obj.get("equipment_id") or "").strip()
+                if eq_id:
+                    bridge_equipment_ids.add(eq_id)
+                    object_by_equipment.setdefault(eq_id, []).append(obj)
+
+            logger.info(
+                "[BACNET-DISCOVERY] Bridge reports %d BACnet objects across %d equipment for %s",
+                len(objects),
+                len(bridge_equipment_ids),
+                site_id,
+            )
+
+            known_codes: set[str] = set()
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb = get_supabase_client()
+                site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+                if not site_resp.data:
+                    logger.warning("[BACNET-DISCOVERY] Site %s not found in database", site_id)
+                    return
+                site_uuid = site_resp.data[0]["id"]
+                resp = sb.table("equipment").select("code").eq("site_id", site_uuid).execute()
+                known_codes = {row["code"] for row in (resp.data or [])}
+            except Exception as db_err:
+                logger.warning("[BACNET-DISCOVERY] DB query failed: %s", db_err)
+
+            new_equipment = bridge_equipment_ids - known_codes
+            missing_equipment = known_codes - bridge_equipment_ids
+
+            if new_equipment:
+                logger.warning(
+                    "[BACNET-DISCOVERY] NEW equipment detected on %s (%d): %s",
+                    site_id,
+                    len(new_equipment),
+                    sorted(new_equipment)[:20],
+                )
+            if missing_equipment:
+                logger.warning(
+                    "[BACNET-DISCOVERY] MISSING equipment on %s (%d): %s",
+                    site_id,
+                    len(missing_equipment),
+                    sorted(missing_equipment)[:20],
+                )
+
+            if not new_equipment and not missing_equipment:
+                logger.info(
+                    "[BACNET-DISCOVERY] No equipment changes detected for %s",
+                    site_id,
+                )
+
+            logger.info(
+                "[BACNET-DISCOVERY] Summary for %s: %d total, %d new, %d missing",
+                site_id,
+                len(bridge_equipment_ids),
+                len(new_equipment),
+                len(missing_equipment),
+            )
+
+        except httpx.ConnectError:
+            logger.warning("[BACNET-DISCOVERY] Bridge unreachable for %s — will retry next cycle", site_id)
+        except httpx.TimeoutException:
+            logger.warning("[BACNET-DISCOVERY] Bridge timed out for %s — will retry next cycle", site_id)
+        except Exception as e:
+            logger.error("[BACNET-DISCOVERY] Failed for %s: %s", site_id, e, exc_info=True)
+
 
 # Sync wrapper — APScheduler passes sync functions to job executors
 def _run_compiler_worker_sync():
@@ -5230,87 +5410,243 @@ def _run_daily_health_sweep_sync():
         loop.close()
 
 
+def _run_rag_doc_sync():
+    """Incrementally sync changed system docs to the RAG vector store.
+
+    Compares each doc's current content against the stored full_text in Supabase.
+    Only re-embeds documents where content has actually changed. Skips the rest.
+
+    Runs as a background APScheduler job every 12 hours (or as configured).
+    """
+    import subprocess
+    import sys
+
+    logger.info("[RAG-SYNC] Documentation sync job triggered")
+
+    try:
+        # Run the ingest script in incremental mode (no --force, no --file)
+        # The script itself handles change detection via full_text comparison
+        result = subprocess.run(
+            [
+                sys.executable,
+                "/opt/bms-intelligence/backend/scripts/ingest_system_docs.py",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 minute max
+        )
+        if result.returncode == 0:
+            logger.info("[RAG-SYNC] Documentation sync completed successfully")
+        else:
+            logger.warning("[RAG-SYNC] Documentation sync completed with errors: %s", result.stderr)
+    except Exception as e:
+        logger.error("[RAG-SYNC] Documentation sync failed: %s", e)
+
+
 def _run_recommendation_digest_sync(site_id: str = "site-002"):
-    """Sync wrapper for recommendation digest — sends Telegram morning digest."""
+    """Send morning building digest to FM Telegram — health, alerts, work orders, AI recommendations."""
     import asyncio
     import logging
 
     from app.services.recommendation_service import get_recommendation_service
 
     logger = logging.getLogger(__name__)
+
+    BUILDING_NAMES = {
+        "site-001": "Rosebank Towers",
+        "site-002": "Sandton City Office Tower",
+        "site-003": "Centurion Mall",
+        "site-004": "V&A Waterfront Retail",
+        "site-005": "Gateway Theatre of Shopping",
+        "site-006": "Mediclinic Sandton",
+        "site-007": "Mediclinic Constantiaberg",
+        "site-008": "Standard Bank Centre",
+        "site-009": "Standard Bank Rosebank",
+        "site-010": "Standard Bank Durban Regional",
+    }
+
     try:
 
         async def _send():
-            svc = get_recommendation_service()
-            pending = await svc.get_pending_recommendations(site_id, limit=20)
-            if not pending:
-                return
-
+            from app.config.settings import settings
             from app.services.telegram_message_sender import get_telegram_sender
 
             sender = get_telegram_sender()
-            from app.config.settings import settings
-
             chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
             if not chat_id:
                 return
 
-            ADVISORY_TYPES = {"ai_optimization"}
-            ai_recs = [r for r in pending if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES]
-            if not ai_recs:
-                header = (
-                    f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest \u2014 {site_id.upper()}*\n"
-                    "No AI optimization recommendations pending.\n"
-                    "Building status: Optimal\n"
-                    "Next AI-OPT cycle: 09:00 SAST"
-                )
-                await sender.send_text(str(chat_id), header, parse_mode="HTML")
-                return
+            # --- 1. Equipment health from Supabase ---
+            critical_assets = []
+            warning_assets = []
+            healthy_count = 0
+            total_assets = 0
+            try:
+                from app.database.supabase_client import get_supabase_client
 
-            header = (
-                f"\xf0\x9f\x93\x9b *SENTINEL Morning Digest \u2014 {site_id.upper()}*\n"
-                f"{len(ai_recs)} AI recommendations pending approval:\n"
+                sb = get_supabase_client()
+                resp = (
+                    sb.table("equipment")
+                    .select("code,name,type,health_score,location,status,manufacturer")
+                    .eq("site_id", site_id)
+                    .execute()
+                )
+                if resp.data:
+                    total_assets = len(resp.data)
+                    for eq in resp.data:
+                        hs = eq.get("health_score") or 100
+                        if hs < 70:
+                            critical_assets.append(eq)
+                        elif hs < 90:
+                            warning_assets.append(eq)
+                        else:
+                            healthy_count += 1
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch equipment health: {e}")
+
+            # --- 2. Active alerts ---
+            alert_count = 0
+            critical_alerts = []
+            try:
+                from app.database.repositories.alert_repository import AlertRepository
+
+                alert_repo = AlertRepository()
+                alerts = await alert_repo.get_all(status="active")
+                if alerts and alerts.data:
+                    alert_count = len(alerts.data)
+                    critical_alerts = [
+                        a for a in alerts.data if str(getattr(a, "severity", "") or "").lower() in ("critical", "high")
+                    ][:5]
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch active alerts: {e}")
+
+            # --- 3. Open work orders ---
+            open_wo_count = 0
+            try:
+                from app.services.csv_loader import WorkOrderData
+
+                all_wo = WorkOrderData.load()
+                open_wo_count = sum(
+                    1 for wo in all_wo if str(wo.get("status", "")).lower() in ("open", "scheduled", "in_progress")
+                )
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch work orders: {e}")
+
+            # --- 4. Pending AI recommendations ---
+            ai_recs = []
+            try:
+                svc = get_recommendation_service()
+                pending = await svc.get_pending_recommendations(site_id, limit=20)
+                ADVISORY_TYPES = {"ai_optimization"}
+                ai_recs = [r for r in pending if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES]
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch recommendations: {e}")
+
+            # --- 5. ROI savings (verified vs estimated) ---
+            verified_savings = 0
+            estimated_savings = 0
+            verified_count = 0
+            try:
+                from app.mcp.openai_connector_server import get_openai_connector_server
+
+                server = get_openai_connector_server()
+                roi = await server.get_roi_summary(site_id, "all")
+                verified_savings = roi.get("verified_savings_zar") or 0
+                estimated_savings = roi.get("estimated_savings_zar") or 0
+                verified_count = roi.get("verified_count") or 0
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch ROI summary: {e}")
+
+            # --- Build digest ---
+            site_name = BUILDING_NAMES.get(site_id, site_id.upper())
+            lines = []
+
+            lines.append(f"\U0001f4cb *SENTINEL Morning Digest — {site_name}*")
+            lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M SAST')}")
+            lines.append("")
+
+            # Health section
+            if critical_assets:
+                health_status = "\U0001f534 CRITICAL"
+            elif warning_assets:
+                health_status = "\U0001f7e0 NEEDS ATTENTION"
+            else:
+                health_status = "\U0001f7e2 HEALTHY"
+
+            lines.append(f"\U0001f4ca *Building Health:* {health_status}")
+            lines.append(
+                f"Total: {total_assets} │ "
+                f"Critical: {len(critical_assets)} │ "
+                f"Warning: {len(warning_assets)} │ "
+                f"Healthy: {healthy_count}"
             )
-            await sender.send_text(str(chat_id), header, parse_mode="HTML")
 
-            from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+            if critical_assets:
+                lines.append("\n\U0001f50d *Critical equipment:*")
+                for eq in critical_assets[:5]:
+                    hs = eq.get("health_score", 0)
+                    name = eq.get("name", eq.get("code", "?"))
+                    loc = eq.get("location", "")
+                    loc_str = f" @ {loc}" if loc else ""
+                    lines.append(f"  ● {name} ({hs}%){loc_str}")
+            if warning_assets:
+                lines.append("\n\U0001f7e1 *Warning:*")
+                for eq in warning_assets[:3]:
+                    hs = eq.get("health_score", 0)
+                    name = eq.get("name", eq.get("code", "?"))
+                    lines.append(f"  ○ {name} ({hs}%)")
 
-            for rec in ai_recs[:5]:
-                eq = rec.target_equipment or rec.action_type or "unknown"
-                reason = rec.reason[:70] if rec.reason else ""
-                sev = rec.risk_level.value if hasattr(rec.risk_level, "value") else rec.risk_level or "info"
+            # Alerts section
+            lines.append("")
+            if alert_count > 0:
+                lines.append(f"\U0001f6a8 *Active Alerts:* {alert_count} ({len(critical_alerts)} critical)")
+                for a in critical_alerts[:3]:
+                    msg = getattr(a, "message", "Alert")[:60]
+                    lines.append(f"  [{getattr(a, 'severity', '?').upper()}] {msg}")
+            else:
+                lines.append("\U0001f6a8 *Active Alerts:* 0")
 
-                # Fetch manufacturer/model from Supabase
-                mfr_info = ""
-                try:
-                    from app.database.supabase_client import get_supabase_client
+            # Work orders section
+            lines.append(f"\n\U0001f4dd *Open Work Orders:* {open_wo_count}")
 
-                    sb = get_supabase_client()
-                    if sb and eq.startswith("S002-"):
-                        eq_resp = sb.table("equipment").select("manufacturer, model").eq("code", eq).execute()
-                        if eq_resp.data:
-                            eq_data = eq_resp.data[0]
-                            mfr = eq_data.get("manufacturer")
-                            model = eq_data.get("model")
-                            if mfr and model:
-                                mfr_info = f"{mfr} {model} | "
-                            elif mfr:
-                                mfr_info = f"{mfr} | "
-                except Exception:
-                    pass  # Silently skip if lookup fails
+            # Savings section
+            if verified_savings > 0 or estimated_savings > 0:
+                lines.append(f"\U0001f4b0 *Savings this month:* R{verified_savings:,.0f} verified")
+                if estimated_savings > 0:
+                    lines.append(
+                        f"   + R{estimated_savings:,.0f} estimated ({verified_count} recommendation{'s' if verified_count != 1 else ''} confirmed)"
+                    )
+            else:
+                lines.append("\U0001f4b0 *Savings this month:* No verified savings yet")
 
-                body = f"`{eq}` \u2014 {mfr_info}{reason}\nSeverity: {sev}"
-                rec_id = getattr(rec, "id", "") or ""
-                keyboard = InlineKeyboard(
-                    rows=[
-                        [
-                            InlineButton(label="Accept", callback_data=f"rec:accept:{rec_id}"),
-                            InlineButton(label="Dismiss", callback_data=f"rec:dismiss:{rec_id}"),
-                            InlineButton(label="Open", callback_data=f"rec:open:{rec_id}"),
-                        ],
-                    ]
-                )
-                await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="HTML")
+            # AI recommendations section
+            lines.append("")
+            if ai_recs:
+                lines.append(f"\U0001f4a1 *AI Recommendations:* {len(ai_recs)} pending approval")
+                from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
+                for rec in ai_recs[:5]:
+                    eq = getattr(rec, "target_equipment", "?") or "?"
+                    reason = (getattr(rec, "reason", "") or "")[:65]
+                    sev = getattr(rec.risk_level, "value", None) if hasattr(rec, "risk_level") else None
+                    sev = sev or getattr(rec, "risk_level", "info") or "info"
+                    body = f"`{eq}` — {reason}\nSeverity: {sev}"
+                    rec_id = getattr(rec, "id", "") or ""
+                    keyboard = InlineKeyboard(
+                        rows=[
+                            [
+                                InlineButton(label="Accept", callback_data=f"rec:accept:{rec_id}"),
+                                InlineButton(label="Dismiss", callback_data=f"rec:dismiss:{rec_id}"),
+                                InlineButton(label="Open", callback_data=f"rec:open:{rec_id}"),
+                            ],
+                        ]
+                    )
+                    await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="HTML")
+            else:
+                lines.append("\U0001f4a1 *AI Recommendations:* None pending")
+
+            digest = "\n".join(lines)
+            await sender.send_text(str(chat_id), digest, parse_mode="HTML")
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -5320,169 +5656,6 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             loop.close()
     except Exception as e:
         logger.warning(f"Recommendation digest failed: {e}")
-
-    # -----------------------------------------------------------------
-    # BACnet Discovery Polling — detect equipment changes on site-002
-    # -----------------------------------------------------------------
-
-    def add_bacnet_discovery_polling_job(self, interval_seconds: int = 21600, site_id: str = "site-002"):
-        """Add a job to periodically discover BACnet devices and detect equipment changes.
-
-        Polls the bridge at 10.99.0.1:8080 for the BACnet object catalog, then
-        compares discovered equipment against known records in the database.
-        New devices, missing devices, and metadata changes are logged and tracked.
-
-        Args:
-            interval_seconds: How often to scan (default: 21600 = 6 hours)
-            site_id: Site to scan (default: site-002)
-        """
-        job_id = "bacnet_discovery_polling"
-        if self.scheduler.get_job(job_id):
-            self.scheduler.remove_job(job_id)
-            logger.info("Removed existing BACnet discovery polling job")
-
-        first_run = datetime.now() + timedelta(minutes=15)  # give system time to settle
-
-        self.scheduler.add_job(
-            func=self._run_bacnet_discovery,
-            trigger=IntervalTrigger(seconds=interval_seconds),
-            id=job_id,
-            name=f"BACnet Discovery Polling ({site_id})",
-            args=[site_id],
-            replace_existing=True,
-            next_run_time=first_run,
-            max_instances=1,
-            coalesce=True,
-        )
-        logger.info(
-            "Added BACnet discovery polling job for %s: every %ds (first run at %s)",
-            site_id,
-            interval_seconds,
-            first_run.strftime("%H:%M:%S"),
-        )
-
-    def _run_bacnet_discovery(self, site_id: str = "site-002"):
-        """Query the bridge for BACnet objects and detect equipment changes.
-
-        Fetches the full BACnet object catalog from the bridge at 10.99.0.1:8080,
-        extracts equipment IDs, and compares against known equipment in the DB.
-        Logs new, missing, or changed equipment.
-        """
-        try:
-            import asyncio
-            import os
-
-            import httpx
-
-            token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
-            if not token:
-                logger.warning("[BACNET-DISCOVERY] No bridge token configured — skipping")
-                return
-
-            base_url = "http://10.99.0.1:8080"
-            headers = {"Authorization": f"Bearer {token}"}
-
-            async def _fetch_objects() -> list[dict]:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.get(
-                        f"{base_url}/api/sites/{site_id}/objects",
-                        headers=headers,
-                        params={"limit": 2000},
-                    )
-                    resp.raise_for_status()
-                    data = resp.json()
-                    return data.get("objects", [])
-
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                objects = loop.run_until_complete(_fetch_objects())
-            finally:
-                loop.close()
-
-            if not objects:
-                logger.info("[BACNET-DISCOVERY] No BACnet objects returned from bridge for %s", site_id)
-                return
-
-            # Extract unique equipment IDs from bridge objects
-            bridge_equipment_ids: set[str] = set()
-            object_by_equipment: dict[str, list[dict]] = {}
-            for obj in objects:
-                eq_id = (obj.get("equipment_id") or "").strip()
-                if eq_id:
-                    bridge_equipment_ids.add(eq_id)
-                    object_by_equipment.setdefault(eq_id, []).append(obj)
-
-            logger.info(
-                "[BACNET-DISCOVERY] Bridge reports %d BACnet objects across %d equipment for %s",
-                len(objects),
-                len(bridge_equipment_ids),
-                site_id,
-            )
-
-            # Fetch known equipment from the database
-            known_codes: set[str] = set()
-            try:
-                from app.database.supabase_client import get_supabase_client
-
-                sb = get_supabase_client()
-                # Resolve site UUID from site code (e.g. "site-002" → UUID)
-                site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
-                if not site_resp.data:
-                    logger.warning("[BACNET-DISCOVERY] Site %s not found in database", site_id)
-                    return
-                site_uuid = site_resp.data[0]["id"]
-                resp = sb.table("equipment").select("code").eq("site_id", site_uuid).execute()
-                known_codes = {row["code"] for row in (resp.data or [])}
-            except Exception as db_err:
-                logger.warning("[BACNET-DISCOVERY] DB query failed: %s", db_err)
-
-            # Compare: find new / missing equipment
-            {e.split("-")[0] if "-" in e else e for e in bridge_equipment_ids}
-            {e.split("-")[0] if "-" in e else e for e in known_codes}
-
-            new_equipment = bridge_equipment_ids - known_codes
-            missing_equipment = known_codes - bridge_equipment_ids
-
-            if new_equipment:
-                logger.warning(
-                    "[BACNET-DISCOVERY] NEW equipment detected on %s (%d): %s",
-                    site_id,
-                    len(new_equipment),
-                    sorted(new_equipment)[:20],
-                )
-            if missing_equipment:
-                logger.warning(
-                    "[BACNET-DISCOVERY] MISSING equipment on %s (%d): %s",
-                    site_id,
-                    len(missing_equipment),
-                    sorted(missing_equipment)[:20],
-                )
-
-            if not new_equipment and not missing_equipment:
-                logger.info(
-                    "[BACNET-DISCOVERY] Equipment inventory in sync for %s (%d bridge objects, %d known devices)",
-                    site_id,
-                    len(objects),
-                    len(known_codes),
-                )
-
-            logger.info(
-                "[BACNET-DISCOVERY] Summary for %s: %d objects, %d bridge equipment, %d known, %d new, %d missing",
-                site_id,
-                len(objects),
-                len(bridge_equipment_ids),
-                len(known_codes),
-                len(new_equipment),
-                len(missing_equipment),
-            )
-
-        except httpx.ConnectError:
-            logger.warning("[BACNET-DISCOVERY] Bridge unreachable for %s — will retry next cycle", site_id)
-        except httpx.TimeoutException:
-            logger.warning("[BACNET-DISCOVERY] Bridge timed out for %s — will retry next cycle", site_id)
-        except Exception as e:
-            logger.error("[BACNET-DISCOVERY] Failed for %s: %s", site_id, e, exc_info=True)
 
 
 # Global scheduler instance
