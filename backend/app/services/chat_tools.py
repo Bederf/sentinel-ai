@@ -1,4 +1,3 @@
-
 """Chat tool handlers for Claude AI BMS intelligence.
 
 This module implements the tool functions that Claude can call to:
@@ -13,7 +12,7 @@ This module implements the tool functions that Claude can call to:
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -1412,7 +1411,9 @@ async def _get_zone_equipment_status(zone: dict, site_code: str) -> dict[str, An
 
     equipment_status = {}
     if equip_candidates:
-        resp = client.table("equipment").select("code, type, status, health_score").in_("code", equip_candidates).execute()
+        resp = (
+            client.table("equipment").select("code, type, status, health_score").in_("code", equip_candidates).execute()
+        )
         for e in resp.data or []:
             equipment_status[e["code"]] = e
 
@@ -1421,7 +1422,13 @@ async def _get_zone_equipment_status(zone: dict, site_code: str) -> dict[str, An
         candidate = f"S002-{eq_type}-{zone_code}"
         if candidate not in equipment_status:
             try:
-                eq_resp = client.table("equipment").select("code, type, status, health_score").eq("code", candidate).limit(1).execute()
+                eq_resp = (
+                    client.table("equipment")
+                    .select("code, type, status, health_score")
+                    .eq("code", candidate)
+                    .limit(1)
+                    .execute()
+                )
                 if eq_resp.data:
                     equipment_status[eq_resp.data[0]["code"]] = eq_resp.data[0]
             except Exception:
@@ -3444,34 +3451,6 @@ CHAT_TOOLS = [
         },
     },
     {
-        "name": "close_work_order",
-        "description": (
-            "Close (complete) an existing work order by code. "
-            "WRITE action — restricted to operators and admins. "
-            "Used by the technician /done flow to mark a work order as completed "
-            "and record resolution notes and actual time spent. "
-            "Requires the work order code (e.g. 'WO-2026-0044')."
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "work_order_code": {
-                    "type": "string",
-                    "description": "Work order code (e.g. 'WO-2026-0044')",
-                },
-                "resolution": {
-                    "type": "string",
-                    "description": "Resolution notes — what was done to close the work order",
-                },
-                "actual_duration_hours": {
-                    "type": "number",
-                    "description": "Actual hours spent on the work order",
-                },
-            },
-            "required": ["work_order_code"],
-        },
-    },
-    {
         "name": "approve_recommendation",
         "description": (
             "Approve a pending AI recommendation for execution. "
@@ -4244,9 +4223,7 @@ def _run_single_verification_sync(recommendation_id: str) -> None:
     try:
         loop.run_until_complete(process_single_verification(recommendation_id))
     except Exception as e:
-        logging.getLogger(__name__).warning(
-            f"[OUTCOME] Verification failed for {recommendation_id}: {e}"
-        )
+        logging.getLogger(__name__).warning(f"[OUTCOME] Verification failed for {recommendation_id}: {e}")
     finally:
         loop.close()
 
@@ -4263,7 +4240,6 @@ async def close_work_order_chat(
     to 'completed', stamps completed_at, and records resolution notes.
     """
     try:
-        from datetime import timezone
 
         from app.database.repositories.work_order_repository import get_work_order_repository
 
@@ -4282,7 +4258,7 @@ async def close_work_order_chat(
 
         updates: dict[str, Any] = {
             "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(UTC).isoformat(),
         }
         if resolution:
             updates["resolution"] = resolution
@@ -4324,10 +4300,7 @@ async def close_work_order_chat(
                         replace_existing=True,
                         misfire_grace_time=300,
                     )
-                    logger.info(
-                        f"[WO-CLOSE] Outcome verification scheduled for "
-                        f"{verify_at.strftime('%H:%M:%S SAST')}"
-                    )
+                    logger.info(f"[WO-CLOSE] Outcome verification scheduled for {verify_at.strftime('%H:%M:%S SAST')}")
             except Exception as rec_err:
                 logger.warning("[WO-CLOSE] Failed to update recommendation %s: %s", recommendation_id, rec_err)
 
@@ -4914,7 +4887,7 @@ TOOL_HANDLERS = {
     "process_recommendation": process_recommendation,
     # Write/action tools (role-gated to operator+)
     "adjust_setpoint": adjust_setpoint,
-    "close_work_order": close_work_order_chat,
+    # close_work_order removed — WOs must be closed via the guided inspection checklist (done #WO-XXXX)
     "create_work_order": create_work_order_chat,
     "approve_recommendation": approve_recommendation_chat,
     "reject_recommendation": reject_recommendation_chat,
@@ -5045,7 +5018,13 @@ async def execute_tool(
 
     _t0 = _time.perf_counter()
     _outcome = "success"
-    logger.info("[GATEWAY] tool=%s user=%s tier=%s site=%s", tool_name, user_email or "unknown", tier or "unknown", effective_site_id or "unknown")
+    logger.info(
+        "[GATEWAY] tool=%s user=%s tier=%s site=%s",
+        tool_name,
+        user_email or "unknown",
+        tier or "unknown",
+        effective_site_id or "unknown",
+    )
     try:
         result = await handler(**tool_input)
         if isinstance(result, dict) and "error" in result:

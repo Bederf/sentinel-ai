@@ -678,7 +678,7 @@ class WorkOrderNotifier:
                     return {"success": False, "error": "Failed to create service record"}
                 logger.info(f"Service record {service_record['code']} created for {work_order_data['equipment_name']}")
             else:
-                logger.info(f"Skipping service record — general complaint, no equipment involved")
+                logger.info("Skipping service record — general complaint, no equipment involved")
 
             # Ensure technician email is available (look up if not passed)
             if not work_order_data.get("technician_email"):
@@ -835,37 +835,8 @@ class WorkOrderNotifier:
                 or work_order_data.get("work_order_code")  # sent by bms_desk_wo.py
                 or work_order_data.get("work_order_id", "WO-???")
             )
-            eq_name = work_order_data.get("equipment_name", "?")
             pri = work_order_data.get("criticality", "MEDIUM").upper()
-            service_type = work_order_data.get("service_type", "callout")
             tech_name = work_order_data.get("technician_name", "Technician")
-            desk_id = work_order_data.get("desk_id", "")
-            zone_id = work_order_data.get("zone_id", "")
-            reporter = work_order_data.get("reported_by") or work_order_data.get("reporter_name", "")
-            reporter_contact = work_order_data.get("reporter_phone", "")
-            description = work_order_data.get("problem_description") or work_order_data.get("description", "")
-
-            # Build location line
-            location_parts = []
-            if zone_id:
-                location_parts.append(f"📍 Zone: {zone_id}")
-            if desk_id:
-                location_parts.append(f"🪑 Desk: {desk_id}")
-            location_line = "\n".join(location_parts)
-            location_part = (location_line + "\n") if location_parts else ""
-
-            # Build reporter info
-            reporter_parts = []
-            if reporter:
-                reporter_parts.append(f"👤 Reported by: {reporter}")
-            if reporter_contact:
-                reporter_parts.append(f"📞 {reporter_contact}")
-            reporter_part = "\n".join(reporter_parts)
-            reporter_section = (reporter_part + "\n") if reporter_parts else ""
-
-            # Build issue snippet
-            issue_snippet = (f"💬 {description[:150]}{'...' if len(description) > 150 else ''}\n") if description else ""
-
             equipment_code = work_order_data.get("equipment_code", "")
             code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
             eq_cmds = f"/info-{code_dashed} - Equipment details\n" if code_dashed else ""
@@ -883,21 +854,18 @@ class WorkOrderNotifier:
 
             # Build inline buttons for the technician
             import json
+
             info_value = f"/info-{code_dashed}" if code_dashed else ""
             note_value = f"/note-{code_dashed}" if code_dashed else ""
             done_value = f"done #{wo_ref}"
-            presentation = {
-                "blocks": [
-                    {"type": "text", "text": msg},
-                    {"type": "buttons", "buttons": []},
-                ]
-            }
-            buttons = presentation["blocks"][1]["buttons"]
+            # Buttons as separate rows attached to the message
+            btn_rows = []
             if info_value:
-                buttons.append({"label": "📋 Info", "value": info_value, "style": "primary"})
+                btn_rows.append([{"label": "📋 Info", "value": info_value, "style": "primary"}])
             if note_value:
-                buttons.append({"label": "📝 Notes", "value": note_value, "style": "primary"})
-            buttons.append({"label": "✅ Done", "value": done_value, "style": "success"})
+                btn_rows.append([{"label": "📝 Notes", "value": note_value, "style": "primary"}])
+            btn_rows.append([{"label": "✅ Done", "value": done_value, "style": "success"}])
+            presentation = {"blocks": [{"type": "buttons", "buttons": row} for row in btn_rows]}
 
             cli = get_sentry_bot_cli()
             result = await asyncio.to_thread(
