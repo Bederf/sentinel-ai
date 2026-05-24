@@ -83,6 +83,7 @@ _CALLBACK_FLOW_MAP = {
     "menu:start:inspection": TelegramIntent.TECHNICIAN_REPORT,
     "menu:start:wo_check": TelegramIntent.WO_UPDATE,
     "wo": TelegramIntent.WO_UPDATE,
+    "staff": TelegramIntent.CLIENT_COMPLAINT,
     "inspect": TelegramIntent.TECHNICIAN_REPORT,
     "adhoc": TelegramIntent.AD_HOC_FAULT,
     "ghost": TelegramIntent.GHOST_ROOM,
