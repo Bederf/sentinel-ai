@@ -15,6 +15,8 @@ import {
   TimerReset,
 } from 'lucide-react'
 import type { CockpitRenderMode, CockpitRiskItem, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
+import { phaseAllows } from '@/lib/onboardingPhase'
+import { BUILDING_TAB_ITEMS, type BuildingTabId } from '@/lib/navigation'
 import { SupervisedConfirmBar } from './useHoldToConfirm'
 import { motionReduced } from './motionPreference'
 import { CockpitNervousSystemTwin } from './CockpitNervousSystemTwin'
@@ -29,6 +31,9 @@ interface CockpitViewProps {
   modelReadiness?: ModelReadiness | null
   onAdvancePhase?: () => void
   onZoneSelect?: (zone: CockpitTwinZoneSignal) => void
+  activeMainTab: BuildingTabId
+  onMainTabChange: (tab: BuildingTabId) => void
+  isModuleActive: (module: string) => boolean
 }
 
 const FRAMER_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1]
@@ -179,13 +184,11 @@ function heroHeadline(state: CockpitState) {
   const sys = systemLabel(state.systemFilter)
   const prefix = sys ? `${sys} · ` : ''
   if (state.primaryMetric.value === 'Stable') return `${prefix}All systems nominal`
-  // Truncate long summaries at word boundary to prevent mobile clipping
+  // Truncate only at 200 chars to prevent extreme cases — let the headline wrap naturally in the cockpit panel
   const summary = state.activeCondition.summary
-  const maxLen = 40
+  const maxLen = 200
   if (summary.length > maxLen) {
-    // Find last space before maxLen
     const lastSpace = summary.lastIndexOf(' ', maxLen)
-    // If no space found (single long word) or space is too early, hard truncate at maxLen
     if (lastSpace === -1 || lastSpace < 10) {
       return `${prefix}${summary.slice(0, maxLen - 1)}…`
     }
@@ -250,6 +253,22 @@ function buildQueue(state: CockpitState): QueueItem[] {
     ]
   }
 
+  // Equipment warnings from health thresholding — surfaces in signal queue even when secondary_tensions is empty
+  if (state.equipmentWarnings.length > 0) {
+    return state.equipmentWarnings.slice(0, 3).map((eq, index) => ({
+      severity: eq.healthState === 'critical' ? 'Critical' : 'Escalating' as const,
+      title: `${eq.equipmentCode} · ${eq.equipmentType}`,
+      cause: eq.faultType
+        ? `${eq.faultType} · Health score ${eq.healthScore}/100`
+        : `Health score ${eq.healthScore}/100 · Floor ${eq.floorId}`,
+      impact: index === 0
+        ? state.decision.summary
+        : `${modules} equipment under threshold on floor ${eq.floorId}.`,
+      eta: timeToImpact(state),
+      confidence: evidenceLabel(state),
+    }))
+  }
+
   if (state.emergingRisks.length === 0) {
     return [
       {
@@ -290,15 +309,26 @@ function buildForecast(state: CockpitState) {
   }
 
   const floorIds = state.visualTwin.floors.filter(f => f.isManaged).map(f => f.id).join(', ')
+
+  // Build Modules value: equipment warnings take priority, then secondary tensions, then stable
+  let modulesValue: string
+  if (state.equipmentWarnings.length > 0) {
+    const top = state.equipmentWarnings[0]
+    const others = state.equipmentWarnings.length - 1
+    const equipLabel = `${top.equipmentCode} · ${top.equipmentType}`
+    modulesValue = others > 0
+      ? `${equipLabel} and ${others} more equipment at warning threshold on floor ${top.floorId}`
+      : `${equipLabel} at warning threshold on floor ${top.floorId}`
+  } else {
+    modulesValue = state.emergingRisks[0]?.detail ?? (state.primaryMetric.value === 'Stable'
+      ? `${modules} stable with no secondary tensions rising above background`
+      : state.decision.tradeoff)
+  }
+
   return [
     { label: 'Twin scope', value: floorIds || 'Occupied levels only' },
     { label: 'Guidance', value: `${state.decision.summary} · ${telemetrySnapshot(state)}` },
-    {
-      label: 'Modules',
-      value: state.emergingRisks[0]?.detail ?? (state.primaryMetric.value === 'Stable'
-        ? `${modules} stable with no secondary tensions rising above background`
-        : state.decision.tradeoff),
-    },
+    { label: 'Modules', value: modulesValue },
   ]
 }
 
@@ -496,7 +526,7 @@ function ZoneEquipmentPanel({
   )
 }
 
-export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selectedZone, onZoneClose, modelReadiness, onAdvancePhase, onZoneSelect }: CockpitViewProps) {
+export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selectedZone, onZoneClose, modelReadiness, onAdvancePhase, onZoneSelect, activeMainTab, onMainTabChange, isModuleActive }: CockpitViewProps) {
   const shellRef = useRef<HTMLElement | null>(null)
   const headerRef = useRef<HTMLDivElement | null>(null)
   const railRef = useRef<HTMLDivElement | null>(null)
@@ -705,6 +735,40 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             </button>
           </div>
         </div>
+
+        {/* Row 3 — Main discipline tab bar — single line, disabled tabs removed, remaining spread evenly */}
+        <div className="mt-4 flex items-center gap-1 border-t border-white/8 pt-4 overflow-x-auto">
+          <div className="flex items-center gap-1 flex-1">
+            {BUILDING_TAB_ITEMS.filter((tab) => {
+              if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false
+              if (tab.id === 'controls') {
+                if (!phaseAllows(state.site.onboardingPhase as 'shadow' | 'advisory' | 'supervised' | 'auto', 'approve_reject')) return false
+                const CONTROL_MODULES = ['hvac_control', 'energy_control', 'lighting_control', 'solar_control', 'water_control', 'security_control'] as const
+                return CONTROL_MODULES.some(mod => isModuleActive(mod))
+              }
+              return true
+            }).map((tab) => {
+              const Icon = tab.icon
+              const isActive = activeMainTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => onMainTabChange(tab.id)}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] transition flex-shrink-0"
+                  style={{
+                    background: isActive ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.04)',
+                    color: isActive ? '#22d3ee' : '#64748b',
+                    border: `1px ${isActive ? 'solid rgba(34,211,238,0.35)' : 'solid rgba(255,255,255,0.08)'}`,
+                  }}
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{tab.label}</span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
       </motion.div>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
@@ -722,9 +786,12 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
               transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
               transformOrigin: '50% 0',
               width: '100%',
+              height: '260px',
             }}
           >
-            {canvas}
+            <div className="w-full h-full">
+              {canvas}
+            </div>
           </div>
 
           {selectedZone && (

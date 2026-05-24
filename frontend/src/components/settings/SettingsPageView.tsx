@@ -1,6 +1,7 @@
 import { Monitor } from "lucide-react";
 import type { View } from "../../lib/navigation";
 import { ThemeSwitcher } from "../ThemeSwitcher";
+import { AegisSettings } from "./AegisSettings";
 import { AiCostTracker } from "./AiCostTracker";
 import { AiRuntimePolicySettings } from "./AiRuntimePolicySettings";
 import { AlertMuting } from "./AlertMuting";
@@ -133,6 +134,13 @@ function SettingsSections({
       />
       <SimbiotBridgeSettings
         siteId={controller.selectedSiteId ?? undefined}
+        readOnly={controller.readOnly}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+      />
+      <AegisSettings
+        siteId={controller.selectedSiteId ?? undefined}
+        currentUserRole={controller.currentUserRole}
         readOnly={controller.readOnly}
         onError={onError}
         onSuccess={controller.handleSuccess}

@@ -73,6 +73,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
   const isAdmin = userRole === 'admin';
   const isDemoUser = userEmail ? isRestrictedDemoUser(userEmail) : false;
 
+  // isCollapsed: always true on mobile (sidebar auto-collapses), otherwise user preference
+  const effectiveCollapsed = isMobile ? true : isCollapsed;
+
   // Build the full nav item list: base + admin/profile-driven add-ons + conditional add-ons
   const allNavItems = useMemo(() => {
     // Base items — filter out any with requiredModule that isn't active
@@ -123,7 +126,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
           className={`
             w-full flex items-center gap-3 px-4 py-3 mb-1 mx-auto
             transition-all duration-150 ease-in-out
-            ${isCollapsed ? "justify-center" : "justify-start"}
+            ${effectiveCollapsed ? "justify-center" : "justify-start"}
             hover:brightness-110
             ${!isActive ? 'hover:bg-white/5' : ''}
           `}
@@ -142,6 +145,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
               : "none",
           }}
           aria-current={isActive ? "page" : undefined}
+          aria-label={item.label}
         >
           <Icon
             className={`flex-shrink-0 ${isActive ? 'font-bold' : ''}`}
@@ -157,7 +161,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
             }}
           />
           {/* Always show labels on mobile, or when not collapsed on desktop */}
-          <div className={`flex flex-col items-start flex-1 ${(isCollapsed && !isMobile) ? "hidden" : "flex"}`}>
+          <div className={`flex flex-col items-start flex-1 ${(effectiveCollapsed && !isMobile) ? "hidden" : "flex"}`}>
             <span
               className={`font-medium ${isMobile ? 'text-base' : 'text-sm'}`}
               style={{
@@ -223,9 +227,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
         aria-label={isMobileOpen ? "Close menu" : "Open menu"}
       >
         {isMobileOpen ? (
-          <X className="h-5 w-5" style={{ color: "var(--color-grafana-text-primary)" }} />
+          <X className="h-5 w-5" style={{ color: "var(--color-sentinel-text-primary)" }} />
         ) : (
-          <Menu className="h-5 w-5" style={{ color: "var(--color-grafana-text-primary)" }} />
+          <Menu className="h-5 w-5" style={{ color: "var(--color-sentinel-text-primary)" }} />
         )}
       </button>
 
@@ -251,6 +255,8 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
           flex flex-col
         `}
         style={{
+          transition: 'width 200ms ease-out',
+          willChange: 'width',
           background: "var(--glass-bg)",
           backdropFilter: "blur(var(--glass-blur-lg)) saturate(180%)",
           WebkitBackdropFilter: "blur(var(--glass-blur-lg)) saturate(180%)",
@@ -311,7 +317,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
           <div className="px-3 mb-2">
             <span
               className={`text-xs font-medium uppercase tracking-wider md:hidden ${isCollapsed ? 'lg:hidden' : 'lg:block'}`}
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             >
               Menu
             </span>
@@ -325,7 +331,7 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
           <div
             ref={aboutBtnRef}
             className="mt-4 pt-4 mx-3 relative"
-            style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+            style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
           >
             <button
               onClick={() => setIsAboutOpen(!isAboutOpen)}

@@ -480,32 +480,24 @@ class NotificationRepository:
     @staticmethod
     def _delivery_log_model_to_dict(model: NotificationDeliveryLog) -> dict[str, Any]:
         """Convert NotificationDeliveryLog model to dictionary."""
-        return {
-            "id": str(model.id),
-            "work_order_id": str(model.work_order_id) if model.work_order_id else None,
-            "technician_id": str(model.technician_id),
+        # Columns that actually exist in notification_delivery_log
+        valid_cols = {
+            "notification_type", "channel_type", "status", "recipient_identifier",
+            "error_message", "provider", "external_message_id",
+        }
+        payload: dict[str, Any] = {
             "notification_type": model.notification_type,
-            "title": model.title,
-            "body": model.body,
             "channel_type": model.channel_type.value,
             "recipient_identifier": model.recipient_identifier,
             "status": model.status.value,
-            "error_message": model.error_message,
-            "error_code": model.error_code,
-            "external_message_id": model.external_message_id,
-            "sent_at": model.sent_at.isoformat() if model.sent_at else None,
-            "delivered_at": model.delivered_at.isoformat() if model.delivered_at else None,
             "provider": model.provider,
-            "provider_response": model.provider_response,
-            "retry_count": model.retry_count,
-            "last_retry_at": model.last_retry_at.isoformat() if model.last_retry_at else None,
-            "max_retries": model.max_retries,
-            "created_at": model.created_at.isoformat(),
-            "updated_at": model.updated_at.isoformat(),
-            "acknowledged_at": model.acknowledged_at.isoformat() if model.acknowledged_at else None,
-            "acknowledged_by": model.acknowledged_by,
-            "escalated": model.escalated,
-            "escalated_at": model.escalated_at.isoformat() if model.escalated_at else None,
-            "timeout_minutes": model.timeout_minutes,
-            "notification_id": model.notification_id,
+            "external_message_id": model.external_message_id,
         }
+        # Only add optional fields if they have values
+        if model.error_message:
+            payload["error_message"] = model.error_message
+        if model.id:
+            payload["id"] = str(model.id)
+        if model.technician_id:
+            payload["technician_id"] = str(model.technician_id)
+        return payload

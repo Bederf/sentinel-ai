@@ -135,6 +135,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
             src="/images/sentinel-logo.png"
             alt="SENTINEL"
             className="w-16 h-16 object-contain rounded-lg"
+            loading="lazy"
           />
         </div>
         {/* Brand name below */}

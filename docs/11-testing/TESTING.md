@@ -2,9 +2,9 @@
 title: "Testing Strategy Guide"
 type: "guide"
 status: "approved"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-01-30"
-updated: "2026-02-26"
+updated: "2026-05-23"
 author: "Sentinel Development Team"
 tags: ["testing", "strategy", "pytest", "vitest", "playwright", "k6"]
 related: ["E2E_GUIDE.md", "TEST_DATA.md", "../../k6/README.md"]
@@ -19,8 +19,8 @@ estimated_read_time: 15
 ## Overview
 
 The BMS Intelligence platform uses multiple test layers:
-- `pytest` for backend and Python domain tests
-- `vitest` for frontend unit/integration tests
+- `pytest` + `pytest-asyncio` for backend and Python domain tests
+- `vitest` + `@testing-library/react` for frontend unit/integration tests
 - `playwright` for browser E2E flows
 - `k6` for API/load testing
 - module-specific test suites (for example, `runner/tests`)
@@ -226,6 +226,16 @@ device = DeviceFactory.create(
 - **Integration Tests**: All critical paths covered
 - **E2E Tests**: All user workflows covered
 - **Load Tests**: SLA thresholds in each k6 scenario
+
+### Frontend Coverage Thresholds (Vitest)
+
+Vitest is configured with `v8` provider with the following minimum thresholds:
+- **Lines**: 40%
+- **Functions**: 35%
+- **Branches**: 30%
+- **Statements**: 40%
+
+Reports are generated in HTML, JSON, and LCOV formats in `./coverage` directories.
 
 ## CI/CD Integration
 

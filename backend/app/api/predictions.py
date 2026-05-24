@@ -82,11 +82,13 @@ def format_prediction_for_frontend(pred: dict) -> dict:
     # Extract last reading info from evidence
     last_reading_value = None
     last_reading_parameter = None
+    latest_reading_obj = None
     if evidence and "last_reading" in evidence:
         last_reading = evidence["last_reading"]
         if isinstance(last_reading, dict):
             last_reading_value = last_reading.get("value")
             last_reading_parameter = last_reading.get("parameter")
+            latest_reading_obj = last_reading  # Pass object through for frontend
 
     return {
         "id": pred["code"],  # Use code as frontend ID
@@ -118,6 +120,8 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         "last_reading": f"{last_reading_parameter}: {last_reading_value}"
         if last_reading_parameter and last_reading_value is not None
         else None,
+        # Frontend expects latest_reading as object inside evidence
+        "latest_reading": latest_reading_obj,  # Object form for PredictionCard
     }
 
 
@@ -129,6 +133,8 @@ async def list_predictions(
     equipment_type: str | None = Query(None, description="Filter by equipment type"),
     severity: str | None = Query(None, description="Filter by severity (critical/warning/healthy)"),
     min_probability: int | None = Query(None, description="Minimum probability percentage"),
+    min_confidence: str | None = Query(None, description="Minimum confidence level (high/medium/low)"),
+    has_last_reading: bool | None = Query(None, description="Filter to only predictions with last_reading data"),
 ) -> dict:
     """
     List all AI-driven failure predictions from Supabase.
@@ -180,6 +186,18 @@ async def list_predictions(
 
     if min_probability is not None:
         query = query.gte("probability_percent", min_probability)
+
+    # Filter by confidence (using normalized confidence column)
+    if min_confidence is not None:
+        valid_confidences = {"high": 3, "medium": 2, "low": 1}
+        min_level = valid_confidences.get(min_confidence.lower())
+        if min_level is not None:
+            # confidence is stored as integer 1-3 (low=1, medium=2, high=3)
+            query = query.gte("confidence", min_level)
+
+    # Filter to predictions that have last_reading in evidence
+    if has_last_reading:
+        query = query.contains("evidence", {"last_reading": {}})
 
     response = query.execute()
     predictions = response.data

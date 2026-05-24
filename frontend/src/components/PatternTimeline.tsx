@@ -78,31 +78,31 @@ export function PatternTimeline({
     <div
       className="rounded-lg overflow-hidden"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="px-4 py-3 flex items-center gap-2"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div
           className="p-1.5 rounded"
           style={{ background: "rgba(184, 119, 217, 0.15)" }}
         >
-          <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-grafana-purple)" }} />
+          <AlertTriangle className="h-4 w-4" style={{ color: "var(--color-sentinel-purple)" }} />
         </div>
         <div>
           <h3
             className="font-semibold text-sm"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             Pattern Recognition Timeline
           </h3>
           <p
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             This failure pattern has been detected across {sortedFailures.length + 1} sites
           </p>
@@ -115,7 +115,7 @@ export function PatternTimeline({
           {/* Connecting line */}
           <div
             className="absolute left-6 top-8 bottom-8 w-0.5"
-            style={{ background: "var(--color-grafana-border)" }}
+            style={{ background: "var(--color-sentinel-border)" }}
           />
 
           {/* Timeline items */}
@@ -169,13 +169,13 @@ export function PatternTimeline({
                     {/* Site and equipment */}
                     <div
                       className="font-semibold mb-1"
-                      style={{ color: "var(--color-grafana-text-primary)" }}
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       {item.site}
                     </div>
                     <div
                       className="text-sm mb-2"
-                      style={{ color: "var(--color-grafana-text-secondary)" }}
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
                     >
                       {item.equipment}
                       {isFailure && " - Failed"}
@@ -215,8 +215,8 @@ export function PatternTimeline({
                             key={i}
                             className="text-xs px-2 py-0.5 rounded"
                             style={{
-                              background: "var(--color-grafana-bg-secondary)",
-                              color: "var(--color-grafana-text-secondary)",
+                              background: "var(--color-sentinel-bg-secondary)",
+                              color: "var(--color-sentinel-text-secondary)",
                             }}
                           >
                             {factor}
@@ -236,23 +236,23 @@ export function PatternTimeline({
           className="mt-4 p-3 rounded-lg flex items-start gap-3"
           style={{
             background: "rgba(184, 119, 217, 0.1)",
-            border: "1px solid var(--color-grafana-purple)30",
+            border: "1px solid var(--color-sentinel-purple)30",
           }}
         >
           <CheckCircle
             className="h-5 w-5 flex-shrink-0 mt-0.5"
-            style={{ color: "var(--color-grafana-purple)" }}
+            style={{ color: "var(--color-sentinel-purple)" }}
           />
           <div>
             <span
               className="text-sm font-medium"
-              style={{ color: "var(--color-grafana-purple)" }}
+              style={{ color: "var(--color-sentinel-purple)" }}
             >
               AI Pattern Insight
             </span>
             <p
               className="text-sm mt-1"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               Similar equipment at {sortedFailures.length} other site
               {sortedFailures.length > 1 ? "s" : ""} experienced this exact failure pattern.

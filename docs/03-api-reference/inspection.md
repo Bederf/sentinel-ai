@@ -28,7 +28,7 @@ These endpoints are used by the Sentry Telegram bot during the inspection skill 
 
 ### GET /api/sentry/inspection-checklist/{equipment_type}
 
-Returns a Telegram-formatted inspection checklist for an equipment type. Called by Sentry when a technician uses `/info_{code}` to see what to check on-site, or during the "done" debrief flow.
+Returns a Telegram-formatted inspection checklist for an equipment type. Called by Sentry when a technician uses `/info-{code}` to see what to check on-site, or during the "done" debrief flow.
 
 **Authentication:** None required (read-only, public in demo mode)
 
@@ -194,17 +194,17 @@ The AI chat (SENTINEL web UI) integrates with the same FM workflow used by Teleg
 User asks about equipment problem
     ↓
 Claude presents clickable commands:
-  `/info_{CODE}`    — Equipment diagnostics (health, alerts, history)
-  `/inspect_{CODE}` — Schedule inspection + auto-assign technician
-  `/WO_{CODE}`      — Create formal work order with checklist
-  `/note_{CODE}`    — Log observations against equipment record
+  `/info-{CODE}`    — Equipment diagnostics (health, alerts, history)
+  `/inspect-{CODE}` — Schedule inspection + auto-assign technician
+  `/WO-{CODE}`      — Create formal work order with checklist
+  `/note-{CODE}`    — Log observations against equipment record
     ↓
 User clicks command → sent as chat message → slash_command_router.py handles it
     ↓
 Work order persists to Supabase via POST /api/sentry/create-work-order
 ```
 
-**Clickable command rendering:** Commands matching `/info_`, `/WO_`, `/inspect_`, `/reset_`, `/note_` in inline code blocks are rendered as clickable buttons in the web chat (`ChatMessage.tsx`, `COMMAND_RE` regex). Clicking a button sends the command text as a new chat message.
+**Clickable command rendering:** Commands matching `/info-`, `/WO-`, `/inspect-`, `/reset-`, `/note-` in inline code blocks are rendered as clickable buttons in the web chat (`ChatMessage.tsx`, `COMMAND_RE` regex). Clicking a button sends the command text as a new chat message.
 
 **Implementation:**
 - Slash command router: `backend/app/services/slash_command_router.py`

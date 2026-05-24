@@ -21,6 +21,7 @@ import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 import { useTextToSpeech } from "@/hooks/useTextToSpeech";
 import { useVAD } from "@/hooks/useVAD";
 import { useVoicePipeline } from "@/hooks/useVoicePipeline";
+import { useRealtimeVoicePipeline } from "@/hooks/useRealtimeVoicePipeline";
 import { useStreamingTTS } from "@/hooks/useStreamingTTS";
 
 interface Message {
@@ -81,6 +82,27 @@ export function Chat() {
       setInput(transcript);
     },
   });
+
+  // OpenAI Realtime-2 voice pipeline — conditional on feature flag (Path C surgical)
+  const isRealtimeVoiceEnabled =
+    import.meta.env.VITE_REALTIME_VOICE_ENABLED === "true" && includeSystemDocs;
+
+  const realtimePipeline = useRealtimeVoicePipeline({
+    onTranscript: (transcript) => {
+      if (transcript) {
+        sendMessage(transcript);
+      }
+    },
+    onInterim: (transcript) => {
+      setInput(transcript);
+    },
+    onError: (error) => {
+      console.error("[RealtimeVoice] error:", error);
+    },
+  });
+
+  // Active voice pipeline — swap based on feature flag
+  const activeVoicePipeline = isRealtimeVoiceEnabled ? realtimePipeline : voicePipeline;
 
   // Streaming TTS for progressive audio playback
   const streamingTTS = useStreamingTTS();
@@ -171,9 +193,9 @@ export function Chat() {
     // Stop TTS playback
     tts.stop();
     streamingTTS.stop(); // Stop progressive TTS
-    // Stop voice pipeline if running
-    if (voicePipeline.isRecording) {
-      voicePipeline.interrupt();
+    // Stop active voice pipeline if running
+    if (activeVoicePipeline.isRecording) {
+      activeVoicePipeline.interrupt();
     }
     // Stop old STT if running
     if (stt.isListening) {
@@ -182,26 +204,26 @@ export function Chat() {
     // If in ai_speaking state, transition to interrupted → user_speaking
     if (voiceState === "ai_speaking" || voiceState === "interrupted") {
       setVoiceState("interrupted");
-      // Start new listening session (voice pipeline if docs mode)
+      // Start new listening session (active pipeline in docs mode)
       if (includeSystemDocs) {
-        voicePipeline.startCapture();
+        activeVoicePipeline.startCapture();
       } else {
         stt.startListening();
       }
     }
-  }, [tts, stt, voicePipeline, voiceState, includeSystemDocs, streamingTTS]);
+  }, [tts, stt, activeVoicePipeline, voiceState, includeSystemDocs, streamingTTS]);
 
   // Handle mic toggle with state awareness
   const handleMicToggle = useCallback(() => {
     if (voiceState === "ai_speaking" || voiceState === "interrupted") {
       interruptVoice();
     } else if (includeSystemDocs) {
-      // Use continuous voice pipeline in docs mode
-      if (voicePipeline.isRecording) {
-        voicePipeline.stopCapture();
+      // Use continuous voice pipeline in docs mode (ElevenLabs or Realtime-2 based on flag)
+      if (activeVoicePipeline.isRecording) {
+        activeVoicePipeline.stopCapture();
       } else {
         setVoiceState("user_speaking");
-        voicePipeline.startCapture();
+        activeVoicePipeline.startCapture();
       }
     } else {
       // Use old single-utterance STT
@@ -211,7 +233,7 @@ export function Chat() {
         stt.startListening();
       }
     }
-  }, [stt, voicePipeline, voiceState, includeSystemDocs, interruptVoice]);
+  }, [stt, activeVoicePipeline, voiceState, includeSystemDocs, interruptVoice]);
 
   // Generate unique ID for messages
   const generateId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -352,14 +374,14 @@ export function Chat() {
     <div
       className="chat-container flex flex-col h-full rounded overflow-hidden"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="flex-none p-4 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="flex items-center gap-3">
           <div
@@ -368,19 +390,19 @@ export function Chat() {
           >
             <MessageSquare
               className="h-5 w-5"
-              style={{ color: "var(--color-grafana-blue)" }}
+              style={{ color: "var(--color-sentinel-blue)" }}
             />
           </div>
           <div>
             <h3
               className="font-medium text-sm"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               SENTINEL
             </h3>
             <span
               className="text-xs"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               AI-powered facilities management support
             </span>
@@ -394,9 +416,9 @@ export function Chat() {
             disabled={isLoading || (messages.length === 0 && !streamingContent)}
             className="px-3 py-1.5 rounded text-xs flex items-center gap-1 transition-all hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100"
             style={{
-              background: "var(--color-grafana-bg-secondary)",
-              border: "1px solid var(--color-grafana-border)",
-              color: "var(--color-grafana-text-secondary)",
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-secondary)",
             }}
             aria-label="Clear chat"
             title="Clear chat"
@@ -413,13 +435,13 @@ export function Chat() {
             style={{
               background: includeSystemDocs
                 ? "rgba(50, 116, 217, 0.15)"
-                : "var(--color-grafana-bg-secondary)",
+                : "var(--color-sentinel-bg-secondary)",
               border: includeSystemDocs
-                ? "1px solid var(--color-grafana-blue)"
-                : "1px solid var(--color-grafana-border)",
+                ? "1px solid var(--color-sentinel-blue)"
+                : "1px solid var(--color-sentinel-border)",
               color: includeSystemDocs
-                ? "var(--color-grafana-blue)"
-                : "var(--color-grafana-text-secondary)",
+                ? "var(--color-sentinel-blue)"
+                : "var(--color-sentinel-text-secondary)",
             }}
             aria-label="Include SENTINEL platform documentation"
             title="Include SENTINEL platform documentation in search"
@@ -444,8 +466,8 @@ export function Chat() {
                 </span>
               )}
               {voiceState === "interrupted" && (
-                <span className="flex items-center gap-1" style={{ color: "var(--color-grafana-yellow)" }}>
-                  <span className="w-2 h-2 rounded-full" style={{ background: "var(--color-grafana-yellow)" }} />
+                <span className="flex items-center gap-1" style={{ color: "var(--color-sentinel-yellow)" }}>
+                  <span className="w-2 h-2 rounded-full" style={{ background: "var(--color-sentinel-yellow)" }} />
                   Interrupted
                 </span>
               )}
@@ -472,15 +494,15 @@ export function Chat() {
           <div className="h-full flex flex-col items-center justify-center gap-4">
             <Bot
               className="h-16 w-16"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             />
             <div className="text-center">
-              <p style={{ color: "var(--color-grafana-text-secondary)" }}>
+              <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Start a conversation with SENTINEL
               </p>
               <p
                 className="text-xs mt-2"
-                style={{ color: "var(--color-grafana-text-disabled)" }}
+                style={{ color: "var(--color-sentinel-text-disabled)" }}
               >
                 Ask about equipment status, documentation, alerts, or maintenance insights
               </p>
@@ -522,8 +544,8 @@ export function Chat() {
         onSubmit={handleSubmit}
         className="flex-none p-4 sticky bottom-0 md:relative"
         style={{
-          borderTop: "1px solid var(--color-grafana-border)",
-          background: "var(--color-grafana-bg-secondary)",
+          borderTop: "1px solid var(--color-sentinel-border)",
+          background: "var(--color-sentinel-bg-secondary)",
         }}
       >
         {/* STT error message */}
@@ -548,11 +570,11 @@ export function Chat() {
             disabled={isLoading || stt.isListening}
             className="flex-1 px-3 py-2 md:px-4 md:py-2 text-sm md:text-base rounded focus:outline-none disabled:cursor-not-allowed"
             style={{
-              background: "var(--color-grafana-bg-panel)",
+              background: "var(--color-sentinel-bg-panel)",
               border: stt.isListening
-                ? "1px solid var(--color-grafana-orange)"
-                : "1px solid var(--color-grafana-border)",
-              color: "var(--color-grafana-text-primary)",
+                ? "1px solid var(--color-sentinel-orange)"
+                : "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
             }}
             aria-label="Chat message input"
           />
@@ -597,21 +619,21 @@ export function Chat() {
                     ? "rgba(255, 136, 0, 0.15)"
                     : includeSystemDocs
                     ? "rgba(50, 116, 217, 0.15)"
-                    : "var(--color-grafana-bg-panel)",
+                    : "var(--color-sentinel-bg-panel)",
                 border:
                   voiceState === "user_speaking" || voiceState === "interrupted"
                     ? "1px solid var(--color-sentinel-red)"
                     : voiceState === "ai_speaking"
                     ? "1px solid rgba(255,136,0,0.6)"
                     : includeSystemDocs
-                    ? "1px solid var(--color-grafana-blue)"
-                    : "1px solid var(--color-grafana-border)",
+                    ? "1px solid var(--color-sentinel-blue)"
+                    : "1px solid var(--color-sentinel-border)",
                 color:
                   voiceState === "user_speaking" || voiceState === "interrupted"
                     ? "var(--color-sentinel-red)"
                     : voiceState === "ai_speaking"
                     ? "var(--color-sentinel-orange)"
-                    : "var(--color-grafana-text-secondary)",
+                    : "var(--color-sentinel-text-secondary)",
                 animation:
                   voiceState === "user_speaking" || voiceState === "interrupted"
                     ? "pulse 1.5s ease-in-out infinite"
@@ -647,13 +669,13 @@ export function Chat() {
               style={{
                 background: voiceMode
                   ? "rgba(255, 136, 0, 0.15)"
-                  : "var(--color-grafana-bg-panel)",
+                  : "var(--color-sentinel-bg-panel)",
                 border: voiceMode
                   ? "1px solid rgba(255,136,0,0.6)"
-                  : "1px solid var(--color-grafana-border)",
+                  : "1px solid var(--color-sentinel-border)",
                 color: voiceMode
                   ? "var(--color-sentinel-orange)"
-                  : "var(--color-grafana-text-secondary)",
+                  : "var(--color-sentinel-text-secondary)",
               }}
               aria-label={voiceMode ? "Disable voice mode" : "Enable voice mode"}
               title={
@@ -673,8 +695,8 @@ export function Chat() {
             className="px-3 py-2 md:px-4 md:py-2 rounded flex items-center gap-2 transition-all hover:brightness-110 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:brightness-100 disabled:hover:scale-100"
             style={{
               background: isLoading || !input.trim()
-                ? "var(--color-grafana-border)"
-                : "var(--color-grafana-blue)",
+                ? "var(--color-sentinel-border)"
+                : "var(--color-sentinel-blue)",
               color: "white",
             }}
             aria-label="Send message"

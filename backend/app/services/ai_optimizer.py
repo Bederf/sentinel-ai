@@ -397,6 +397,11 @@ class AIOptimizerService:
             if profile:
                 recommendation = self._score_and_rank_recommendations(recommendation, profile)
 
+            logger.warning(
+                f"[ANALYZE] After scoring: rec_count={len(recommendation.recommendations)}, "
+                f"first_rec_keys={[list(r.keys()) if r else 'empty' for r in recommendation.recommendations[:2]]}"
+            )
+
             # Phase 109: Apply quality gate evaluation to recommendations
             recommendation = await self._apply_quality_gate(site_id, recommendation)
 
@@ -967,6 +972,29 @@ class AIOptimizerService:
                     ]
             except Exception:
                 conditions["active_modules"] = []
+
+            # ── Active urgent work orders — prevent recommendations on faulty equipment ──
+            try:
+                from app.database.repositories.work_order_repository import WorkOrderRepository
+                wo_repo = WorkOrderRepository()
+                urgent_wos = await wo_repo.get_open_urgent_work_orders(site_id)
+                if urgent_wos:
+                    conditions["active_urgent_work_orders"] = [
+                        {
+                            "equipment_code": (wo.get("equipment") or {}).get("code") if isinstance(wo.get("equipment"), dict) else None,
+                            "title": wo.get("title"),
+                            "priority": wo.get("priority"),
+                            "status": wo.get("status"),
+                        }
+                        for wo in urgent_wos
+                        if (wo.get("equipment") or {}).get("code")
+                    ]
+                    logger.warning(
+                        f"[AI-OPT] Active urgent work orders: {len(conditions['active_urgent_work_orders'])} — "
+                        f"{[wo['equipment_code'] for wo in conditions['active_urgent_work_orders']]}"
+                    )
+            except Exception as e:
+                logger.warning(f"[AI-OPT] Could not fetch urgent work orders: {e}")
 
             # ── Carbon context (calculated from electrical telemetry) ──
             try:
@@ -1669,6 +1697,84 @@ If no action needed, return empty recommendations array.
             else:
                 next_change = str(next_entry)
 
+        PROFILE_INTENTS = {
+            "cost_saving": """
+ACTIVE PROFILE: COST SAVING
+Primary objective: Minimise energy spend and demand charges.
+
+MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
+- HVAC load > 70% of total site load during standard or peak tariff
+- Outdoor temp within 6°C of indoor setpoint (free cooling opportunity)
+- AHU running at >80% speed during mild outdoor conditions (<20°C)
+- BESS SOC < 40% before a peak tariff window (pre-charge opportunity)
+- BESS SOC > 85% during off-peak with peak window >2h away (discharge opportunity)
+- Chiller setpoint below 8°C during unoccupied hours (setback opportunity)
+- Any zone conditioning empty floor for >15 minutes (FCU running unnecessary)
+- Demand approaching NMD limit (current kW > 85% of NMD equivalent)
+- Peak tariff window starting within 90 minutes (pre-action opportunity)
+
+Every recommendation must state ZAR saving using:
+- Energy: kW_saved × hours × current_tariff_rate
+- Demand: kVA_reduced × R155.50/kVA/month
+""",
+            "comfort": """
+ACTIVE PROFILE: COMFORT FIRST
+Primary objective: Maintain occupant comfort within setpoint tolerance.
+
+MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
+- Any occupied zone temp > setpoint + 1.5°C for more than 15 minutes
+- Any occupied zone temp < setpoint - 1.5°C (overcooling)
+- Indoor humidity > 65% in any occupied zone
+- Pre-occupancy: building within 60 minutes of occupied hours but not yet pre-conditioned
+- Any occupied zone with CO2 > 800ppm (ventilation insufficient)
+- Chiller capacity < 60% during full occupancy (undersupply risk)
+
+Comfort is non-negotiable. Energy cost is secondary.
+Do not recommend setpoint relaxation in occupied zones.
+""",
+            "asset_preservation": """
+ACTIVE PROFILE: ASSET PRESERVATION
+Primary objective: Protect equipment health and extend service life.
+
+MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
+- Any equipment health score < 85% running at >70% capacity (reduce load)
+- AHU or chiller running continuously for >12 hours (cycling rest recommended)
+- Equipment in warning state running at full speed/capacity
+- Chiller starts/stops >4 times in past hour (cycling stress)
+- Any pump or fan operating outside design flow range
+- BESS discharge depth >80% in a single cycle (battery degradation risk)
+
+Every recommendation must state the asset protection benefit:
+reduced wear, extended service interval, or deferred failure probability.
+""",
+            "balanced": """
+ACTIVE PROFILE: BALANCED
+Objective: Cost efficiency (60%) + Comfort (40%).
+Neither objective overrides the other — both must be considered.
+
+MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
+- HVAC load > 75% of total site load AND tariff is standard or peak
+- Outdoor temp within 5°C of indoor setpoint (free cooling opportunity)
+- Indoor humidity > 62% during occupied hours
+- Zone temp deviation > 1.5°C from setpoint for > 20 minutes
+- BESS SOC > 80% during off-peak (cost saving opportunity)
+- AHU running at >85% speed with outdoor temp < 18°C
+- Pre-peak window within 60 minutes (load reduction opportunity)
+- Any equipment in warning state running at full load
+
+State both cost saving (ZAR) AND comfort impact (°C change) for each recommendation.
+""",
+        }
+
+        base_intent = PROFILE_INTENTS.get(profile, PROFILE_INTENTS["balanced"])
+        tariff_line = f"\nCurrent TOU: R{current_rate}/kWh ({band.upper()}) — next change: {next_change}\n"
+        return f"""
+{'='*60}
+LAYER 1 — ACTIVE GOAL
+{'='*60}
+{base_intent}
+{tariff_line}
+"""
         intents = {
             "cost_saving": """
 ## INTENT: Cost Minimisation
@@ -1837,8 +1943,9 @@ Records available: {ipmvp.get("records_available", 0)}""")
         return "\n\n".join(blocks) if blocks else "Extended telemetry not available."
 
     def _format_constraints(self, site: dict[str, Any], conditions: dict | None = None) -> str:
-        """Layer 4 — Module permissions, autonomous systems, and safety limits."""
+        """Layer 4 — Module permissions, autonomous systems, safety limits, and active faults."""
         active_modules = (conditions or {}).get("active_modules", [])
+        urgent_wos = (conditions or {}).get("active_urgent_work_orders", [])
         perms = {
             "hvac_control": "HVAC setpoints, AHU scheduling, FCU adjustments",
             "energy_control": "Peak shaving, load shifting, demand management",
@@ -1846,15 +1953,24 @@ Records available: {ipmvp.get("records_available", 0)}""")
             "solar_control": "BESS dispatch, solar optimisation, arbitrage",
             "water_control": "Valve scheduling, pressure management",
         }
-        allowed = [f"\u2705 {desc} ({mod} active)" for mod, desc in perms.items() if mod in active_modules]
-        blocked = [f"\u274c {desc} ({mod} not active)" for mod, desc in perms.items() if mod not in active_modules]
+        BASE_MODULES = {"hvac_control", "energy_control", "lighting_control", "water_control"}
 
-        sections = ["ACTIVE CONTROL MODULES \u2014 what you can recommend:"]
-        sections.append("\n".join(allowed) if allowed else "No control modules active \u2014 advisory only")
-        if blocked:
-            sections.append("\nINACTIVE MODULES \u2014 do not recommend:\n" + "\n".join(blocked))
+        # Base modules: always active at sites that have the equipment
+        active = [f"\u2705 {desc} ({mod} active)" for mod, desc in perms.items() if mod in active_modules]
+        # Add-on modules: only flag as unavailable if site lacks the equipment (not suppressed)
+        inactive_addons = [
+            f"\u274c {desc} ({mod} not available at this site \u2014 equipment not installed)"
+            for mod, desc in perms.items()
+            if mod not in active_modules and mod not in BASE_MODULES
+        ]
+
+        sections = ["ACTIVE CONTROL MODULES:"]
+        sections.append("\n".join(active) if active else "No modules active \u2014 advisory mode only")
+        if inactive_addons:
+            sections.append("\nEQUIPMENT NOT INSTALLED at this site:\n" + "\n".join(inactive_addons))
 
         sections.append("""
+
 AUTONOMOUS SYSTEMS (already running \u2014 do not duplicate):
 - DALI/Tridonic: occupancy dimming, daylight harvesting
 - BESS solar arbitrage: TOU charge/discharge cycles
@@ -1865,6 +1981,23 @@ SAFETY LIMITS:
 - Maximum setpoint relaxation: +3\u00b0C from comfort baseline
 - Do not increase load on equipment with health score < 70%
 """)
+
+        # Active urgent work orders \u2014 do not recommend adjustments on faulty equipment
+        if urgent_wos:
+            wo_lines = "\n".join(
+                f"  - {wo['equipment_code']}: {wo['title']} ({wo['priority']})"
+                for wo in urgent_wos
+            )
+            sections.append(f"""
+ACTIVE URGENT WORK ORDERS \u2014 do not recommend operational adjustments for these:
+{wo_lines}
+
+Equipment with open urgent/high-priority work orders is already under active
+maintenance. Recommending setpoint changes on this equipment could mask fault
+symptoms or interfere with the maintenance response. Flag the equipment as
+"under maintenance" in the recommendation instead.
+""")
+
         return "\n".join(sections)
 
     def _format_task(
@@ -1874,62 +2007,68 @@ SAFETY LIMITS:
         energy_prices: dict[str, Any],
     ) -> str:
         """Layer 5 — The specific question the AI should answer."""
-        time_str = current_time.strftime("%H:%M")
         is_occupied = 7 <= current_time.hour < 18
-        period = "occupied hours" if is_occupied else "after hours"
+        tariff = energy_prices.get("band", "standard")
+        current_rate = energy_prices.get("current_rate", energy_prices.get("eskom_rate", 0))
 
-        return f"""
-Current time: {time_str} SAST ({period})
-Active profile: {profile.upper().replace("_", " ")}
+        task_instruction = f"""
+TASK — FIND AND RECOMMEND EFFICIENCY OPPORTUNITIES
 
-RESPONSE FORMAT:
+Current time: {current_time.strftime('%A %H:%M')} SAST
+Building status: {'Occupied' if is_occupied else 'Unoccupied'}
+Active profile: {profile.upper().replace('_', ' ')}
+Current tariff: R{current_rate}/kWh ({tariff})
+
+YOUR DEFAULT ASSUMPTION: There is almost always an efficiency opportunity
+in a building this size. Your job is to find it.
+
+STEP 1 — Check every mandatory trigger condition for the active profile.
+STEP 2 — Check the waste opportunities flagged above (Layer 2).
+STEP 3 — Check learned patterns for this time of day and day of week.
+STEP 4 — Generate recommendations for every trigger condition that is met.
+
+FORMAT each recommendation as:
 {{
-  "building_assessment": "One sentence describing the dominant building condition right now",
+  "building_assessment": "One sentence describing the dominant building condition",
   "recommendations": [
     {{
-      "title": "Short description of the coordinated action",
+      "target_equipment": "S002-AHU-B01",
       "adjustments": [
         {{
-          "equipment_id": "S002-FCU-L2-A",
-          "point": "cooling_setpoint",
-          "current_value": 22.0,
-          "recommended_value": 22.9,
-          "unit": "°C"
+          "equipment_id": "S002-AHU-B01",
+          "point": "speed_percent",
+          "current_value": 100,
+          "recommended_value": 75,
+          "unit": "%"
         }}
       ],
-      "reason": "Explanation grounded in live telemetry AND shadow-learned patterns. Must reference actual values — current temp, current tariff, observed pattern frequency.",
-      "affected_zones": ["Zone-201", "Zone-202"],
-      "profile_goal": "{profile}",
-      "saving": "R18.40 this afternoon",
-      "confidence": 0.84,
-      "confidence_basis": "23 similar observations during shadow phase"
+      "reason": "Must reference actual telemetry values. Must reference which trigger condition was met.",
+      "saving": "R 84.50/hour, 312 kWh/month at current tariff",
+      "confidence": 0.70,
+      "confidence_basis": "Based on X observations during shadow phase"
     }}
   ],
   "no_action_reasons": [],
   "data_requests": []
 }}
 
-RULES:
-- building_assessment is REQUIRED — always describe the whole building state
-- adjustments array can contain multiple equipment items — this is ONE coordinated recommendation
-- reason MUST reference actual telemetry values (temperatures, kW, tariff rate)
-- reason MUST reference shadow learning when available
-- NEVER generate more than 3 recommendations per cycle — consolidate if you have more
-- NEVER generate a recommendation without specific adjustments
-- Each adjustment must have equipment_id, point, current_value, recommended_value
+RULES FOR no_action_reasons:
+- This field is NOT an exit route. It is a checklist.
+- If you return zero recommendations, you MUST list every trigger
+  condition you checked and specifically why it was not met.
+- "Building is optimal" is NOT acceptable as a no_action_reason.
+- Each entry must reference an actual telemetry value:
+  WRONG: "HVAC load is acceptable"
+  RIGHT: "HVAC load is 52% of site load — below the 75% trigger threshold"
 
-DEFAULT IS ACTION — efficiency opportunities almost always exist.
-Prove no action is needed by checking every trigger condition listed in your INTENT profile.
-If all triggers are false AND the building is genuinely optimal, explain exactly which
-conditions you checked and why each one does not apply. Do NOT use generic reasons like
-"building is running optimally" without referencing specific values from the telemetry.
+- If HVAC load > 75% of site load AND you return no recommendation,
+  that is a failure. Check your reasoning.
 
-If the building is already running optimally for {profile},
-list the specific trigger conditions that are not met — this is your no_action_reasons.
-
-If you need additional data to improve recommendations, list in:
-{{"data_requests": ["occupancy_schedule", "nmd_limit"]}}
+EQUIPMENT CODES — use ONLY codes from the valid equipment list provided.
+Do not modify, abbreviate, or invent equipment codes.
+If unsure of the exact code, use the closest match from the valid list.
 """
+        return task_instruction
 
     def _build_optimization_prompt(
         self,
@@ -2260,6 +2399,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             try:
                 json_text = self._extract_json(response_text)
                 result = json.loads(json_text)
+                logger.debug(f"[PARSE] LLM raw JSON keys: {list(result.keys())}, recs={len(result.get('recommendations', []))}, no_action={len(result.get('no_action_reasons', []))}")
 
                 # Log data_requests for observability (Phase 2: data request mechanism)
                 data_requests = result.get("data_requests", [])
@@ -2285,6 +2425,10 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 normalised_recommendations = self._parse_holistic_recommendations(
                     result.get("recommendations", []), building_assessment
                 )
+                logger.warning(
+                    f"[ANALYZE] _parse returned {len(normalised_recommendations)} recs — "
+                    f"first target_equipment={[r.get('target_equipment') for r in normalised_recommendations[:2]]}"
+                )
 
                 # Hard filter: remove DALI equipment from AI optimization recs
                 filtered = []
@@ -2309,8 +2453,10 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
                 # Validate and resolve equipment codes — drop any hallucinated codes
                 resolved = []
-                for r in normalised_recommendations:
+                logger.debug(f"[RESOLVE] Starting resolution loop for {len(normalised_recommendations)} normalised recs")
+                for i, r in enumerate(normalised_recommendations):
                     raw_code = r.get("target_equipment", "")
+                    logger.debug(f"[RESOLVE]   Rec {i+1}: raw_code='{raw_code}'")
                     if raw_code:
                         valid_code = await self._resolve_equipment_code(raw_code, site_id)
                         if valid_code:
@@ -2318,14 +2464,23 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                                 logger.info(f"[AI-OPT] Equipment code corrected: {raw_code} → {valid_code}")
                             r["target_equipment"] = valid_code
                             resolved.append(r)
+                            logger.debug(f"[RESOLVE]   Rec {i+1}: ✅ resolved to {valid_code}")
                         else:
-                            logger.warning(f"[AI-OPT] Dropping recommendation for unknown equipment: {raw_code}")
+                            logger.warning(f"[AI-OPT] Dropping rec {i+1}: unresolvable equipment '{raw_code}'")
                     else:
+                        logger.warning(f"[RESOLVE]   Rec {i+1}: no target_equipment — passing through as-is")
                         resolved.append(r)
                 normalised_recommendations = resolved
+                logger.warning(
+                    f"[ANALYZE] After RESOLVE: {len(normalised_recommendations)} recs — "
+                    f"targets={[r.get('target_equipment') for r in normalised_recommendations]}"
+                )
 
-                # Validate allowed control points before proceeding
-
+                logger.debug(
+                    f"[ANALYZE] Returning OptimizationRecommendation: "
+                    f"site={site_id}, rec_count={len(normalised_recommendations)}, "
+                    f"first_keys={[list(r.keys())[0] if r else 'empty' for r in normalised_recommendations[:2]]}"
+                )
                 return OptimizationRecommendation(
                     site_id=site_id,
                     timestamp=datetime.now().isoformat(),
@@ -2442,8 +2597,10 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         import uuid
 
         result = []
+        logger.debug(f"[PARSE] Processing {len(recommendations)} LLM recommendations, building_assessment='{building_assessment}'")
         for rec in recommendations:
             adjustments = rec.get("adjustments", [])
+            logger.debug(f"[PARSE]   rec keys={list(rec.keys())} adjustments={'yes' if adjustments else 'NO'}")
             if not adjustments:
                 # Fallback: treat as flat recommendation format
                 result.append(self._normalise_recommendation(rec))
@@ -2488,11 +2645,19 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 },
                 "reason": reason,
                 "confidence": confidence,
-                "expected_impact": {"cost_zar": cost_val} if cost_val > 0 else {},
+                "expected_impact": {"cost_zar": cost_val} if cost_val > 0 else {"cost_zar": 0},
+                "projected_savings": {
+                    "cost_zar_per_hour": cost_val,
+                    "saving_text": saving,
+                },
                 "metadata": metadata,
             }
             result.append(canonical)
 
+        logger.warning(
+            f"[PARSE] _parse_holistic_recommendations returned {len(result)} recs "
+            f"(from {len(recommendations)} LLM recs, building_assessment='{building_assessment[:80]}')"
+        )
         return result
 
     def _normalise_recommendation(self, raw: dict) -> dict:
@@ -2517,6 +2682,8 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         - action.value as float or string
         """
         out = dict(raw)
+        logger.debug(f"[NORM] Raw rec keys: {list(out.keys())}")
+        logger.debug(f"[NORM] target_equipment={out.get('target_equipment')} equipment_id={out.get('equipment_id')} action={out.get('action')} adjustments={out.get('adjustments')}")
 
         # Normalise equipment_id → target_equipment
         if "equipment_id" in out and "target_equipment" not in out:
@@ -2552,9 +2719,11 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             import re
 
             saving_text = out.get("metadata", {}).get("saving", "") or out.get("saving", "")
-            cost_match = re.search(r"[RZ](\d+(?:[\s,.]\d+)?)", saving_text.replace(",", ""))
+            cost_match = re.search(r"[RZ](\d+(?:[\s,. ]\d+)?)", saving_text.replace(",", ""))
             if cost_match:
-                out["expected_impact"] = {"cost_zar": float(cost_match.group(1))}
+                cost_val = float(cost_match.group(1))
+                out["expected_impact"] = {"cost_zar": cost_val}
+                out["projected_savings"] = {"cost_zar_per_hour": cost_val, "saving_text": saving_text}
 
         return out
 
@@ -2975,66 +3144,59 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         Returns:
             Valid equipment code, or None if no match found (recommendation should be dropped).
         """
-
-        if not generated_code:
-            return None
-
         from app.database.repositories.equipment_repository import EquipmentRepository
+
+        logger.debug(f"[RESOLVE] Attempting: '{generated_code}' for {site_id}")
 
         eq_repo = EquipmentRepository()
 
-        # Try exact match first
-        equipment = eq_repo.get_by_code(generated_code)
-        if equipment:
-            return generated_code
-
-        # Strategy 1: Normalize common AI-generated code format variations
-        normalised = self._normalize_code_format(generated_code)
-        if normalised != generated_code:
-            equipment = eq_repo.get_by_code(normalised)
-            if equipment:
-                logger.info(f"[AI-OPT] Normalised equipment code: {generated_code} → {normalised}")
-                return normalised
-
-        # Strategy 2: Find codes with same equipment type and location prefix
-        prefix = self._extract_prefix(generated_code)
-        if not prefix:
-            logger.warning(f"[AI-OPT] Unknown equipment code {generated_code} — no match in DB. Skipping.")
-            return None
-
-        # Get all equipment for site and find prefix matches
+        # Resolve site_id to UUID for repo calls
+        site_uuid = None
         try:
             from app.database.supabase_client import get_supabase_client
-
             sb = get_supabase_client()
             site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
             if site_resp.data:
                 site_uuid = site_resp.data[0]["id"]
-            else:
-                site_uuid = None
         except Exception:
-            site_uuid = None
+            pass
 
-        if site_uuid:
-            all_equipment = eq_repo.get_all(site_id=site_uuid)
-        else:
-            all_equipment = eq_repo.get_all()
+        all_equipment = eq_repo.get_all(site_id=site_uuid) if site_uuid else eq_repo.get_all()
+        all_codes = {eq.get("code"): eq for eq in all_equipment if eq.get("code")}
 
-        all_codes = [eq.get("code", "") for eq in all_equipment if eq.get("code")]
+        # Try exact match first
+        if generated_code in all_codes:
+            logger.debug(f"[RESOLVE] Exact match: {generated_code}")
+            return generated_code
+
+        # Strategy 1: Normalize common AI-generated code format variations
+        normalised = self._normalize_code_format(generated_code)
+        logger.debug(f"[RESOLVE] Normalised: '{generated_code}' → '{normalised}'")
+
+        if normalised != generated_code and normalised in all_codes:
+            logger.info(f"[RESOLVE] ✅ Normalised match: {generated_code} → {normalised}")
+            return normalised
+
+        # Strategy 2: Find codes with same equipment type and location prefix
+        prefix = self._extract_prefix(generated_code)
+        logger.debug(f"[RESOLVE] Extracted prefix: '{prefix}'")
+
+        if not prefix:
+            logger.warning(f"[RESOLVE] ❌ No prefix extractable from: {generated_code}")
+            return None
+
         matches = [c for c in all_codes if c.startswith(prefix)]
+        logger.debug(f"[RESOLVE] Prefix '{prefix}' matches: {matches}")
 
         if len(matches) == 1:
-            logger.info(f"[AI-OPT] Resolved equipment code by prefix: {generated_code} → {matches[0]}")
+            logger.info(f"[RESOLVE] ✅ Prefix match: {generated_code} → {matches[0]}")
             return matches[0]
 
         if len(matches) > 1:
-            logger.warning(
-                f"[AI-OPT] Ambiguous equipment code {generated_code} — "
-                f"multiple prefix matches: {matches}. Skipping recommendation."
-            )
+            logger.warning(f"[RESOLVE] ❌ Ambiguous: {generated_code} — matches: {matches}")
             return None
 
-        logger.warning(f"[AI-OPT] Unknown equipment code {generated_code} — no match in DB. Skipping.")
+        logger.warning(f"[RESOLVE] ❌ No match for: {generated_code}")
         return None
 
     def _normalize_code_format(self, code: str) -> str:

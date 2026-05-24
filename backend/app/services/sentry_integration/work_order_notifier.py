@@ -325,8 +325,8 @@ class WorkOrderNotifier:
         if tg_code:
             tg_commands = (
                 f"\nTELEGRAM COMMANDS\n"
-                f"  /info_{tg_code} — Equipment status & readings\n"
-                f"  /note_{tg_code} — Add a note during inspection\n"
+                f"  /info-{tg_code} — Equipment status & readings\n"
+                f"  /note-{tg_code} — Add a note during inspection\n"
                 f"  done #{wo_ref} — Submit inspection findings"
             )
 
@@ -525,8 +525,8 @@ class WorkOrderNotifier:
 
         if tg_code:
             html += f"""      <p>Open Telegram and use these commands:</p>
-      <p><code>/info_{tg_code}</code> — Equipment status &amp; readings</p>
-      <p><code>/note_{tg_code}</code> — Add a note during inspection</p>
+      <p><code>/info-{tg_code}</code> — Equipment status &amp; readings</p>
+      <p><code>/note-{tg_code}</code> — Add a note during inspection</p>
       <p><code>done #{wo_ref}</code> — Submit inspection findings</p>"""
         else:
             html += f"""      <p>When you have completed the inspection, type: <code>done #{wo_ref}</code></p>"""
@@ -867,21 +867,37 @@ class WorkOrderNotifier:
             issue_snippet = (f"💬 {description[:150]}{'...' if len(description) > 150 else ''}\n") if description else ""
 
             equipment_code = work_order_data.get("equipment_code", "")
-            code_underscored = equipment_code.replace("-", "_") if equipment_code else ""
-            eq_cmds = f"/info_{code_underscored} - Equipment details\n" if code_underscored else ""
+            code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
+            eq_cmds = f"/info-{code_dashed} - Equipment details\n" if code_dashed else ""
+            note_cmd = f"/note-{code_dashed} - Add note"
 
             msg = (
-                f"📋 Work Order {wo_ref}\n"
-                f"🔧 {eq_name}\n"
-                f"🔴 Priority: {pri} | Type: {service_type}\n"
-                f"👤 Assigned: {tech_name}\n"
-                f"{location_part}"
-                f"{reporter_section}"
-                f"{issue_snippet}"
+                f"Work Order Created #{wo_ref}\n"
+                f"Assigned: {tech_name}\n"
+                f"Priority: {pri}\n"
+                f"Equipment: {equipment_code}\n"
                 f"─────────────────\n"
-                f"{eq_cmds}"
-                f"done #{wo_ref} - Submit inspection"
+                f"{eq_cmds}{note_cmd}\n"
+                f"done #{wo_ref} - Complete work order"
             )
+
+            # Build inline buttons for the technician
+            import json
+            info_value = f"/info-{code_dashed}" if code_dashed else ""
+            note_value = f"/note-{code_dashed}" if code_dashed else ""
+            done_value = f"done #{wo_ref}"
+            presentation = {
+                "blocks": [
+                    {"type": "text", "text": msg},
+                    {"type": "buttons", "buttons": []},
+                ]
+            }
+            buttons = presentation["blocks"][1]["buttons"]
+            if info_value:
+                buttons.append({"label": "📋 Info", "value": info_value, "style": "primary"})
+            if note_value:
+                buttons.append({"label": "📝 Notes", "value": note_value, "style": "primary"})
+            buttons.append({"label": "✅ Done", "value": done_value, "style": "success"})
 
             cli = get_sentry_bot_cli()
             result = await asyncio.to_thread(
@@ -898,6 +914,8 @@ class WorkOrderNotifier:
                     technician_id,
                     "--message",
                     msg,
+                    "--presentation",
+                    json.dumps(presentation),
                 ],
                 timeout=15,
                 capture_output=True,

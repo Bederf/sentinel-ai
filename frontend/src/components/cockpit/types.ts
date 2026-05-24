@@ -115,6 +115,19 @@ export interface CockpitRiskItem {
   detail: string
 }
 
+/** Equipment warning surfaced from health-score thresholding — drives signal queue and modules block */
+export interface CockpitEquipmentWarning {
+  id: string
+  equipmentId: string
+  equipmentCode: string
+  equipmentType: string
+  floorId: string
+  healthScore: number
+  healthState: CockpitHealthState
+  faultType?: string
+  zoneId?: string
+}
+
 export type CockpitRiskBand = 'low' | 'medium' | 'high' | 'critical'
 export type CockpitPolicyLevel = 'site_asset_criticality' | 'site_asset' | 'site' | 'posture' | 'system'
 export type CockpitConstraintType = 'comfort' | 'asset' | 'cost' | 'compliance'
@@ -166,6 +179,8 @@ export interface CockpitState {
   evidence: CockpitEvidence
   severity: CockpitSeverityInterpretation
   emergingRisks: CockpitRiskItem[]
+  /** Active equipment warnings from health-score thresholding — drives signal queue when secondary_tensions is empty */
+  equipmentWarnings: CockpitEquipmentWarning[]
   /** Active occupant complaint clusters (count >= 3) — email heatmap signals */
   emailClusters: EmailClusterData[]
   /** Active system filter — when set, only zones/equipment of this system type render */

@@ -9,7 +9,7 @@ ALTER TABLE equipment ADD COLUMN IF NOT EXISTS zone_key TEXT;
 
 -- Step 2: Index for fast zone lookups
 CREATE INDEX IF NOT EXISTS idx_equipment_zone_key ON equipment(zone_key);
-CREATE INDEX IF NOT EXISTS idx_equipment_building_zone ON equipment(building_id, zone_key);
+CREATE INDEX IF NOT EXISTS idx_equipment_site_zone ON equipment(site_id, zone_key);
 
 -- Step 3: Backfill zone_key for existing equipment
 -- Uses EquipmentIDConverter logic to normalize codes:
@@ -24,7 +24,7 @@ SET zone_key = CASE
     WHEN code ~ 'S002-GEN-G'       THEN 'Zone-G-plant'
     WHEN code ~ 'S002-MTR-W'       THEN 'Zone-B1-plant'
     -- Zone-encoded office equipment: S002-VAV-101 → Zone-L1-1
-    WHEN code ~ 'S002-.*-[0-9]{3}$' THEN
+    WHEN code ~ 'S002-.*-[0-9]{3}$' AND split_part(code, '-', 3) ~ '^[0-9]+$' THEN
         'Zone-' ||
         CASE
             WHEN split_part(code, '-', 3)::int BETWEEN 1 AND 99   THEN 'L0'
@@ -50,7 +50,7 @@ WHERE zone_key IS NULL
 -- Site-003, S003, etc.
 UPDATE equipment
 SET zone_key = CASE
-    WHEN code ~ '^[A-Z]{3}-[^-]+-[^-]+-[0-9]+$' THEN
+    WHEN code ~ '^[A-Z]{3}-[^-]+-[^-]+-[0-9]+$' AND split_part(code, '-', 3) ~ '^[0-9]+$' THEN
         -- Generic numeric zone encoding
         'Zone-' ||
         CASE
@@ -86,7 +86,7 @@ BEGIN
             NEW.zone_key := 'Zone-R-plant';
         ELSIF NEW.code ~ 'S002-GEN-G' THEN
             NEW.zone_key := 'Zone-G-plant';
-        ELSIF NEW.code ~ 'S002-.*-[0-9]{3}$' THEN
+        ELSIF NEW.code ~ 'S002-.*-[0-9]{3}$' AND split_part(NEW.code, '-', 3) ~ '^[0-9]+$' THEN
             DECLARE
                 zone_num INT := split_part(NEW.code, '-', 3)::int;
                 floor_code TEXT;

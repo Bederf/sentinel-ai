@@ -14,10 +14,7 @@ from typing import Any
 
 logger = logging.getLogger("slo-report-service")
 
-SLO_RECIPIENTS = [
-    "peter.marshall@fnb.co.za",
-    "ntaote.moshoeshoe@fnb.co.za",
-]
+SLO_RECIPIENTS = []
 
 
 class SLOReportService:

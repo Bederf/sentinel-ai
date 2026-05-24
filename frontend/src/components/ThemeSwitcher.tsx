@@ -46,6 +46,8 @@ export function ThemeSwitcher() {
             ? "var(--color-sentinel-bg-panel)"
             : "var(--color-sentinel-bg-secondary)",
           border: "1px solid var(--color-sentinel-border)",
+          minHeight: 48,
+          minWidth: 48,
         }}
         aria-label="Switch theme"
         title={`Theme: ${themeConfig.label}`}

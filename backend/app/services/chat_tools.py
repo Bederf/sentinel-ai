@@ -13,7 +13,7 @@ This module implements the tool functions that Claude can call to:
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -3407,9 +3407,9 @@ CHAT_TOOLS = [
             "WRITE action — restricted to operators and admins. "
             "IMPORTANT: Before calling this tool, ALWAYS guide the user through "
             "the FM workflow first. Present clickable slash commands in this order:\n"
-            "1. `/info_{CODE}` — show equipment diagnostics first\n"
-            "2. `/inspect_{CODE}` — schedule inspection with technician notification\n"
-            "3. `/WO_{CODE}` — create general work order\n"
+            "1. `/info-{CODE}` — show equipment diagnostics first\n"
+            "2. `/inspect-{CODE}` — schedule inspection with technician notification\n"
+            "3. `/WO-{CODE}` — create general work order\n"
             "Only call this tool directly if the user explicitly confirms they want "
             "to skip diagnostics and create a work order immediately. "
             "Replace {CODE} with the equipment code using underscores (e.g., S002_FCU_301)."
@@ -4233,6 +4233,24 @@ async def _fetch_equipment_diagnostics(equipment_code: str) -> dict[str, Any] | 
         return None
 
 
+def _run_single_verification_sync(recommendation_id: str) -> None:
+    """Synchronous wrapper for APScheduler — runs outcome verification for a single recommendation."""
+    import asyncio
+
+    from app.services.recommendation_outcome_service import process_single_verification
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(process_single_verification(recommendation_id))
+    except Exception as e:
+        logging.getLogger(__name__).warning(
+            f"[OUTCOME] Verification failed for {recommendation_id}: {e}"
+        )
+    finally:
+        loop.close()
+
+
 async def close_work_order_chat(
     work_order_code: str,
     resolution: str | None = None,
@@ -4276,6 +4294,43 @@ async def close_work_order_chat(
         if not updated:
             return {"success": False, "error": f"Failed to update work order {work_order_code}"}
 
+        # Wire 1: If WO is linked to a recommendation, mark it EXECUTED
+        recommendation_id = wo.get("recommendation_id")
+        if recommendation_id:
+            try:
+                from app.database.repositories.recommendation_repository import get_recommendation_repository
+                from app.models.recommendation import RecommendationStatus
+
+                rec_repo = get_recommendation_repository()
+                rec = await rec_repo.get_by_id(recommendation_id)
+                if rec and rec.status in (RecommendationStatus.PENDING, RecommendationStatus.APPROVED):
+                    rec.status = RecommendationStatus.EXECUTED
+                    rec.executed_at = datetime.utcnow()
+                    await rec_repo.update(recommendation_id, rec)
+                    logger.info(
+                        f"[WO-CLOSE] Recommendation {recommendation_id} marked EXECUTED "
+                        f"— outcome verification will fire in 30min"
+                    )
+
+                    # Wire 2: Schedule outcome verification 30 minutes from now
+                    from app.services.background_scheduler import scheduler_service
+
+                    verify_at = datetime.utcnow() + timedelta(minutes=30)
+                    scheduler_service.scheduler.add_job(
+                        func=lambda rid=recommendation_id: asyncio.run(_run_single_verification_sync(rid)),
+                        trigger="date",
+                        run_date=verify_at,
+                        id=f"outcome_verify_{recommendation_id}",
+                        replace_existing=True,
+                        misfire_grace_time=300,
+                    )
+                    logger.info(
+                        f"[WO-CLOSE] Outcome verification scheduled for "
+                        f"{verify_at.strftime('%H:%M:%S SAST')}"
+                    )
+            except Exception as rec_err:
+                logger.warning("[WO-CLOSE] Failed to update recommendation %s: %s", recommendation_id, rec_err)
+
         logger.info("close_work_order: %s closed by %s", work_order_code, _user_email or "technician")
         return {
             "success": True,
@@ -4301,7 +4356,7 @@ async def create_work_order_chat(
 ) -> dict[str, Any]:
     """Create a work order from chat via the Sentry work-order API.
 
-    Uses the same POST /api/sentry/create-work-order endpoint as the /WO_
+    Uses the same POST /api/sentry/create-work-order endpoint as the /WO-
     slash command, ensuring work orders are persisted to Supabase and
     technicians are auto-assigned.
 
@@ -4328,7 +4383,7 @@ async def create_work_order_chat(
         if assigned_to:
             payload["assigned_to"] = assigned_to
 
-        # Use the Sentry create-work-order endpoint (same as /WO_ slash command)
+        # Use the Sentry create-work-order endpoint (same as /WO- slash command)
         headers: dict[str, str] = {
             "X-Sentry-Secret": settings.sentry_webhook_secret,
             "Content-Type": "application/json",
@@ -4990,6 +5045,7 @@ async def execute_tool(
 
     _t0 = _time.perf_counter()
     _outcome = "success"
+    logger.info("[GATEWAY] tool=%s user=%s tier=%s site=%s", tool_name, user_email or "unknown", tier or "unknown", effective_site_id or "unknown")
     try:
         result = await handler(**tool_input)
         if isinstance(result, dict) and "error" in result:

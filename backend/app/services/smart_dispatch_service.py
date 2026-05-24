@@ -27,7 +27,7 @@ from app.services.work_order_service import work_order_service
 logger = logging.getLogger(__name__)
 
 DATA_DIR = Path(__file__).parent.parent / "data"
-TECHNICIANS_FILE = DATA_DIR / "technicians.json"
+TECHNICIANS_FILE = DATA_DIR / "technicians.json"  # Deprecated — Supabase is source of truth
 
 # Floor ordering for efficient routing (bottom to top)
 FLOOR_ORDER = {"B2": 0, "B1": 1, "G": 2, "L0": 3, "L1": 4, "L2": 5, "L3": 6, "R": 7}
@@ -105,14 +105,22 @@ class SmartDispatchService:
         logger.info(f"SmartDispatchService initialized with {len(self._technicians)} technicians")
 
     def _load_technicians(self) -> None:
-        """Load technician data from JSON file."""
+        """Load technician data from Supabase (source of truth)."""
         try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            if client:
+                result = client.table("technicians").select("*").eq("active", True).execute()
+                if result.data:
+                    self._technicians = result.data
+                    logger.info(f"Loaded {len(self._technicians)} technicians from Supabase")
+                    return
+            logger.warning("Supabase unavailable, falling back to local file")
             if TECHNICIANS_FILE.exists():
                 with open(TECHNICIANS_FILE) as f:
-                    self._technicians = json.load(f)
-                logger.info(f"Loaded {len(self._technicians)} technicians")
+                    self._technicians = json.load(f).get("technicians", [])
+                logger.info(f"Loaded {len(self._technicians)} technicians from fallback file")
             else:
-                logger.warning(f"Technicians file not found: {TECHNICIANS_FILE}")
                 self._technicians = []
         except Exception as e:
             logger.error(f"Failed to load technicians: {e}")

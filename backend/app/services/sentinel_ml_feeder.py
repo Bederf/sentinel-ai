@@ -953,9 +953,11 @@ class SentinelMLFeeder:
         Queries equipment_sensor_readings for the wall-clock span of data,
         NOT the in-memory poll counter. This is restart-proof and truthful.
 
+        Queries both canonical (site-002) and legacy (S002) formats to handle
+        the historical site_id format mismatch.
+
         Args:
-            site_id: Site identifier matching equipment_sensor_readings.site_id
-                     format (e.g. 'S002').
+            site_id: Site identifier (canonical format: 'site-002').
 
         Returns:
             Hours of telemetry data span, or 0.0 if no data / error.
@@ -970,6 +972,15 @@ class SentinelMLFeeder:
                 logger.warning("[ML FEEDER] DATABASE_URL not set — cannot calculate actual hours")
                 return 0.0
 
+            # Build list of site_id variants to query (canonical + legacy)
+            site_ids = [site_id]
+            if site_id.startswith("site-"):
+                legacy = "S" + site_id[5:]  # site-002 → S002
+                site_ids.append(legacy)
+            elif site_id.startswith("S") and not site_id.startswith("site-"):
+                canonical = "site-" + site_id[1:]  # S002 → site-002
+                site_ids.append(canonical)
+
             conn = psycopg2.connect(database_url)
             try:
                 cur = conn.cursor()
@@ -977,15 +988,15 @@ class SentinelMLFeeder:
                     """
                     SELECT EXTRACT(EPOCH FROM (MAX(recorded_at) - MIN(recorded_at))) / 3600.0
                     FROM equipment_sensor_readings
-                    WHERE site_id = %s AND recorded_at IS NOT NULL
+                    WHERE site_id = ANY(%s) AND recorded_at IS NOT NULL
                     """,
-                    (site_id,),
+                    (site_ids,),
                 )
                 row = cur.fetchone()
                 cur.close()
                 if row and row[0] is not None:
                     hours = float(row[0])
-                    logger.info("[ML FEEDER] Actual ML hours for %s: %.1fh", site_id, hours)
+                    logger.info("[ML FEEDER] Actual ML hours for %s: %.1fh (queried %s)", site_id, hours, site_ids)
                     return hours
                 logger.info("[ML FEEDER] No telemetry found for %s", site_id)
             finally:

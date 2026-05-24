@@ -239,6 +239,7 @@ async def mcp_get_info():
     Useful for connector discovery and health checks.
     """
     server = get_openai_connector_server()
+    server._ensure_index()
     return JSONResponse(
         content={
             "name": "sentinel-bms-connector",
@@ -247,8 +248,8 @@ async def mcp_get_info():
             "protocol": "MCP",
             "protocolVersion": "2024-11-05",
             "transport": "streamable-http",
-            "tools": ["search", "fetch"],
-            "documents_indexed": len(server._documents or []) if server._documents else "not loaded",
+            "tools": [t["name"] for t in server.list_tools()],
+            "documents_indexed": len(server._documents),
         },
         headers=CORS_HEADERS,
     )
@@ -263,6 +264,8 @@ async def mcp_get_info():
 async def openai_connector_info():
     """Get connector information and available tools."""
     server = get_openai_connector_server()
+    server._ensure_index()
+    tool_schemas = server.list_tools()
     return JSONResponse(
         content={
             "name": "sentinel-bms-connector",
@@ -271,11 +274,8 @@ async def openai_connector_info():
             "mcp_version": "2024-11-05",
             "transport": "streamable-http",
             "mcp_endpoint": "/api/mcp/openai/mcp",
-            "tools": server.list_tools(),
-            "capabilities": {
-                "search": "Search BMS data including buildings, equipment, alerts, predictions",
-                "fetch": "Retrieve full document content by ID",
-            },
+            "tools": tool_schemas,
+            "capabilities": {t["name"]: t["description"] for t in tool_schemas},
         },
         headers=CORS_HEADERS,
     )
@@ -290,11 +290,11 @@ async def openai_connector_health():
     return JSONResponse(
         content={
             "status": "healthy",
-            "documents_indexed": len(server._documents or []),
+            "documents_indexed": len(server._documents),
             "timestamp": datetime.now().isoformat(),
             "mcp_endpoint": "/api/mcp/openai/mcp",
             "transport": "streamable-http",
-            "tools": ["search", "fetch"],
+            "tools": [t["name"] for t in server.list_tools()],
         },
         headers=CORS_HEADERS,
     )
@@ -384,17 +384,16 @@ async def mcp_discovery():
     This is the standard location for MCP server discovery.
     Returns server info and endpoint URL.
     """
+    server = get_openai_connector_server()
+    tool_schemas = server.list_tools()
     return JSONResponse(
         content={
             "name": "sentinel-bms-connector",
             "version": "1.0.0",
             "description": "SENTINEL BMS Intelligence Platform - Building Management Data Connector",
             "mcp": {"version": "2024-11-05", "transport": "streamable-http", "endpoint": "/api/mcp/openai/mcp"},
-            "tools": ["search", "fetch"],
-            "capabilities": {
-                "search": "Search BMS data including buildings, equipment, alerts, predictions",
-                "fetch": "Retrieve full document content by ID",
-            },
+            "tools": [t["name"] for t in tool_schemas],
+            "capabilities": {t["name"]: t["description"] for t in tool_schemas},
         },
         headers=CORS_HEADERS,
     )
@@ -410,3 +409,310 @@ async def mcp_discovery_options():
             "Access-Control-Max-Age": "86400",
         },
     )
+
+
+# =============================================================================
+# Well-Known OpenAPI Schema for ChatGPT Actions
+# =============================================================================
+
+
+@wellknown_router.get("/.well-known/openapi.json")
+async def well_known_openapi():
+    """
+    OpenAPI 3.1 schema for ChatGPT Actions discovery.
+
+    Dynamically generates path operations from live MCP tool definitions.
+    Always stays in sync with actual tool availability — never hardcoded.
+    """
+    server = get_openai_connector_server()
+    tool_schemas = server.list_tools()
+
+    paths: dict[str, Any] = {}
+    for tool in tool_schemas:
+        tool_name = tool.get("name", "")
+        tool_desc = tool.get("description", "")
+        input_schema = tool.get("inputSchema", {}) or {}
+
+        # Truncate description to first sentence for OpenAPI summary
+        first_sentence = tool_desc.split(".")[0] if tool_desc else tool_name
+
+        # Build request body schema from tool's inputSchema properties
+        properties = {}
+        required: list[str] = []
+        schema_props = input_schema.get("properties", {})
+        for prop_name, prop_def in schema_props.items():
+            properties[prop_name] = {
+                k: v for k, v in prop_def.items() if k != "description"
+            }
+            if prop_def.get("required"):
+                required.append(prop_name)
+
+        request_body_schema = {
+            "type": "object",
+            "properties": properties,
+        }
+        if required:
+            request_body_schema["required"] = required
+
+        paths[f"/{tool_name}"] = {
+            "post": {
+                "operationId": tool_name,
+                "summary": first_sentence,
+                "description": tool_desc,
+                "tags": ["SENTINEL BMS"],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": request_body_schema
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object"}
+                            }
+                        }
+                    }
+                },
+            }
+        }
+
+    logger.info(f"Well-known OpenAPI schema generated with {len(paths)} tool paths")
+
+    return JSONResponse(
+        content={
+            "openapi": "3.1.0",
+            "info": {
+                "title": "SENTINEL BMS MCP",
+                "version": "1.0.0",
+                "description": "SENTINEL Building Management Intelligence — live operational data for S002 (Sandton City Office Tower). S001 (FNB Fairlands) is in commissioning.",
+            },
+            "servers": [{"url": "https://bms.sentinel-ai.co.za/api/mcp/openai"}],
+            "paths": paths,
+        },
+        headers=CORS_HEADERS,
+    )
+
+
+@wellknown_router.options("/.well-known/openapi.json")
+async def well_known_openapi_options():
+    """Handle CORS preflight for well-known OpenAPI endpoint."""
+    return Response(
+        status_code=200,
+        headers={
+            **CORS_HEADERS,
+            "Access-Control-Max-Age": "86400",
+        },
+    )
+
+
+@router.get("/openapi.json", include_in_schema=True)
+async def openapi_json():
+    """
+    OpenAPI 3.1 schema for GPT Actions integration.
+
+    GPT Actions requires an OpenAPI schema to describe tool endpoints.
+    This endpoint returns a complete schema covering all MCP tools
+    (ping, search, fetch, inspect_equipment, get_site_status, etc.)
+    formatted as proper REST endpoints for GPT Actions consumption.
+
+    Schema is auto-generated from MCP tool definitions.
+    """
+    from app.mcp.openai_connector_server import get_openai_connector_server
+
+    server = get_openai_connector_server()
+    tools = server.list_tools()
+
+    paths: dict[str, Any] = {}
+    components: dict[str, Any] = {"schemas": {}}
+
+    for tool in tools:
+        name = tool.get("name", "")
+        desc = tool.get("description", "") or f"SENTINEL tool: {name}"
+        input_schema = tool.get("inputSchema", {}) or {}
+
+        # Build requestBody from inputSchema
+        properties = input_schema.get("properties", {})
+        required = input_schema.get("required", [])
+
+        schema_body = {"type": "object"}
+        if properties:
+            schema_body["properties"] = {k: {**v, "description": v.get("description", "")} for k, v in properties.items()}
+        if required:
+            schema_body["required"] = required
+
+        request_body_content = {"application/json": {"schema": schema_body}}
+
+        paths[f"/{name}"] = {
+            "post": {
+                "operationId": name,
+                "summary": desc[:160],
+                "description": desc,
+                "requestBody": {
+                    "required": True,
+                    "content": request_body_content,
+                },
+                "responses": {
+                    "200": {
+                        "description": f"{name} response",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "content": {
+                                            "type": "array",
+                                            "items": {"type": "object"},
+                                        }
+                                    },
+                                }
+                            }
+                        },
+                    }
+                },
+            }
+        }
+
+    logger.info(f"OpenAPI schema generated with {len(paths)} tool paths")
+
+    return JSONResponse(
+        content={
+            "openapi": "3.1.0",
+            "info": {
+                "title": "SENTINEL BMS API",
+                "version": "1.0.0",
+                "description": "SENTINEL Building Management Intelligence Platform — live operational data for Sandton City Office Tower (site-002).",
+            },
+            "servers": [{"url": "https://bms.sentinel-ai.co.za/api/mcp/openai"}],
+            "paths": paths,
+            "components": {
+                "schemas": {
+                    "Error": {
+                        "type": "object",
+                        "properties": {"error": {"type": "string"}},
+                    }
+                }
+            },
+        },
+        headers=CORS_HEADERS,
+    )
+
+
+# =============================================================================
+# OpenAPI Tool Endpoints (for GPT Actions no-auth integration)
+# =============================================================================
+
+
+async def _tool_endpoint(tool_name: str, request_data: dict | None) -> JSONResponse:
+    """Generic handler for all OpenAPI tool endpoints."""
+    server = get_openai_connector_server()
+    try:
+        result = await server.call_tool(tool_name, **(request_data or {}))
+        return JSONResponse(content={"content": [{"type": "text", "text": json.dumps(result)}]}, headers=CORS_HEADERS)
+    except Exception as e:
+        logger.error(f"[{tool_name}] tool call failed: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"content": [{"type": "text", "text": json.dumps({"error": str(e)})}], "isError": True},
+            headers=CORS_HEADERS,
+        )
+
+
+@router.post("/search", include_in_schema=False)
+async def tool_search(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("search", body)
+
+
+@router.post("/fetch", include_in_schema=False)
+async def tool_fetch(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("fetch", body)
+
+
+@router.post("/get_site_status", include_in_schema=False)
+async def tool_get_site_status(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_site_status", body)
+
+
+@router.post("/get_recommendations", include_in_schema=False)
+async def tool_get_recommendations(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_recommendations", body)
+
+
+@router.post("/trace_recommendation", include_in_schema=False)
+async def tool_trace_recommendation(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("trace_recommendation", body)
+
+
+@router.post("/inspect_equipment", include_in_schema=False)
+async def tool_inspect_equipment(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("inspect_equipment", body)
+
+
+@router.post("/get_roi_summary", include_in_schema=False)
+async def tool_get_roi_summary(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_roi_summary", body)
+
+
+@router.post("/analyze_impact", include_in_schema=False)
+async def tool_analyze_impact(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("analyze_impact", body)
+
+
+@router.post("/compare_sites", include_in_schema=False)
+async def tool_compare_sites(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("compare_sites", body)
+
+
+@router.post("/get_curtailable_load", include_in_schema=False)
+async def tool_get_curtailable_load(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_curtailable_load", body)
+
+
+@router.post("/get_odse_export", include_in_schema=False)
+async def tool_get_odse_export(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_odse_export", body)
+
+
+@router.post("/search_knowledge", include_in_schema=False)
+async def tool_search_knowledge(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("search_knowledge", body)
+
+
+@router.post("/get_knowledge_detail", include_in_schema=False)
+async def tool_get_knowledge_detail(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_knowledge_detail", body)
+
+
+@router.post("/get_work_orders", include_in_schema=False)
+async def tool_get_work_orders(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_work_orders", body)
+
+
+@router.post("/get_work_order", include_in_schema=False)
+async def tool_get_work_order(request: Request):
+    body = await request.json()
+    return await _tool_endpoint("get_work_order", body)
+
+
+@router.post("/ping", include_in_schema=False)
+async def tool_ping(request: Request):
+    body = await request.json() if request.body else {}
+    return await _tool_endpoint("ping", body)

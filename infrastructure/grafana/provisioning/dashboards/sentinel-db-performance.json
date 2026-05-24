@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(245, 135, 30, 0.59)",
@@ -20,13 +23,21 @@
   "links": [],
   "panels": [
     {
-      "title": "Slow Queries (>500ms) — Last 24h",
+      "title": "Slow Queries (>500ms) \u2014 Last 24h",
       "type": "logs",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "{job=\"sentinel\"} |= \"SLOW_QUERY\"",
+          "expr": "{job=\"sentinel-docker\"} |= \"SLOW_QUERY\"",
           "legendFormat": "",
           "refId": "A"
         }
@@ -42,27 +53,46 @@
       }
     },
     {
-      "title": "Slow Query Count — 24h",
+      "title": "Slow Query Count \u2014 24h",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 8 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "count_over_time({job=\"sentinel\"} |= \"SLOW_QUERY\" [24h])",
+          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"SLOW_QUERY\" [24h])",
           "legendFormat": "Slow Queries",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#10b981", "value": null },
-              { "color": "#f59e0b", "value": 5 },
-              { "color": "#ef4444", "value": 20 }
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 5
+              },
+              {
+                "color": "#ef4444",
+                "value": 20
+              }
             ]
           },
           "unit": "none",
@@ -80,7 +110,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -90,30 +122,49 @@
     {
       "title": "Cache Hit Rate",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 8 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 8
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "count_over_time({job=\"sentinel\"} |= \"cache\" |= \"hit\" [24h])",
+          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"hit\" [24h])",
           "legendFormat": "Cache Hits",
           "refId": "A"
         },
         {
-          "expr": "count_over_time({job=\"sentinel\"} |= \"cache\" |= \"miss\" [24h])",
+          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"miss\" [24h])",
           "legendFormat": "Cache Misses",
           "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#ef4444", "value": null },
-              { "color": "#f59e0b", "value": 0.6 },
-              { "color": "#10b981", "value": 0.85 }
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 0.6
+              },
+              {
+                "color": "#10b981",
+                "value": 0.85
+              }
             ]
           },
           "unit": "percentunit",
@@ -131,7 +182,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -139,20 +192,30 @@
       }
     },
     {
-      "title": "Slow Query by Repo — 24h",
+      "title": "Slow Query by Repo \u2014 24h",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "sum by (repo) (count_over_time({job=\"sentinel\"} |= \"SLOW_QUERY\" | json | repo != \"\" [1h]))",
+          "expr": "sum by (repo) (count_over_time({job=\"sentinel-docker\"} |= \"SLOW_QUERY\" | json | repo != \"\" [1h]))",
           "legendFormat": "{{repo}}",
           "refId": "A"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -160,9 +223,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#10b981", "value": null },
-              { "color": "#f59e0b", "value": 3 },
-              { "color": "#ef4444", "value": 10 }
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 3
+              },
+              {
+                "color": "#ef4444",
+                "value": 10
+              }
             ]
           },
           "unit": "none",
@@ -173,23 +245,33 @@
     {
       "title": "Cache Hits vs Misses",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=\"sentinel\"} |= \"cache\" |= \"hit\" [1h]))",
+          "expr": "sum(count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"hit\" [1h]))",
           "legendFormat": "Hits",
           "refId": "A"
         },
         {
-          "expr": "sum(count_over_time({job=\"sentinel\"} |= \"cache\" |= \"miss\" [1h]))",
+          "expr": "sum(count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"miss\" [1h]))",
           "legendFormat": "Misses",
           "refId": "B"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -205,11 +287,19 @@
     {
       "title": "Database Archival Events",
       "type": "logs",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "{job=\"sentinel\"} |= \"DB archival\" or {job=\"sentinel\"} |= \"archive\"",
+          "expr": "{job=\"sentinel-docker\"} |= \"DB archival\" or {job=\"sentinel-docker\"} |= \"archive\"",
           "legendFormat": "",
           "refId": "A"
         }
@@ -224,13 +314,21 @@
       }
     },
     {
-      "title": "Gateway Tool Activity — 24h",
+      "title": "Gateway Tool Activity \u2014 24h",
       "type": "logs",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 20 },
-      "datasource": { "type": "loki", "uid": "P8E80F9AEF21F6940" },
+      "gridPos": {
+        "h": 7,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "P8E80F9AEF21F6940"
+      },
       "targets": [
         {
-          "expr": "{job=\"sentinel\"} |= \"GATEWAY\"",
+          "expr": "{job=\"sentinel-docker\"} |= \"GATEWAY\"",
           "legendFormat": "",
           "refId": "A"
         }
@@ -246,17 +344,25 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["sentinel", "database", "performance", "phase4"],
-  "templating": { "list": [] },
-  "time": { "from": "now-24h", "to": "now" },
+  "tags": [
+    "sentinel",
+    "database",
+    "performance",
+    "phase4"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "Africa/Johannesburg",
-  "title": "SENTINEL — Database",
+  "title": "SENTINEL \u2014 Database",
   "uid": "sentinel-db-perf",
   "version": 2,
   "weekStart": "",
   "refresh": "30s",
-  "style": "dark",
-  "fiscalYearStartMonth": 0,
-  "links": []
+  "style": "dark"
 }

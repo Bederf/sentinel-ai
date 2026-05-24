@@ -173,9 +173,9 @@ export function DocumentUpload({
         onClick={handleOpenPanel}
         className="px-2 py-1.5 rounded flex items-center gap-2 transition-all hover:brightness-110 hover:scale-105"
         style={{
-          background: 'var(--color-grafana-bg-secondary)',
-          border: '1px solid var(--color-grafana-border)',
-          color: 'var(--color-grafana-text-secondary)',
+          background: 'var(--color-sentinel-bg-secondary)',
+          border: '1px solid var(--color-sentinel-border)',
+          color: 'var(--color-sentinel-text-secondary)',
         }}
         title={!siteId ? 'Select a building first' : 'Upload document'}
         aria-label="Upload document"
@@ -200,18 +200,18 @@ export function DocumentUpload({
             style={{
               width: '400px',
               maxWidth: '90vw',
-              background: 'var(--color-grafana-bg-panel)',
-              borderLeft: '1px solid var(--color-grafana-border)',
+              background: 'var(--color-sentinel-bg-panel)',
+              borderLeft: '1px solid var(--color-sentinel-border)',
             }}
           >
             {/* Header */}
             <div
               className="flex items-center justify-between p-4"
-              style={{ borderBottom: '1px solid var(--color-grafana-border)' }}
+              style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}
             >
               <div className="flex items-center gap-3">
                 <FileText className="w-5 h-5" style={{ color: 'var(--color-sentinel-amber)' }} />
-                <h2 className="font-semibold" style={{ color: 'var(--color-grafana-text-primary)' }}>
+                <h2 className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
                   Upload Document
                 </h2>
               </div>
@@ -220,7 +220,7 @@ export function DocumentUpload({
                 className="p-1 rounded hover:brightness-110"
                 aria-label="Close panel"
               >
-                <X className="w-5 h-5" style={{ color: 'var(--color-grafana-text-secondary)' }} />
+                <X className="w-5 h-5" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
               </button>
             </div>
 
@@ -230,7 +230,7 @@ export function DocumentUpload({
               <div>
                 <label
                   className="block text-sm font-medium mb-2"
-                  style={{ color: 'var(--color-grafana-text-secondary)' }}
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
                 >
                   Document Type
                 </label>
@@ -239,9 +239,9 @@ export function DocumentUpload({
                   onChange={(e) => setDocumentType(e.target.value)}
                   className="w-full px-3 py-2 rounded border"
                   style={{
-                    background: 'var(--color-grafana-bg-secondary)',
-                    borderColor: 'var(--color-grafana-border)',
-                    color: 'var(--color-grafana-text-primary)',
+                    background: 'var(--color-sentinel-bg-secondary)',
+                    borderColor: 'var(--color-sentinel-border)',
+                    color: 'var(--color-sentinel-text-primary)',
                   }}
                 >
                   <option value="">Select document type...</option>
@@ -257,25 +257,25 @@ export function DocumentUpload({
               <div>
                 <label
                   className="block text-sm font-medium mb-2"
-                  style={{ color: 'var(--color-grafana-text-secondary)' }}
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
                 >
                   Equipment
                 </label>
                 <div className="relative">
                   <Wrench
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                    style={{ color: 'var(--color-grafana-text-disabled)' }}
+                    style={{ color: 'var(--color-sentinel-text-disabled)' }}
                   />
                   <select
                     value={selectedEquipment}
                     onChange={(e) => setSelectedEquipment(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 rounded border"
                     style={{
-                      background: 'var(--color-grafana-bg-secondary)',
-                      borderColor: 'var(--color-grafana-border)',
+                      background: 'var(--color-sentinel-bg-secondary)',
+                      borderColor: 'var(--color-sentinel-border)',
                       color: loadingEquipment
-                        ? 'var(--color-grafana-text-disabled)'
-                        : 'var(--color-grafana-text-primary)',
+                        ? 'var(--color-sentinel-text-disabled)'
+                        : 'var(--color-sentinel-text-primary)',
                     }}
                     disabled={loadingEquipment}
                   >
@@ -295,14 +295,14 @@ export function DocumentUpload({
               <div>
                 <label
                   className="block text-sm font-medium mb-2"
-                  style={{ color: 'var(--color-grafana-text-secondary)' }}
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
                 >
                   Document Date
                 </label>
                 <div className="relative">
                   <Calendar
                     className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
-                    style={{ color: 'var(--color-grafana-text-disabled)' }}
+                    style={{ color: 'var(--color-sentinel-text-disabled)' }}
                   />
                   <input
                     type="date"
@@ -310,9 +310,9 @@ export function DocumentUpload({
                     onChange={(e) => setDocumentDate(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 rounded border"
                     style={{
-                      background: 'var(--color-grafana-bg-secondary)',
-                      borderColor: 'var(--color-grafana-border)',
-                      color: 'var(--color-grafana-text-primary)',
+                      background: 'var(--color-sentinel-bg-secondary)',
+                      borderColor: 'var(--color-sentinel-border)',
+                      color: 'var(--color-sentinel-text-primary)',
                     }}
                   />
                 </div>
@@ -322,7 +322,7 @@ export function DocumentUpload({
               <div>
                 <label
                   className="block text-sm font-medium mb-2"
-                  style={{ color: 'var(--color-grafana-text-secondary)' }}
+                  style={{ color: 'var(--color-sentinel-text-secondary)' }}
                 >
                   File (PDF, DOCX, TXT - max 10MB)
                 </label>
@@ -340,11 +340,11 @@ export function DocumentUpload({
                   style={{
                     borderColor: selectedFile
                       ? 'var(--color-sentinel-amber)'
-                      : 'var(--color-grafana-border)',
-                    background: 'var(--color-grafana-bg-secondary)',
+                      : 'var(--color-sentinel-border)',
+                    background: 'var(--color-sentinel-bg-secondary)',
                     color: selectedFile
-                      ? 'var(--color-grafana-text-primary)'
-                      : 'var(--color-grafana-text-disabled)',
+                      ? 'var(--color-sentinel-text-primary)'
+                      : 'var(--color-sentinel-text-disabled)',
                   }}
                 >
                   {selectedFile ? (
@@ -396,7 +396,7 @@ export function DocumentUpload({
             {/* Footer with Upload button */}
             <div
               className="p-4"
-              style={{ borderTop: '1px solid var(--color-grafana-border)' }}
+              style={{ borderTop: '1px solid var(--color-sentinel-border)' }}
             >
               <button
                 onClick={handleUpload}
@@ -404,7 +404,7 @@ export function DocumentUpload({
                 className="w-full py-3 rounded font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:brightness-110 flex items-center justify-center gap-2"
                 style={{
                   background: uploading
-                    ? 'var(--color-grafana-border)'
+                    ? 'var(--color-sentinel-border)'
                     : 'var(--color-sentinel-blue)',
                   color: 'white',
                 }}

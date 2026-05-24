@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Shield, Plus, UserX, Edit2, X, Save } from "lucide-react";
+import { Shield, Plus, UserX, Edit2, X, Save, Mail, Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { authorizedFetch } from "../../lib/api/client";
 
 interface Manager {
@@ -39,6 +39,15 @@ export function ManagerRegistry({
   const [newTelegram, setNewTelegram] = useState("");
   const [newRole, setNewRole] = useState("manager");
   const [adding, setAdding] = useState(false);
+
+  const [showInvite, setShowInvite] = useState(false);
+  const [inviteName, setInviteName] = useState("");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState("operator");
+  const [inviteSiteId, setInviteSiteId] = useState(siteId);
+  const [inviting, setInviting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState("");
 
   // Edit form state
   const [editName, setEditName] = useState("");
@@ -125,6 +134,36 @@ export function ManagerRegistry({
     }
   };
 
+  const handleInvite = async () => {
+    if (!inviteName.trim() || !inviteEmail.trim()) return;
+    setInviting(true);
+    setInviteError("");
+    setInviteSuccess("");
+    try {
+      const res = await authorizedFetch("/api/auth/invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: inviteEmail.trim(),
+          full_name: inviteName.trim(),
+          role: inviteRole,
+          site_id: inviteSiteId || siteId,
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Failed to send invite");
+      }
+      setInviteSuccess(`Invite sent to ${inviteEmail}`);
+      setInviteName(""); setInviteEmail("");
+      setTimeout(() => { setShowInvite(false); setInviteSuccess(""); }, 3000);
+    } catch (err) {
+      setInviteError(err instanceof Error ? err.message : "Failed to send invite");
+    } finally {
+      setInviting(false);
+    }
+  };
+
   const handleDelete = async (mgr: Manager) => {
     if (!confirm(`Deactivate ${mgr.name}?`)) return;
     try {
@@ -174,6 +213,15 @@ export function ManagerRegistry({
             >
               <Plus className="h-3 w-3" />
               Add Manager
+            </button>
+          )}
+          {!readOnly && (
+            <button type="button" onClick={() => { setShowInvite(true); setInviteError(""); setInviteSuccess(""); }}
+              className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium transition-colors hover:brightness-110"
+              style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)", border: "1px solid rgba(59, 130, 246, 0.3)" }}
+            >
+              <Mail className="h-3 w-3" />
+              Invite Manager
             </button>
           )}
         </div>
@@ -226,6 +274,71 @@ export function ManagerRegistry({
               >
                 <Save className="h-3 w-3" />
                 {adding ? "Adding..." : "Add Manager"}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Invite Form */}
+        {showInvite && !readOnly && (
+          <div className="p-4 rounded-lg space-y-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid rgba(59, 130, 246, 0.3)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Mail className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
+              <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Invite Manager</span>
+            </div>
+            <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              An invite link will be sent to the email address. The recipient can set their own password.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Full Name *</label>
+                <input type="text" value={inviteName} onChange={(e) => setInviteName(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="Jane Manager" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Email *</label>
+                <input type="email" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="jane@example.com" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Role</label>
+                <div className="flex gap-2">
+                  {["operator", "manager", "admin"].map((r) => (
+                    <button key={r} type="button" onClick={() => setInviteRole(r)}
+                      className="px-3 py-1 rounded text-xs font-medium transition-colors"
+                      style={{
+                        background: inviteRole === r ? `${roleColor(r)}20` : "transparent",
+                        color: roleColor(r),
+                        border: `1px solid ${inviteRole === r ? roleColor(r) : "var(--glass-border)"}`,
+                      }}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Site</label>
+                <input type="text" value={inviteSiteId} onChange={(e) => setInviteSiteId(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="site-002" />
+              </div>
+            </div>
+            {inviteError && (
+              <div className="flex items-center gap-1 text-xs" style={{ color: "var(--color-sentinel-red)" }}>
+                <AlertCircle className="h-3 w-3" />
+                {inviteError}
+              </div>
+            )}
+            {inviteSuccess && (
+              <div className="flex items-center gap-1 text-xs" style={{ color: "var(--color-sentinel-green)" }}>
+                <CheckCircle2 className="h-3 w-3" />
+                {inviteSuccess}
+              </div>
+            )}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => setShowInvite(false)} className="px-3 py-1.5 rounded text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>Cancel</button>
+              <button type="button" onClick={() => void handleInvite()} disabled={inviting || !inviteName.trim() || !inviteEmail.trim()}
+                className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium"
+                style={{ background: "rgba(59, 130, 246, 0.15)", color: "var(--color-sentinel-blue)", border: "1px solid rgba(59, 130, 246, 0.3)", opacity: inviting || !inviteName.trim() || !inviteEmail.trim() ? 0.5 : 1 }}
+              >
+                {inviting ? <><Loader2 className="h-3 w-3 animate-spin" /> Sending...</> : <><Mail className="h-3 w-3" /> Send Invite</>}
               </button>
             </div>
           </div>

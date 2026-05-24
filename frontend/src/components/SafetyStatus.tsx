@@ -170,9 +170,9 @@ export const SafetyStatusPanel: React.FC<SafetyStatusPanelProps> = ({
             onChange={(event) => setFilterStatus(event.target.value)}
             className="min-w-[120px] rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
             style={{
-              background: "var(--color-grafana-bg-secondary)",
-              border: "1px solid var(--color-grafana-border)",
-              color: "var(--color-grafana-text-primary)",
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
               outline: "none",
             }}

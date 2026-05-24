@@ -499,7 +499,6 @@ class VectorDBService:
     ) -> list[dict[str, Any]]:
         """Search equipment knowledge base."""
         query_embedding = self.embedding_service.embed_text(query)
-
         result = self.client.rpc(
             "match_equipment_knowledge",
             {
@@ -513,7 +512,7 @@ class VectorDBService:
 
         return result.data if result.data else []
 
-    def hybrid_search(
+    async def hybrid_search(
         self,
         query: str,
         n_results: int = 5,
@@ -521,6 +520,7 @@ class VectorDBService:
         site_id: str | None = None,
         keyword_weight: float = 0.3,
         semantic_weight: float = 0.7,
+        use_hyde: bool = False,
     ) -> list[dict[str, Any]]:
         """Hybrid search combining keyword and semantic matching.
 
@@ -531,11 +531,18 @@ class VectorDBService:
             site_id: Optional filter by building (includes system docs if None)
             keyword_weight: Weight for keyword matching (0-1)
             semantic_weight: Weight for semantic matching (0-1)
+            use_hyde: Use Hypothetical Document Embedding — generates a hypothetical
+                answer with Haiku, embeds that instead of the raw query to resolve
+                vocabulary mismatches between informal queries and formal documents.
+                Keyword component always uses the original query.
 
         Returns:
             List of matching document chunks with hybrid scores
         """
-        query_embedding = self.embedding_service.embed_text(query)
+        if use_hyde:
+            query_embedding = await self._hyde_embed(query)
+        else:
+            query_embedding = self.embedding_service.embed_text(query)
 
         result = self.client.rpc(
             "hybrid_search_chunks",
@@ -551,6 +558,34 @@ class VectorDBService:
         ).execute()
 
         return self._attach_grounding_metadata(result.data if result.data else [])
+
+    async def _hyde_embed(self, query: str) -> list[float]:
+        """Generate hypothetical answer and embed it for better retrieval.
+
+        Uses Haiku to produce a brief hypothetical answer, then embeds that
+        instead of the raw query. Resolves vocabulary mismatch between informal
+        user queries and formally-written documentation.
+        """
+        from app.services.model_gateway import model_gateway
+
+        system = (
+            "You are a technical documentation writer. Write one brief hypothetical "
+            "answer (2-4 sentences) that a BMS expert might include in official "
+            "SENTINEL documentation. Focus on technical terms and concrete details. "
+            "Do not speculate. Do not prefix your answer."
+        )
+        try:
+            hypothetical = await model_gateway.call(
+                task_class="extraction",
+                messages=[{"role": "user", "content": query}],
+                system=system,
+                max_tokens=256,
+            )
+        except Exception as e:
+            logger.warning("HyDE generation failed, falling back to raw query embed: %s", e)
+            return self.embedding_service.embed_text(query)
+
+        return self.embedding_service.embed_text(hypothetical)
 
     def add_knowledge(
         self,

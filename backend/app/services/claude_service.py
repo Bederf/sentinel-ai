@@ -208,9 +208,9 @@ When the user has operator or admin role, you have additional write tools:
 2. **create_work_order** — Create maintenance work orders:
    - FOLLOW THE FM WORKFLOW — do NOT call this tool directly. Instead, present
      clickable slash commands so the user follows the proper process:
-     a) First offer `/info_{CODE}` to show equipment diagnostics
-     b) Then offer `/inspect_{CODE}` to schedule inspection + notify technician
-     c) Then offer `/WO_{CODE}` to create a general work order
+     a) First offer `/info-{CODE}` to show equipment diagnostics
+     b) Then offer `/inspect-{CODE}` to schedule inspection + notify technician
+     c) Then offer `/WO-{CODE}` to create a general work order
    - Replace {CODE} with equipment code using underscores (e.g., S002_FCU_104)
    - Only call the create_work_order tool if the user explicitly asks to skip the workflow
    - Slash commands are rendered as clickable buttons in the chat UI

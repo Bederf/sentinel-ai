@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { useModules, useCriticalRecommendations, useCrossSystemRecommendations } from '../../contexts/ModuleHooks';
 import { PRIORITY_COLORS, MODULE_COLORS } from '../../lib/moduleRegistry';
@@ -7,8 +7,10 @@ import { phaseAllows } from '../../lib/onboardingPhase';
 import type { OnboardingPhase } from '../../lib/onboardingPhase';
 import { Panel } from '../Panel';
 import { Badge } from '../Badge';
+import api, { type ROISummaryResponse } from '../../lib/api';
 
 interface AIRecommendationsPanelProps {
+  siteId?: string;
   compact?: boolean;
   maxItems?: number;
   moduleFilter?: ModuleType;
@@ -16,6 +18,7 @@ interface AIRecommendationsPanelProps {
 }
 
 export function AIRecommendationsPanel({
+  siteId,
   compact = false,
   maxItems = 10,
   moduleFilter,
@@ -32,6 +35,12 @@ export function AIRecommendationsPanel({
   const crossSystemRecs = useCrossSystemRecommendations();
 
   const [filter, setFilter] = useState<'all' | 'critical' | 'cross_system' | ModuleType>('all');
+  const [roiData, setRoiData] = useState<ROISummaryResponse | null>(null);
+
+  useEffect(() => {
+    if (!siteId) return;
+    api.getROISummary(siteId).then(setRoiData).catch(() => {});
+  }, [siteId]);
 
   let filteredRecs = recommendations.filter(r => !r.resolved);
 
@@ -118,6 +127,18 @@ export function AIRecommendationsPanel({
           )}
         </div>
       </div>
+
+      {/* Savings summary bar */}
+      {roiData && (
+        <div className="mx-4 mt-3 px-3 py-2 rounded text-xs" style={{ background: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+          <span style={{ color: 'var(--color-sentinel-green)' }}>This month:</span>
+          {' '}<span style={{ color: 'var(--color-sentinel-text-primary)', fontWeight: 600 }}>{roiData.verified_count} verified</span>
+          {' · '}
+          <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>{filteredRecs.length} pending</span>
+          {' · '}
+          <span style={{ color: 'var(--color-sentinel-green)', fontWeight: 600 }}>R{roiData.verified_savings_zar.toLocaleString()} confirmed savings</span>
+        </div>
+      )}
 
       {!moduleFilter && (
         <div className="px-4 pt-4">

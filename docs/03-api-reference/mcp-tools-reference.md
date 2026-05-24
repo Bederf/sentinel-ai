@@ -445,9 +445,9 @@ List work orders with filtering.
 ```
 
 #### `create_work_order`
-Create maintenance work order. **Important:** Claude is instructed to follow the FM workflow rather than calling this tool directly. It presents clickable slash commands (`/info_`, `/inspect_`, `/WO_`) so the user follows the proper process.
+Create maintenance work order. **Important:** Claude is instructed to follow the FM workflow rather than calling this tool directly. It presents clickable slash commands (`/info-`, `/inspect-`, `/WO-`) so the user follows the proper process.
 
-When called, the tool routes through `POST /api/sentry/create-work-order` (same endpoint as the `/WO_` slash command) to persist to Supabase and auto-assign a technician. Falls back to in-memory storage if the Sentry API is unreachable.
+When called, the tool routes through `POST /api/sentry/create-work-order` (same endpoint as the `/WO-` slash command) to persist to Supabase and auto-assign a technician. Falls back to in-memory storage if the Sentry API is unreachable.
 
 **Parameters:**
 - `equipment_code` (string, required): Equipment code (e.g., `S002-FCU-301`)

@@ -118,7 +118,7 @@ export const RecommendationHistory: React.FC<
           <table className="w-full border-collapse">
             <thead>
               <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
-                {['Action', 'Profile', 'Score', 'Status', 'Accuracy', 'Date'].map(h => (
+                {['Action', 'Profile', 'Expected', 'Actual', 'Outcome', 'Status', 'Date'].map(h => (
                   <th
                     key={h}
                     className="text-left py-3 pr-4 font-medium text-xs uppercase tracking-wider"
@@ -160,11 +160,28 @@ export const RecommendationHistory: React.FC<
                       {rec.profile ?? '--'}
                     </span>
                   </td>
-                  <td
-                    className="py-3 pr-4 text-sm"
-                    style={{ color: "var(--color-sentinel-text-primary)" }}
-                  >
-                    {typeof rec.multi_objective_score === 'number' ? rec.multi_objective_score.toFixed(2) : '--'}
+                  <td className="py-3 pr-4 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {rec.expected_impact?.cost_zar
+                      ? `R${rec.expected_impact.cost_zar}`
+                      : '--'}
+                  </td>
+                  <td className="py-3 pr-4 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {rec.actual_saving_zar
+                      ? `R${rec.actual_saving_zar}`
+                      : rec.outcome && rec.outcome.accuracy >= 0
+                        ? '⏳ Pending'
+                        : '--'}
+                  </td>
+                  <td className="py-3 pr-4">
+                    {rec.outcome_validated === true ? (
+                      <span style={{ color: "var(--color-sentinel-green)" }}>✅ Verified</span>
+                    ) : rec.outcome_validated === false ? (
+                      <span style={{ color: "var(--color-sentinel-red)" }}>❌ No gain</span>
+                    ) : rec.status === 'executed' || rec.status === 'auto_executed' ? (
+                      <span style={{ color: "var(--color-sentinel-amber)" }}>⏳ Verifying</span>
+                    ) : (
+                      <span style={{ color: "var(--color-sentinel-text-disabled)" }}>—</span>
+                    )}
                   </td>
                   <td className="py-3 pr-4">
                     <span
@@ -174,52 +191,10 @@ export const RecommendationHistory: React.FC<
                       {rec.status}
                     </span>
                   </td>
-                  <td className="py-3 pr-4">
-                    {rec.outcome ? (
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center"
-                          style={{ background: "var(--color-sentinel-bg-secondary)" }}
-                        >
-                          <span
-                            style={{
-                              color: rec.outcome.accuracy > 0.8
-                                ? "var(--color-sentinel-green)"
-                                : rec.outcome.accuracy > 0.5
-                                ? "var(--color-sentinel-amber)"
-                                : "var(--color-sentinel-red)",
-                            }}
-                          >
-                            {(rec.outcome.accuracy * 100).toFixed(0)}%
-                          </span>
-                        </div>
-                        <div className="text-xs">
-                          <p
-                            className="font-medium"
-                            style={{ color: "var(--color-sentinel-text-primary)" }}
-                          >
-                            Pred: {typeof rec.expected_impact?.temperature_c === 'number' ? `${rec.expected_impact.temperature_c.toFixed(1)}°C` : '--'}
-                          </p>
-                          <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                            Actual:{' '}
-                            {rec.outcome.actual.temperature_c?.toFixed(1) ?? '--'}°C
-                          </p>
-                        </div>
-                      </div>
-                    ) : (
-                      <span
-                        className="text-xs italic"
-                        style={{ color: "var(--color-sentinel-text-disabled)" }}
-                      >
-                        Pending...
-                      </span>
-                    )}
-                  </td>
-                  <td
-                    className="py-3 text-xs"
-                    style={{ color: "var(--color-sentinel-text-secondary)" }}
-                  >
-                    {new Date(rec.timestamp).toLocaleDateString()}
+                  <td className="py-3 pr-4 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    {rec.executed_at || rec.timestamp
+                      ? new Date(rec.executed_at || rec.timestamp).toLocaleDateString()
+                      : '--'}
                   </td>
                 </tr>
               ))}

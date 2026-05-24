@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { authorizedFetch } from '@/lib/api'
+import type { Equipment } from '@/lib/api/sites'
 import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
-import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry } from './mapCockpitState'
+import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry, type EquipmentWarningInput } from './mapCockpitState'
 import type { CockpitTwinZoneSignal, ModelReadiness } from './types'
+
+import type { BuildingTabId } from '@/lib/navigation'
 
 interface OverviewCockpitHostProps {
   siteId: string
@@ -19,6 +22,10 @@ interface OverviewCockpitHostProps {
   posture?: string | null
   systemFilter?: string | null
   onModuleDisplayChange?: (moduleDisplay: Record<string, string>) => void
+  siteFloors?: string[] // floors from building config (settings page), e.g. ['B1','L0','L1','L2']
+  activeMainTab: BuildingTabId
+  onMainTabChange: (tab: BuildingTabId) => void
+  isModuleActive: (module: string) => boolean
 }
 
 const POLL_INTERVAL_MS = 30_000
@@ -34,6 +41,7 @@ function useBuildingStatePayload(siteId: string) {
   const [payload, setPayload] = useState<BuildingStatePayload | null>(null)
   const [hvacOverview, setHvacOverview] = useState<HVACOverview | null>(null)
   const [energyTelemetry, setEnergyTelemetry] = useState<EnergyCentreTelemetry | null>(null)
+  const [equipment, setEquipment] = useState<Equipment[] | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
 
   useEffect(() => {
@@ -46,7 +54,7 @@ function useBuildingStatePayload(siteId: string) {
         controller?.abort()
         controller = new AbortController()
 
-        const [buildingStateRes, hvacRes, energyRes] = await Promise.all([
+        const [buildingStateRes, hvacRes, energyRes, equipmentRes] = await Promise.all([
           authorizedFetch(`/api/building-state/${encodeURIComponent(siteId)}`, {
             signal: controller.signal,
           }),
@@ -56,6 +64,9 @@ function useBuildingStatePayload(siteId: string) {
           authorizedFetch(`/api/energy-centre/power-summary/${encodeURIComponent(siteId)}`, {
             signal: controller.signal,
           }),
+          authorizedFetch(`/api/buildings/${encodeURIComponent(siteId)}/equipment`, {
+            signal: controller.signal,
+          }),
         ])
 
         if (!buildingStateRes.ok) {
@@ -63,6 +74,7 @@ function useBuildingStatePayload(siteId: string) {
             setPayload(null)
             setHvacOverview(null)
             setEnergyTelemetry(null)
+            setEquipment(null)
             setLastUpdatedAt(Date.now())
           }
           return
@@ -71,6 +83,7 @@ function useBuildingStatePayload(siteId: string) {
         const json = await buildingStateRes.json()
         const hvacJson = hvacRes.ok ? await hvacRes.json() : null
         const energyJson = energyRes.ok ? await energyRes.json() : null
+        const equipmentJson = equipmentRes.ok ? await equipmentRes.json() : null
         if (mounted) {
           setPayload(json.payload as BuildingStatePayload | null)
           setHvacOverview((hvacJson as HVACOverview | null) ?? null)
@@ -91,6 +104,7 @@ function useBuildingStatePayload(siteId: string) {
                 }
               : null,
           )
+          setEquipment(equipmentJson?.equipment ?? null)
           setLastUpdatedAt(Date.now())
         }
       } catch (error) {
@@ -110,7 +124,7 @@ function useBuildingStatePayload(siteId: string) {
     }
   }, [siteId])
 
-  return { payload, hvacOverview, energyTelemetry, lastUpdatedAt }
+  return { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt }
 }
 
 function buildCockpitSummary(
@@ -129,6 +143,7 @@ function buildCockpitSummary(
     predictionsCount: props.predictionsCount,
     equipmentCount: props.equipmentCount,
     dataFreshnessLabel: formatFreshness(lastUpdatedAt),
+    siteFloors: props.siteFloors ?? null,
   }
 }
 
@@ -145,6 +160,10 @@ export function OverviewCockpitHost({
   posture,
   systemFilter,
   onModuleDisplayChange: _onModuleDisplayChange,
+  siteFloors,
+  activeMainTab,
+  onMainTabChange,
+  isModuleActive,
 }: OverviewCockpitHostProps) {
   const { payload, hvacOverview, energyTelemetry, lastUpdatedAt } = useBuildingStatePayload(siteId)
   const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
@@ -209,11 +228,32 @@ export function OverviewCockpitHost({
 
   const state = useMemo(() => {
     const summary = buildCockpitSummary(
-      { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount },
+      { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, siteFloors },
       lastUpdatedAt,
     )
-    return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter)
-  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter])
+    // Extract floor_id from zone_key (e.g. Zone-L1-1 → L1, Zone-L3-ICU → L3)
+    const equipmentWarnings: EquipmentWarningInput[] = (equipment ?? [])
+      .filter((eq) => eq.health_score < 85)
+      .map((eq) => {
+        let floorId = ''
+        const zoneKey = eq.zone_key ?? ''
+        const match = zoneKey.match(/^Zone-(L\d+|B\d+|R|G)/i)
+        if (match) {
+          floorId = match[1].toUpperCase()
+        }
+        return {
+          id: eq.id,
+          equipment_id: eq.id,
+          code: eq.code,
+          equipment_type: eq.equipment_type,
+          floor_id: floorId,
+          health_score: eq.health_score,
+          health_state: eq.health_score >= 70 ? 'degraded' : 'critical',
+          zone_id: zoneKey,
+        }
+      })
+    return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter, equipmentWarnings)
+  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter, siteFloors, equipment])
 
   return (
     <CockpitView
@@ -225,6 +265,9 @@ export function OverviewCockpitHost({
       onZoneClose={() => setSelectedZone(null)}
       modelReadiness={modelReadiness}
       onAdvancePhase={handleAdvancePhase}
+      activeMainTab={activeMainTab}
+      onMainTabChange={onMainTabChange}
+      isModuleActive={isModuleActive}
     />
   )
 }

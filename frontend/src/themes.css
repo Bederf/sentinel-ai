@@ -3,6 +3,9 @@
 /* Maps Grafana-style variables to SENTINEL theme variables       */
 /* ═══════════════════════════════════════════════════════════════ */
 
+/* Base fonts — used by sentinel, ops, and glass themes */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
 :root {
   --color-grafana-text-primary: var(--color-sentinel-text-primary, #e2e8f0);
   --color-grafana-text-secondary: var(--color-sentinel-text-secondary, #64748b);
@@ -44,6 +47,67 @@
   --color-sentinel-blue: #3B82F6;
   --radius-panel: 6px;
   --shadow-panel: 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* ═══════════════════════════════════════════════════════════════ */
+/* REDUCED MOTION — WCAG AA accessibility                         */
+/* ═══════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  /* Matrix theme — disable animated glow/pulse effects */
+  .matrix-theme .panel::before,
+  .matrix-theme .panel::after,
+  [data-theme="matrix"] .panel::before,
+  [data-theme="matrix"] .panel::after {
+    box-shadow: none;
+    opacity: 0;
+  }
+  /* Matrix scanline overlay: non-animated static opacity 0.03 — remove via opacity 0 */
+  .matrix-theme::before,
+  [data-theme="matrix"]::before {
+    opacity: 0;
+  }
+  .matrix-theme .glow-green,
+  .matrix-theme .glow-blue,
+  [data-theme="matrix"] .glow-green,
+  [data-theme="matrix"] .glow-blue {
+    box-shadow: none;
+  }
+  /* Matrix tab underline transitions */
+  .matrix-theme .tab-item-active,
+  [data-theme="matrix"] .tab-item-active {
+    transition: none;
+  }
+  /* Matrix sidebar hover transitions */
+  .matrix-theme .sidebar-item-active:hover,
+  [data-theme="matrix"] .sidebar-item-active:hover {
+    transition: none;
+  }
+
+  /* Ops theme — disable animated glow effects */
+  .ops-theme .panel::before,
+  .ops-theme .card::before,
+  [data-theme="ops"] .panel::before,
+  [data-theme="ops"] .card::before {
+    box-shadow: none;
+    opacity: 0;
+  }
+  .ops-theme .glow-green,
+  .ops-theme .glow-blue,
+  [data-theme="ops"] .glow-green,
+  [data-theme="ops"] .glow-blue {
+    box-shadow: none;
+  }
+  /* Ops tab underline transitions */
+  .ops-theme .tab-item-active,
+  [data-theme="ops"] .tab-item-active {
+    transition: none;
+  }
+  /* Ops sidebar hover transitions */
+  .ops-theme .sidebar-item-active:hover,
+  [data-theme="ops"] .sidebar-item-active:hover {
+    transition: none;
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════ */
@@ -128,6 +192,9 @@
   --sentinel-shadow-panel: 0 0 10px var(--color-matrix-green-dim), inset 0 0 10px var(--color-matrix-green-dim);
   --sentinel-font-body: 'Share Tech Mono', 'JetBrains Mono', monospace;
   --sentinel-font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
+
+  /* Matrix-specific fonts — loaded only for this theme */
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 }
 
 @layer components {
@@ -138,7 +205,7 @@
   [data-theme="matrix"] .card {
     background: rgba(6, 14, 24, 0.85);
     border: 1px solid var(--color-matrix-green);
-    border-radius: 0;
+    border-radius: var(--sentinel-radius-md);
     box-shadow: var(--sentinel-shadow-panel);
     position: relative;
     overflow: hidden;
@@ -228,7 +295,7 @@
     color: var(--color-matrix-green);
     border: 1px solid var(--color-matrix-green);
     font-weight: 600;
-    border-radius: 0;
+    border-radius: var(--sentinel-radius-md);
     box-shadow: 0 0 8px var(--color-matrix-green-dim);
   }
 
@@ -304,7 +371,7 @@
   [data-theme="matrix"] .input-dark {
     background: rgba(6, 14, 24, 0.6);
     border-color: var(--color-matrix-green-dim);
-    border-radius: 0;
+    border-radius: var(--sentinel-radius-md);
   }
 
   .matrix-theme .input-dark:focus,
@@ -313,15 +380,23 @@
     box-shadow: 0 0 12px var(--color-matrix-green-dim), inset 0 0 4px var(--color-matrix-green-dim);
   }
 
+  /* Matrix focus — green ring */
+  .matrix-theme :focus-visible,
+  [data-theme="matrix"] :focus-visible {
+    outline-color: var(--color-sentinel-green);
+  }
+
   /* Matrix glow effects */
   .matrix-theme .glow-green,
   [data-theme="matrix"] .glow-green {
     box-shadow: 0 0 16px var(--color-matrix-green-glow);
+    will-change: box-shadow;
   }
 
   .matrix-theme .glow-blue,
   [data-theme="matrix"] .glow-blue {
     box-shadow: 0 0 16px var(--color-matrix-green-glow);
+    will-change: box-shadow;
   }
 
   .matrix-theme .glow-amber,
@@ -442,6 +517,12 @@
 }
 
 @layer components {
+  /* Ops focus — cyan ring */
+  .ops-theme :focus-visible,
+  [data-theme="ops"] :focus-visible {
+    outline-color: var(--color-sentinel-amber);
+  }
+
   /* Ops Panel — gradient background with subtle glow */
   .ops-theme .panel,
   .ops-theme .card,
@@ -852,6 +933,9 @@
   --sentinel-radius-xl: 16px;
   --sentinel-shadow-panel: 0 4px 24px rgba(0, 0, 0, 0.3), 0 1px 4px rgba(0, 0, 0, 0.2);
   --sentinel-font-body: 'Syne', -apple-system, sans-serif;
+
+  /* Teal-specific font — loaded only for this theme */
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
 }
 
 @layer components {

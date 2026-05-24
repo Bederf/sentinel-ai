@@ -15,7 +15,7 @@ The simulation layer (simulation_persistence.py) writes JSON only.
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from app.api.metrics import sentinel_data_freshness_violations_total
@@ -53,11 +53,54 @@ def _blend_health_score(
     return round(blended, 2)
 
 
+EQUIPMENT_EXPECTED_LIFE: dict[str, int] = {
+    'chiller': 20, 'ahu': 15, 'fcu': 15, 'vav': 20,
+    'pump': 15, 'cooling_tower': 20, 'bess': 10,
+    'generator': 25, 'ups': 10, 'meter': 20,
+    'lighting': 15, 'dali': 15,
+}
+
+
+def calculate_age_based_health(
+    install_date: date,
+    equipment_type: str,
+    last_service_date: date | None,
+) -> tuple[float, str]:
+    """Calculate health score from static factors only.
+    Used when no live telemetry is available.
+    Returns (health_score, confidence).
+    """
+    today = date.today()
+    expected_life = EQUIPMENT_EXPECTED_LIFE.get(equipment_type.lower(), 20)
+
+    age_years = (today - install_date).days / 365
+    age_health = max(0.0, 100.0 - (age_years / expected_life * 40.0))
+
+    service_penalty = 0.0
+    if last_service_date:
+        days_since_service = (today - last_service_date).days
+        service_interval = 365
+        if days_since_service > service_interval * 1.5:
+            service_penalty = 15.0
+        elif days_since_service > service_interval:
+            service_penalty = 8.0
+    else:
+        service_penalty = 10.0
+
+    health_score = round(max(30.0, age_health - service_penalty), 1)
+    return health_score, 'low'
+
+
 class SentinelDataSync:
     """SENTINEL Supabase sync + ML pipeline feeder."""
 
     def __init__(self, site_id: str | None = None):
-        self.site_id = site_id or get_primary_site_code() or "unknown"
+        raw = site_id or get_primary_site_code() or "unknown"
+        # Normalize to site-XXX format (not SXXX legacy)
+        if raw.startswith("S") and not raw.startswith("site-"):
+            num = raw[1:]  # "S002" → "002"
+            raw = f"site-{num}"
+        self.site_id = raw
 
         # ML feeder — accumulates sensor data and triggers training
         from app.services.sentinel_ml_feeder import SentinelMLFeeder
@@ -262,6 +305,12 @@ class SentinelDataSync:
         except Exception as e:
             results["errors"].append(f"supabase_sync: {e}")
 
+        # 2a. Calculate age-based health for equipment with no live telemetry
+        try:
+            results["no_telemetry_health_updated"] = await self._update_no_telemetry_health(simulated_time, equipment_states)
+        except Exception as e:
+            results["errors"].append(f"no_telemetry_health: {e}")
+
         # 3. Persist individual sensor readings to equipment_sensor_readings
         try:
             results["sensor_readings_written"] = self._write_sensor_readings(simulated_time, equipment_states)
@@ -315,7 +364,7 @@ class SentinelDataSync:
 
         health_calc = HealthRatingCalculator()
 
-        # Get equipment metadata from DB for health calculations
+        # Get equipment metadata from DB for health calculations and trend tracking
         equipment_codes = list(equipment_states.keys())
         equipment_meta = {}
         try:
@@ -324,7 +373,7 @@ class SentinelDataSync:
             client = get_supabase_client()
             resp = (
                 client.table("equipment")
-                .select("id, code, type, age_years, runtime_hours, operating_data")
+                .select("id, code, type, age_years, runtime_hours, operating_data, health_score")
                 .in_("code", equipment_codes)
                 .execute()
             )
@@ -332,6 +381,8 @@ class SentinelDataSync:
                 equipment_meta = {eq["code"]: eq for eq in resp.data}
         except Exception as e:
             logger.warning(f"Could not fetch equipment metadata: {e}")
+
+        ml_hours = self.ml_feeder.hours_ingested
 
         updates = []
         for code, state in equipment_states.items():
@@ -363,7 +414,6 @@ class SentinelDataSync:
 
             # Blend LSTM anomaly into health_score when gate is met.
             # health_score from caller is the "base" rule-based score.
-            ml_hours = self.ml_feeder.hours_ingested
             final_health_score = _blend_health_score(health_score, sensor_readings, ml_hours)
 
             if final_health_score is not None and health_score is not None and final_health_score != health_score:
@@ -390,7 +440,28 @@ class SentinelDataSync:
             status = health_to_status(final_health_score)
             h = round(final_health_score) if final_health_score is not None else None
 
-            updates.append((code, json.dumps(operating_data), h, status))
+            # Compute confidence and trend from available signals
+            eq_meta = equipment_meta.get(code, {})
+            existing_op = eq_meta.get("operating_data", {}) if isinstance(eq_meta.get("operating_data"), dict) else {}
+            has_live = bool(sensor_readings)
+            op_age = None
+            if existing_op:
+                # Estimate data age from first timestamp found in operating_data
+                for pt_data in existing_op.values():
+                    if isinstance(pt_data, dict) and pt_data.get("timestamp"):
+                        try:
+                            op_ts = datetime.fromisoformat(str(pt_data["timestamp"]).replace("Z", "+00:00"))
+                            op_age = int((simulated_time - op_ts).total_seconds() / 60)
+                            break
+                        except Exception:
+                            pass
+            confidence = health_calc.calculate_confidence(has_live, op_age, ml_hours)
+
+            prev_score = eq_meta.get("health_score")
+            trend = health_calc.calculate_trend(final_health_score or 0, prev_score)
+            data_freshness = op_age  # already computed above
+
+            updates.append((code, json.dumps(operating_data), h, status, confidence, trend, data_freshness, simulated_time.isoformat()))
 
         if not updates:
             return 0
@@ -400,7 +471,7 @@ class SentinelDataSync:
             conn.autocommit = True
             cur = conn.cursor()
 
-            values_sql = ",".join(cur.mogrify("(%s, %s::jsonb, %s::int, %s)", row).decode() for row in updates)
+            values_sql = ",".join(cur.mogrify("(%s, %s::jsonb, %s::int, %s, %s, %s, %s::int, %s::timestamptz)", row).decode() for row in updates)
 
             cur.execute(
                 f"""
@@ -408,9 +479,13 @@ class SentinelDataSync:
                     operating_data = v.operating_data,
                     health_score = v.health_score,
                     status = v.status,
+                    health_confidence = v.confidence,
+                    health_trend = v.trend,
+                    last_ml_update = v.last_ml_update,
+                    data_freshness_minutes = v.data_freshness,
                     updated_at = now()
                 FROM (VALUES {values_sql})
-                    AS v(code, operating_data, health_score, status)
+                    AS v(code, operating_data, health_score, status, confidence, trend, data_freshness, last_ml_update)
                 WHERE e.code = v.code
             """
             )
@@ -423,6 +498,115 @@ class SentinelDataSync:
         except Exception as e:
             logger.error(f"Supabase equipment sync failed: {e}")
             raise
+
+    async def _update_no_telemetry_health(
+        self,
+        simulated_time: datetime,
+        equipment_states: dict[str, dict[str, Any]],
+    ) -> int:
+        """Calculate and persist age-based health scores for equipment without live telemetry.
+
+        Queries all equipment for the current site, finds those not present in the
+        current telemetry cycle, and assigns an age-based health score derived
+        from install_date, equipment type, and service recency.
+
+        Returns:
+            Number of equipment updated.
+        """
+        import psycopg2
+
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            return 0
+
+        from app.database.repositories.equipment_repository import EquipmentRepository
+
+        # Resolve site code -> UUID
+        site_code = self.site_id
+        if site_code.startswith("S"):
+            num = site_code[1:]
+            site_code = f"site-{num}"
+
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        sites_resp = client.table("sites").select("id").eq("code", site_code).execute()
+        if not sites_resp.data:
+            return 0
+        site_uuid = sites_resp.data[0]["id"]
+
+        # Get all equipment for this site
+        eq_repo = EquipmentRepository()
+        all_equipment = eq_repo.get_all(site_id=site_uuid)
+
+        telemetry_codes = set(equipment_states.keys())
+        today = simulated_time.date()
+
+        updates: list[tuple[str, int, str, str, str]] = []
+        for eq in all_equipment:
+            code = eq.get("code", "")
+            if code in telemetry_codes:
+                continue
+
+            raw_install = eq.get("install_date")
+            if not raw_install:
+                continue
+
+            install_dt = date.fromisoformat(raw_install) if isinstance(raw_install, str) else raw_install
+
+            raw_service = eq.get("last_service")
+            service_dt: date | None = None
+            if raw_service:
+                service_dt = date.fromisoformat(raw_service) if isinstance(raw_service, str) else raw_service
+
+            score, confidence = calculate_age_based_health(
+                install_date=install_dt,
+                equipment_type=eq.get("type", ""),
+                last_service_date=service_dt,
+            )
+
+            health_int = round(score)
+            updates.append((code, health_int, confidence, "unknown", simulated_time.isoformat()))
+            logger.debug(
+                f"[HEALTH] {code} \u2014 age-based score: {score}%% "
+                f"(no telemetry, install_date={raw_install})"
+            )
+
+        if not updates:
+            return 0
+
+        try:
+            conn = psycopg2.connect(database_url)
+            conn.autocommit = True
+            cur = conn.cursor()
+
+            values_sql = ",".join(
+                cur.mogrify("(%s, %s::int, %s, %s, %s::timestamptz)", row).decode()
+                for row in updates
+            )
+
+            cur.execute(
+                f"""
+                UPDATE equipment AS e SET
+                    health_score = v.health_score,
+                    health_confidence = v.health_confidence,
+                    health_trend = v.health_trend,
+                    data_freshness_minutes = NULL,
+                    last_ml_update = NULL,
+                    updated_at = now()
+                FROM (VALUES {values_sql})
+                    AS v(code, health_score, health_confidence, health_trend, last_ml_update)
+                WHERE e.code = v.code
+                """
+            )
+            updated = cur.rowcount
+            cur.close()
+            conn.close()
+            logger.info(f"[HEALTH] Updated {updated} no-telemetry equipment with age-based scores")
+            return updated
+        except Exception as e:
+            logger.error(f"[HEALTH] No-telemetry batch update failed: {e}")
+            return 0
 
     def _upsert_equipment_analytics(
         self,

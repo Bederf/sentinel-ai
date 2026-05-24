@@ -7,6 +7,7 @@ editMessageReplyMarkup) from flow handlers.
 from __future__ import annotations
 
 import logging
+import os
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -72,6 +73,56 @@ class TelegramMessageSender:
             result = resp.json()
             if not result.get("ok"):
                 logger.error("Telegram sendMessage failed: %s", result)
+            return result
+
+    async def send_voice(
+        self,
+        chat_id: str,
+        audio_path: str,
+        caption: str | None = None,
+    ) -> dict:
+        """Send a voice/audio message using Telegram's sendAudio API.
+
+        Args:
+            chat_id: Target chat ID
+            audio_path: Local path to the audio file (OGG/Opus preferred, MP3 also works)
+            caption: Optional text caption shown above audio
+
+        Returns:
+            Telegram API response dict
+        """
+        if not os.path.exists(audio_path):
+            logger.error("Audio file not found: %s", audio_path)
+            return {"ok": False, "error": "audio_file_not_found"}
+
+        # Determine mime type from extension
+        ext = audio_path.lower().split(".")[-1]
+        mime_types = {"ogg": "audio/ogg", "mp3": "audio/mpeg", "oga": "audio/ogg", "opus": "audio/opus"}
+        mime_type = mime_types.get(ext, "audio/mpeg")
+
+        with open(audio_path, "rb") as f:
+            audio_data = f.read()
+
+        payload: dict[str, Any] = {
+            "chat_id": chat_id,
+        }
+        if caption:
+            payload["caption"] = caption
+            payload["parse_mode"] = "HTML"
+
+        files: dict[str, Any] = {
+            "audio": (os.path.basename(audio_path), audio_data, mime_type),
+        }
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            resp = await client.post(
+                f"{self._base}/sendAudio",
+                data=payload,
+                files=files,
+            )
+            result = resp.json()
+            if not result.get("ok"):
+                logger.error("Telegram sendAudio failed: %s", result)
             return result
 
     async def answer_callback_query(

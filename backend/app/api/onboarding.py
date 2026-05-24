@@ -12,14 +12,33 @@ Phase: 206-asset-onboarding
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.database.repositories.equipment_repository import EquipmentRepository
+from app.middleware.auth_middleware import AuthContext, require_auth
 from app.services.baseline_seed_service import BaselineSeedService
+
+
+class SeedBaselinesBody(BaseModel):
+    equipment_ids: list[str] = []
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
+
+
+def _check_site_access(auth: AuthContext, site_id: str) -> None:
+    """Raise 403 if auth context does not have access to site_id."""
+    from app.config.access_profiles import has_profile_site_access
+
+    email = getattr(auth, "email", None) or ""
+    if not has_profile_site_access(email, site_id):
+        raise HTTPException(
+            status_code=403,
+            detail=f"You do not have access to site {site_id}",
+        )
 
 
 async def _get_major_mechanical_equipment(site_id: str) -> list[dict[str, Any]]:
@@ -43,7 +62,10 @@ async def _get_major_mechanical_equipment(site_id: str) -> list[dict[str, Any]]:
 
 
 @router.get("/baseline-eligibility")
-async def check_baseline_eligibility(site_id: str) -> dict[str, Any]:
+async def check_baseline_eligibility(
+    site_id: str,
+    auth: AuthContext = Depends(require_auth()),
+) -> dict[str, Any]:
     """
     Check baseline eligibility for all major mechanical equipment at a site.
 
@@ -55,6 +77,7 @@ async def check_baseline_eligibility(site_id: str) -> dict[str, Any]:
     - already_baselined: Already has active baseline
     - not_applicable: Not major mechanical type
     """
+    _check_site_access(auth, site_id)
     equipment = await _get_major_mechanical_equipment(site_id)
 
     if not equipment:
@@ -135,18 +158,24 @@ def _get_eligibility_reason(status: str) -> str:
 
 
 @router.post("/seed-baselines")
-async def seed_baselines(site_id: str, equipment_ids: list[str]) -> dict[str, Any]:
+async def seed_baselines(
+    site_id: str,
+    body: SeedBaselinesBody = Body(...),
+    auth: AuthContext = Depends(require_auth()),
+) -> dict[str, Any]:
     """
     Seed baselines for specified equipment.
 
     Args:
         site_id: Site identifier
-        equipment_ids: List of equipment identifiers to seed
+        body: Request body with equipment_ids list
+        auth: Auth context (injected, validates site access)
 
     Returns:
         Batch result with seeded/skipped/error counts and per-equipment results
     """
-    if not equipment_ids:
+    _check_site_access(auth, site_id)
+    if not body.equipment_ids:
         return {
             "site_id": site_id,
             "total_requested": 0,
@@ -160,7 +189,7 @@ async def seed_baselines(site_id: str, equipment_ids: list[str]) -> dict[str, An
 
     try:
         results = await service.seed_batch(
-            equipment_ids=equipment_ids,
+            equipment_ids=body.equipment_ids,
             site_id=site_id,
             captured_by="automated",
         )
@@ -171,7 +200,7 @@ async def seed_baselines(site_id: str, equipment_ids: list[str]) -> dict[str, An
 
         return {
             "site_id": site_id,
-            "total_requested": len(equipment_ids),
+            "total_requested": len(body.equipment_ids),
             "seeded_count": seeded_count,
             "skipped_count": skipped_count,
             "error_count": error_count,

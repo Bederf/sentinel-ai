@@ -630,30 +630,24 @@ class DiagnosisFlowEngine:
         }
 
     def _get_resolution_step(self, flow: DiagnosisFlow) -> dict:
-        """Generate resolution plan with repair steps"""
+        """Generate resolution plan with repair steps, enriched with parts + maintenance guidance."""
         diagnosis = flow.collected_info.get("diagnosis", {})
         critical_findings = flow.collected_info.get("critical_findings", [])
 
-        # Get repair steps from fault info or generate generic ones
         repair_steps = []
         parts_needed = []
         safety_notes = []
 
         if flow.fault_info:
-            # Use recommended fix from fault lookup
             rec_fix = flow.fault_info.get("recommended_fix", {})
             if isinstance(rec_fix, dict):
                 repair_steps = rec_fix.get("immediate", [])
             elif isinstance(rec_fix, str):
                 repair_steps = [rec_fix]
-
-            # Get parts from fault lookup
             if flow.fault_info.get("parts_suggested"):
                 parts_needed = [p.get("part_name") for p in flow.fault_info.get("parts_suggested", [])]
-
             safety_notes = [flow.fault_info.get("safety_notes")] if flow.fault_info.get("safety_notes") else []
 
-        # Add generic safety notes
         if not safety_notes:
             safety_notes = [
                 "Always follow LOTO (Lock Out Tag Out) procedures",
@@ -661,11 +655,33 @@ class DiagnosisFlowEngine:
                 "Verify equipment is de-energized before service",
             ]
 
-        # Generate repair steps if not available from fault lookup
         if not repair_steps:
             repair_steps = self._generate_repair_steps(flow, critical_findings)
 
-        # Move to complete
+        # --- SPARE PARTS ENRICHMENT ---
+        equip_type = (flow.equipment.get("equipment_type") or "").lower()
+        spare_parts_list = self._get_spare_parts_for_equipment(equip_type)
+        if spare_parts_list:
+            if not parts_needed:
+                parts_needed = []
+            for sp in spare_parts_list:
+                pn = sp.get("part_name", "")
+                pnum = sp.get("part_number", "")
+                label = f"{pn}" + (f" (#{pnum})" if pnum else "")
+                if label not in parts_needed:
+                    parts_needed.append(label)
+
+        # --- MAINTENANCE GUIDANCE ENRICHMENT ---
+        from app.services.maintenance_recommender import DEFAULT_MAINTENANCE_ACTIONS
+        mfr_risk = "medium"
+        mfr_actions = DEFAULT_MAINTENANCE_ACTIONS.get(equip_type) or DEFAULT_MAINTENANCE_ACTIONS.get("default", {})
+        guidance = mfr_actions.get(mfr_risk, [])
+        if guidance:
+            maintenance_note = "Maintenance guidance for this equipment type:"
+            for action in guidance:
+                if action not in repair_steps:
+                    repair_steps.append(action)
+
         flow.advance_state(DiagnosisState.COMPLETE)
 
         return {
@@ -684,6 +700,18 @@ class DiagnosisFlowEngine:
             ],
             "flow": flow.to_dict(),
         }
+
+    def _get_spare_parts_for_equipment(self, equipment_type: str) -> list[dict]:
+        """Query the spare_parts table for parts matching the equipment type."""
+        if not equipment_type:
+            return []
+        try:
+            from app.database.repositories.spare_parts_repository import SparePartsRepository
+            repo = SparePartsRepository()
+            return repo.get_parts_for_type(equipment_type)
+        except Exception as e:
+            logger.debug("[PARTS] Could not fetch spare parts for %s: %s", equipment_type, e)
+            return []
 
     def _get_completion_step(self, flow: DiagnosisFlow) -> dict:
         """Generate completion summary"""

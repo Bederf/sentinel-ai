@@ -113,9 +113,11 @@ class CacheService:
             if data:
                 self._stats["hits"] += 1
                 self._inc_prometheus("hit")
+                logger.debug("[cache HIT] key=%s", key)
                 return json.loads(data)
             self._stats["misses"] += 1
             self._inc_prometheus("miss")
+            logger.debug("[cache MISS] key=%s", key)
             return None
         except Exception as e:
             self._stats["errors"] += 1
@@ -480,7 +482,7 @@ class CacheInvalidation:
         cache.delete(CacheKeys.user_access(email))
 
 
-_slow_query_logger = _logging.getLogger("sentinel.slow_queries")
+_slow_query_logger = _logging.getLogger("sentinel")
 
 # Threshold in seconds — queries slower than this get logged as warnings
 SLOW_QUERY_THRESHOLD_S = float(_os.environ.get("SLOW_QUERY_THRESHOLD_S", "0.5"))

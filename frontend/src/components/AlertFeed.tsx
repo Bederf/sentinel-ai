@@ -78,19 +78,19 @@ function getSeverityConfig(severity: Alert["severity"]): {
       };
     case "medium":
       return {
-        color: "var(--color-grafana-yellow)",
+        color: "var(--color-sentinel-yellow)",
         bg: "color-mix(in oklch, var(--color-sentinel-amber) 10%, transparent)",
         label: "MEDIUM",
       };
     case "low":
       return {
-        color: "var(--color-grafana-blue)",
+        color: "var(--color-sentinel-blue)",
         bg: "color-mix(in oklch, var(--color-sentinel-blue) 10%, transparent)",
         label: "LOW",
       };
     default:
       return {
-        color: "var(--color-grafana-text-secondary)",
+        color: "var(--color-sentinel-text-secondary)",
         bg: "color-mix(in oklch, var(--color-sentinel-text-disabled) 10%, transparent)",
         label: "INFO",
       };
@@ -260,18 +260,18 @@ export function AlertFeed({
       <div
         className="h-full rounded overflow-hidden flex flex-col"
         style={{
-          background: "var(--color-grafana-bg-panel)",
-          border: "1px solid var(--color-grafana-border)",
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
         }}
       >
         <div
           className="p-4 flex items-center gap-2"
-          style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+          style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
         >
-          <Bell className="h-5 w-5" style={{ color: "var(--color-grafana-orange)" }} />
+          <Bell className="h-5 w-5" style={{ color: "var(--color-sentinel-orange)" }} />
           <span
             className="font-medium text-sm"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             Recent Alerts
           </span>
@@ -279,7 +279,7 @@ export function AlertFeed({
         <div className="flex-1 flex items-center justify-center">
           <RefreshCw
             className="h-6 w-6 animate-spin"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           />
         </div>
       </div>
@@ -290,26 +290,26 @@ export function AlertFeed({
     <div
       className="h-full rounded overflow-hidden flex flex-col"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="p-4 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="flex items-center gap-3">
           <div
             className="p-2 rounded"
             style={{ background: "color-mix(in oklch, var(--color-sentinel-amber) 15%, transparent)" }}
           >
-            <Bell className="h-5 w-5" style={{ color: "var(--color-grafana-orange)" }} />
+            <Bell className="h-5 w-5" style={{ color: "var(--color-sentinel-orange)" }} />
           </div>
           <div>
             <h3
               className="font-medium text-sm"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               Recent Alerts
             </h3>
@@ -345,8 +345,8 @@ export function AlertFeed({
               onClick={handleClearAll}
               className="px-2 py-1 rounded text-xs font-medium transition-colors hover:brightness-125 flex items-center gap-1"
               style={{
-                background: "var(--color-grafana-bg-secondary)",
-                color: "var(--color-grafana-text-secondary)",
+                background: "var(--color-sentinel-bg-secondary)",
+                color: "var(--color-sentinel-text-secondary)",
               }}
               title="Mark all as read"
             >
@@ -357,12 +357,13 @@ export function AlertFeed({
           <button
             onClick={handleManualRefresh}
             className="p-2 rounded transition-colors hover:brightness-125"
-            style={{ background: "var(--color-grafana-bg-secondary)" }}
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
+            aria-label="Refresh alerts"
             title="Refresh alerts"
           >
             <RefreshCw
               className={`h-4 w-4 ${loading ? "animate-spin" : ""}`}
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             />
           </button>
         </div>
@@ -390,7 +391,7 @@ export function AlertFeed({
               className="h-12 w-12 mx-auto mb-2"
               style={{ color: "var(--color-status-success)" }}
             />
-            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               No active alerts
             </span>
           </div>
@@ -426,7 +427,7 @@ export function AlertFeed({
                       <span
                         className="text-sm line-clamp-2"
                         style={{
-                          color: "var(--color-grafana-text-primary)",
+                          color: "var(--color-sentinel-text-primary)",
                           fontWeight: isRead ? 400 : 500,
                         }}
                       >
@@ -454,11 +455,11 @@ export function AlertFeed({
 
                     {/* Context: Site and Equipment */}
                     <div className="flex items-center gap-2 text-xs mb-2">
-                      <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         {alert.site_name}
                       </span>
-                      <span style={{ color: "var(--color-grafana-text-disabled)" }}>•</span>
-                      <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      <span style={{ color: "var(--color-sentinel-text-disabled)" }}>•</span>
+                      <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         {alert.equipment_name}
                       </span>
                     </div>
@@ -468,12 +469,12 @@ export function AlertFeed({
                       <div
                         className="text-xs mb-2 px-2 py-1.5 rounded"
                         style={{
-                          borderLeft: "3px solid var(--color-grafana-blue)",
+                          borderLeft: "3px solid var(--color-sentinel-blue)",
                           backgroundColor: "rgba(61, 113, 217, 0.08)",
-                          color: "var(--color-grafana-text-primary)",
+                          color: "var(--color-sentinel-text-primary)",
                         }}
                       >
-                        <span style={{ color: "var(--color-grafana-blue)", fontWeight: 600 }}>Action: </span>
+                        <span style={{ color: "var(--color-sentinel-blue)", fontWeight: 600 }}>Action: </span>
                         {alert.recommended_action}
                       </div>
                     )}
@@ -497,7 +498,7 @@ export function AlertFeed({
                           className="px-1.5 py-0.5 rounded"
                           style={{
                             backgroundColor: "rgba(140, 140, 140, 0.12)",
-                            color: "var(--color-grafana-text-secondary)",
+                            color: "var(--color-sentinel-text-secondary)",
                             fontSize: "0.65rem",
                           }}
                         >
@@ -508,7 +509,7 @@ export function AlertFeed({
                             className="px-1.5 py-0.5 rounded"
                             style={{
                               backgroundColor: "rgba(140, 140, 140, 0.12)",
-                              color: "var(--color-grafana-text-secondary)",
+                              color: "var(--color-sentinel-text-secondary)",
                               fontSize: "0.65rem",
                             }}
                           >
@@ -523,11 +524,11 @@ export function AlertFeed({
                       <div className="flex items-center gap-1">
                         <Clock
                           className="h-3 w-3"
-                          style={{ color: "var(--color-grafana-text-disabled)" }}
+                          style={{ color: "var(--color-sentinel-text-disabled)" }}
                         />
                         <span
                           className="text-xs"
-                          style={{ color: "var(--color-grafana-text-disabled)" }}
+                          style={{ color: "var(--color-sentinel-text-disabled)" }}
                         >
                           {getRelativeTime(alert.created_at)}
                         </span>
@@ -579,11 +580,11 @@ export function AlertFeed({
       {/* Footer with last refresh time */}
       <div
         className="p-3 text-center"
-        style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+        style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
       >
         <span
           className="text-xs"
-          style={{ color: "var(--color-grafana-text-disabled)" }}
+          style={{ color: "var(--color-sentinel-text-disabled)" }}
         >
           Updated: {lastRefresh.toLocaleTimeString()}
           {refreshInterval > 0 && (

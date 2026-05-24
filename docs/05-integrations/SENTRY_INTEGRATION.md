@@ -78,8 +78,8 @@ Free-text messages and inline keyboard callbacks are now routed through the back
                     ┌─────────┴─────────┐
                     ▼                   ▼
             Slash commands         Free-text / Callbacks
-            (/info_, /WO_,         ("too hot", "broken tap",
-             /inspect_, etc.)       button taps)
+            (/info-, /WO-,         ("too hot", "broken tap",
+             /inspect-, etc.)       button taps)
                     │                   │
                     ▼                   ▼
 ┌──────────────────────┐  ┌──────────────────────────────────┐
@@ -435,11 +435,11 @@ Root Cause Analysis (FCU valve stuck at 15%)
 Alert Notifier → Sentry Bot → Telegram FM Group
     ↓
 FM chooses action via slash commands:
-  /info_    → Equipment details + checklist
-  /reset_   → Remote on/off to clear fault
-  /inspect_ → Dispatch technician for physical check
-  /WO_      → Formal maintenance work order
-  /note_    → Log observation only
+  /info-    → Equipment details + checklist
+  /reset-   → Remote on/off to clear fault
+  /inspect- → Dispatch technician for physical check
+  /WO-      → Formal maintenance work order
+  /note-    → Log observation only
 ```
 
 ### Alert Notification Format
@@ -456,18 +456,18 @@ FCU valve stuck at 15% - insufficient chilled water flow
 
 ⏰ Time: 14:32:15
 ━━━━━━━━━━━━━━━━━━
-/info_S002_FCU_L10_03 - More info
-/reset_S002_FCU_L10_03 - Remote reset
-/inspect_S002_FCU_L10_03 - Send technician
-/WO_S002_FCU_L10_03 - Raise work order
-/note_S002_FCU_L10_03 - Add note
+/info-S002_FCU_L10_03 - More info
+/reset-S002_FCU_L10_03 - Remote reset
+/inspect-S002_FCU_L10_03 - Send technician
+/WO-S002_FCU_L10_03 - Raise work order
+/note-S002_FCU_L10_03 - Add note
 ```
 
 **Important: Telegram Command Format**
 
 Telegram bot commands can only contain letters, numbers, and underscores. Commands end at hyphens or spaces. Therefore:
 
-- Equipment code `FCU-L10-03` becomes command `/WO_FCU_L10_03`
+- Equipment code `FCU-L10-03` becomes command `/WO-FCU_L10_03`
 - Sentry converts underscores back to dashes when looking up equipment
 - The actual equipment code is displayed in the `Code:` field for reference
 
@@ -508,52 +508,52 @@ Sentry uses AI-driven slash commands (not hardcoded handlers). The bot reads `SO
 
 ### FM Workflow
 
-**Standard flow:** Alert → `/info_` → Action (`/reset_`, `/inspect_`, `/WO_`) → `/note_`
+**Standard flow:** Alert → `/info-` → Action (`/reset-`, `/inspect-`, `/WO-`) → `/note-`
 
 Each response ends with clickable next-step buttons (excluding the command just used).
 
-**Web Chat Integration:** The same FM workflow is enforced in the SENTINEL web chat. Claude presents `/info_`, `/inspect_`, `/WO_`, `/note_` as clickable buttons (rendered via `COMMAND_RE` regex in `ChatMessage.tsx`). Claude's system prompt and tool description instruct it to follow the FM process rather than calling `create_work_order` directly. When the tool is called, it routes through `POST /api/sentry/create-work-order` (same as `/WO_` slash command) to persist to Supabase.
+**Web Chat Integration:** The same FM workflow is enforced in the SENTINEL web chat. Claude presents `/info-`, `/inspect-`, `/WO-`, `/note-` as clickable buttons (rendered via `COMMAND_RE` regex in `ChatMessage.tsx`). Claude's system prompt and tool description instruct it to follow the FM process rather than calling `create_work_order` directly. When the tool is called, it routes through `POST /api/sentry/create-work-order` (same as `/WO-` slash command) to persist to Supabase.
 
 ### Command Reference
 
 | Command | Purpose | Response to FM |
 |---------|---------|----------------|
-| `/info_{code}` | Full equipment details: health, make, model, service history, inspection checklist | Detailed report + buttons: `/reset_`, `/inspect_`, `/WO_`, `/note_` |
-| `/reset_{code}` | Remote on/off to clear fault (blocked for FIRE/GEN) | Reset result + buttons: `/info_`, `/inspect_`, `/WO_`, `/note_` |
-| `/inspect_{code}` | Create inspection WO + dispatch technician via Telegram | One-line ack: `✅ #WO-XXXX sent to {name}` |
-| `/WO_{code}` | Formal maintenance work order (asks FM for title/desc/priority) | WO confirmation + buttons: `/reset_`, `/info_`, `/inspect_`, `/note_` |
-| `/note_{code}` | Add maintenance note to equipment record | Confirmation + buttons: `/info_`, `/reset_`, `/inspect_`, `/WO_` |
+| `/info-{code}` | Full equipment details: health, make, model, service history, inspection checklist | Detailed report + buttons: `/reset-`, `/inspect-`, `/WO-`, `/note-` |
+| `/reset-{code}` | Remote on/off to clear fault (blocked for FIRE/GEN) | Reset result + buttons: `/info-`, `/inspect-`, `/WO-`, `/note-` |
+| `/inspect-{code}` | Create inspection WO + dispatch technician via Telegram | One-line ack: `✅ #WO-XXXX sent to {name}` |
+| `/WO-{code}` | Formal maintenance work order (asks FM for title/desc/priority) | WO confirmation + buttons: `/reset-`, `/info-`, `/inspect-`, `/note-` |
+| `/note-{code}` | Add maintenance note to equipment record | Confirmation + buttons: `/info-`, `/reset-`, `/inspect-`, `/WO-` |
 
-**Telegram command format:** Equipment dashes become underscores (`S002-FCU-301` → `/info_S002_FCU_301`). Bot converts back when calling API.
+**Telegram command format:** Equipment dashes become underscores (`S002-FCU-301` → `/info-S002_FCU_301`). Bot converts back when calling API.
 
-### `/inspect_` — Dispatch Flow
+### `/inspect-` — Dispatch Flow
 
-The `/inspect_` command is a **silent dispatch** — it creates a work order and notifies the technician without verbose output to the FM:
+The `/inspect-` command is a **silent dispatch** — it creates a work order and notifies the technician without verbose output to the FM:
 
-1. FM sends `/inspect_S002_FCU_301`
+1. FM sends `/inspect-S002_FCU_301`
 2. Bot calls `POST /api/sentry/create-work-order` with `telegram_user_id` for audit
 3. Bot sends tech a Telegram message via `sentry message send --target {technician_telegram_id}`:
    ```
    #WO-2026-0030 — S002-FCU-301
    ━━━━━━━━━━━━━━━━━━
-   /info_S002_FCU_301 - Equipment details
-   /note_S002_FCU_301 - Add note
+   /info-S002_FCU_301 - Equipment details
+   /note-S002_FCU_301 - Add note
    ```
 4. Bot replies to FM: `✅ #WO-2026-0030 sent to John Smith` (one line, no buttons)
 
-**Important:** Technicians only get `/info_` and `/note_` buttons. They do NOT get `/reset_`, `/WO_`, or `/inspect_`.
+**Important:** Technicians only get `/info-` and `/note-` buttons. They do NOT get `/reset-`, `/WO-`, or `/inspect-`.
 
-### `/WO_` — Formal Work Order
+### `/WO-` — Formal Work Order
 
-When FM clicks `/WO_`, the bot asks for title, description, and priority before creating the work order:
+When FM clicks `/WO-`, the bot asks for title, description, and priority before creating the work order:
 
-1. FM sends `/WO_S002_FCU_301`
+1. FM sends `/WO-S002_FCU_301`
 2. Bot asks for work order details (title, description, priority)
 3. Bot calls `POST /api/sentry/create-work-order`
 4. Bot sends email notification to assigned technician
 5. Bot confirms to FM with WO code and assignment
 
-### `/note_` — Log Note
+### `/note-` — Log Note
 
 For observations that don't require action. Bot asks the FM for the note text, then logs it against the equipment record.
 
@@ -777,14 +777,14 @@ The inspection skill is a complete end-to-end workflow: FM dispatches, tech insp
 ### Full Flow
 
 ```
-FM: /inspect_S002_FCU_301
+FM: /inspect-S002_FCU_301
     ↓
 Bot: Creates WO via POST /api/sentry/create-work-order
     ↓
-Bot → Tech (Telegram): "#WO-2026-0030 — S002-FCU-301" + /info_ + /note_
+Bot → Tech (Telegram): "#WO-2026-0030 — S002-FCU-301" + /info- + /note-
 Bot → FM: "✅ #WO-2026-0030 sent to John Smith"
     ↓
-Tech: /info_S002_FCU_301 (sees equipment details + inspection checklist)
+Tech: /info-S002_FCU_301 (sees equipment details + inspection checklist)
     ↓
 Tech inspects on-site
     ↓
@@ -801,7 +801,7 @@ Bot: Saves to Supabase via POST /api/sentry/inspection-result
     ↓
 Bot → FM: AI-curated diagnosis with findings + recommendations + next-step commands
     ↓
-FM: /WO_S002_FCU_301 (if needed, creates formal repair work order)
+FM: /WO-S002_FCU_301 (if needed, creates formal repair work order)
 ```
 
 ### Data Persistence

@@ -138,7 +138,7 @@ class ExplanationService:
         query = f"{failure_type} {equipment_type} maintenance troubleshooting"
 
         # Hybrid search for relevant documentation
-        doc_results = self.vector_db.hybrid_search(query=query, n_results=3, equipment_type=equipment_type)
+        doc_results = await self.vector_db.hybrid_search(query=query, n_results=3, equipment_type=equipment_type)
 
         # Also search knowledge base
         knowledge_results = self.vector_db.search_knowledge(

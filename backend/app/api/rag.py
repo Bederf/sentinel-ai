@@ -167,7 +167,7 @@ async def hybrid_search(
     client = get_supabase_client()
     vector_db = get_vector_db_service(client)
 
-    results = vector_db.hybrid_search(
+    results = await vector_db.hybrid_search(
         query=query,
         n_results=n_results,
         equipment_type=equipment_type,

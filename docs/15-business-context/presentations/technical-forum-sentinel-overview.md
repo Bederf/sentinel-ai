@@ -56,7 +56,7 @@ An AI layer that sits on top of your existing BMS (Siemens Desigo, Tridonic DALI
 - Occupancy-driven optimisation: empty zones get relaxed setpoints and dimmed lighting automatically
 
 **Technician Tools**
-- Telegram bot: `/info_` for equipment status, `/inspect_` for guided inspections, `done #WO-XXXX` to complete
+- Telegram bot: `/info-` for equipment status, `/inspect-` for guided inspections, `done #WO-XXXX` to complete
 - No app install — browser-based dashboard works on iPads, phones, media walls
 
 ---

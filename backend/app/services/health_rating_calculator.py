@@ -213,8 +213,51 @@ class HealthRatingCalculator:
         return round(_clamp(score), 1)
 
     # ------------------------------------------------------------------
-    # Status (delegated)
+    # Data quality helpers
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def calculate_confidence(
+        has_live_telemetry: bool,
+        operating_data_age_minutes: int | None,
+        ml_hours_accumulated: float,
+    ) -> str:
+        """Score the confidence in a health assessment.
+
+        Returns:
+            'high': live telemetry confirmed, operating_data fresh (<=30 min), ML trained
+            'medium': some telemetry or ML model warming up
+            'low': no live telemetry or operating_data empty/stale
+        """
+        if not has_live_telemetry or operating_data_age_minutes is None:
+            return "low"
+        if operating_data_age_minutes > 30:
+            return "low"
+        if ml_hours_accumulated < 72:
+            return "medium"
+        return "high"
+
+    @staticmethod
+    def calculate_trend(
+        current_score: float,
+        previous_score: float | None,
+    ) -> str:
+        """Determine health trend from current and previous score.
+
+        Returns:
+            'improving': score increased by >2 points (lower degradation)
+            'stable': score change within ±2 points
+            'degrading': score dropped by >2 points
+            'unknown': no previous score available
+        """
+        if previous_score is None:
+            return "unknown"
+        delta = current_score - previous_score
+        if delta > 2:
+            return "improving"
+        if delta < -2:
+            return "degrading"
+        return "stable"
 
     @staticmethod
     def get_health_status(score: float) -> str:

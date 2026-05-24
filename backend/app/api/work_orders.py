@@ -1017,12 +1017,33 @@ async def create_technician_work_order(
     try:
         repo = get_work_order_repository()
 
+        parts_required = list(order.parts_needed or [])
+
+        # Enrich parts_required from spare_parts catalog if equipment type is known
+        if not parts_required and order.equipment_id:
+            try:
+                from app.database.repositories.equipment_repository import EquipmentRepository
+                eq = EquipmentRepository().get_by_id(order.equipment_id)
+                if eq:
+                    from app.database.repositories.spare_parts_repository import SparePartsRepository
+                    sp_repo = SparePartsRepository()
+                    equip_type = (eq.get("type") or "").lower()
+                    catalog_parts = sp_repo.get_parts_for_type(equip_type)
+                    for sp in catalog_parts:
+                        pn = sp.get("part_name", "")
+                        pnum = sp.get("part_number", "")
+                        label = f"{pn}" + (f" (#{pnum})" if pnum else "")
+                        if label not in parts_required:
+                            parts_required.append(label)
+            except Exception as e:
+                logger.debug("[PARTS] Could not enrich parts_required: %s", e)
+
         payload: dict[str, Any] = {
             "title": f"Technician: {order.fault_description[:80]}",
             "description": order.fault_description,
             "priority": _to_db_priority(order.priority),
             "status": "draft",
-            "parts_required": order.parts_needed or [],
+            "parts_required": parts_required,
             "follow_up_notes": order.technician_notes,
             "findings": order.diagnosis,
             "estimated_duration_hours": _parse_duration_hours(order.estimated_duration),
@@ -1277,6 +1298,24 @@ async def complete_technician_work_order(
     updated = await repo.update_work_order(work_order_id, updates)
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to complete work order")
+
+    # Decrement spare_parts_inventory for parts_used
+    try:
+        from app.database.repositories.spare_parts_repository import SparePartsRepository
+        sp_repo = SparePartsRepository()
+        used_parts = completion.parts_used or []
+        for used in used_parts:
+            search_results = sp_repo.search_parts(used, limit=3)
+            for sp in search_results:
+                inv = sp.get("spare_parts_inventory")
+                if isinstance(inv, list):
+                    inv = inv[0] if inv else {}
+                if isinstance(inv, dict) and inv.get("quantity_on_hand", 0) > 0:
+                    sp_repo.decrement_stock(sp["id"])
+                    logger.info("[PARTS] Decremented %s (%s) from inventory", sp.get("part_name"), sp.get("part_number"))
+                    break
+    except Exception as e:
+        logger.debug("[PARTS] Could not decrement inventory: %s", e)
 
     # Workflow integration: trigger repair completed
     try:

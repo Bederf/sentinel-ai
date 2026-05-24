@@ -148,9 +148,9 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                       }}
                       className="w-48 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
                       style={{
-                        background: "var(--color-grafana-bg-secondary)",
-                        border: "1px solid var(--color-grafana-border)",
-                        color: "var(--color-grafana-text-primary)",
+                        background: "var(--color-sentinel-bg-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
+                        color: "var(--color-sentinel-text-primary)",
                         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
                         outline: "none",
                       }}
@@ -179,9 +179,9 @@ export function ColumnMappingStep({ siteId: _siteId, formatDetection, onNext, on
                         }}
                         className="w-36 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
                         style={{
-                          background: "var(--color-grafana-bg-secondary)",
-                          border: "1px solid var(--color-grafana-border)",
-                          color: "var(--color-grafana-text-primary)",
+                          background: "var(--color-sentinel-bg-secondary)",
+                          border: "1px solid var(--color-sentinel-border)",
+                          color: "var(--color-sentinel-text-primary)",
                           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
                           outline: "none",
                         }}

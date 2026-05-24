@@ -1,6 +1,6 @@
 """Slash command router for web chat.
 
-Intercepts FM workflow commands (/info_, /WO_, /inspect_, /reset_, /note_)
+Intercepts FM workflow commands (/info-, /WO-, /reset-, /note-)
 before the AI pipeline, calling internal APIs directly. Works even when
 Claude credits are exhausted — no AI invocation needed.
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # Pattern: /command_EQUIPMENT_CODE [optional trailing text]
 # Equipment codes use underscores in chat (S002_FCU_301), converted to dashes for APIs.
 _SLASH_RE = re.compile(
-    r"^/(info|WO|inspect|reset|note|status_WO)[-_]([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
+    r"^/(info|WO|reset|note|status_WO)[-_]([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
     re.DOTALL,
 )
 
@@ -56,8 +56,8 @@ def parse(message: str) -> tuple[str, str, str | None] | None:
 
 
 def _code_for_buttons(equipment_code: str) -> str:
-    """Convert dashed equipment code back to underscored form for chat buttons."""
-    return equipment_code.replace("-", "_")
+    """Convert underscored equipment code back to dashed form for chat buttons."""
+    return equipment_code.replace("_", "-")
 
 
 def _base_url() -> str:
@@ -92,7 +92,7 @@ def _parse_assign(extra: str | None) -> tuple[str | None, str | None]:
 def _quick_actions(code: str) -> str:
     """Render the quick-actions footer with clickable commands."""
     c = _code_for_buttons(code)
-    return f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/reset_{c}` \u00b7 `/WO_{c}` \u00b7 `/note_{c}`"
+    return f"\n---\n**Quick Actions:** `/info-{c}` \u00b7 `/reset-{c}` \u00b7 `/WO-{c}` \u00b7 `/note-{c}`"
 
 
 async def _notify_technician(
@@ -105,18 +105,17 @@ async def _notify_technician(
 ) -> None:
     """Send Telegram + email notification to the assigned technician.
 
-    Mirrors bms_inspect.py / bms_wo.py: uses ``sentry message send`` CLI
-    for Telegram and the work_order_notifier for email.
+    Uses ``sentry message send`` CLI for Telegram and work_order_notifier for email.
     """
-    code_underscored = equipment_code.replace("-", "_")
+    code_dashed = equipment_code.replace("_", "-")
 
     # --- Telegram via sentry CLI ---
     if tech_telegram_id:
+        assigned = tech_name or "Pending"
         msg = (
-            f"\U0001f527 #{wo_code} \u2014 {equipment_code}\n"
-            f"\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n"
-            f"/info_{code_underscored} - Equipment details\n"
-            f"/note_{code_underscored} - Add note"
+            f"Work Order Created #{wo_code}\n"
+            f"Assigned: {assigned}\n"
+            f"Priority: {priority.upper()}"
         )
         cli = get_sentry_bot_cli()
         try:
@@ -149,7 +148,7 @@ async def _notify_technician(
 
             svc = get_email_reply_service()
             if svc.is_configured():
-                # Gather equipment context + checklist for the email
+                # Gather equipment context for the email
                 body_plain = await _build_wo_email_body(
                     wo_code,
                     equipment_code,
@@ -180,7 +179,7 @@ async def _build_wo_email_body(
     priority: str,
     tech_name: str | None,
 ) -> str:
-    """Fetch equipment info + checklist and build a full briefing email."""
+    """Fetch equipment info and build a full briefing email."""
     lines = [
         f"WORK ORDER: {wo_code}",
         f"Equipment: {equipment_code}",
@@ -243,45 +242,11 @@ async def _build_wo_email_body(
     except Exception as exc:
         logger.debug("Could not fetch alerts for email: %s", exc)
 
-    # --- Inspection checklist ---
-    eq_type = equipment_code.split("-")[1].lower() if "-" in equipment_code else ""
-    if eq_type:
-        try:
-            async with httpx.AsyncClient(timeout=10) as client:
-                resp = await client.get(
-                    f"{_base_url()}/api/sentry/inspection-checklist/{eq_type}",
-                    headers=_sentry_headers(),
-                )
-            if resp.status_code == 200:
-                cl = resp.json()
-                if cl.get("found"):
-                    lines.append("=" * 50)
-                    lines.append("INSPECTION CHECKLIST")
-                    lines.append("=" * 50)
-                    tpl = cl.get("template_name", "Inspection")
-                    est = cl.get("estimated_minutes", "")
-                    lines.append(f"{tpl}" + (f" (est. {est} min)" if est else ""))
-                    lines.append("")
-                    for item in cl.get("items", []):
-                        q = item.get("question") or item.get("description", "")
-                        cat = item.get("category", "")
-                        opts = item.get("options")
-                        line = f"  [ ] {q}"
-                        if cat:
-                            line += f"  ({cat})"
-                        if opts:
-                            line += f"  — {' / '.join(opts)}"
-                        lines.append(line)
-                    lines.append("")
-        except Exception as exc:
-            logger.debug("Could not fetch checklist for email: %s", exc)
-
     lines.append("=" * 50)
     lines.append("INSTRUCTIONS")
     lines.append("=" * 50)
-    lines.append("1. Inspect the equipment using the checklist above.")
-    lines.append(f"2. When complete, reply 'done #{wo_code}' in Telegram.")
-    lines.append("3. The bot will guide you through the debrief checklist.")
+    lines.append(f"1. Reply 'done #{wo_code}' in Telegram when work is complete.")
+    lines.append("2. Use /info and /note commands as needed.")
     lines.append("")
     lines.append("-- SENTINEL Work Order System")
 
@@ -298,7 +263,6 @@ async def execute(
     handlers = {
         "info": _handle_info,
         "WO": _handle_wo,
-        "inspect": _handle_inspect,
         "reset": _handle_reset,
         "note": _handle_note,
         "status_WO": _handle_status_wo,
@@ -412,22 +376,6 @@ async def _handle_wo(code: str, extra: str | None, user: str | None) -> CommandR
     # 2. Send Telegram + email to the assigned technician (fire-and-forget)
     asyncio.create_task(_notify_technician(wo_code, code, tech_telegram_id, tech_email, assigned, priority))
 
-    # 3. Fetch inspection checklist
-    eq_type = code.split("-")[1].lower() if "-" in code else "unknown"
-    checklist_text = ""
-    async with httpx.AsyncClient(timeout=10) as client:
-        try:
-            cl_resp = await client.get(
-                f"{_base_url()}/api/sentry/inspection-checklist/{eq_type}",
-                headers=_sentry_headers(),
-            )
-            if cl_resp.status_code == 200:
-                cl = cl_resp.json()
-                if cl.get("found"):
-                    checklist_text = f"\n\n### Inspection Checklist\n{cl.get('checklist_text', '')}"
-        except Exception:
-            pass  # Checklist is optional
-
     c = _code_for_buttons(code)
     notified_via = []
     if tech_telegram_id:
@@ -448,66 +396,9 @@ async def _handle_wo(code: str, extra: str | None, user: str | None) -> CommandR
         f"| **Notified Via** | {notified_str} |",
         "| **Status** | scheduled |",
     ]
-    if checklist_text:
-        lines.append(checklist_text)
 
-    lines.append(f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/note_{c}`")
+    lines.append(f"\n---\n**Quick Actions:** `/info-{c}` \u00b7 `/note-{c}`")
     return CommandResult(message="\n".join(lines))
-
-
-async def _handle_inspect(code: str, extra: str | None, user: str | None) -> CommandResult:
-    """Create a work order + notify tech via Telegram + email."""
-    assigned_to, remaining = _parse_assign(extra)
-    title = remaining or f"Inspection requested for {code}"
-
-    payload: dict = {
-        "equipment_code": code,
-        "title": title,
-        "description": f"Inspection requested via web chat: {title}",
-        "priority": "medium",
-        "created_by": user or "web-chat",
-    }
-    if assigned_to:
-        payload["assigned_to"] = assigned_to
-
-    async with httpx.AsyncClient(timeout=20) as client:
-        wo_resp = await client.post(
-            f"{_base_url()}/api/sentry/create-work-order",
-            json=payload,
-            headers=_sentry_headers(),
-        )
-
-    if wo_resp.status_code != 200:
-        return CommandResult(
-            message=f"Failed to create inspection for `{code}` (HTTP {wo_resp.status_code}).",
-            success=False,
-        )
-
-    wo = wo_resp.json()
-    wo_code = wo.get("code", "N/A")
-    assigned = wo.get("assigned_to", "Unassigned")
-    tech_telegram_id = wo.get("technician_telegram_id")
-    tech_email = wo.get("technician_email")
-
-    # Send Telegram + email to the assigned technician (fire-and-forget)
-    asyncio.create_task(_notify_technician(wo_code, code, tech_telegram_id, tech_email, assigned, "medium"))
-
-    c = _code_for_buttons(code)
-    notified_via = []
-    if tech_telegram_id:
-        notified_via.append("Telegram")
-    if tech_email:
-        notified_via.append(f"email ({tech_email})")
-    notified_str = " + ".join(notified_via) if notified_via else "no contact info on file"
-
-    return CommandResult(
-        message=(
-            f"## Inspection Scheduled\n\n"
-            f"**WO:** `{wo_code}` | **Equipment:** `{code}` | **Assigned:** {assigned}\n\n"
-            f"Technician notified via {notified_str}.\n"
-            f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/note_{c}`"
-        )
-    )
 
 
 async def _handle_reset(code: str, extra: str | None, user: str | None) -> CommandResult:
@@ -520,10 +411,30 @@ async def _handle_reset(code: str, extra: str | None, user: str | None) -> Comma
         return CommandResult(
             message=(
                 f"**Reset blocked:** `{eq_type}` equipment cannot be remotely reset for safety reasons.\n\n"
-                f"Create a work order instead: `/WO_{c}`"
+                f"Create a work order instead: `/WO-{c}`"
             ),
             success=False,
         )
+
+    # Gate: only available in supervised or auto mode with control module active
+    try:
+        from app.services.control_policy_engine import ControlPolicyEngine
+        from app.services.control_policy_engine import ControlMode
+
+        engine = ControlPolicyEngine()
+        mode = engine.get_control_mode()
+        if mode == ControlMode.RECOMMEND:
+            c = _code_for_buttons(code)
+            return CommandResult(
+                message=(
+                    f"**Reset not available:** System is in advisory mode.\n"
+                    f"Remote reset requires supervised or automatic control mode.\n"
+                    f"Create a work order instead: `/WO-{c}`"
+                ),
+                success=False,
+            )
+    except Exception:
+        pass  # If gate check fails, allow the request (defense in depth)
 
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.post(
@@ -546,7 +457,7 @@ async def _handle_reset(code: str, extra: str | None, user: str | None) -> Comma
     if data.get("blocked"):
         c = _code_for_buttons(code)
         return CommandResult(
-            message=f"**Reset blocked:** {data.get('reason', 'Unknown reason')}\n\n`/WO_{c}`",
+            message=f"**Reset blocked:** {data.get('reason', 'Unknown reason')}\n\n`/WO-{c}`",
             success=False,
         )
 
@@ -560,7 +471,7 @@ async def _handle_reset(code: str, extra: str | None, user: str | None) -> Comma
             f"**Equipment:** `{code}`\n"
             f"**Health:** {prev_health}% \u2192 {new_health}%\n"
             f"**Predictions resolved:** {data.get('predictions_resolved', 0)}\n"
-            f"\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/WO_{c}`"
+            f"\n---\n**Quick Actions:** `/info-{c}` \u00b7 `/WO-{c}`"
         )
     )
 
@@ -571,7 +482,7 @@ async def _handle_note(code: str, extra: str | None, user: str | None) -> Comman
         c = _code_for_buttons(code)
         return CommandResult(
             message=(
-                f"**Usage:** `/note_{c} <your note text>`\n\nExample: `/note_{c} Filter replaced during inspection`"
+                f"**Usage:** `/note-{c} <your note text>`\n\nExample: `/note-{c} Filter replaced during maintenance`"
             ),
             success=False,
         )
@@ -599,7 +510,7 @@ async def _handle_note(code: str, extra: str | None, user: str | None) -> Comman
 
     c = _code_for_buttons(code)
     return CommandResult(
-        message=(f"**Note saved** for `{code}`\n\n> {extra}\n\n---\n**Quick Actions:** `/info_{c}` \u00b7 `/WO_{c}`")
+        message=(f"**Note saved** for `{code}`\n\n> {extra}\n\n---\n**Quick Actions:** `/info-{c}` \u00b7 `/WO-{c}`")
     )
 
 

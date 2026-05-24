@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Body, HTTPException, Request
+from fastapi import APIRouter, Body, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.config.settings import settings
@@ -24,6 +24,7 @@ from app.models.optimization import (
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.approval_service import get_approval_service
+from app.services.decision_event_logger import emit_decision_event
 from app.services.audit_logger import AuditLogger
 from app.services.device_abstraction import device_manager
 from app.services.eskomsepush_service import eskomsepush_service
@@ -534,10 +535,49 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
         routing_decisions = []
         recommendations_list = rec_dict.get("recommendations", [])
         _rec_repo = RecommendationRepository()
+
+        # Gate: Load active urgent/critical work orders once before persisting any recs
+        # Prevents SENTINEL from recommending adjustments on equipment with active faults
+        urgent_equipment: set[str] = set()
+        try:
+            from app.database.repositories.work_order_repository import WorkOrderRepository
+            wo_repo = WorkOrderRepository()
+            urgent_wos = await wo_repo.get_open_urgent_work_orders(request.site_id)
+            urgent_equipment = {
+                wo.get("equipment_code")
+                for wo in urgent_wos
+                if wo.get("equipment_code")
+            }
+            if urgent_equipment:
+                logger.warning(
+                    f"[GATE] Active urgent/critical work orders for {request.site_id}: "
+                    f"{len(urgent_equipment)} equipment — {urgent_equipment}"
+                )
+        except Exception as _wo_err:
+            logger.warning(f"[GATE] Could not load urgent work orders: {_wo_err}")
+
         for rec_item in recommendations_list:
             system = rec_item.get("system", rec_item.get("equipment_type", "HVAC"))
             point = rec_item.get("point_name", rec_item.get("setpoint", ""))
             confidence = rec_item.get("confidence", recommendation.confidence)
+            target_eq = rec_item.get("equipment_code", rec_item.get("equipment", ""))
+
+            # Hard gate: never store recommendation for equipment with active urgent WO
+            if target_eq and target_eq in urgent_equipment:
+                logger.warning(
+                    f"[GATE] Blocking recommendation for {target_eq} — "
+                    f"active urgent/critical work order exists"
+                )
+                routing_decisions.append(
+                    optimization_routing_to_tier_result(
+                        confidence=confidence,
+                        system=system,
+                        point_name=point,
+                        tier="BLOCKED_GATE",
+                        reason="active_urgent_work_order",
+                    )
+                )
+                continue
 
             # G1: Persist Recommendation record before routing so that downstream
             # steps (G2 approval, G3 execution) can fetch a stable rec.id from DB.
@@ -556,6 +596,8 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
                     "point": point,
                     "value": rec_item.get("value", rec_item.get("setpoint_value", None)),
                 },
+                reason=rec_item.get("reason", ""),
+                expected_impact=rec_item.get("expected_impact", {}),
                 confidence=str(confidence) if not isinstance(confidence, str) else confidence,
                 profile=recommendation.profile or "",
                 correlation_id=_correlation_id,
@@ -582,6 +624,35 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
                 control_tier=control_tier,
             )
             routing_decisions.append(decision)
+
+            # Emit Loki event with traceability IDs for Grafana pipeline panels
+            _rec_id = rec_item.get("_recommendation_id", "")
+            _corr_id = rec_item.get("_correlation_id", "")
+            _raw_tier = decision.tier.value  # e.g. "tier1_advisory"
+            _tier = _raw_tier.split("_")[0] if _raw_tier.startswith("tier") else _raw_tier
+            _action_map = {
+                "advisory": "advisory",
+                "pending_approval": "supervised",
+                "auto_execute": "auto_execute",
+                "blocked": "advisory",
+                "log_only": "advisory",
+            }
+            emit_decision_event(
+                "tier_routing.decided",
+                correlation_id=_corr_id,
+                recommendation_id=_rec_id,
+                equipment_code=rec_item.get("equipment_code", rec_item.get("equipment", "")),
+                site_id=request.site_id,
+                tier=_tier,
+                status=_action_map.get(decision.action, "advisory"),
+                details={
+                    "confidence_score": decision.effective_confidence,
+                    "risk_level": "medium",
+                    "reason": decision.reason,
+                    "routing_source": "optimization_api",
+                    "equipment_type": system,
+                },
+            )
 
         routing_summary = tier_router.get_routing_summary(routing_decisions, control_tier)
 
@@ -1397,6 +1468,35 @@ async def get_optimization_status(site_id: str, request: Request) -> dict[str, A
         raise
     except Exception as e:
         logger.error(f"Error getting optimization status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/optimization/roi-summary/{site_id}")
+async def get_roi_summary(site_id: str, days: int = Query(default=30, description="Number of days to look back")) -> dict[str, Any]:
+    """
+    Get ROI metrics for executed recommendations with verified vs estimated savings.
+
+    Returns:
+        - total_savings_zar: combined verified + estimated savings
+        - verified_savings_zar: actual measured savings after outcome verification
+        - estimated_savings_zar: predicted savings from expected_impact (not yet verified)
+        - verified_count: number of recommendations with actual_saving_zar set
+        - recommendation_count: total executed recommendations in window
+        - confidence: confidence score based on sample size
+    """
+    from app.mcp.openai_connector_server import get_openai_connector_server
+
+    try:
+        server = get_openai_connector_server()
+        result = await server.get_roi_summary(site_id, "all")
+        # Strip any error wrapper if present
+        if "error" in result and len(result) == 1:
+            raise HTTPException(status_code=500, detail=result["error"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting ROI summary for {site_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

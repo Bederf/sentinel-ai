@@ -2,7 +2,7 @@
   "annotations": {
     "list": []
   },
-  "description": "Backend API uptime and health monitoring — SENTINEL BMS Intelligence",
+  "description": "Backend API uptime and health monitoring \u2014 SENTINEL BMS Intelligence",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -11,10 +11,18 @@
   "panels": [
     {
       "id": 1,
-      "title": "Governance Job — Up",
+      "title": "Governance Job \u2014 Up",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -27,14 +35,38 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "#ef4444", "value": null},
-              {"color": "#10b981", "value": 1}
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
             ]
           },
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            {"type": "value", "options": {"0": {"text": "Down", "color": "#ef4444"}}},
-            {"type": "value", "options": {"1": {"text": "Up", "color": "#10b981"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "#ef4444"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up",
+                  "color": "#10b981"
+                }
+              }
+            }
           ],
           "sparkline": {}
         }
@@ -42,10 +74,18 @@
     },
     {
       "id": 2,
-      "title": "Discipline Job — Up",
+      "title": "Discipline Job \u2014 Up",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -58,14 +98,38 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "#ef4444", "value": null},
-              {"color": "#10b981", "value": 1}
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
             ]
           },
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            {"type": "value", "options": {"0": {"text": "Down", "color": "#ef4444"}}},
-            {"type": "value", "options": {"1": {"text": "Up", "color": "#10b981"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "#ef4444"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up",
+                  "color": "#10b981"
+                }
+              }
+            }
           ],
           "sparkline": {}
         }
@@ -75,8 +139,16 @@
       "id": 3,
       "title": "Last Scrape Age",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -90,12 +162,23 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "#10b981", "value": null},
-              {"color": "#f59e0b", "value": 15},
-              {"color": "#ef4444", "value": 30}
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 15
+              },
+              {
+                "color": "#ef4444",
+                "value": 30
+              }
             ]
           },
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "sparkline": {}
         }
@@ -103,14 +186,22 @@
     },
     {
       "id": 4,
-      "title": "API Health — MCP Endpoint",
+      "title": "API Health \u2014 MCP Endpoint",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_http_requests_total{job=\"sentinel-governance\", path=\"/api/mcp/openai/health\", status_code=\"200\"} > 0",
+          "expr": "sentinel_http_requests_total{job=\"sentinel-governance\", path=\"/api/health\", status_code=\"200\"} > 0",
           "legendFormat": "MCP Health"
         }
       ],
@@ -119,14 +210,36 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "#ef4444", "value": null},
-              {"color": "#10b981", "value": 1}
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
             ]
           },
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            {"type": "value", "options": {"0": {"text": "Unreachable"}}},
-            {"type": "value", "options": {"1": {"text": "Healthy"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Unreachable"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Healthy"
+                }
+              }
+            }
           ],
           "sparkline": {}
         }
@@ -134,10 +247,18 @@
     },
     {
       "id": 5,
-      "title": "HTTP Request Rate — Last 5m",
+      "title": "HTTP Request Rate \u2014 Last 5m",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -148,32 +269,57 @@
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "custom": {"lineWidth": 1, "fillOpacity": 20}
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 20
+          }
         }
       }
     },
     {
       "id": 6,
-      "title": "Error Rate — Last 5m",
+      "title": "Error Rate \u2014 Last 5m",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(sentinel_http_requests_total{job=\"sentinel-governance\", status_code=~\"5..\"}[5m])",
+          "expr": "rate(sentinel_http_requests_total{job=\"sentinel-governance\", status_code=~\"5..\"}[5m]) or vector(0)",
           "legendFormat": "{{method}} {{path}} {{status_code}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "unit": "reqps",
-          "custom": {"lineWidth": 1, "fillOpacity": 20}
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 20
+          }
         },
         "overrides": [
           {
-            "matcher": {"id": "byRegexp", "options": ".*"},
-            "properties": [{"id": "color", "value": {"fixedColor": "#ef4444", "mode": "fixed"}}]
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef4444",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       }
@@ -182,8 +328,16 @@
       "id": 7,
       "title": "Supabase Query Duration",
       "type": "timeseries",
-      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 12},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -199,7 +353,9 @@
       "fieldConfig": {
         "defaults": {
           "unit": "s",
-          "custom": {"lineWidth": 1}
+          "custom": {
+            "lineWidth": 1
+          }
         }
       }
     },
@@ -207,8 +363,16 @@
       "id": 8,
       "title": "Bridge Connection Status",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 12},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -221,14 +385,36 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "#ef4444", "value": null},
-              {"color": "#10b981", "value": 1}
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
             ]
           },
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            {"type": "value", "options": {"0": {"text": "Disconnected"}}},
-            {"type": "value", "options": {"1": {"text": "Connected"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Disconnected"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Connected"
+                }
+              }
+            }
           ],
           "sparkline": {}
         }
@@ -238,8 +424,16 @@
       "id": 9,
       "title": "Backend Uptime",
       "type": "stat",
-      "gridPos": {"h": 4, "w": 4, "x": 16, "y": 12},
-      "datasource": {"type": "prometheus", "uid": "PBFA97CFB590B2093"},
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -252,14 +446,36 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              {"color": "#ef4444", "value": null},
-              {"color": "#10b981", "value": 1}
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
             ]
           },
-          "color": {"mode": "thresholds"},
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            {"type": "value", "options": {"0": {"text": "Down"}}},
-            {"type": "value", "options": {"1": {"text": "Up"}}}
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up"
+                }
+              }
+            }
           ],
           "sparkline": {}
         }
@@ -268,12 +484,28 @@
   ],
   "refresh": "10s",
   "schemaVersion": 38,
-  "tags": ["sentinel", "backend", "infrastructure"],
-  "templating": {"list": []},
-  "time": {"from": "now-1h", "to": "now"},
-  "timepicker": {"refresh_intervals": ["5s", "10s", "30s", "1m"]},
+  "tags": [
+    "sentinel",
+    "backend",
+    "infrastructure"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m"
+    ]
+  },
   "timezone": "browser",
-  "title": "SENTINEL — Backend Uptime",
+  "title": "SENTINEL \u2014 Backend Uptime",
   "uid": "sentinel-backend-uptime",
   "version": 1,
   "weekStart": "",

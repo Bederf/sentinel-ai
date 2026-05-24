@@ -12,8 +12,8 @@ import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { Volume2, Loader2 } from "lucide-react";
 
-/** Regex to detect slash commands in inline code: /info_S002_FCU_301 etc. */
-const COMMAND_RE = /^\/(info|WO|inspect|reset|note)_[A-Za-z0-9][\w]*$/;
+/** Regex to detect slash commands in inline code: /info-S002-FCU-301 etc. */
+const COMMAND_RE = /^\/(info|WO|inspect|reset|note)-[A-Za-z0-9][\w]*$/;
 
 /** Regex to detect equipment IDs like S002-CHILLER-B1-001 */
 const EQUIPMENT_ID_RE = /^S\d{3}-[A-Z0-9]+(?:-[A-Za-z0-9]+)+$/;
@@ -126,12 +126,12 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
           style={{
             userSelect: "text",
             background: isUser
-              ? "var(--color-grafana-blue)"
-              : "var(--color-grafana-bg-secondary)",
-            color: isUser ? "white" : "var(--color-grafana-text-primary)",
+              ? "var(--color-sentinel-blue)"
+              : "var(--color-sentinel-bg-secondary)",
+            color: isUser ? "white" : "var(--color-sentinel-text-primary)",
             borderBottomRightRadius: isUser ? "4px" : undefined,
             borderBottomLeftRadius: !isUser ? "4px" : undefined,
-            border: !isUser ? "1px solid var(--color-grafana-border)" : undefined,
+            border: !isUser ? "1px solid var(--color-sentinel-border)" : undefined,
           }}
       >
         {/* User messages: plain text */}
@@ -144,11 +144,11 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
           <div className="flex items-center gap-2">
             <div
               className="animate-spin h-4 w-4 border-2 border-t-transparent rounded-full"
-              style={{ borderColor: "var(--color-grafana-blue)", borderTopColor: "transparent" }}
+              style={{ borderColor: "var(--color-sentinel-blue)", borderTopColor: "transparent" }}
             />
             <span
               className="text-sm"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               SENTINEL is thinking...
             </span>
@@ -164,8 +164,8 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                     className="font-semibold mb-3 mt-4 first:mt-0"
                     style={{
                       fontSize: "1.125rem",
-                      color: "var(--color-grafana-text-primary)",
-                      borderBottom: "1px solid var(--color-grafana-border)",
+                      color: "var(--color-sentinel-text-primary)",
+                      borderBottom: "1px solid var(--color-sentinel-border)",
                       paddingBottom: "0.5rem",
                     }}
                     {...props}
@@ -176,7 +176,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                     className="font-semibold mb-2 mt-4 first:mt-0"
                     style={{
                       fontSize: "1rem",
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                     }}
                     {...props}
                   />
@@ -186,7 +186,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                     className="font-semibold mb-2 mt-3 first:mt-0"
                     style={{
                       fontSize: "0.9375rem",
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                     }}
                     {...props}
                   />
@@ -196,7 +196,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <p
                     className="mb-3 last:mb-0"
                     style={{
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                       lineHeight: "1.6",
                     }}
                     {...props}
@@ -208,7 +208,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                     className="mb-3 ml-4 space-y-1.5 last:mb-0"
                     style={{
                       listStyleType: "disc",
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                     }}
                     {...props}
                   />
@@ -218,7 +218,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                     className="mb-3 ml-4 space-y-1.5 last:mb-0"
                     style={{
                       listStyleType: "decimal",
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                     }}
                     {...props}
                   />
@@ -227,7 +227,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <li
                     className="pl-1"
                     style={{
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                       lineHeight: "1.6",
                     }}
                     {...props}
@@ -244,7 +244,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                         className="px-2 py-0.5 rounded text-xs font-mono cursor-pointer transition-all hover:brightness-125"
                         style={{
                           background: "rgba(50, 116, 217, 0.15)",
-                          color: "var(--color-grafana-blue)",
+                          color: "var(--color-sentinel-blue)",
                           border: "1px solid rgba(50, 116, 217, 0.3)",
                         }}
                       >
@@ -260,7 +260,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                         className="px-2 py-0.5 rounded text-xs font-mono cursor-pointer transition-all hover:brightness-125 select-all"
                         style={{
                           background: "rgba(16, 185, 129, 0.15)",
-                          color: "var(--color-grafana-green)",
+                          color: "var(--color-sentinel-green)",
                           border: "1px solid rgba(16, 185, 129, 0.3)",
                         }}
                       >
@@ -273,7 +273,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                       className="px-1.5 py-0.5 rounded text-xs font-mono"
                       style={{
                         background: "rgba(0, 0, 0, 0.25)",
-                        color: "var(--color-grafana-orange)",
+                        color: "var(--color-sentinel-orange)",
                         border: "1px solid rgba(0, 0, 0, 0.1)",
                       }}
                       {...props}
@@ -285,8 +285,8 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                       className="block p-3 rounded text-xs font-mono mb-3 overflow-x-auto"
                       style={{
                         background: "rgba(0, 0, 0, 0.25)",
-                        color: "var(--color-grafana-text-primary)",
-                        border: "1px solid var(--color-grafana-border)",
+                        color: "var(--color-sentinel-text-primary)",
+                        border: "1px solid var(--color-sentinel-border)",
                         lineHeight: "1.5",
                       }}
                       {...props}
@@ -300,7 +300,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <strong
                     className="font-semibold"
                     style={{
-                      color: "var(--color-grafana-orange)",
+                      color: "var(--color-sentinel-orange)",
                       fontWeight: "600",
                     }}
                     {...props}
@@ -311,7 +311,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <em
                     className="italic"
                     style={{
-                      color: "var(--color-grafana-text-primary)",
+                      color: "var(--color-sentinel-text-primary)",
                       fontStyle: "italic",
                     }}
                     {...props}
@@ -322,7 +322,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <a
                     className="underline"
                     style={{
-                      color: "var(--color-grafana-blue)",
+                      color: "var(--color-sentinel-blue)",
                       textDecoration: "underline",
                     }}
                     {...props}
@@ -333,7 +333,7 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <hr
                     className="my-4 border-0"
                     style={{
-                      borderTop: "1px solid var(--color-grafana-border)",
+                      borderTop: "1px solid var(--color-sentinel-border)",
                     }}
                     {...props}
                   />
@@ -343,8 +343,8 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   <blockquote
                     className="border-l-4 pl-4 my-3 italic"
                     style={{
-                      borderLeftColor: "var(--color-grafana-blue)",
-                      color: "var(--color-grafana-text-secondary)",
+                      borderLeftColor: "var(--color-sentinel-blue)",
+                      color: "var(--color-sentinel-text-secondary)",
                     }}
                     {...props}
                   />
@@ -357,13 +357,13 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
             {!animDone && (
               <span
                 className="inline-block w-2 h-4 ml-1 animate-pulse"
-                style={{ background: "var(--color-grafana-orange)" }}
+                style={{ background: "var(--color-sentinel-orange)" }}
                 aria-label="typing"
               />
             )}
             {/* EU AI Act Article 50 — AI-generated content disclosure */}
             {animDone && (
-              <p className="mt-2 text-xs" style={{ color: "var(--color-grafana-text-secondary)", opacity: 0.7 }}>
+              <p className="mt-2 text-xs" style={{ color: "var(--color-sentinel-text-secondary)", opacity: 0.7 }}>
                 AI-generated &middot; Review before acting
               </p>
             )}
@@ -378,10 +378,10 @@ export function ChatMessage({ role, content, isStreaming, messageId, onSpeak, tt
                   background: ttsState?.isPlaying
                     ? "rgba(50, 116, 217, 0.2)"
                     : "transparent",
-                  border: "1px solid var(--color-grafana-border)",
+                  border: "1px solid var(--color-sentinel-border)",
                   color: ttsState?.isPlaying
-                    ? "var(--color-grafana-blue)"
-                    : "var(--color-grafana-text-secondary)",
+                    ? "var(--color-sentinel-blue)"
+                    : "var(--color-sentinel-text-secondary)",
                   cursor: ttsState?.isLoading ? "wait" : "pointer",
                 }}
                 aria-label={ttsState?.isPlaying ? "Stop audio" : "Listen to response"}

@@ -90,3 +90,32 @@ groups:
             2. Verify port 9095 is listening: ss -tlnp | grep 9095
             3. Check Prometheus → backend network path
           runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/backend-stale"
+
+      # ── Discipline job is down — ML/optimization metrics stop updating ────────
+      - uid: sentinel-discipline-down
+        title: "SENTINEL Discipline Job is DOWN"
+        condition: D
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 120
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: "up{job=\"sentinel-discipline\"} == 0"
+              refId: A
+        for: 2m
+        noDataState: Alerting
+        execErrState: Alerting
+        labels:
+          severity: critical
+          category: infrastructure
+        annotations:
+          summary: "SENTINEL Discipline job is unreachable"
+          description: "The discipline scrape job has been down for more than 2 minutes. HVAC/Energy/Lighting/Solar/Water/Fire/Security/ESG metrics will go stale."
+          action: |
+            1. Check Prometheus scrape config: docker exec sentinel-prometheus cat /etc/prometheus/prometheus.yml
+            2. Verify backend metrics endpoint: curl -H "Authorization: Bearer <token>" http://localhost:9095/metrics | head
+            3. Reload Prometheus: curl -X POST http://localhost:9090/-/reload
+            4. Restart Prometheus if needed: docker restart sentinel-prometheus
+          runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/discipline-down"

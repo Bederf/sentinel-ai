@@ -208,10 +208,11 @@ async def list_alerts(
     request: Request,
     site_id: str | None = Query(None, description="Filter by site ID"),
     equipment_id: str | None = Query(None, description="Filter by equipment ID (UUID)"),
-    severity: str | None = Query(None, description="Filter by severity"),
+    severity: str | None = Query(None, description="Filter by severity (critical, warning, info)"),
     status: str | None = Query(None, description="Filter by status (active, acknowledged, resolved)"),
     category: str | None = Query(None, description="Filter by category (hvac, electrical, maintenance)"),
     limit: int = Query(50, description="Maximum number of results"),
+    _auth=Depends(require_query_site_access("site_id")),
 ) -> AlertListResponse:
     """
     List all alerts with optional filtering.

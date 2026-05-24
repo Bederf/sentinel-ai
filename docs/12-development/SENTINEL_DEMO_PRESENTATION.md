@@ -438,18 +438,18 @@ Facility managers receive instant notifications:
 ⏰ Time: 14:32:45
 
 ━━━━━━━━━━━━━━━━━━
-/fix_CHILLER_001 - Run maintenance
-/details_CHILLER_001 - Full diagnosis
-/WO_CHILLER_001 - Create work order
+/fix-CHILLER_001 - Run maintenance
+/details-CHILLER_001 - Full diagnosis
+/WO-CHILLER_001 - Create work order
 ```
 
 ### Interactive Commands
 
 | Command | Action |
 |---------|--------|
-| `/fix_[equipment]` | Execute maintenance procedure |
-| `/details_[equipment]` | Get full diagnostic report |
-| `/WO_[equipment]` | Create work order in CMMS |
+| `/fix-[equipment]` | Execute maintenance procedure |
+| `/details-[equipment]` | Get full diagnostic report |
+| `/WO-[equipment]` | Create work order in CMMS |
 | `/status` | Building-wide health summary |
 
 ---
@@ -541,7 +541,7 @@ curl -X POST "http://localhost:9095/api/simulation/demo/trigger-warnings?count=3
 **Show:**
 - Dashboard health indicators changing
 - Telegram notification arriving
-- Clicking `/details_` for diagnosis
+- Clicking `/details-` for diagnosis
 
 ### Demo 2: AI Chat Interaction
 

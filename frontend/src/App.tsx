@@ -28,6 +28,7 @@ const Dashboard = lazy(() => import("./components/Dashboard").then(m => ({ defau
 const ControlAuditTrail = lazy(() => import("./components/ControlAuditTrail").then(m => ({ default: m.ControlAuditTrail })));
 const Settings = lazy(() => import("./components/Settings").then(m => ({ default: m.Settings })));
 const SystemHealthPage = lazy(() => import("./components/SystemHealthPage"));
+const InviteAcceptPage = lazy(() => import("./components/auth/InviteAcceptPage").then(m => ({ default: m.InviteAcceptPage })));
 const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
 const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
 const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
@@ -527,6 +528,7 @@ function App() {
     <ModuleProvider initialSiteId={effectiveSiteId || undefined} initialSiteName={effectiveSiteName}>
     <Routes>
       <Route path="/buildings/:siteId" element={<Suspense fallback={<RouteLoading />}><BuildingRoute /></Suspense>} />
+      <Route path="/invite" element={<Suspense fallback={<RouteLoading />}><InviteAcceptPage /></Suspense>} />
       <Route path="*" element={
     <div
       className="h-screen flex"
@@ -566,6 +568,7 @@ function App() {
                   src="/images/sentinel-logo.png"
                   alt="Sentinel Shield"
                   className="h-5 w-5 pulse-slow"
+                  loading="lazy"
                   style={{
                     animation: 'pulse-slow 2s ease-in-out infinite',
                   }}
@@ -600,6 +603,8 @@ function App() {
                 border: "1px solid var(--color-sentinel-border)",
               }}
               aria-label={`View alerts${unreadAlertCount > 0 ? ` (${unreadAlertCount} unread)` : ""}`}
+              aria-expanded={showAlertsPanel}
+              aria-controls={showAlertsPanel ? "alerts-panel" : undefined}
             >
               <Bell
                 className="h-5 w-5"
@@ -623,6 +628,7 @@ function App() {
             {showAlertsPanel && (
               <div
                 ref={alertsPanelRef}
+                id="alerts-panel"
                 className="absolute top-full right-0 mt-2 w-96 max-h-[600px] overflow-hidden rounded-md shadow-lg z-50"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
@@ -753,6 +759,8 @@ function App() {
                   border: "1px solid var(--color-sentinel-border)",
                 }}
                 aria-label="Open calendar"
+                aria-expanded={showCalendar}
+                aria-controls={showCalendar ? "calendar-picker" : undefined}
               >
                 <Clock
                   className="h-3.5 w-3.5"
@@ -776,18 +784,20 @@ function App() {
 
               {/* Calendar Picker */}
               {showCalendar && (
-                <CalendarPicker
-                  selectedDate={currentTime}
-                  onDateSelect={(date) => {
-                    // Update time but keep the current time of day
-                    const newDate = new Date(date);
-                    newDate.setHours(currentTime.getHours());
-                    newDate.setMinutes(currentTime.getMinutes());
-                    newDate.setSeconds(currentTime.getSeconds());
-                    setCurrentTime(newDate);
-                  }}
-                  onClose={() => setShowCalendar(false)}
-                />
+                <div id="calendar-picker">
+                  <CalendarPicker
+                    selectedDate={currentTime}
+                    onDateSelect={(date) => {
+                      // Update time but keep the current time of day
+                      const newDate = new Date(date);
+                      newDate.setHours(currentTime.getHours());
+                      newDate.setMinutes(currentTime.getMinutes());
+                      newDate.setSeconds(currentTime.getSeconds());
+                      setCurrentTime(newDate);
+                    }}
+                    onClose={() => setShowCalendar(false)}
+                  />
+                </div>
               )}
             </div>
 

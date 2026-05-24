@@ -69,6 +69,19 @@ This helps technicians and facility managers answer key questions:
   - Loading spinner during fetch
   - Error state with retry message
 
+#### 4. EquipmentPartsList.tsx (Spare Parts Section) — Phase 209
+
+- Expandable "Spare Parts" section above Work Order History
+- Displays parts from the `spare_parts` catalog linked to the equipment
+- Shows per-part: OEM part number, stock level (color-coded), unit cost, criticality badge, source
+- "-1" button to mark a part as consumed (decrements inventory)
+- Warning indicator when critical parts are low-stock
+- Collapses by default; fetches data on expand
+
+```typescript
+<MaintenanceHistoryTabs equipmentId={prediction.id} equipmentCode={prediction.equipment_code} />
+```
+
 ### API & Data Layer
 
 **Location:** `/frontend/src/lib/api/equipment_history.ts`
@@ -357,16 +370,28 @@ psql postgresql://postgres:postgres@localhost:55322/postgres \
 
 ## Files Modified/Created
 
-### New Files
+### New Files (Phase 209)
 - `/frontend/src/lib/api/equipment_history.ts` - API client
 - `/frontend/src/hooks/useEquipmentHistory.ts` - React Query hooks
 - `/frontend/src/components/maintenance/MaintenanceHistoryTabs.tsx` - Tab container
 - `/frontend/src/components/maintenance/WorkOrderHistoryList.tsx` - Work orders component
 - `/frontend/src/components/maintenance/EquipmentAlertsList.tsx` - Alerts component
+- `/frontend/src/components/maintenance/EquipmentPartsList.tsx` - Spare parts section (Phase 209)
+- `/backend/app/api/spare_parts.py` - Spare parts API (Phase 209)
+- `/backend/app/database/repositories/spare_parts_repository.py` - Parts repository (Phase 209)
+- `/backend/app/services/spare_parts_service.py` - Parts population service (Phase 209)
+- `/backend/app/services/oem_parts_scraper.py` - Firecrawl OEM scraping (Phase 209)
+- `/supabase/migrations/216_spare_parts_catalog.sql` - DB schema + seed data (Phase 209)
 
 ### Modified Files
 - `/frontend/src/lib/api/index.ts` - Added equipment_history exports
 - `/frontend/src/components/PredictionDetail.tsx` - Added import and section
+- `/frontend/src/components/maintenance/MaintenanceHistoryTabs.tsx` - Added EquipmentPartsList
+- `/frontend/src/lib/api/equipment_history.ts` - Added parts types
+- `/backend/app/api/registrars/operations.py` - Registered spare_parts router
+- `/backend/app/mcp/simbiot_server.py` - Post-onboarding parts population hook
+- `/backend/app/services/technician_chat.py` - Parts + maintenance actions in resolution step
+- `/backend/app/api/work_orders.py` - Parts auto-populate + inventory decrement
 - `/opt/bms-intelligence/CLAUDE.md` - Added feature documentation
 - `/frontend/README.md` - Added hooks and integration docs
 - `/frontend/src/lib/api/README.md` - Added module documentation
@@ -384,6 +409,7 @@ psql postgresql://postgres:postgres@localhost:55322/postgres \
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | Feb 2026 | Initial implementation - work orders and alerts history |
+| 2.0 | May 2026 | Phase 209: Added spare parts section with inventory, OEM numbers, stock tracking |
 
 ---
 

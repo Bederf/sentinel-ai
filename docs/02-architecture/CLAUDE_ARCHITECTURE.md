@@ -23,11 +23,13 @@ Complete system architecture for SENTINEL BMS Intelligence Platform.
 
 **SENTINEL BMS Intelligence Platform** — AI-powered building management system combining predictive maintenance, conversational AI, and device control.
 
-- **Backend:** FastAPI + Python 3.11 | Supabase (PostgreSQL) | TensorFlow | Claude API + Ollama
-- **Frontend:** React + TypeScript (Vite) | Sentinel design system + Tailwind (no Tremor)
+- **Backend:** FastAPI + Python 3.10+ | Supabase (PostgreSQL) | LangGraph | Claude API + Ollama
+- **Frontend:** React 18 + TypeScript 5.9 (Vite) | Tailwind CSS 4 | shadcn/ui
 - **Scale:** 70+ API endpoints, 31 MCP tools, 3 buildings, 542+ equipment
-- **Multi-Protocol:** BACnet, Modbus, DALI, OPC-UA, Telegram
-- **Automation:** PostgreSQL triggers + APScheduler + Sentry webhook integration
+- **Multi-Protocol:** BACnet/IP (BAC0), Modbus TCP (pymodbus), Niagara oBIX REST, MQTT
+- **Automation:** APScheduler + Sentry webhooks + n8n workflows
+- **AI:** Anthropic Claude (primary), OpenAI GPT-4.1 (fallback), Ollama deepseek-r1:14b (local)
+- **Database:** Supabase (PostgreSQL + Storage + Auth) + InfluxDB (time-series) + Redis (cache)
 
 ---
 
@@ -36,14 +38,18 @@ Complete system architecture for SENTINEL BMS Intelligence Platform.
 ### Application Structure
 ```
 backend/app/
-├── api/                 # 70+ routers organized by domain
-│   ├── registrars/      # 4 registrars that organize routes
+├── api/                 # 70+ routers organized by domain (4 registrars)
+│   ├── registrars/      # Core, Building, Operations, Analytics registrars
 │   └── {domain}.py      # Individual route files
-├── services/            # 30+ business logic services
-├── database/            # Repositories + data access
-├── ml/                  # ML models, predictions, inference
-├── mcp/                 # SIMBIOT MCP Server (31 tools)
-└── startup/             # Routes, jobs, middleware, events
+├── services/            # 50+ business logic services
+├── database/            # Repositories + Supabase client
+├── middleware/         # Auth, CORS, audit, security headers, rate limiting
+├── models/              # Pydantic request/response models, SentinelRole enum
+├── config/              # Environment-driven settings (settings.py)
+├── ml/                  # Fleet models, solar anomaly, monitoring
+├── agents_kernel/       # LangGraph complaint NLP + recommendation graph
+├── tasks/               # APScheduler job definitions
+└── data/                # JSON fallbacks, site/building/simulation state
 ```
 
 ### 4-Registrar Pattern

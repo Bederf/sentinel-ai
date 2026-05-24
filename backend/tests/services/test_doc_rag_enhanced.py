@@ -136,11 +136,15 @@ class TestSearchDocumentation:
     async def test_full_pipeline(self, mock_client, mock_vdb_factory):
         """Simplified pipeline: hybrid_search returns results directly."""
         mock_vdb = MagicMock()
-        mock_vdb.hybrid_search.return_value = [
-            {"id": "a", "content": "Chiller health uses sensors", "hybrid_score": 0.85},
-            {"id": "b", "content": "Generator maintenance", "hybrid_score": 0.5},
-            {"id": "c", "content": "Cooling plant overview", "hybrid_score": 0.7},
-        ]
+
+        async def mock_hybrid_search(*args, **kwargs):
+            return [
+                {"id": "a", "content": "Chiller health uses sensors", "hybrid_score": 0.85},
+                {"id": "b", "content": "Generator maintenance", "hybrid_score": 0.5},
+                {"id": "c", "content": "Cooling plant overview", "hybrid_score": 0.7},
+            ]
+
+        mock_vdb.hybrid_search = MagicMock(return_value=mock_hybrid_search())
         mock_vdb_factory.return_value = mock_vdb
 
         results = await search_documentation("chiller health scoring", n_results=5)
@@ -164,9 +168,11 @@ class TestSearchDocumentation:
     async def test_site_id_passed_through(self, mock_client, mock_vdb_factory):
         """Building ID is forwarded to hybrid_search."""
         mock_vdb = MagicMock()
-        mock_vdb.hybrid_search.return_value = [
-            {"id": "a", "content": "Chiller doc", "hybrid_score": 0.8},
-        ]
+
+        async def mock_hybrid_search(*args, **kwargs):
+            return [{"id": "a", "content": "Chiller doc", "hybrid_score": 0.8}]
+
+        mock_vdb.hybrid_search = MagicMock(return_value=mock_hybrid_search())
         mock_vdb_factory.return_value = mock_vdb
 
         results = await search_documentation("chiller fault", site_id="site-002-uuid")
@@ -182,7 +188,11 @@ class TestSearchDocumentation:
     async def test_search_returns_empty_on_no_results(self, mock_client, mock_vdb_factory):
         """Empty result set is returned cleanly."""
         mock_vdb = MagicMock()
-        mock_vdb.hybrid_search.return_value = []
+
+        async def mock_hybrid_search(*args, **kwargs):
+            return []
+
+        mock_vdb.hybrid_search = MagicMock(return_value=mock_hybrid_search())
         mock_vdb_factory.return_value = mock_vdb
 
         results = await search_documentation("nonexistent topic")

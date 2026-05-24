@@ -420,6 +420,47 @@ Every 5 minutes:
 - API response time: <1 second (recommendations pre-calculated)
 - Database queries cached (5-minute TTL on NMD lookups)
 
+**Full algorithm documentation:** [Demand-Aware Coordinator Feature Guide](../04-features/13-demand-aware-coordinator.md)
+
+---
+
+## BESS Real-Time Shaving Thresholds
+
+**Source:** `backend/app/services/solar_demand_service.py:793`
+
+The BESS shaving engine runs independently (event-driven, not part of the 5-min coordinator cycle). It monitors demand continuously and triggers discharge at NMD thresholds:
+
+| Condition | Action | Priority |
+|-----------|--------|----------|
+| `demand > 95% NMD` | Max discharge: `min(BESS_RATED_POWER, demand - (NMD × 0.85))` | **critical** |
+| `demand > 85% NMD` | Discharge: `min(BESS_RATED_POWER, demand - (NMD × 0.85))` | **high** |
+| `demand > 85% × 0.9` and rising | BESS on standby | **medium** |
+| Below threshold | No action | **low** |
+
+BESS peak shaving **always preempts TOU arbitrage** — when demand approaches NMD, the battery prioritises shaving over energy trading.
+
+Example for site-002 (NMD = 1,820 kVA):
+- 85% threshold = **1,547 kW**
+- 95% threshold = **1,729 kW**
+- At 1,730 kW demand: discharge `min(200, 1730 - 1547)` = **183 kW**
+
+---
+
+## Demand Ratchet (12-Month Rolling Peak)
+
+**Source:** `backend/app/services/demand_ratchet.py`
+
+City Power bills the higher of current month peak or the highest peak in the previous 11 months. The ratchet algorithm calculates:
+
+```
+ratchet_kva       = max(trailing 11 month peaks)
+billing_kva       = max(current_peak, ratchet_kva)
+shaving_target    = ratchet_kva (or NMD × 0.85 if no ratchet yet)
+spike_cost_r      = (current_peak - shaving_target) × demand_charge_rate
+```
+
+Full algorithm documentation: [Demand Ratchet Algorithm](../04-features/12-demand-ratchet-algorithm.md)
+
 ---
 
 ## NMD Data Sources & Persistence

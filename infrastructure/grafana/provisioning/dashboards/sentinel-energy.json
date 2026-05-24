@@ -25,7 +25,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "targets": [{ "refId": "A", "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}", "legendFormat": "{{instance}}" }],
       "fieldConfig": {
         "defaults": {
           "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
@@ -124,7 +124,7 @@
       "type": "timeseries",
       "gridPos": { "h": 7, "w": 8, "x": 0, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_energy_cost_zar", "legendFormat": "{{site_id}} {{period}}" }],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_cost_zar or vector(0)", "legendFormat": "{{site_id}} {{period}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "currencyZAR",
@@ -140,7 +140,7 @@
       "type": "timeseries",
       "gridPos": { "h": 7, "w": 8, "x": 8, "y": 13 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_energy_peak_demand_kw", "legendFormat": "{{site_id}} {{month}}" }],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_peak_demand_kw or vector(0)", "legendFormat": "{{site_id}} {{month}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
@@ -190,7 +190,7 @@
       "type": "timeseries",
       "gridPos": { "h": 7, "w": 12, "x": 0, "y": 20 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_energy_carbon_kg", "legendFormat": "{{site_id}} {{period}}" }],
+      "targets": [{ "refId": "A", "expr": "sentinel_energy_carbon_kg or vector(0)", "legendFormat": "{{site_id}} {{period}}" }],
       "fieldConfig": {
         "defaults": {
           "unit": "none",

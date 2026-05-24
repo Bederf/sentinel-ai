@@ -51,9 +51,9 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
       case "high":
         return "var(--color-status-warning)";
       case "medium":
-        return "var(--color-grafana-yellow)";
+        return "var(--color-sentinel-amber)";
       default:
-        return "var(--color-grafana-blue)";
+        return "var(--color-sentinel-blue)";
     }
   };
 
@@ -93,7 +93,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
           <span
             className="text-xs px-2 py-0.5 rounded-full font-medium"
             style={{
-              background: "var(--color-grafana-purple)",
+              background: "var(--color-sentinel-purple)",
               color: "white",
             }}
           >
@@ -115,7 +115,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                   cy="60"
                   r="52"
                   fill="none"
-                  stroke="var(--color-grafana-border)"
+                  stroke="var(--color-sentinel-border)"
                   strokeWidth="12"
                 />
                 {/* Progress circle */}
@@ -149,7 +149,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                   y="72"
                   textAnchor="middle"
                   className="text-xs"
-                  fill="var(--color-grafana-text-secondary)"
+                  fill="var(--color-sentinel-text-secondary)"
                 >
                   PROBABILITY
                 </text>
@@ -159,13 +159,13 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
             {/* Equipment Name */}
             <h3
               className="text-xl font-bold mb-1 text-center lg:text-left"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               {prediction.equipment_name}
             </h3>
             <p
               className="text-sm mb-3 text-center lg:text-left"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               {prediction.site_name} • {prediction.equipment_type}
             </p>
@@ -186,7 +186,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
           <div className="flex flex-col justify-center px-2">
             <h4
               className="text-xs font-semibold uppercase tracking-wider mb-5 text-center"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               Cost Impact Analysis
             </h4>
@@ -206,7 +206,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 </div>
                 <div
                   className="text-[10px] lg:text-xs uppercase tracking-wider font-medium mb-2"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Failure Cost
                 </div>
@@ -221,7 +221,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 <div
                   className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
                   style={{
-                    color: "var(--color-grafana-blue)",
+                    color: "var(--color-sentinel-blue)",
                     fontVariantNumeric: "tabular-nums",
                     letterSpacing: "-0.02em"
                   }}
@@ -230,13 +230,13 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 </div>
                 <div
                   className="text-[10px] lg:text-xs uppercase tracking-wider font-medium mb-2"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Preventive Cost
                 </div>
                 <div
                   className="h-1 w-full rounded-full"
-                  style={{ background: "var(--color-grafana-blue)" }}
+                  style={{ background: "var(--color-sentinel-blue)" }}
                 />
               </div>
 
@@ -245,7 +245,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 <div
                   className="text-lg lg:text-xl xl:text-2xl font-bold mb-2 leading-tight"
                   style={{
-                    color: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-grafana-text-secondary)",
+                    color: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-sentinel-text-secondary)",
                     fontVariantNumeric: "tabular-nums",
                     letterSpacing: "-0.02em"
                   }}
@@ -254,14 +254,14 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
                 </div>
                 <div
                   className="text-[10px] lg:text-xs uppercase tracking-wider font-medium mb-2"
-                  style={{ color: "var(--color-grafana-text-secondary)" }}
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
                 >
                   Savings
                 </div>
                 <div
                   className="h-1 w-full rounded-full"
                   style={{
-                    background: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-grafana-text-secondary)",
+                    background: displaySavings > 0 ? "var(--color-status-success)" : "var(--color-sentinel-text-secondary)",
                     opacity: displaySavings > 0 ? 1 : 0.3
                   }}
                 />
@@ -275,8 +275,8 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
             <div
               className="p-4 rounded-lg mb-4"
               style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
+                background: "var(--color-sentinel-bg-secondary)",
+                border: "1px solid var(--color-sentinel-border)",
               }}
             >
               <div className="flex items-start gap-2 mb-2">
@@ -293,7 +293,7 @@ export function HeroPredictionCard({ prediction, onClick }: HeroPredictionCardPr
               </div>
               <p
                 className="text-sm leading-relaxed line-clamp-3"
-                style={{ color: "var(--color-grafana-text-primary)" }}
+                style={{ color: "var(--color-sentinel-text-primary)" }}
               >
                 {storyExcerpt}
               </p>

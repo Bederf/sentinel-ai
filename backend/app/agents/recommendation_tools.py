@@ -279,6 +279,9 @@ async def route_through_tier_engine(
         "reason": result.reason,
         "equipment_type": result.equipment_type,
         "risk_level": result.risk_level,
+        "decision_id": result.decision_id,
+        "correlation_id": result.correlation_id,
+        "recommendation_id": recommendation.get("recommendation_id") or recommendation.get("id") or "",
     }
 
 
@@ -312,7 +315,7 @@ async def execute_tier3_auto(recommendation_id: str, tier_result: dict[str, Any]
             "execution_result": None,
         }
 
-    # Reconstruct TierRoutingResult from dict
+    # Reconstruct TierRoutingResult from dict, preserving traceability IDs
     routing_result = TierRoutingResult(
         tier=tier_result["tier"],
         action=tier_result["action"],
@@ -323,6 +326,8 @@ async def execute_tier3_auto(recommendation_id: str, tier_result: dict[str, Any]
         reason=tier_result["reason"],
         equipment_type=tier_result["equipment_type"],
         risk_level=tier_result["risk_level"],
+        decision_id=tier_result.get("decision_id", ""),
+        correlation_id=tier_result.get("correlation_id", ""),
     )
 
     result = await service.auto_execute_recommendation(

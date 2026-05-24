@@ -37,18 +37,22 @@ export function TabBar({
       style={{
         display: "flex",
         overflowX: "auto",
+        scrollSnapType: "x mandatory",
         borderBottom: "1px solid var(--color-sentinel-border)",
         msOverflowStyle: "none",
         scrollbarWidth: "none",
         ...style,
       }}
+      className="scrollbar-hide"
     >
+      <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
       {tabs.map((tab) => {
         const isActive = active === tab.id;
         return (
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
+            aria-label={tab.label}
             style={{
               flexShrink: 0,
               display: "flex",
@@ -64,6 +68,7 @@ export function TabBar({
               color: isActive ? accentColor : "var(--color-sentinel-text-secondary)",
               transition: "all 0.15s",
               whiteSpace: "nowrap",
+              scrollSnapAlign: "start",
             }}
             onMouseEnter={(e) => {
               if (!isActive) {

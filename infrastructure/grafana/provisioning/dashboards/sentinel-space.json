@@ -25,7 +25,7 @@
       "type": "stat",
       "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
       "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "up{job=\"sentinel-backend\"}", "legendFormat": "{{instance}}" }],
+      "targets": [{ "refId": "A", "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}", "legendFormat": "{{instance}}" }],
       "fieldConfig": {
         "defaults": {
           "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },

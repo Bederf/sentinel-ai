@@ -10,6 +10,7 @@ the recommendation achieved its goal and feeds the result back into:
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -98,6 +99,12 @@ async def validate_outcome(rec_id: str) -> dict[str, Any] | None:
         "current_reading": current_reading,
         "recommended_value": recommended_value,
     }
+
+
+async def process_single_verification(recommendation_id: str) -> dict[str, Any] | None:
+    """Verify outcome for a single recommendation — called 30 minutes after WO closure."""
+    rec = await validate_outcome(recommendation_id)
+    return rec
 
 
 async def process_pending_verifications() -> list[dict[str, Any]]:

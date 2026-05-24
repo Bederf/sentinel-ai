@@ -49,8 +49,8 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
     <div
       className="rounded p-4"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -91,11 +91,11 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
 
             <div
               className="pt-4"
-              style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+              style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
             >
               <span
                 className="text-sm font-medium"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
                 Total
               </span>
@@ -140,11 +140,11 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
 
             <div
               className="pt-4"
-              style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+              style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
             >
               <span
                 className="text-sm font-medium"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
                 Total
               </span>
@@ -162,12 +162,12 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
       {/* Bottom: Savings */}
       <div
         className="mt-6 pt-4"
-        style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+        style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="mb-3">
           <span
             className="text-sm"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             Potential Savings
           </span>
@@ -182,7 +182,7 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
         {/* Progress bar */}
         <div
           className="h-2 rounded-full overflow-hidden"
-          style={{ background: "var(--color-grafana-border)" }}
+          style={{ background: "var(--color-sentinel-border)" }}
         >
           <div
             className="h-full rounded-full transition-all duration-500"
@@ -194,7 +194,7 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
         </div>
         <span
           className="text-xs mt-1 block"
-          style={{ color: "var(--color-grafana-text-disabled)" }}
+          style={{ color: "var(--color-sentinel-text-disabled)" }}
         >
           {savingsPercent}% savings by taking preventive action
         </span>
@@ -202,7 +202,7 @@ export function CostBreakdownDetail({ costImpact }: CostBreakdownDetailProps) {
         {costImpact.story && (
           <p
             className="text-sm mt-3 italic"
-            style={{ color: "var(--color-grafana-text-secondary)" }}
+            style={{ color: "var(--color-sentinel-text-secondary)" }}
           >
             {costImpact.story}
           </p>
@@ -228,7 +228,7 @@ function CostLineItem({
     <div>
       <span
         className="text-sm"
-        style={{ color: "var(--color-grafana-text-secondary)" }}
+        style={{ color: "var(--color-sentinel-text-secondary)" }}
       >
         {label}
       </span>
@@ -237,7 +237,7 @@ function CostLineItem({
       </div>
       <span
         className="text-xs"
-        style={{ color: "var(--color-grafana-text-disabled)" }}
+        style={{ color: "var(--color-sentinel-text-disabled)" }}
       >
         {description}
       </span>

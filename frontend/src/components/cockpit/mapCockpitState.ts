@@ -1,4 +1,4 @@
-import type { CockpitGuidanceMode, CockpitState, CockpitTwinRiskLevel } from './types'
+import type { CockpitGuidanceMode, CockpitHealthState, CockpitState, CockpitTwinRiskLevel } from './types'
 import type { HVACOverview } from '@/lib/hvacApi'
 
 export interface BuildingStateLocation {
@@ -59,6 +59,7 @@ export interface CockpitSiteSummary {
   predictionsCount: number
   equipmentCount: number
   dataFreshnessLabel: string
+  siteFloors?: string[] | null // floors from building config (settings page)
 }
 
 export interface EnergyCentreTelemetry {
@@ -155,9 +156,13 @@ function riskLevelFromTone(tone: CockpitState['primaryMetric']['tone']): Cockpit
   return 'stable'
 }
 
-function buildFloorOrder(siteId: string, focusFloorId: string | null, affectedFloors: string[]): string[] {
-  const profile = SITE_TOWER_PROFILES[siteId]
-  const order = [...(profile?.towerFloors ?? DEFAULT_FLOOR_ORDER)]
+function buildFloorOrder(siteId: string, focusFloorId: string | null, affectedFloors: string[], siteFloors?: string[] | null): string[] {
+  // When siteFloors is provided (from building config / settings page), use it directly
+  // as both the tower floor order and the managed scope. Each site defines its own floors.
+  const baseOrder = siteFloors?.length
+    ? [...siteFloors]
+    : [...(SITE_TOWER_PROFILES[siteId]?.towerFloors ?? DEFAULT_FLOOR_ORDER)]
+  const order = [...baseOrder]
   for (const floorId of affectedFloors) {
     if (!order.includes(floorId)) order.push(floorId)
   }
@@ -222,7 +227,7 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
       flowSpeed: 0.9,
       consumptionIntensity: 0.12,
       focusFloorId: null,
-      floors: buildFloorOrder(summary.siteId, null, []).map((floorId, index, order) => ({
+      floors: buildFloorOrder(summary.siteId, null, [], summary.siteFloors).map((floorId, index, order) => ({
         id: floorId,
         label: formatFloorLabel(floorId),
         meshId: `floor:${floorId}`,
@@ -230,7 +235,7 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
         intensity: 0.14,
         spread: 0,
         elevation: (order.length - index - 1) * 2.25,
-        isManaged: (SITE_TOWER_PROFILES[summary.siteId]?.managedFloors ?? order).includes(floorId),
+        isManaged: (summary.siteFloors ?? SITE_TOWER_PROFILES[summary.siteId]?.managedFloors ?? order).includes(floorId),
       })),
       zoneSignals: [],
       flowPaths: [],
@@ -267,6 +272,7 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
       criticality: null,
     },
     emergingRisks: [],
+    equipmentWarnings: [],
     emailClusters: [],
   }
 }
@@ -304,6 +310,7 @@ function buildTwinFloors(
   floorLabels: Record<string, string> | null | undefined,
   bands: { low: number; medium: number; high: number; critical: number },
   affectedZoneIds: string[],
+  siteFloors?: string[] | null,
 ): Array<{
   id: string
   label: string
@@ -324,9 +331,10 @@ function buildTwinFloors(
   }
 
   const anchorIndex = focusFloorId ? floorOrder.indexOf(focusFloorId) : -1
+  const managedFloors = siteFloors?.length ? siteFloors : (SITE_TOWER_PROFILES[siteId]?.managedFloors ?? [])
 
   return floorOrder.map((floorId, index) => {
-    const isManaged = (SITE_TOWER_PROFILES[siteId]?.managedFloors ?? []).includes(floorId)
+    const isManaged = managedFloors.includes(floorId)
     const isDirectlyAffected = directlyAffectedFloors.has(floorId)
 
     // Spread calculated for directly affected floors only; non-affected floors
@@ -493,6 +501,18 @@ function flowPathsFromNarrative(narrative: BuildingStateNarrative | null): Array
   }))
 }
 
+export interface EquipmentWarningInput {
+  id: string
+  equipment_id: string
+  code: string
+  equipment_type: string
+  floor_id: string
+  health_score: number
+  health_state: 'healthy' | 'degraded' | 'critical'
+  fault_type?: string
+  zone_id?: string
+}
+
 export function mapCockpitState(
   summary: CockpitSiteSummary,
   payload?: BuildingStatePayload | null,
@@ -500,6 +520,7 @@ export function mapCockpitState(
   energyCentreTelemetry?: EnergyCentreTelemetry | null,
   remoteTelemetry?: RemoteSiteTelemetry | null,
   systemFilter?: string | null,
+  equipmentWarnings?: EquipmentWarningInput[] | null,
 ): CockpitState {
   if (!payload) return buildUnavailableState(summary)
 
@@ -546,7 +567,7 @@ export function mapCockpitState(
   const narrativeAffectedFloors = (narrative?.location.affected ?? [])
     .map((zone) => extractFloorCode(zone))
     .filter((floorId): floorId is string => floorId !== null)
-  const floorOrder = buildFloorOrder(summary.siteId, focusFloorId, narrativeAffectedFloors)
+  const floorOrder = buildFloorOrder(summary.siteId, focusFloorId, narrativeAffectedFloors, summary.siteFloors)
   const zoneSignals = narrative
     ? [narrative.location.epicenter, ...narrative.location.affected].map((zoneId, index) => {
         const floorId = extractFloorCode(zoneId) ?? focusFloorId ?? floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
@@ -681,7 +702,7 @@ export function mapCockpitState(
       tone,
       attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
       activeConditionCount: narrative ? 1 : 0,
-      emergingRiskCount: secondaryTensions.length,
+      emergingRiskCount: secondaryTensions.length + equipmentWarnings.length,
       evidenceStrength: narrative ? 'moderate' : 'strong',
     },
     primaryMetric: {
@@ -713,7 +734,9 @@ export function mapCockpitState(
     decision: {
       impact: locationSummary(narrative),
       summary: isShadowPhase ? 'Observe telemetry flow and model calibration.' : (narrative?.action ?? 'No action needed.'),
-      tradeoff: secondarySummary,
+      tradeoff: equipmentWarnings.length > 0
+      ? `${equipmentWarnings.length} equipment at health warning: ${equipmentWarnings.map((e) => `${e.equipmentCode} (${e.healthScore}/100)`).join(', ')}`
+      : secondarySummary,
       confidence: isShadowPhase ? 'Shadow training mode' : payload.operator_guidance.headline,
     },
     visualTwin: {
@@ -735,6 +758,7 @@ export function mapCockpitState(
         null,
         bands,
         payload.affected_zone_ids ?? [],
+        summary.siteFloors,
       ),
       zoneSignals: zoneSignalsWithClusters,
       flowPaths,
@@ -791,6 +815,17 @@ export function mapCockpitState(
       detail: tension.message,
     })),
     emailClusters,
+    equipmentWarnings: (equipmentWarnings ?? []).map((eq) => ({
+      id: eq.id,
+      equipmentId: eq.equipment_id,
+      equipmentCode: eq.code,
+      equipmentType: eq.equipment_type,
+      floorId: eq.floor_id,
+      healthScore: eq.health_score,
+      healthState: eq.health_state as CockpitHealthState,
+      faultType: eq.fault_type,
+      zoneId: eq.zone_id,
+    })),
     systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null,
   }
 }

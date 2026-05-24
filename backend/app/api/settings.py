@@ -542,3 +542,93 @@ async def set_site_mode(
         logger.warning("Failed to sync bridge policy stage for %s: %s", site_id, e)
 
     return {"site_id": site_id, "current_stage": canonical_stage}
+
+
+# =============================================================================
+# AEGIS BESS Writer Settings
+# =============================================================================
+
+
+class AegisWriterSettings(BaseModel):
+    """AEGIS BESS writer enable/disable payload."""
+
+    aegis_bess_writer_enabled: bool = False
+
+
+@router.get("/settings/aegis/{site_id}")
+async def get_aegis_settings(
+    site_id: str,
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, Any]:
+    """Get AEGIS BESS writer settings for a site. Requires AUDITOR (level 1)."""
+    from app.config.settings import settings
+
+    # Check site mode — only supervised or automatic allow execution
+    from app.services.site_mode_policy_service import SiteModePolicyService
+
+    svc = SiteModePolicyService()
+    try:
+        state = svc._load_state(site_id, svc.load_policy(site_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
+
+    current_stage = state.get("current_stage", "commissioning")
+    execution_allowed = current_stage in ("supervised", "automatic")
+
+    return {
+        "site_id": site_id,
+        "aegis_bess_writer_enabled": settings.aegis_bess_writer_enabled,
+        "current_stage": current_stage,
+        "execution_allowed": execution_allowed,
+        "gate_status": "open" if (settings.aegis_bess_writer_enabled and execution_allowed) else "closed",
+    }
+
+
+@router.put("/settings/aegis/{site_id}")
+async def update_aegis_settings(
+    site_id: str,
+    payload: AegisWriterSettings,
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> dict[str, Any]:
+    """Update AEGIS BESS writer enable flag. Requires ADMIN (level 4).
+
+    Safety gates:
+    - Flag is persisted to backend config at runtime (not in Supabase)
+    - Actual writes also require site to be in supervised or automatic mode
+    - All state changes are audit-logged via CONFIG_CHANGE events
+    """
+    from app.config.settings import settings
+
+    # Check site mode — warn if enabling while not in supervised/automatic
+    from app.services.site_mode_policy_service import SiteModePolicyService
+
+    svc = SiteModePolicyService()
+    try:
+        state = svc._load_state(site_id, svc.load_policy(site_id))
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
+
+    current_stage = state.get("current_stage", "commissioning")
+    execution_allowed = current_stage in ("supervised", "automatic")
+
+    # Update runtime setting (this affects the running backend process)
+    settings.aegis_bess_writer_enabled = payload.aegis_bess_writer_enabled
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change(
+        f"settings.aegis.{site_id}.aegis_bess_writer_enabled",
+        user=auth.user_id,
+        source_ip=source_ip,
+        old_value=not payload.aegis_bess_writer_enabled,
+        new_value=payload.aegis_bess_writer_enabled,
+    )
+
+    return {
+        "site_id": site_id,
+        "aegis_bess_writer_enabled": settings.aegis_bess_writer_enabled,
+        "current_stage": current_stage,
+        "execution_allowed": execution_allowed,
+        "gate_status": "open" if (settings.aegis_bess_writer_enabled and execution_allowed) else "closed",
+        "warning": None if execution_allowed else f"execution_blocked: site is in '{current_stage}' mode (requires supervised or automatic)",
+    }

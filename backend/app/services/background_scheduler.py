@@ -21,9 +21,45 @@ from app.services.ai_optimizer import get_ai_optimizer
 from app.services.audit_logger import AuditLogger
 from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
 
-EXPIRY_HOURS = 168  # 7 days — gives Evans a full week to review before expiry
+EXPIRY_HOURS = 24  # Expire pending recommendations older than 24 hours
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_value_for_dedup(value: Any) -> str:
+    """Normalize numeric values for consistent string comparison in dedup.
+
+    Python's str() distinguishes int from float: str(50)='50', str(50.0)='50.0'.
+    JSON stores both as text. This causes '50' != '50.0' in the dedup set,
+    allowing duplicate recommendations for the same setpoint.
+
+    Fix: normalize by stripping trailing .0 for integer-valued floats,
+    then compare as lowercase strings.
+    """
+    if value is None:
+        return ""
+    try:
+        # Try to parse as float, normalize, then convert to string
+        f = float(value)
+        # If it's an integer value (1.0, 50.0, 7.0), drop the decimal
+        if f == int(f):
+            return str(int(f)).strip().lower()
+        return str(f).strip().lower()
+    except (ValueError, TypeError):
+        return str(value).strip().lower()
+
+
+def _log_rec_dedup_status(equipment_id: str, point_name: str, action_value: Any, recent_keys: set) -> None:
+    """Log dedup decision per recommendation for traceability."""
+    if not equipment_id or not point_name:
+        return
+    rec_key = (equipment_id, point_name, _normalize_value_for_dedup(action_value))
+    # Log at most 1 message per equipment per cycle (first rec that hits this path)
+    logger.info(
+        f"[DEDUP-B] Checking rec: {equipment_id} {point_name}={action_value} "
+        f"→ normalized={rec_key[2]} "
+        f"in recent_keys={rec_key in recent_keys}"
+    )
 
 
 class BackgroundSchedulerService:
@@ -509,6 +545,31 @@ class BackgroundSchedulerService:
                     finally:
                         loop.close()
 
+                    # Gate: load active urgent/critical work orders before persisting any recs
+                    # Prevents SENTINEL from recommending on equipment with active faults
+                    urgent_equipment: set[str] = set()
+                    try:
+                        from app.database.repositories.work_order_repository import WorkOrderRepository
+                        wo_repo = WorkOrderRepository()
+                        _wo_loop = asyncio.new_event_loop()
+                        asyncio.set_event_loop(_wo_loop)
+                        try:
+                            urgent_wos = _wo_loop.run_until_complete(wo_repo.get_open_urgent_work_orders(site_id))
+                            urgent_equipment = {
+                                wo.get("equipment_code")
+                                for wo in urgent_wos
+                                if wo.get("equipment_code")
+                            }
+                            if urgent_equipment:
+                                logger.warning(
+                                    f"[GATE] Active urgent/critical work orders for {site_id}: "
+                                    f"{len(urgent_equipment)} equipment — {urgent_equipment}"
+                                )
+                        finally:
+                            _wo_loop.close()
+                    except Exception as _wo_err:
+                        logger.warning(f"[GATE] Could not load urgent work orders: {_wo_err}")
+
                     recs_len = len(optimization_result.recommendations)
                     logger.warning(
                         "[AI-OPT DEBUG] recs count=%d, recs=%s", recs_len, optimization_result.recommendations
@@ -544,11 +605,49 @@ class BackgroundSchedulerService:
                             control_recs.append(rec_dict)
 
                     # Persist maintenance recs immediately — no validation needed
+                    # Build existing-key set for dedup: (target_equipment, action_type) within 48h
+                    existing_maint_keys: set[tuple[str, str]] = set()
+                    try:
+                        existing_pending = loop.run_until_complete(
+                            recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500)
+                        )
+                        maint_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
+                        for existing in existing_pending:
+                            ts = existing.timestamp
+                            if isinstance(ts, str):
+                                try:
+                                    ts = datetime.fromisoformat(ts)
+                                except (ValueError, TypeError):
+                                    continue
+                            if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+                                ts = ts.replace(tzinfo=None)
+                            if ts >= maint_cutoff:
+                                existing_maint_keys.add((existing.target_equipment, existing.action_type))
+                    except Exception:
+                        pass
+
                     for rec_dict in maintenance_recs:
-                        # FIX: Use correct field name from ai_optimizer response
                         equipment_id = rec_dict.get("target_equipment", "")
                         if not equipment_id:
                             equipment_id = rec_dict.get("equipment_id", "")
+
+                        # Dedup: skip if pending maintenance rec exists for this equipment within 48h
+                        dedup_key = (equipment_id, rec_dict.get("action_type", "maintenance"))
+                        if dedup_key in existing_maint_keys:
+                            logger.debug(
+                                "[AI-OPT] Dedup: skipping maintenance rec for %s — already pending",
+                                equipment_id,
+                            )
+                            skipped_count += 1
+                            continue
+
+                        # Gate: skip recommendations for equipment with active urgent/critical WO
+                        if urgent_equipment and equipment_id in urgent_equipment:
+                            logger.warning(
+                                f"[GATE] Skipping maintenance recommendation for {equipment_id} — "
+                                f"active urgent/critical work order exists"
+                            )
+                            continue
 
                         rec_action_type = rec_dict.get("action_type", "")
                         if not rec_action_type:
@@ -666,7 +765,7 @@ class BackgroundSchedulerService:
                             action_value = ""
                             if isinstance(existing.action, dict):
                                 action_point = existing.action.get("point", "")
-                                action_value = str(existing.action.get("value", "")).strip().lower()
+                                action_value = _normalize_value_for_dedup(existing.action.get("value", ""))
                             recent_keys.add((existing.target_equipment, action_point, action_value))
 
                     # Persist each recommendation
@@ -704,9 +803,13 @@ class BackgroundSchedulerService:
                         raw_value = rec_dict.get("recommended_value", "")
                         if raw_value == "":
                             raw_value = rec_dict.get("action", {}).get("value", "")
-                        rec_value = str(raw_value).strip().lower()
+                        rec_value = _normalize_value_for_dedup(raw_value)
                         if (equipment_id, point_name, rec_value) in recent_keys:
                             skipped_count += 1
+                            logger.info(
+                                f"[DEDUP-B] Skipped duplicate: {equipment_id} {point_name}={raw_value} "
+                                f"(matches existing pending with same normalized value)"
+                            )
                             continue
 
                         # GROUPED REC DIPLEX: If this is a grouped rec (affected_equipment),
@@ -749,12 +852,22 @@ class BackgroundSchedulerService:
                         action_value = rec_dict.get("recommended_value")
                         if action_value is None:
                             action_value = rec_dict.get("action", {}).get("value")
+                        # Log dedup info for first rec of each equipment so we can trace decisions
+                        _log_rec_dedup_status(equipment_id, point_name, action_value, recent_keys)
                         current_value = rec_dict.get("current_value")
                         if current_value is None:
                             current_value = rec_dict.get("action", {}).get("current_value")
                         unit_value = rec_dict.get("unit", "")
                         if not unit_value:
                             unit_value = rec_dict.get("action", {}).get("unit", "")
+
+                        # Gate: skip recommendations for equipment with active urgent/critical WO
+                        if urgent_equipment and equipment_id in urgent_equipment:
+                            logger.warning(
+                                f"[GATE] Skipping recommendation for {equipment_id} — "
+                                f"active urgent/critical work order exists"
+                            )
+                            continue
 
                         rec = Recommendation(
                             site_id=site_id,
@@ -851,8 +964,8 @@ class BackgroundSchedulerService:
                                                 title=rec.reason or "SENTINEL Advisory",
                                                 message=_msg,
                                                 reference_id=rec.id,
-                                                action_label="🛠 Create Work Order",
-                                                callback_action="wo",
+                                                action_label="Create Work Order",
+                                                callback_action=f"wo:rec_id:{rec.id}",
                                             )
                                         else:
                                             send_result = _svc.send_certified(
@@ -1419,7 +1532,7 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Milestone deadline check failed: %s", e)
 
-    def add_recommendation_expiry_job(self, interval_seconds: int = 21600):
+    def add_recommendation_expiry_job(self, interval_seconds: int = 3600):
         """Add a job to expire stale recommendations and dedup duplicate noise.
 
         Runs every 6 hours by default. For each (site_id, action_type):
@@ -1522,7 +1635,7 @@ class BackgroundSchedulerService:
                 ids_to_expire: set[str] = set()
 
                 for _action_type, typed_records in by_type.items():
-                    for r in typed_records[10:]:
+                    for r in typed_records[3:]:
                         ids_to_expire.add(r["id"])
 
                 if ids_to_expire:
@@ -1967,6 +2080,22 @@ class BackgroundSchedulerService:
         profile = (rec.profile or "cost_saving").replace("_", " ").title()
         reason = rec.reason or ""
 
+        # Fallback: construct adjustments from flat action format when array is empty
+        # (happens when LLM returns point/value at top level instead of nested)
+        if not adjustments and rec.action:
+            point = rec.action.get("point", "")
+            value = rec.action.get("value", "")
+            current = rec.action.get("current_value", "")
+            unit = rec.action.get("unit", "")
+            if point and value is not None:
+                adjustments = [{
+                    "equipment_id": rec.target_equipment,
+                    "point": point,
+                    "current_value": current,
+                    "recommended_value": value,
+                    "unit": unit,
+                }]
+
         adj_lines = []
         for adj in adjustments[:5]:
             equip = adj.get("equipment_id", "")
@@ -1982,7 +2111,7 @@ class BackgroundSchedulerService:
             adj_lines.append(f"\u2022 ...and {len(adjustments) - 5} more zones")
 
         lines = [
-            "⚡ SENTINEL Advisory — Sandton City Office Tower",
+            "*SENTINEL Advisory — Sandton City Office Tower*",
             "",
             f"<b>{title}</b>",
             "",
@@ -5395,7 +5524,7 @@ def _run_daily_health_sweep_sync():
 
                     sender = get_telegram_sender()
                     body = (
-                        f"\xf0\x9f\x9f\x8a *SENTINEL Health Sweep*\n"
+                        f"*SENTINEL Health Sweep*\n"
                         f"{total_recs} recommendations generated across {len(target_sites)} active sites"
                     )
                     await sender.send_text(str(chat_id), body, parse_mode="HTML")
@@ -5561,19 +5690,19 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             site_name = BUILDING_NAMES.get(site_id, site_id.upper())
             lines = []
 
-            lines.append(f"\U0001f4cb *SENTINEL Morning Digest — {site_name}*")
+            lines.append(f"*SENTINEL Morning Digest — {site_name}*")
             lines.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M SAST')}")
             lines.append("")
 
             # Health section
             if critical_assets:
-                health_status = "\U0001f534 CRITICAL"
+                health_status = "CRITICAL"
             elif warning_assets:
-                health_status = "\U0001f7e0 NEEDS ATTENTION"
+                health_status = "NEEDS ATTENTION"
             else:
-                health_status = "\U0001f7e2 HEALTHY"
+                health_status = "HEALTHY"
 
-            lines.append(f"\U0001f4ca *Building Health:* {health_status}")
+            lines.append(f"*Building Health:* {health_status}")
             lines.append(
                 f"Total: {total_assets} │ "
                 f"Critical: {len(critical_assets)} │ "
@@ -5582,7 +5711,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             )
 
             if critical_assets:
-                lines.append("\n\U0001f50d *Critical equipment:*")
+                lines.append("\n*Critical equipment:*")
                 for eq in critical_assets[:5]:
                     hs = eq.get("health_score", 0)
                     name = eq.get("name", eq.get("code", "?"))
@@ -5590,7 +5719,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     loc_str = f" @ {loc}" if loc else ""
                     lines.append(f"  ● {name} ({hs}%){loc_str}")
             if warning_assets:
-                lines.append("\n\U0001f7e1 *Warning:*")
+                lines.append("\n*Warning:*")
                 for eq in warning_assets[:3]:
                     hs = eq.get("health_score", 0)
                     name = eq.get("name", eq.get("code", "?"))
@@ -5599,30 +5728,30 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             # Alerts section
             lines.append("")
             if alert_count > 0:
-                lines.append(f"\U0001f6a8 *Active Alerts:* {alert_count} ({len(critical_alerts)} critical)")
+                lines.append(f"*Active Alerts:* {alert_count} ({len(critical_alerts)} critical)")
                 for a in critical_alerts[:3]:
                     msg = getattr(a, "message", "Alert")[:60]
                     lines.append(f"  [{getattr(a, 'severity', '?').upper()}] {msg}")
             else:
-                lines.append("\U0001f6a8 *Active Alerts:* 0")
+                lines.append("*Active Alerts:* 0")
 
             # Work orders section
-            lines.append(f"\n\U0001f4dd *Open Work Orders:* {open_wo_count}")
+            lines.append(f"*Open Work Orders:* {open_wo_count}")
 
             # Savings section
             if verified_savings > 0 or estimated_savings > 0:
-                lines.append(f"\U0001f4b0 *Savings this month:* R{verified_savings:,.0f} verified")
+                lines.append(f"*Savings this month:* R{verified_savings:,.0f} verified")
                 if estimated_savings > 0:
                     lines.append(
                         f"   + R{estimated_savings:,.0f} estimated ({verified_count} recommendation{'s' if verified_count != 1 else ''} confirmed)"
                     )
             else:
-                lines.append("\U0001f4b0 *Savings this month:* No verified savings yet")
+                lines.append("*Savings this month:* No verified savings yet")
 
             # AI recommendations section
             lines.append("")
             if ai_recs:
-                lines.append(f"\U0001f4a1 *AI Recommendations:* {len(ai_recs)} pending approval")
+                lines.append(f"*AI Recommendations:* {len(ai_recs)} pending approval")
                 from app.services.telegram_message_sender import InlineButton, InlineKeyboard
 
                 for rec in ai_recs[:5]:
@@ -5643,7 +5772,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     )
                     await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="HTML")
             else:
-                lines.append("\U0001f4a1 *AI Recommendations:* None pending")
+                lines.append("*AI Recommendations:* None pending")
 
             digest = "\n".join(lines)
             await sender.send_text(str(chat_id), digest, parse_mode="HTML")

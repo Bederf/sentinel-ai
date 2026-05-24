@@ -250,6 +250,14 @@ async def telegram_webhook(request: Request):
             await route_to_handler(session.intent, chat_id, "", callback_data=data, message_id=cq.get("message", {}).get("message_id"))
             return {"ok": True}
 
+        # Handle "Create Work Order" button on advisory notifications (no active session needed)
+        if data.startswith("wo:rec_id:"):
+            rec_uuid = data.split(":")[-1]
+            from app.services.telegram_flow_handlers import _handle_create_wo_from_rec, get_telegram_sender
+            sender = get_telegram_sender()
+            await _handle_create_wo_from_rec(chat_id, rec_uuid, sender)
+            return {"ok": True}
+
         return {"ok": True}
 
     # Handle regular message

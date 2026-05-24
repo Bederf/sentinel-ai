@@ -37,6 +37,7 @@ from app.api import (
     peak_demand,
     predictions,
     rag,
+    realtime_voice,
     recommendations,
     repair_effectiveness,
     sensor_analysis,
@@ -57,6 +58,7 @@ def register_analytics_routers(app: FastAPI) -> None:
     """Register analytics API routers (AI/ML, predictions, diagnostics)."""
     # Chat and AI
     app.include_router(chat.router, prefix="/api", tags=["chat"])
+    app.include_router(realtime_voice.router, prefix="/api", tags=["realtime-voice"])
     app.include_router(hybrid_chat.router, tags=["hybrid-chat"])
     app.include_router(local_chat.router, prefix="/api", tags=["local-chat"])
 

@@ -54,6 +54,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - [Technician Document Upload API](03-api-reference/technician-document-upload-api.md) - Login-derived site-bound technician uploads with controlled metadata and date validation
 - [Concept Evolution Connector API](03-api-reference/concept-evolution-connector-api.md) - Site-network document upload handoff endpoint for per-site Concept/internal network storage integration
 - [Local Chat API](03-api-reference/local-chat-api.md) - Natural language query endpoints (Phase 44-03)
+- **[Chat & Voice API](03-api-reference/chat-api.md)** - Chat with tool calling, ElevenLabs STT/TTS, OpenAI Realtime-2 voice pipeline (Path C-Surgical)
 - [ML Retraining API](03-api-reference/ml-retraining-api.md) - Model retraining, performance monitoring, A/B testing (Phase 45-01)
 - [Fleet Learning API](03-api-reference/fleet-learning-api.md) - Cross-site patterns, global models, fine-tuning (Phase 45-02)
 - [MLOps API](03-api-reference/mlops-api.md) - Drift detection, ML alerts, retraining triggers, success metrics (Phase 45-03)

@@ -328,6 +328,13 @@ async def defer_node(state: RecommendationAgentState) -> dict:
 async def route_tier_node(state: RecommendationAgentState) -> dict:
     """Route recommendation through PARASITE tier engine."""
     rec = state.get("recommendation", {})
+    rec_id = state.get("recommendation_id", "")
+
+    # Stamp IDs so TierRoutingEngine emits them to Loki events
+    if rec_id:
+        rec["recommendation_id"] = rec_id
+        if "correlation_id" not in rec:
+            rec["correlation_id"] = rec_id  # rec_id IS the correlation_id (set at creation)
 
     tier_result = await route_through_tier_engine(rec)
     tier = tier_result.get("tier", "tier1")
@@ -335,6 +342,12 @@ async def route_tier_node(state: RecommendationAgentState) -> dict:
     logger.info(
         f"[RecAgent] Routed {rec.get('id')} to {tier} (confidence={tier_result.get('confidence_score', 0):.2f})"
     )
+
+    # Propagate IDs from recommendation into tier_result for Loki traceability
+    if rec_id:
+        tier_result["recommendation_id"] = rec_id
+        tier_result["correlation_id"] = rec.get("correlation_id") or rec_id
+        tier_result["decision_id"] = tier_result.get("decision_id", "")
 
     return {
         "tier_result": tier_result,

@@ -50,6 +50,7 @@ class RecommendationScorer:
                 "comfort": 0.2,
                 "cost": 0.2,
                 "runtime": 0.2,
+                "health": 0.2,
                 "energy": 0.2,
                 "maintenance": 0.2,
             }
@@ -95,7 +96,7 @@ class RecommendationScorer:
         score = (
             comfort_norm * self.weights.get("comfort", 0.2)
             + cost_norm * self.weights.get("cost", 0.2)
-            + health_norm * self.weights.get("runtime", 0.2)
+            + health_norm * self.weights.get("health", 0.2)
             + energy_norm * self.weights.get("energy", 0.2)
             + maintenance_norm * self.weights.get("maintenance", 0.2)
         )

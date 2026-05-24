@@ -97,15 +97,15 @@ export function EnergyChart({
       <div
         className="rounded p-4"
         style={{
-          background: "var(--color-grafana-bg-panel)",
-          border: "1px solid var(--color-grafana-border)",
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
         }}
       >
         <div className="flex items-center gap-2 mb-4">
-          <Zap className="h-5 w-5" style={{ color: "var(--color-grafana-yellow)" }} />
+          <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
           <span
             className="font-medium"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             Energy Consumption
           </span>
@@ -129,21 +129,21 @@ export function EnergyChart({
       <div
         className="rounded p-4"
         style={{
-          background: "var(--color-grafana-bg-panel)",
-          border: "1px solid var(--color-grafana-border)",
+          background: "var(--color-sentinel-bg-panel)",
+          border: "1px solid var(--color-sentinel-border)",
         }}
       >
         <div className="flex items-center gap-2 mb-4">
-          <Zap className="h-5 w-5" style={{ color: "var(--color-grafana-yellow)" }} />
+          <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
           <span
             className="font-medium"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             Energy Consumption
           </span>
         </div>
         <div className="h-72 flex items-center justify-center">
-          <span style={{ color: "var(--color-grafana-text-disabled)" }}>
+          <span style={{ color: "var(--color-sentinel-text-disabled)" }}>
             No energy records found for the last {days} days
             {selectedSiteId ? ` at ${selectedSiteId}` : ""}
           </span>
@@ -156,32 +156,32 @@ export function EnergyChart({
     <div
       className="rounded overflow-hidden"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="p-4 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="flex items-center gap-3">
           <div
             className="p-2 rounded"
             style={{ background: "rgba(242, 204, 12, 0.15)" }}
           >
-            <Zap className="h-5 w-5" style={{ color: "var(--color-grafana-yellow)" }} />
+            <Zap className="h-5 w-5" style={{ color: "var(--color-sentinel-amber)" }} />
           </div>
           <div>
             <h3
               className="font-medium text-sm"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               Energy Consumption
             </h3>
             <span
               className="text-xs"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               Last {days} days
               {selectedSiteId
@@ -196,12 +196,12 @@ export function EnergyChart({
           <div className="flex items-center gap-1">
             <TrendingUp
               className="h-4 w-4"
-              style={{ color: "var(--color-grafana-green)" }}
+              style={{ color: "var(--color-sentinel-green)" }}
             />
             <span
               className="text-xl font-medium"
               style={{
-                color: "var(--color-grafana-text-primary)",
+                color: "var(--color-sentinel-text-primary)",
                 fontVariantNumeric: "tabular-nums",
               }}
             >
@@ -209,20 +209,20 @@ export function EnergyChart({
             </span>
             <span
               className="text-sm"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               kWh
             </span>
           </div>
           <span
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
             Total consumption
           </span>
           {/* Energy efficiency benchmark for SA commercial office */}
           {grandTotal > 0 && days > 0 && (
-            <div className="text-xs mt-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+            <div className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
               {(() => {
                 // SA commercial office benchmarks (kWh/m²/month)
                 // See docs/04-features/energy-chart-benchmark-calculation.md for methodology
@@ -244,13 +244,13 @@ export function EnergyChart({
                 let color: string
                 if (kwhPerSqm <= BENCHMARK_EFFICIENT) {
                   badge = "Efficient"
-                  color = "var(--color-grafana-green)"
+                  color = "var(--color-sentinel-green)"
                 } else if (kwhPerSqm <= BENCHMARK_TYPICAL) {
                   badge = "Typical"
-                  color = "var(--color-grafana-yellow)"
+                  color = "var(--color-sentinel-amber)"
                 } else {
                   badge = "Above avg"
-                  color = "var(--color-grafana-red)"
+                  color = "var(--color-sentinel-red)"
                 }
 
                 return (
@@ -275,8 +275,8 @@ export function EnergyChart({
               const pct = (total / maxTotal) * 100;
               return (
                 <div key={i} className="flex-1 flex flex-col justify-end" style={{ height: `${pct}%`, minHeight: '4px' }}>
-                  <div style={{ background: 'var(--color-grafana-cyan)', height: `${(point.HVAC / total) * 100}%` }} title={`HVAC: ${point.HVAC} kWh`} />
-                  <div style={{ background: 'var(--color-grafana-yellow)', height: `${(point.Lighting / total) * 100}%` }} title={`Lighting: ${point.Lighting} kWh`} />
+                  <div style={{ background: 'var(--sentinel-cyan)', height: `${(point.HVAC / total) * 100}%` }} title={`HVAC: ${point.HVAC} kWh`} />
+                  <div style={{ background: 'var(--color-sentinel-amber)', height: `${(point.Lighting / total) * 100}%` }} title={`Lighting: ${point.Lighting} kWh`} />
                   <div style={{ background: '#64748b', height: `${(point.Other / total) * 100}%` }} title={`Other: ${point.Other} kWh`} />
                 </div>
               );
@@ -288,18 +288,18 @@ export function EnergyChart({
       {/* Category breakdown */}
       <div
         className="px-4 py-3 flex justify-center gap-8"
-        style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+        style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
       >
         {/* HVAC */}
         <div className="text-center">
           <div className="flex items-center gap-2 justify-center mb-1">
             <div
               className="w-3 h-3 rounded"
-              style={{ background: "var(--color-grafana-cyan)" }}
+              style={{ background: "var(--sentinel-cyan)" }}
             />
             <span
               className="text-xs uppercase tracking-wide"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               HVAC
             </span>
@@ -307,7 +307,7 @@ export function EnergyChart({
           <div
             className="text-lg font-medium"
             style={{
-              color: "var(--color-grafana-cyan)",
+              color: "var(--sentinel-cyan)",
               fontVariantNumeric: "tabular-nums",
             }}
           >
@@ -315,7 +315,7 @@ export function EnergyChart({
           </div>
           <span
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
             kWh
           </span>
@@ -326,11 +326,11 @@ export function EnergyChart({
           <div className="flex items-center gap-2 justify-center mb-1">
             <div
               className="w-3 h-3 rounded"
-              style={{ background: "var(--color-grafana-yellow)" }}
+              style={{ background: "var(--color-sentinel-amber)" }}
             />
             <span
               className="text-xs uppercase tracking-wide"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               Lighting
             </span>
@@ -338,7 +338,7 @@ export function EnergyChart({
           <div
             className="text-lg font-medium"
             style={{
-              color: "var(--color-grafana-yellow)",
+              color: "var(--color-sentinel-amber)",
               fontVariantNumeric: "tabular-nums",
             }}
           >
@@ -346,7 +346,7 @@ export function EnergyChart({
           </div>
           <span
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
             kWh
           </span>
@@ -361,7 +361,7 @@ export function EnergyChart({
             />
             <span
               className="text-xs uppercase tracking-wide"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               Other
             </span>
@@ -369,7 +369,7 @@ export function EnergyChart({
           <div
             className="text-lg font-medium"
             style={{
-              color: "var(--color-grafana-text-primary)",
+              color: "var(--color-sentinel-text-primary)",
               fontVariantNumeric: "tabular-nums",
             }}
           >
@@ -377,7 +377,7 @@ export function EnergyChart({
           </div>
           <span
             className="text-xs"
-            style={{ color: "var(--color-grafana-text-disabled)" }}
+            style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
             kWh
           </span>

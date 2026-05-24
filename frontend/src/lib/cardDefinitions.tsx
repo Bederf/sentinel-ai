@@ -21,6 +21,7 @@ import {
   Droplets,
   Flame,
   Shield,
+  TrendingUp,
 } from 'lucide-react';
 
 // Card definition with metadata
@@ -60,10 +61,10 @@ export const KPI_CARDS: CardDefinition[] = [
     defaultVisible: true
   },
   {
-    id: 'kpi-predictions',
-    name: 'Predictions',
-    description: 'AI-detected risk predictions',
-    icon: <Shield className="w-4 h-4" />,
+    id: 'kpi-savings',
+    name: 'Savings',
+    description: 'Verified savings this month',
+    icon: <TrendingUp className="w-4 h-4" />,
     category: 'kpi',
     defaultVisible: true
   }

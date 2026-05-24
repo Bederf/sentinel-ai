@@ -60,13 +60,13 @@ assigned ──► in_progress ──► resolved ──► verified
 ```
 Alert / User Question
     ↓
-1. `/info_{CODE}`    — Equipment diagnostics (health, alerts, service history)
+1. `/info-{CODE}`    — Equipment diagnostics (health, alerts, service history)
     ↓
-2. `/inspect_{CODE}` — Schedule inspection + auto-assign technician
+2. `/inspect-{CODE}` — Schedule inspection + auto-assign technician
     ↓
-3. `/WO_{CODE}`      — Create formal work order with checklist
+3. `/WO-{CODE}`      — Create formal work order with checklist
     ↓
-4. `/note_{CODE}`    — Log observations against equipment record
+4. `/note-{CODE}`    — Log observations against equipment record
 ```
 
 Each command renders as a **clickable button** in the web chat. Claude is instructed to present these commands rather than calling `create_work_order` directly, ensuring the FM workflow is followed.
@@ -232,4 +232,36 @@ Indexes: `idx_work_orders_milestone_status`, `idx_work_orders_sla_deadline`, `id
 - **Slash command router:** `backend/app/services/slash_command_router.py`
 - **Standard API:** `backend/app/api/work_orders.py`
 - **Repository:** `backend/app/database/repositories/work_order_repository.py`
+
+---
+
+## Spare Parts Integration (Phase 209)
+
+Technician work orders are enriched from the spare parts catalog at two points.
+
+### Work Order Creation (`POST /api/work-orders/technician`)
+
+When a work order is created without `parts_needed`, the system queries the `spare_parts` table for the equipment type and auto-populates `parts_required` with matching part names and OEM part numbers.
+
+Example: Creating a work order for `S002-AHU-B01` without specifying parts auto-fills:
+```json
+"parts_required": [
+  "V-belt set (#BELT-AHU-B)",
+  "Air filter MERV-13 (set) (#FLT-AHU-M13)",
+  "Fan bearing assembly (#BRG-AHU-6205)",
+  "Motor capacitor (#CAP-AHU-50UF)",
+  "Condensate drain trap (#DRAIN-AHU)"
+]
+```
+
+### Work Order Completion (`POST /api/work-orders/technician/{id}/complete`)
+
+When a work order is completed with `parts_used`, the system matches each part against the `spare_parts` catalog and decrements `spare_parts_inventory.quantity_on_hand`. This keeps inventory in sync with actual consumption.
+
+**Related files:**
+- `backend/app/services/maintenance_recommender.py` — `DEFAULT_MAINTENANCE_ACTIONS` + `COMMON_SPARE_PARTS`
+- `backend/app/database/repositories/spare_parts_repository.py` — CRUD + inventory
+- `backend/app/api/spare_parts.py` — Parts catalog API
+- `docs/03-api-reference/spare-parts-api.md` — Full API reference
+- `docs/04-features/spare-parts-catalog.md` — Feature documentation
 - **Migration:** `supabase/migrations/209_milestone_sla_work_orders.sql`

@@ -127,7 +127,7 @@ export function SiteCard({
     degraded:"var(--color-sentinel-amber)",
     at_risk: "var(--color-sentinel-red)",
   };
-  const borderColor = statusBorderColor[site.status ?? "normal"] ?? "var(--color-grafana-border)";
+  const borderColor = statusBorderColor[site.status ?? "normal"] ?? "var(--color-sentinel-border)";
 
   return (
     <div
@@ -136,8 +136,9 @@ export function SiteCard({
       onClick={onClick ? () => onClick(site) : undefined}
       onKeyDown={onClick ? (e) => e.key === "Enter" && onClick(site) : undefined}
       className={onClick ? "cursor-pointer hover:brightness-110 transition-all" : ""}
+      aria-label={`${site.name}${onClick ? ', click to view details' : ''}`}
       style={{
-        background: "var(--color-grafana-bg-panel)",
+        background: "var(--color-sentinel-bg-panel)",
         border: `1.5px solid ${borderColor}`,
         borderRadius: "8px",
         padding: "16px",
@@ -151,14 +152,14 @@ export function SiteCard({
         <div className="flex-1 min-w-0">
           <h4
             className="font-medium text-sm truncate"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             {site.name}
           </h4>
           {site.location && (
             <p
               className="text-xs truncate"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               {site.location}
             </p>
@@ -172,9 +173,9 @@ export function SiteCard({
         <span
           className="self-start px-2 py-0.5 rounded text-xs"
           style={{
-            background: "var(--color-grafana-bg-secondary)",
-            border: "1px solid var(--color-grafana-border)",
-            color: "var(--color-grafana-text-secondary)",
+            background: "var(--color-sentinel-bg-secondary)",
+            border: "1px solid var(--color-sentinel-border)",
+            color: "var(--color-sentinel-text-secondary)",
           }}
         >
           {site.type}
@@ -184,28 +185,28 @@ export function SiteCard({
       {/* Stats */}
       <div className="flex gap-4">
         <div className="flex items-center gap-1.5">
-          <Shield className="w-3.5 h-3.5" style={{ color: "var(--color-grafana-text-secondary)" }} />
-          <span className="text-sm font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>
+          <Shield className="w-3.5 h-3.5" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+          <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
             {site.equipment_count}
           </span>
-          <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Equipment
           </span>
         </div>
         <div className="flex items-center gap-1.5">
           <AlertTriangle
             className="w-3.5 h-3.5"
-            style={{ color: site.alert_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-grafana-text-secondary)" }}
+            style={{ color: site.alert_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-secondary)" }}
           />
           <span
             className="text-sm font-medium"
             style={{
-              color: site.alert_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-grafana-text-primary)",
+              color: site.alert_count > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-primary)",
             }}
           >
             {site.alert_count}
           </span>
-          <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+          <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
             Risks
           </span>
         </div>
@@ -215,18 +216,18 @@ export function SiteCard({
       {showSafetyStatus && (
         <div className="flex items-center gap-2">
           {isLoading ? (
-            <span className="text-xs" style={{ color: "var(--color-grafana-text-disabled)" }}>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
               Loading...
             </span>
           ) : (
             <>
               <span
                 className="text-xs font-medium"
-                style={{ color: "var(--color-grafana-text-primary)" }}
+                style={{ color: "var(--color-sentinel-text-primary)" }}
               >
                 {safeFraction}
               </span>
-              <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+              <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Safe
               </span>
               {summary?.safety && (
@@ -276,7 +277,7 @@ export function SiteCard({
             {site.bridge_connected ? "Bridge connected" : "Bridge offline"}
           </span>
           {site.bridge_last_sync && (
-            <span className="text-xs" style={{ color: "var(--color-grafana-text-disabled)" }}>
+            <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
               · {new Date(site.bridge_last_sync).toLocaleTimeString()}
             </span>
           )}

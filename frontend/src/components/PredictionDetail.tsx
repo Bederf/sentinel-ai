@@ -33,6 +33,7 @@ interface PredictionDetailProps {
   prediction: {
     id: string;
     equipment_id?: string;
+    equipment_code?: string;
     equipment_name: string;
     site_name: string;
     site_id?: string;
@@ -146,11 +147,11 @@ function getSeverityConfig(severity: string) {
     case "high":
       return { color: "var(--color-status-warning)", bg: "rgba(255, 152, 48, 0.15)" };
     case "medium":
-      return { color: "var(--color-grafana-yellow)", bg: "rgba(242, 204, 12, 0.15)" };
+      return { color: "var(--color-sentinel-amber)", bg: "rgba(242, 204, 12, 0.15)" };
     case "low":
-      return { color: "var(--color-grafana-blue)", bg: "rgba(50, 116, 217, 0.15)" };
+      return { color: "var(--color-sentinel-blue)", bg: "rgba(50, 116, 217, 0.15)" };
     default:
-      return { color: "var(--color-grafana-text-secondary)", bg: "rgba(142, 142, 142, 0.15)" };
+      return { color: "var(--color-sentinel-text-secondary)", bg: "rgba(142, 142, 142, 0.15)" };
   }
 }
 
@@ -159,11 +160,11 @@ function getConfidenceConfig(confidence: string) {
     case "high":
       return { color: "var(--color-status-success)", label: "HIGH CONFIDENCE" };
     case "medium":
-      return { color: "var(--color-grafana-yellow)", label: "MEDIUM CONFIDENCE" };
+      return { color: "var(--color-sentinel-amber)", label: "MEDIUM CONFIDENCE" };
     case "low":
-      return { color: "var(--color-grafana-text-secondary)", label: "LOW CONFIDENCE" };
+      return { color: "var(--color-sentinel-text-secondary)", label: "LOW CONFIDENCE" };
     default:
-      return { color: "var(--color-grafana-text-secondary)", label: "UNKNOWN" };
+      return { color: "var(--color-sentinel-text-secondary)", label: "UNKNOWN" };
   }
 }
 
@@ -198,22 +199,22 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
       <div
         className="relative z-10 w-full h-full md:w-2/3 md:h-auto md:max-w-5xl md:max-h-[90vh] md:overflow-y-auto md:rounded"
         style={{
-          background: "var(--color-grafana-bg-canvas)",
-          border: "1px solid var(--color-grafana-border)",
+          background: "var(--color-sentinel-bg-canvas)",
+          border: "1px solid var(--color-sentinel-border)",
         }}
       >
         {/* Header */}
         <div
           className="sticky top-0 z-10 p-4 flex items-start justify-between"
           style={{
-            background: "var(--color-grafana-bg-primary)",
-            borderBottom: "1px solid var(--color-grafana-border)",
+            background: "var(--color-sentinel-bg-primary)",
+            borderBottom: "1px solid var(--color-sentinel-border)",
           }}
         >
           <div>
             <h2
               className="text-xl font-bold mb-2"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               Failure Prediction Details
             </h2>
@@ -239,8 +240,8 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
               <span
                 className="text-xs font-medium px-2 py-0.5 rounded"
                 style={{
-                  background: "var(--color-grafana-bg-secondary)",
-                  color: "var(--color-grafana-text-secondary)",
+                  background: "var(--color-sentinel-bg-secondary)",
+                  color: "var(--color-sentinel-text-secondary)",
                 }}
               >
                 {(prediction.equipment_type || "equipment").toUpperCase()}
@@ -250,9 +251,9 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
           <button
             onClick={onClose}
             className="p-2 rounded transition-colors"
-            style={{ background: "var(--color-grafana-bg-secondary)" }}
+            style={{ background: "var(--color-sentinel-bg-secondary)" }}
           >
-            <X className="h-5 w-5" style={{ color: "var(--color-grafana-text-secondary)" }} />
+            <X className="h-5 w-5" style={{ color: "var(--color-sentinel-text-secondary)" }} />
           </button>
         </div>
 
@@ -267,12 +268,12 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
             <MetricCard
               value={prediction.timeframe_days.toString()}
               label="Days Until Failure"
-              color="var(--color-grafana-orange)"
+              color="var(--color-sentinel-amber)"
             />
             <MetricCard
               value={(prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years) ? `${prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years} yrs` : (prediction.evidence?.health_score ? `${prediction.evidence.health_score}%` : "N/A")}
               label={(prediction.evidence?.asset_age_years ?? prediction.evidence?.age_years) ? "Asset Age" : "Health Score"}
-              color="var(--color-grafana-cyan)"
+              color="var(--sentinel-cyan)"
             />
           </div>
 
@@ -280,19 +281,19 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
           <div
             className="rounded p-4"
             style={{
-              background: "var(--color-grafana-bg-panel)",
-              border: "1px solid var(--color-grafana-border)",
+              background: "var(--color-sentinel-bg-panel)",
+              border: "1px solid var(--color-sentinel-border)",
             }}
           >
             <h3
               className="text-lg font-semibold mb-2"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               {prediction.equipment_name}
             </h3>
             <div className="flex items-center gap-2 text-sm mb-4">
-              <Activity className="h-4 w-4" style={{ color: "var(--color-grafana-text-disabled)" }} />
-              <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+              <Activity className="h-4 w-4" style={{ color: "var(--color-sentinel-text-disabled)" }} />
+              <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 {prediction.site_name} • {prediction.equipment_type}
               </span>
             </div>
@@ -310,7 +311,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 <span className="font-medium text-sm" style={{ color: severityConfig.color }}>
                   {formatPredictionType(prediction.prediction_type)}
                 </span>
-                <p className="text-sm mt-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Predicted failure:{" "}
                   {new Date(prediction.predicted_failure_date).toLocaleDateString("en-ZA", {
                     day: "numeric",
@@ -339,7 +340,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   className="text-xs px-2 py-1 rounded flex items-center gap-1"
                   style={{
                     background: prediction.evidence.anomaly_score > 0.5 ? "rgba(220, 38, 38, 0.15)" : prediction.evidence.anomaly_score > 0.3 ? "rgba(255, 152, 48, 0.15)" : "rgba(50, 116, 217, 0.15)",
-                    color: prediction.evidence.anomaly_score > 0.5 ? "var(--color-grafana-red)" : prediction.evidence.anomaly_score > 0.3 ? "var(--color-status-warning)" : "var(--color-grafana-blue)",
+                    color: prediction.evidence.anomaly_score > 0.5 ? "var(--color-sentinel-red)" : prediction.evidence.anomaly_score > 0.3 ? "var(--color-status-warning)" : "var(--color-sentinel-blue)",
                   }}
                 >
                   <Activity className="h-3 w-3" />
@@ -351,7 +352,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   className="text-xs px-2 py-1 rounded flex items-center gap-1"
                   style={{
                     background: prediction.evidence.health_trend === "declining" ? "rgba(220, 38, 38, 0.15)" : "rgba(50, 116, 217, 0.15)",
-                    color: prediction.evidence.health_trend === "declining" ? "var(--color-grafana-red)" : "var(--color-grafana-blue)",
+                    color: prediction.evidence.health_trend === "declining" ? "var(--color-sentinel-red)" : "var(--color-sentinel-blue)",
                   }}
                 >
                   <TrendingUp className="h-3 w-3" />
@@ -363,7 +364,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   className="text-xs px-2 py-1 rounded flex items-center gap-1"
                   style={{
                     background: "rgba(50, 116, 217, 0.15)",
-                    color: "var(--color-grafana-blue)",
+                    color: "var(--color-sentinel-blue)",
                   }}
                 >
                   <Clock className="h-3 w-3" />
@@ -377,12 +378,12 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
               <div
                 className="mt-3 p-3 rounded text-sm"
                 style={{
-                  background: "var(--color-grafana-bg-secondary)",
-                  border: "1px solid var(--color-grafana-border)",
-                  color: "var(--color-grafana-text-secondary)",
+                  background: "var(--color-sentinel-bg-secondary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-secondary)",
                 }}
               >
-                <span className="font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>Observation: </span>
+                <span className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>Observation: </span>
                 {prediction.evidence.observation}
               </div>
             )}
@@ -396,20 +397,20 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   <div className="flex justify-between mb-1">
                     <span
                       className="text-sm font-medium"
-                      style={{ color: "var(--color-grafana-text-primary)" }}
+                      style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
                       {factor.factor}
                     </span>
                     <span
                       className="text-sm"
-                      style={{ color: "var(--color-grafana-text-secondary)" }}
+                      style={{ color: "var(--color-sentinel-text-secondary)" }}
                     >
                       {Math.round(factor.weight * 100)}%
                     </span>
                   </div>
                   <div
                     className="h-2 rounded-full overflow-hidden"
-                    style={{ background: "var(--color-grafana-border)" }}
+                    style={{ background: "var(--color-sentinel-border)" }}
                   >
                     <div
                       className="h-full rounded-full"
@@ -421,7 +422,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   </div>
                   <p
                     className="text-xs mt-1"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     {factor.description}
                   </p>
@@ -441,7 +442,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <button
                       onClick={() => setShowCostBreakdown(true)}
                       className="mt-3 text-sm flex items-center gap-1"
-                      style={{ color: "var(--color-grafana-text-link)" }}
+                      style={{ color: "var(--color-sentinel-text-link)" }}
                     >
                       <ChevronDown className="h-4 w-4" />
                       View detailed breakdown
@@ -453,7 +454,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <button
                       onClick={() => setShowCostBreakdown(false)}
                       className="mt-3 text-sm flex items-center gap-1"
-                      style={{ color: "var(--color-grafana-text-link)" }}
+                      style={{ color: "var(--color-sentinel-text-link)" }}
                     >
                       <ChevronUp className="h-4 w-4" />
                       Hide breakdown
@@ -485,17 +486,17 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <div
                       className="p-3 rounded"
                       style={{
-                        background: "var(--color-grafana-bg-secondary)",
-                        border: "1px solid var(--color-grafana-border)",
+                        background: "var(--color-sentinel-bg-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
                       }}
                     >
-                      <div className="text-xs mb-2" style={{ color: "var(--color-grafana-text-disabled)" }}>
+                      <div className="text-xs mb-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                         Preventive Maintenance
                       </div>
                       <div className="text-xl font-bold" style={{ color: "var(--color-status-success)" }}>
                         {formatZAR(prediction.cost_impact.preventive_breakdown.total_zar)}
                       </div>
-                      <div className="text-xs mt-2 space-y-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      <div className="text-xs mt-2 space-y-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         <div className="flex justify-between">
                           <span>Labor:</span>
                           <span>{formatZAR(prediction.cost_impact.preventive_breakdown.labor_cost_zar)}</span>
@@ -515,17 +516,17 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <div
                       className="p-3 rounded"
                       style={{
-                        background: "var(--color-grafana-bg-secondary)",
-                        border: "1px solid var(--color-grafana-border)",
+                        background: "var(--color-sentinel-bg-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
                       }}
                     >
-                      <div className="text-xs mb-2" style={{ color: "var(--color-grafana-text-disabled)" }}>
+                      <div className="text-xs mb-2" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                         If Failure Occurs
                       </div>
                       <div className="text-xl font-bold" style={{ color: "var(--color-status-error)" }}>
                         {formatZAR(prediction.cost_impact.failure_breakdown.total_zar)}
                       </div>
-                      <div className="text-xs mt-2 space-y-1" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                      <div className="text-xs mt-2 space-y-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                         <div className="flex justify-between">
                           <span>Emergency repair:</span>
                           <span>{formatZAR(prediction.cost_impact.failure_breakdown.emergency_repair_zar)}</span>
@@ -544,7 +545,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
 
                   {/* Savings highlight */}
                   <div className="flex justify-between items-center">
-                    <span className="text-sm" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                    <span className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       Potential Savings
                     </span>
                     <span className="text-lg font-bold" style={{ color: "var(--color-status-success)" }}>
@@ -563,7 +564,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
               {reading ? (
                 <>
                   <div className="flex justify-between items-start mb-3">
-                    <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+                    <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       {reading.parameter.replace(/_/g, " ")}
                     </span>
                     <span
@@ -576,7 +577,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                         color:
                           reading.trend === "increasing" || reading.trend === "declining"
                             ? "var(--color-status-error)"
-                            : "var(--color-grafana-blue)",
+                            : "var(--color-sentinel-blue)",
                       }}
                     >
                       {reading.trend === "increasing" || reading.trend === "declining" ? (
@@ -589,12 +590,12 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   </div>
                   <div
                     className="text-3xl font-bold mb-2"
-                    style={{ color: "var(--color-grafana-text-primary)" }}
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
                   >
                     {reading.value}
                     <span
                       className="text-sm ml-2"
-                      style={{ color: "var(--color-grafana-text-disabled)" }}
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
                     >
                       (baseline: {reading.baseline})
                     </span>
@@ -603,7 +604,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <div>
                       <span
                         className="text-xs"
-                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
                       >
                         Change
                       </span>
@@ -620,13 +621,13 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <div>
                       <span
                         className="text-xs"
-                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
                       >
                         Threshold
                       </span>
                       <div
                         className="text-sm font-semibold"
-                        style={{ color: "var(--color-grafana-text-primary)" }}
+                        style={{ color: "var(--color-sentinel-text-primary)" }}
                       >
                         {reading.threshold}
                       </div>
@@ -634,7 +635,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   </div>
                 </>
               ) : (
-                <div style={{ color: "var(--color-grafana-text-disabled)" }}>
+                <div style={{ color: "var(--color-sentinel-text-disabled)" }}>
                   No reading data available
                 </div>
               )}
@@ -648,7 +649,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <div key={alarm} className="flex justify-between items-center">
                       <span
                         className="text-sm"
-                        style={{ color: "var(--color-grafana-text-secondary)" }}
+                        style={{ color: "var(--color-sentinel-text-secondary)" }}
                       >
                         {alarm.replace(/_/g, " ")}
                       </span>
@@ -664,7 +665,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     </div>
                   ))
                 ) : (
-                  <div style={{ color: "var(--color-grafana-text-disabled)" }}>
+                  <div style={{ color: "var(--color-sentinel-text-disabled)" }}>
                     No alarm data available
                   </div>
                 )}
@@ -694,13 +695,13 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 <div>
                   <div
                     className="text-xl font-bold"
-                    style={{ color: "var(--color-grafana-text-primary)" }}
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
                   >
                     {formatZAR(prediction.financial_impact.repair_cost_zar || 0)}
                   </div>
                   <span
                     className="text-xs"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Repair Cost
                   </span>
@@ -714,7 +715,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   </div>
                   <span
                     className="text-xs"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Potential Loss
                   </span>
@@ -731,7 +732,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   </div>
                   <span
                     className="text-xs"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Potential Savings
                   </span>
@@ -739,13 +740,13 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 <div>
                   <div
                     className="text-xl font-bold"
-                    style={{ color: "var(--color-grafana-orange)" }}
+                    style={{ color: "var(--color-sentinel-amber)" }}
                   >
                     {prediction.financial_impact.estimated_repair_hours || 0}h
                   </div>
                   <span
                     className="text-xs"
-                    style={{ color: "var(--color-grafana-text-secondary)" }}
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
                   >
                     Est. Downtime
                   </span>
@@ -758,10 +759,10 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
           {prediction.id && (
             <div
               style={{
-                backgroundColor: "var(--color-grafana-panel-bg)",
+                backgroundColor: "var(--sentinel-bg-panel)",
                 padding: "1.5rem",
                 borderRadius: "8px",
-                border: "1px solid var(--color-grafana-border)",
+                border: "1px solid var(--color-sentinel-border)",
                 marginBottom: "1.5rem",
               }}
             >
@@ -770,12 +771,12 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                   fontSize: "1.125rem",
                   fontWeight: 600,
                   marginBottom: "1rem",
-                  color: "var(--color-grafana-text-primary)",
+                  color: "var(--color-sentinel-text-primary)",
                 }}
               >
                 Maintenance History
               </h3>
-              <MaintenanceHistoryTabs equipmentId={prediction.id} />
+              <MaintenanceHistoryTabs equipmentId={prediction.id} equipmentCode={prediction.equipment_code} />
             </div>
           )}
 
@@ -795,7 +796,7 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 </span>
                 <p
                   className="text-sm mt-1"
-                  style={{ color: "var(--color-grafana-text-primary)" }}
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
                   {prediction.recommended_action}
                 </p>
@@ -813,9 +814,9 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                     <div key={index} className="flex items-center gap-2">
                       <Wrench
                         className="h-4 w-4"
-                        style={{ color: "var(--color-grafana-text-disabled)" }}
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
                       />
-                      <span style={{ color: "var(--color-grafana-text-primary)" }}>{part}</span>
+                      <span style={{ color: "var(--color-sentinel-text-primary)" }}>{part}</span>
                     </div>
                   ) : (
                     // New format: object with details
@@ -823,30 +824,30 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                       key={index}
                       className="p-3 rounded"
                       style={{
-                        background: "var(--color-grafana-bg-secondary)",
-                        border: "1px solid var(--color-grafana-border)",
+                        background: "var(--color-sentinel-bg-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
                       }}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex items-start gap-2">
                           <Wrench
                             className="h-4 w-4 mt-0.5"
-                            style={{ color: "var(--color-grafana-text-disabled)" }}
+                            style={{ color: "var(--color-sentinel-text-disabled)" }}
                           />
                           <div>
-                            <div className="font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>
+                            <div className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
                               {part.name}
                             </div>
-                            <div className="text-xs mt-1" style={{ color: "var(--color-grafana-text-disabled)" }}>
+                            <div className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-disabled)" }}>
                               Part #: {part.part_number} • Qty: {part.quantity}
                             </div>
                           </div>
                         </div>
                         <div className="text-right">
-                          <div className="font-medium" style={{ color: "var(--color-grafana-text-primary)" }}>
+                          <div className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
                             {formatZAR(part.cost_zar)}
                           </div>
-                          <div className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                          <div className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                             {part.lead_time_days} day{part.lead_time_days !== 1 ? 's' : ''} lead time
                           </div>
                         </div>
@@ -859,12 +860,12 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
                 {typeof prediction.parts_required[0] !== 'string' && (
                   <div
                     className="pt-3 mt-3 flex justify-between items-center"
-                    style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+                    style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
                   >
-                    <span className="text-sm font-medium" style={{ color: "var(--color-grafana-text-secondary)" }}>
+                    <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                       Total Parts Cost
                     </span>
-                    <span className="text-lg font-bold" style={{ color: "var(--color-grafana-text-primary)" }}>
+                    <span className="text-lg font-bold" style={{ color: "var(--color-sentinel-text-primary)" }}>
                       {formatZAR(
                         (prediction.parts_required as Array<{ cost_zar: number; quantity: number }>)
                           .reduce((sum, p) => sum + (p.cost_zar * p.quantity), 0)
@@ -882,9 +883,9 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
               onClick={onClose}
               className="px-4 py-2 rounded text-sm font-medium transition-colors cursor-pointer hover:brightness-110"
               style={{
-                background: "var(--color-grafana-bg-secondary)",
-                color: "var(--color-grafana-text-primary)",
-                border: "1px solid var(--color-grafana-border)",
+                background: "var(--color-sentinel-bg-secondary)",
+                color: "var(--color-sentinel-text-primary)",
+                border: "1px solid var(--color-sentinel-border)",
               }}
             >
               Close
@@ -918,14 +919,14 @@ function MetricCard({ value, label, color }: { value: string; label: string; col
     <div
       className="rounded p-4 text-center"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       <div className="text-3xl font-bold mb-1" style={{ color }}>
         {value}
       </div>
-      <span className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
+      <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
         {label}
       </span>
     </div>
@@ -937,15 +938,15 @@ function SectionCard({ title, children }: { title: string; children: React.React
     <div
       className="rounded overflow-hidden"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       <div
         className="px-4 py-3"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
-        <h3 className="font-semibold text-sm" style={{ color: "var(--color-grafana-text-primary)" }}>
+        <h3 className="font-semibold text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
           {title}
         </h3>
       </div>

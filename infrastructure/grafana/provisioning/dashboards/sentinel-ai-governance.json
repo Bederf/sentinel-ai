@@ -26,27 +26,59 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=\"sentinel-backend\"}",
+          "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}",
           "legendFormat": "{{instance}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [
-            { "type": "value", "options": { "1": { "text": "UP", "color": "#10b981" } } },
-            { "type": "value", "options": { "0": { "text": "DOWN", "color": "#ef4444" } } }
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "UP",
+                  "color": "#10b981"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "#ef4444"
+                }
+              }
+            }
           ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#ef4444", "value": null },
-              { "color": "#10b981", "value": 1 }
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
             ]
           },
           "sparkline": {
@@ -62,7 +94,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -71,10 +105,18 @@
     },
     {
       "id": 2,
-      "title": "Quality Gate — 5m Rate",
+      "title": "Quality Gate \u2014 5m Rate",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 14, "x": 5, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 5,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -84,7 +126,9 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 15,
@@ -97,42 +141,94 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "pass" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#10b981", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "pass"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#10b981",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "fail" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#ef4444", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "fail"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef4444",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byName", "options": "warn" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#f59e0b", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byName",
+              "options": "warn"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#f59e0b",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       }
     },
     {
       "id": 3,
-      "title": "Safety Violations — 24h",
+      "title": "Safety Violations \u2014 24h",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 19,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(increase(sentinel_safety_violations_total[24h]))"
+          "expr": "sum(increase(sentinel_safety_violations_total[24h])) or vector(0)"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#10b981", "value": null },
-              { "color": "#f59e0b", "value": 1 },
-              { "color": "#ef4444", "value": 5 }
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 1
+              },
+              {
+                "color": "#ef4444",
+                "value": 5
+              }
             ]
           },
           "unit": "none",
@@ -150,7 +246,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -161,8 +259,16 @@
       "id": 4,
       "title": "Recommendations by Tier",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -172,7 +278,9 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -183,14 +291,22 @@
     },
     {
       "id": 5,
-      "title": "Approval Decisions — 1h Rate",
+      "title": "Approval Decisions \u2014 1h Rate",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (decision) (rate(sentinel_approval_decisions_total[1h]))",
+          "expr": "sum by (decision) (rate(sentinel_approval_decisions_total[1h])) or vector(0)",
           "legendFormat": "{{decision}}"
         }
       ],
@@ -208,18 +324,28 @@
       "id": 6,
       "title": "Model Drift Alerts",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_model_drift_alerts{source=\"supabase\", data_sufficient=\"true\", data_quality!=\"insufficient_samples\", data_quality!=\"insufficient_timespan\"}",
+          "expr": "sentinel_model_drift_alerts{source=\"supabase\"}",
           "legendFormat": "{{site_id}}/{{model_type}} [{{data_quality}}]"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -227,9 +353,18 @@
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#10b981", "value": null },
-              { "color": "#f59e0b", "value": 1 },
-              { "color": "#ef4444", "value": 3 }
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 1
+              },
+              {
+                "color": "#ef4444",
+                "value": 3
+              }
             ]
           }
         }
@@ -239,8 +374,16 @@
       "id": 61,
       "title": "Drift Baseline Hours",
       "type": "stat",
-      "gridPos": { "h": 3, "w": 8, "x": 0, "y": 20 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 3,
+        "w": 8,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -250,14 +393,25 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
+          "color": {
+            "mode": "thresholds"
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#ef4444", "value": null },
-              { "color": "#f59e0b", "value": 72 },
-              { "color": "#10b981", "value": 168 }
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 72
+              },
+              {
+                "color": "#10b981",
+                "value": 168
+              }
             ]
           },
           "unit": "h",
@@ -275,7 +429,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -284,20 +440,30 @@
     },
     {
       "id": 7,
-      "title": "Rollback Events — 1h Rate",
+      "title": "Rollback Events \u2014 1h Rate",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (equipment_type) (rate(sentinel_rollback_total[1h]))",
+          "expr": "sum by (equipment_type) (rate(sentinel_rollback_total[1h])) or vector(0)",
           "legendFormat": "{{equipment_type}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -310,8 +476,16 @@
       "id": 8,
       "title": "Sentinel Build",
       "type": "table",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -324,13 +498,21 @@
       "id": 10,
       "title": "Quality Gate Pass/Fail by Rule",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 20 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
           "expr": "sum by (rule_name, status) (rate(sentinel_quality_gate_rule_evaluations_total[5m]))",
-          "legendFormat": "{{rule_name}} — {{status}}"
+          "legendFormat": "{{rule_name}} \u2014 {{status}}"
         }
       ],
       "fieldConfig": {
@@ -338,23 +520,60 @@
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 20,
-            "stacking": { "mode": "normal" }
+            "stacking": {
+              "mode": "normal"
+            }
           },
-          "thresholds": { "mode": "absolute" },
+          "thresholds": {
+            "mode": "absolute"
+          },
           "unit": "ops"
         },
         "overrides": [
           {
-            "matcher": { "id": "byRegexp", "options": ".*pass.*" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#10b981", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*pass.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#10b981",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byRegexp", "options": ".*warn.*" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#f59e0b", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*warn.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#f59e0b",
+                  "mode": "fixed"
+                }
+              }
+            ]
           },
           {
-            "matcher": { "id": "byRegexp", "options": ".*fail.*" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "#ef4444", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*fail.*"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "#ef4444",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       }
@@ -363,8 +582,16 @@
       "id": 11,
       "title": "Model Drift Score",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 20 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 14,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -374,20 +601,33 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 2,
             "fillOpacity": 8,
-            "thresholdsStyle": { "mode": "line" }
+            "thresholdsStyle": {
+              "mode": "line"
+            }
           },
           "min": 0,
           "max": 1,
           "thresholds": {
             "mode": "absolute",
             "steps": [
-              { "color": "#10b981", "value": null },
-              { "color": "#f59e0b", "value": 0.3 },
-              { "color": "#ef4444", "value": 0.6 }
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 0.3
+              },
+              {
+                "color": "#ef4444",
+                "value": 0.6
+              }
             ]
           },
           "unit": "percentunit",
@@ -395,8 +635,27 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byRegexp", "options": ".*insufficient.*" },
-            "properties": [{ "id": "custom.lineWidth", "value": 1 }, { "id": "custom.fillOpacity", "value": 5 }, { "id": "color", "value": { "fixedColor": "dark-yellow", "mode": "fixed" } }]
+            "matcher": {
+              "id": "byRegexp",
+              "options": ".*insufficient.*"
+            },
+            "properties": [
+              {
+                "id": "custom.lineWidth",
+                "value": 1
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 5
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "dark-yellow",
+                  "mode": "fixed"
+                }
+              }
+            ]
           }
         ]
       }
@@ -405,33 +664,58 @@
       "id": 12,
       "title": "Tool Error Rate by Type",
       "type": "barchart",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 28 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (error_type) (rate(sentinel_tool_call_errors_total[5m]))",
+          "expr": "sum by (error_type) (rate(sentinel_tool_call_errors_total[5m])) or vector(0)",
           "legendFormat": "{{error_type}}"
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "unit": "ops",
           "decimals": 2
         }
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 13,
       "title": "Approval Latency Distribution",
       "type": "histogram",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 28 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 28
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -455,8 +739,16 @@
       "id": 14,
       "title": "AI Cost per Route",
       "type": "barchart",
-      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 36 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -466,21 +758,35 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "unit": "currencyUSD",
           "decimals": 2
         }
       },
       "options": {
-        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true },
-        "tooltip": { "mode": "single", "sort": "none" }
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
       }
     },
     {
       "id": 15,
       "title": "POPIA Evidence Pack",
       "type": "text",
-      "gridPos": { "h": 8, "w": 14, "x": 10, "y": 36 },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 10,
+        "y": 36
+      },
       "options": {
         "mode": "markdown",
         "content": "## POPIA Monthly Evidence\n\nGenerated on-demand via API:\n\n`GET /api/governance/popia-evidence`\n\nCovers: consent metrics, retention enforcement, DSR completion, access control audit.\n\nEvidence packs stored in `popia_evidence_packs.json` (24-month FIFO)."
@@ -490,8 +796,16 @@
       "id": 17,
       "title": "Retrieval Latency p95/p99",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 0,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -506,11 +820,15 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12,
-            "stacking": { "mode": "none" }
+            "stacking": {
+              "mode": "none"
+            }
           },
           "unit": "s",
           "decimals": 3
@@ -521,8 +839,16 @@
       "id": 18,
       "title": "Retrieval Hits/sec",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 5, "x": 14, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 14,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -532,7 +858,9 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -546,8 +874,16 @@
       "id": 19,
       "title": "Fallback Rate",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 5, "x": 19, "y": 44 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "gridPos": {
+        "h": 8,
+        "w": 5,
+        "x": 19,
+        "y": 44
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
       "targets": [
         {
           "refId": "A",
@@ -557,7 +893,9 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
+          "color": {
+            "mode": "palette-classic"
+          },
           "custom": {
             "lineWidth": 1,
             "fillOpacity": 12
@@ -571,12 +909,21 @@
   "refresh": "30s",
   "schemaVersion": 39,
   "style": "dark",
-  "tags": ["sentinel", "ai-governance", "compliance"],
-  "templating": { "list": [] },
-  "time": { "from": "now-24h", "to": "now" },
+  "tags": [
+    "sentinel",
+    "ai-governance",
+    "compliance"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
   "timepicker": {},
   "timezone": "browser",
-  "title": "SENTINEL — AI Governance",
+  "title": "SENTINEL \u2014 AI Governance",
   "uid": "sentinel-ai-governance",
   "version": 2,
   "weekStart": ""

@@ -42,7 +42,7 @@ async def search_documentation(
         # Use hybrid search to combine keyword + semantic matching
         # This ensures custom terms like "SIMBIOT" are found via keyword matching
         # even if the semantic embedding doesn't recognize them
-        results = vector_db.hybrid_search(
+        results = await vector_db.hybrid_search(
             query=query,
             n_results=n_results,
             equipment_type=None,  # Search all documentation

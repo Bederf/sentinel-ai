@@ -319,9 +319,9 @@ export default function InspectionForm({
                       onChange={(event) => handleResponseChange(item.item_id, event.target.value)}
                       className="w-full rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
                       style={{
-                        background: "var(--color-grafana-bg-secondary)",
-                        border: "1px solid var(--color-grafana-border)",
-                        color: "var(--color-grafana-text-primary)",
+                        background: "var(--color-sentinel-bg-secondary)",
+                        border: "1px solid var(--color-sentinel-border)",
+                        color: "var(--color-sentinel-text-primary)",
                         boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
                         outline: "none",
                       }}
@@ -346,9 +346,9 @@ export default function InspectionForm({
                           onChange={(e) => handleResponseChange(item.item_id, parseFloat(e.target.value))}
                           className="flex-1 rounded-md px-3 py-2 text-sm"
                           style={{
-                            background: "var(--color-grafana-bg-secondary)",
-                            border: "1px solid var(--color-grafana-border)",
-                            color: "var(--color-grafana-text-primary)",
+                            background: "var(--color-sentinel-bg-secondary)",
+                            border: "1px solid var(--color-sentinel-border)",
+                            color: "var(--color-sentinel-text-primary)",
                             boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
                             outline: "none",
                           }}
@@ -403,9 +403,9 @@ export default function InspectionForm({
                         onChange={(e) => handleResponseChange(item.item_id, e.target.value)}
                         className="w-full rounded-md px-3 py-2 text-sm"
                         style={{
-                          background: "var(--color-grafana-bg-secondary)",
-                          border: "1px solid var(--color-grafana-border)",
-                          color: "var(--color-grafana-text-primary)",
+                          background: "var(--color-sentinel-bg-secondary)",
+                          border: "1px solid var(--color-sentinel-border)",
+                          color: "var(--color-sentinel-text-primary)",
                           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
                           outline: "none",
                         }}
@@ -445,9 +445,9 @@ export default function InspectionForm({
             onChange={(e) => setNotes(e.target.value)}
             className="w-full rounded-md px-3 py-2 text-sm"
             style={{
-              background: "var(--color-grafana-bg-secondary)",
-              border: "1px solid var(--color-grafana-border)",
-              color: "var(--color-grafana-text-primary)",
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
               boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
               outline: "none",
             }}

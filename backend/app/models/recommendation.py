@@ -202,6 +202,7 @@ class Recommendation:
             "external_ticket_id": self.external_ticket_id,
             "is_cluster_alert": self.is_cluster_alert,
             "cluster_count": self.cluster_count,
+            "correlation_id": self.correlation_id,
         }
 
     @classmethod

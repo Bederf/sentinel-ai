@@ -912,14 +912,28 @@ async def save_building_handbook(
 
 
 @router.get("/inspection-checklist/{equipment_type}", status_code=status.HTTP_200_OK)
-async def get_inspection_checklist_for_telegram(equipment_type: str):
+async def get_inspection_checklist_for_telegram(
+    equipment_type: str,
+    description: str | None = Query(None, description="WO description for dynamic checklist generation"),
+    fault_code: str | None = Query(None, description="Optional fault code for targeted checklist"),
+):
     """Get a Telegram-formatted inspection checklist for an equipment type.
 
     Called by Sentry when sending WO notification so the technician
     knows exactly what to check on-site.
 
+    When `description` is provided, generates a targeted checklist
+    based on the specific issue using LLM + 46-category taxonomy.
+    Falls back to static template if generation fails.
+
+    Enriches each checklist item with OEM spec context from indexed manuals
+    via doc_rag_service, so the technician gets manufacturer-specific
+    guidance, not generic questions.
+
     Args:
         equipment_type: Equipment type (ups, chiller, ahu, generator, pump, etc.)
+        description: WO description for dynamic checklist generation
+        fault_code: Optional fault code for targeted checklist
 
     Returns:
         - found: bool
@@ -927,11 +941,28 @@ async def get_inspection_checklist_for_telegram(equipment_type: str):
         - template_name: str
         - estimated_minutes: int
         - checklist_text: Telegram-formatted checklist string
-        - items: list of checklist items (structured)
+        - items: list of checklist items (structured) with optional oem_spec field
     """
     from app.services.checklist_service import get_checklist_service
 
     svc = get_checklist_service()
+
+    # Dynamic generation when description is provided
+    if description:
+        generated = await svc.generate_checklist(
+            equipment_type=equipment_type.lower(),
+            description=description,
+            fault_code=fault_code,
+        )
+        if generated.get("source") != "none":
+            items = generated.get("items", [])
+            name = generated.get("template_name", f"{equipment_type} Inspection")
+            duration = generated.get("estimated_minutes", 30)
+            # Skip static fallback logic — use generated result
+            if items:
+                return await _build_checklist_response(equipment_type, items, name, duration)
+
+    # Static template fallback
     template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
 
     if not template:
@@ -946,6 +977,40 @@ async def get_inspection_checklist_for_telegram(equipment_type: str):
     name = template.get("template_name", f"{equipment_type} Inspection")
     duration = template.get("estimated_duration_minutes", 30)
 
+    return await _build_checklist_response(equipment_type, items, name, duration)
+
+
+async def _build_checklist_response(
+    equipment_type: str,
+    items: list[dict[str, Any]],
+    name: str,
+    duration: int,
+) -> dict[str, Any]:
+    """Build the standard checklist response with OEM enrichment and Telegram formatting."""
+    # --- OEM spec enrichment via doc_rag_service ---
+    oem_contexts = {}
+    try:
+        from app.services.doc_rag_service import search_documentation
+
+        for item in items:
+            item_id = item.get("item_id", "")
+            question = item.get("description") or item.get("question", "") or ""
+            if question and item_id:
+                try:
+                    results = await search_documentation(
+                        query=f"{equipment_type} {question}",
+                        n_results=2,
+                        site_id=None,
+                    )
+                    if results and len(results) > 0:
+                        spec_text = results[0].get("content", "")[:500]
+                        if spec_text:
+                            oem_contexts[item_id] = spec_text
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning(f"[INSPECTION] Could not enrich OEM specs: {e}")
+
     # Build Telegram-formatted text grouped by category
     lines = [f"📋 {name}", f"⏱ Estimated: {duration} min", ""]
     current_category = None
@@ -956,19 +1021,27 @@ async def get_inspection_checklist_for_telegram(equipment_type: str):
             current_category = cat
             lines.append(f"▸ {cat}")
 
-        q = item.get("question", "")
+        item_id = item.get("item_id", "")
         item_type = item.get("item_type", "")
+        q = item.get("description") or item.get("question", "") or ""
+        oem_spec = oem_contexts.get(item_id, "")
+
+        spec_hint = f" | OEM: {oem_spec[:150]}..." if oem_spec else ""
+        q_with_spec = f"{q}{spec_hint}"
 
         if item_type == "measurement":
             unit = item.get("unit", "")
             tmin = item.get("tolerance_min")
             tmax = item.get("tolerance_max")
             tol = f" ({tmin}-{tmax} {unit})" if tmin is not None else ""
-            lines.append(f"  ☐ {q}{tol}")
+            lines.append(f"  ☐ {q_with_spec}{tol}")
         elif item_type == "visual_inspection":
-            lines.append(f"  📷 {q}")
+            lines.append(f"  📷 {q_with_spec}")
         else:
-            lines.append(f"  ☐ {q}")
+            lines.append(f"  ☐ {q_with_spec}")
+
+        if oem_spec:
+            item["oem_spec"] = oem_spec[:300]
 
     return {
         "found": True,
@@ -2180,12 +2253,19 @@ async def handle_telegram_callback(
         try:
             sender = get_telegram_sender()
             if result["success"]:
-                if result.get("action") == "open_work_order_exists":
-                    work_order = result.get("work_order") or {}
-                    text = f"🛠 Open work order already exists: {work_order.get('code', 'unknown')}."
+                action = result.get("action")
+                work_order = result.get("work_order") or {}
+                if action in ("open_work_order_exists", "duplicate_work_order_exists"):
+                    wo_code = work_order.get("code", "unknown")
+                    if action == "duplicate_work_order_exists":
+                        text = f"🛠 Duplicate work order blocked: WO {wo_code} already covers this exact action."
+                    else:
+                        text = f"🛠 Open work order already exists: {wo_code}."
                 else:
-                    work_order = result.get("work_order") or {}
-                    text = f"🛠 Work order created: {work_order.get('code', 'created')}."
+                    wo_code = work_order.get("code", "created")
+                    assigned = work_order.get("assigned_to") or "Pending"
+                    priority = (work_order.get("priority") or "medium").upper()
+                    text = f"Work Order Created #{wo_code}\nAssigned: {assigned}\nPriority: {priority}"
             else:
                 text = f"Could not create work order: {result.get('error', 'unknown_error')}"
             await sender.send_text(chat_id=payload.chat_id, text=text)
@@ -2417,7 +2497,10 @@ async def focus_room_status(site_id: str = Query("site-002")):
         for s in (active.data or []):
             start = s.get("start_time")
             if start:
-                start_dt = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+                if isinstance(start, str):
+                    start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+                else:
+                    start_dt = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
                 elapsed_min = (now - start_dt).total_seconds() / 60
                 s["elapsed_minutes"] = round(elapsed_min, 1)
                 s["nearing_limit"] = elapsed_min >= 90

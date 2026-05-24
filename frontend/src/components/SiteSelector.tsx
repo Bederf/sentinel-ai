@@ -28,7 +28,7 @@ export function SiteSelector({
     <div className="relative w-full">
       <Building2
         className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 transform"
-        style={{ color: "var(--color-grafana-text-secondary)" }}
+        style={{ color: "var(--color-sentinel-text-secondary)" }}
       />
 
       <select
@@ -36,9 +36,9 @@ export function SiteSelector({
         onChange={(event) => handleChange(event.target.value)}
         className="w-full rounded-md appearance-none cursor-pointer pl-9 pr-9 py-2.5 text-sm transition-colors focus:outline-none focus:ring-0"
         style={{
-          background: "var(--color-grafana-bg-secondary)",
-          border: "1px solid var(--color-grafana-border)",
-          color: "var(--color-grafana-text-primary)",
+          background: "var(--color-sentinel-bg-secondary)",
+          border: "1px solid var(--color-sentinel-border)",
+          color: "var(--color-sentinel-text-primary)",
           boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
           outline: "none",
         }}
@@ -55,7 +55,7 @@ export function SiteSelector({
 
       <ChevronDown
         className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 transform"
-        style={{ color: "var(--color-grafana-text-secondary)" }}
+        style={{ color: "var(--color-sentinel-text-secondary)" }}
       />
     </div>
   );

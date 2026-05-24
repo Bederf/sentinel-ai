@@ -70,13 +70,13 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
           <div>
             <h3
               className="font-semibold text-base"
-              style={{ color: "var(--color-grafana-text-primary)" }}
+              style={{ color: "var(--color-sentinel-text-primary)" }}
             >
               AI Predictive Maintenance ROI Summary
             </h3>
             <p
               className="text-xs"
-              style={{ color: "var(--color-grafana-text-secondary)" }}
+              style={{ color: "var(--color-sentinel-text-secondary)" }}
             >
               Potential value from acting on all predictions
             </p>
@@ -110,7 +110,7 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
               <Shield className="h-4 w-4" style={{ color: "var(--color-status-error)" }} />
               <span
                 className="text-xs font-medium uppercase tracking-wider"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
                 Risk Exposure
               </span>
@@ -123,7 +123,7 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
             </div>
             <div
               className="h-2 rounded-full overflow-hidden"
-              style={{ background: "var(--color-grafana-border)" }}
+              style={{ background: "var(--color-sentinel-border)" }}
             >
               <div
                 className="h-full rounded-full transition-all duration-1000"
@@ -135,7 +135,7 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
             </div>
             <p
               className="text-xs mt-2"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             >
               Total potential loss if failures occur
             </p>
@@ -144,35 +144,35 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
           {/* Investment Required */}
           <div>
             <div className="flex items-center gap-2 mb-2">
-              <DollarSign className="h-4 w-4" style={{ color: "var(--color-grafana-blue)" }} />
+              <DollarSign className="h-4 w-4" style={{ color: "var(--color-sentinel-blue)" }} />
               <span
                 className="text-xs font-medium uppercase tracking-wider"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
                 Investment Required
               </span>
             </div>
             <div
               className="text-3xl font-bold mb-2"
-              style={{ color: "var(--color-grafana-blue)" }}
+              style={{ color: "var(--color-sentinel-blue)" }}
             >
               {formatZAR(totalInvestment)}
             </div>
             <div
               className="h-2 rounded-full overflow-hidden"
-              style={{ background: "var(--color-grafana-border)" }}
+              style={{ background: "var(--color-sentinel-border)" }}
             >
               <div
                 className="h-full rounded-full transition-all duration-1000"
                 style={{
                   width: `${investWidth}%`,
-                  background: "var(--color-grafana-blue)",
+                  background: "var(--color-sentinel-blue)",
                 }}
               />
             </div>
             <p
               className="text-xs mt-2"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             >
               Cost to implement preventive maintenance
             </p>
@@ -184,7 +184,7 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
               <TrendingUp className="h-4 w-4" style={{ color: "var(--color-status-success)" }} />
               <span
                 className="text-xs font-medium uppercase tracking-wider"
-                style={{ color: "var(--color-grafana-text-secondary)" }}
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
               >
                 Net Savings
               </span>
@@ -197,7 +197,7 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
             </div>
             <div
               className="h-2 rounded-full overflow-hidden"
-              style={{ background: "var(--color-grafana-border)" }}
+              style={{ background: "var(--color-sentinel-border)" }}
             >
               <div
                 className="h-full rounded-full transition-all duration-1000"
@@ -209,7 +209,7 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
             </div>
             <p
               className="text-xs mt-2"
-              style={{ color: "var(--color-grafana-text-disabled)" }}
+              style={{ color: "var(--color-sentinel-text-disabled)" }}
             >
               Value protected by acting proactively
             </p>
@@ -219,15 +219,15 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
         {/* Bottom Stats Row */}
         <div
           className="flex flex-wrap items-center justify-center gap-6 pt-4"
-          style={{ borderTop: "1px solid var(--color-grafana-border)" }}
+          style={{ borderTop: "1px solid var(--color-sentinel-border)" }}
         >
           <div className="flex items-center gap-2">
             <div
               className="w-3 h-3 rounded-full"
-              style={{ background: "var(--color-grafana-purple)" }}
+              style={{ background: "var(--color-sentinel-purple)" }}
             />
-            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
-              <strong style={{ color: "var(--color-grafana-text-primary)" }}>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              <strong style={{ color: "var(--color-sentinel-text-primary)" }}>
                 {predictions.length}
               </strong>{" "}
               predictions
@@ -236,13 +236,13 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
 
           <div
             className="w-px h-4"
-            style={{ background: "var(--color-grafana-border)" }}
+            style={{ background: "var(--color-sentinel-border)" }}
           />
 
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4" style={{ color: "var(--color-grafana-orange)" }} />
-            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
-              <strong style={{ color: "var(--color-grafana-text-primary)" }}>
+            <Calendar className="h-4 w-4" style={{ color: "var(--color-sentinel-orange)" }} />
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              <strong style={{ color: "var(--color-sentinel-text-primary)" }}>
                 {minDays === maxDays ? `${minDays}` : `${minDays}-${maxDays}`}
               </strong>{" "}
               {minDays === maxDays ? "day" : "day window"} to act
@@ -251,13 +251,13 @@ export function ROISummaryCard({ predictions }: ROISummaryCardProps) {
 
           <div
             className="w-px h-4"
-            style={{ background: "var(--color-grafana-border)" }}
+            style={{ background: "var(--color-sentinel-border)" }}
           />
 
           <div className="flex items-center gap-2">
-            <span style={{ color: "var(--color-grafana-text-secondary)" }}>
+            <span style={{ color: "var(--color-sentinel-text-secondary)" }}>
               Avg. confidence:{" "}
-              <strong style={{ color: "var(--color-grafana-text-primary)" }}>
+              <strong style={{ color: "var(--color-sentinel-text-primary)" }}>
                 {Math.round(
                   predictions.reduce((sum, p) => sum + p.probability_percent, 0) /
                     predictions.length

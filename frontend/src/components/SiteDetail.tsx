@@ -39,7 +39,7 @@ import {
   Shield,
   ClipboardList,
 } from "lucide-react";
-import api, { createWorkOrder, getAccessToken } from '@/lib/api';
+import api, { createWorkOrder, getAccessToken, type ROISummaryResponse } from '@/lib/api';
 import type {
   Alert,
   Prediction,
@@ -175,12 +175,15 @@ type TabType = "equipment" | "alerts" | "energy" | "predictions";
 
 export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) {
   const [site, setSite] = useState<SiteDetailData | null>(null);
+  const [siteFloors, setSiteFloors] = useState<string[] | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentCategories, setEquipmentCategories] = useState<Record<string, CategoryStatus>>({});
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  const [totalRiskExposure, setTotalRiskExposure] = useState<number>(0);
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
+  const [roiData, setRoiData] = useState<ROISummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("equipment");
@@ -378,11 +381,40 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
         // Fetch predictions for this site
         const predictionsData = await api.getPredictions(siteId);
-        setPredictions(predictionsData.predictions || []);
+        // Gate: only show predictions with last_reading data (confidence-gated at source)
+        const predictionsWithData = (predictionsData.predictions || []).filter(
+          (p: Prediction) => p.latest_reading?.value != null
+        );
+        setPredictions(predictionsWithData);
+        // Sum potential_loss_zar for risk exposure KPI (all predictions, not just filtered)
+        const riskSum = (predictionsData.predictions || []).reduce(
+          (sum: number, p: Prediction) => sum + (p.financial_impact?.potential_loss_zar || 0),
+          0
+        );
+        setTotalRiskExposure(riskSum);
 
         // Fetch energy data for this site
         const energyResponse = await api.getEnergy(siteId, 30);
         setEnergyData(energyResponse.data || []);
+
+        // Fetch ROI savings for this site
+        try {
+          const roi = await api.getROISummary(siteId);
+          setRoiData(roi);
+        } catch (e) {
+          console.warn("Could not load ROI summary:", e);
+        }
+
+        // Fetch building config for cockpit floor configuration
+        try {
+          const floorsRes = await authorizedFetch(`/api/buildings/${encodeURIComponent(siteId)}`);
+          if (floorsRes.ok) {
+            const config = await floorsRes.json();
+            if (config.floors?.length) setSiteFloors(config.floors);
+          }
+        } catch {
+          // Building config fetch failure is silent — cockpit falls back to SITE_TOWER_PROFILES
+        }
 
         setError(null);
       } catch (err) {
@@ -910,12 +942,13 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             accentColor={sentinelEnabled && avgHealth >= thresholds.healthy ? "green" : sentinelEnabled && avgHealth >= thresholds.warning ? "orange" : sentinelEnabled ? "red" : "blue"}
           />
         )}
-        {visibleKpiCards.includes('kpi-predictions') && (
+        {visibleKpiCards.includes('kpi-savings') && (
           <KPICard
-            title="Predictions"
-            value={sentinelEnabled ? predictions.length : "—"}
-            icon={<TrendingUp className="h-5 w-5" />}
-            accentColor="purple"
+            title="Risk Exposure"
+            value={`R${totalRiskExposure.toLocaleString()}`}
+            icon={<AlertTriangle className="h-5 w-5" />}
+            accentColor="orange"
+            subtitle="Predicted loss exposure — all active predictions"
           />
         )}
       </div>
@@ -1038,76 +1071,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       </div>
 
       {/* ═══════════════════════════════════════════════════════════
-          Main Tab Bar — 10 discipline tabs (SIMBIOT-data-driven)
-          ═══════════════════════════════════════════════════════════ */}
-      <div
-        className="mb-6 rounded-md"
-        style={{
-          background: "var(--color-sentinel-bg-panel)",
-          border: "1px solid var(--color-sentinel-border)",
-        }}
-      >
-        <div
-          className="flex overflow-x-auto border-b scrollbar-hide"
-          style={{ borderColor: "var(--color-sentinel-border)" }}
-        >
-          {BUILDING_TAB_ITEMS
-            .filter((tab) => {
-              // Hide tabs that require a module add-on (e.g., simulation)
-              if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false;
-              // Controls tab: only show if ANY control add-on is active AND phase permits
-              if (tab.id === "controls") {
-                if (!phaseAllows(sitePhase, "approve_reject")) return false;
-                const CONTROL_MODULES = [
-                  'hvac_control', 'energy_control', 'lighting_control',
-                  'solar_control', 'water_control', 'security_control',
-                ] as const;
-                return CONTROL_MODULES.some(mod => isModuleActive(mod));
-              }
-              return true;
-            })
-            .map((tab) => {
-              const Icon = tab.icon;
-              const isActive = activeMainTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveMainTab(tab.id)}
-                  className="flex-shrink-0 flex items-center gap-2 px-4 py-3 text-sm font-medium transition-colors relative whitespace-nowrap"
-                  onMouseEnter={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.color = "var(--color-sentinel-text-primary)";
-                      e.currentTarget.style.background = "rgba(255,255,255,0.03)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isActive) {
-                      e.currentTarget.style.color = "var(--color-sentinel-text-secondary)";
-                      e.currentTarget.style.background = "transparent";
-                    }
-                  }}
-                  style={{
-                    color: isActive
-                      ? "var(--color-sentinel-amber)"
-                      : "var(--color-sentinel-text-secondary)",
-                    borderBottom: isActive
-                      ? "2px solid var(--color-sentinel-amber)"
-                      : "2px solid transparent",
-                    background: isActive
-                      ? "rgba(245, 158, 11, 0.08)"
-                      : "transparent",
-                  }}
-                >
-                  <Icon className="h-4 w-4" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════
-          Sentinel Cockpit — persists across all tabs
+          Sentinel Cockpit + tabs — persists across all tabs
           ═══════════════════════════════════════════════════════════ */}
       {sentinelEnabled && site && (
         <div className="mb-6">
@@ -1121,7 +1085,11 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             activeAlerts={alerts.length}
             predictionsCount={predictions.length}
             equipmentCount={equipment.length}
+            siteFloors={siteFloors ?? undefined}
             systemFilter={systemFilter}
+            activeMainTab={activeMainTab}
+            onMainTabChange={setActiveMainTab}
+            isModuleActive={isModuleActive}
           />
         </div>
       )}

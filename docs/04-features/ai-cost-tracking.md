@@ -51,6 +51,7 @@ The Cost Tracking module monitors spend across **all paid external services** us
 | Provider | Key | Cost/Unit (USD) | Unit | Where Used |
 |----------|-----|----------------|------|------------|
 | **ElevenLabs** | `elevenlabs_chars` | $0.00003 | Character | Voice TTS synthesis |
+| **OpenAI Realtime-2** | `openai_realtime_tokens` | tiered | Token | Voice I/O (STT/LLM tokens); session creation via `POST /api/chat/realtime/connect` |
 | **EskomSePush** | `eskomsepush_call` | $0.00 (free tier) | API call | Load shedding status |
 
 Each API call is tagged with a **source** label for route-level attribution.

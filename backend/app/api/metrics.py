@@ -207,6 +207,14 @@ sentinel_backend_up = Gauge(
     registry=REGISTRY,
 )
 
+# 16c. Metrics last updated timestamp (epoch seconds)
+sentinel_metrics_last_updated_timestamp = Gauge(
+    "sentinel_metrics_last_updated_timestamp",
+    "Unix timestamp of the last metrics collection, used for scrape age tracking",
+    labelnames=["job"],
+    registry=REGISTRY,
+)
+
 # ---------------------------------------------------------------------------
 # FM / Media Wall metrics (Phase 144 — Building Intelligence Dashboard)
 # ---------------------------------------------------------------------------
@@ -254,7 +262,7 @@ sentinel_critical_response_time_seconds = Gauge(
 # 22. Equipment health status
 sentinel_equipment_health = Gauge(
     "sentinel_equipment_health",
-    "Equipment health status gauge (1 = in this state)",
+    "Equipment health status gauge (0-100 score)",
     labelnames=["building", "equipment", "health"],
     registry=REGISTRY,
 )
@@ -490,6 +498,614 @@ sentinel_llm_judge_score = Gauge(
 )
 
 
+# ---------------------------------------------------------------------------
+# Phase 212 — Discipline Metrics (HVAC, Energy, Lighting, Solar, Water, Fire, Security, Space, Fuel, ESG)
+# ---------------------------------------------------------------------------
+
+# HVAC — zone temperature
+sentinel_hvac_zone_temp_celsius = Gauge(
+    "sentinel_hvac_zone_temp_celsius",
+    "Zone actual temperature in Celsius",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_hvac_zone_temp_deviation_celsius = Gauge(
+    "sentinel_hvac_zone_temp_deviation_celsius",
+    "Zone temperature deviation from setpoint in Celsius",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_hvac_ahu_status = Gauge(
+    "sentinel_hvac_ahu_status",
+    "AHU operational status (1=running, 0=off)",
+    labelnames=["site_id", "ahu_id"],
+    registry=REGISTRY,
+)
+
+sentinel_hvac_savings_zar = Gauge(
+    "sentinel_hvac_savings_zar",
+    "HVAC energy cost savings in ZAR",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_hvac_thermal_runway_warnings = Gauge(
+    "sentinel_hvac_thermal_runway_warnings",
+    "Count of zones approaching thermal runway",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# Energy — aggregate
+sentinel_energy_total_kwh = Gauge(
+    "sentinel_energy_total_kwh",
+    "Total site energy consumption in kWh",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_demand_kw = Gauge(
+    "sentinel_energy_demand_kw",
+    "Current site demand in kW",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_cost_zar = Gauge(
+    "sentinel_energy_cost_zar",
+    "Total energy cost in ZAR",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_peak_demand_kw = Gauge(
+    "sentinel_energy_peak_demand_kw",
+    "Peak demand in kW this billing period",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_lighting_kwh = Gauge(
+    "sentinel_energy_lighting_kwh",
+    "Lighting energy in kWh",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_carbon_kg = Gauge(
+    "sentinel_energy_carbon_kg",
+    "Carbon emissions in kg CO2",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# Lighting — per zone
+sentinel_lighting_zone_lux = Gauge(
+    "sentinel_lighting_zone_lux",
+    "Zone lighting level in lux",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_lighting_fixtures_on = Gauge(
+    "sentinel_lighting_fixtures_on",
+    "Number of lighting fixtures currently on",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_lighting_fixtures_total = Gauge(
+    "sentinel_lighting_fixtures_total",
+    "Total number of lighting fixtures",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_lighting_energy_kwh_total = Counter(
+    "sentinel_lighting_energy_kwh_total",
+    "Total lighting energy consumed in kWh",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_lighting_occupancy_percent = Gauge(
+    "sentinel_lighting_occupancy_percent",
+    "Zone occupancy percentage for lighting control",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+# Solar / BESS
+sentinel_solar_pv_generation_kw = Gauge(
+    "sentinel_solar_pv_generation_kw",
+    "Current solar PV generation in kW",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_bess_current_charge_kw = Gauge(
+    "sentinel_bess_current_charge_kw",
+    "BESS current charge (positive) or discharge (negative) in kW",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_solar_total_generation_kwh_total = Counter(
+    "sentinel_solar_total_generation_kwh_total",
+    "Total solar generation in kWh",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_solar_export_kwh_total = Counter(
+    "sentinel_solar_export_kwh_total",
+    "Total solar export to grid in kWh",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# Water
+sentinel_water_consumption_kl_total = Counter(
+    "sentinel_water_consumption_kl_total",
+    "Total water consumption in kL",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_water_flow_rate_lph = Gauge(
+    "sentinel_water_flow_rate_lph",
+    "Water flow rate in liters per hour",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_water_tank_level_percent = Gauge(
+    "sentinel_water_tank_level_percent",
+    "Water tank level percentage",
+    labelnames=["site_id", "tank_id"],
+    registry=REGISTRY,
+)
+
+sentinel_water_cost_zar = Gauge(
+    "sentinel_water_cost_zar",
+    "Total water cost in ZAR",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# Fire
+sentinel_fire_panel_status = Gauge(
+    "sentinel_fire_panel_status",
+    "Fire panel status (0=normal, 1=alarm, 2=fault)",
+    labelnames=["site_id", "panel_id"],
+    registry=REGISTRY,
+)
+
+sentinel_fire_detector_faults = Gauge(
+    "sentinel_fire_detector_faults",
+    "Number of fire detector faults per panel",
+    labelnames=["site_id", "panel_id"],
+    registry=REGISTRY,
+)
+
+sentinel_fire_extinguisher_expiry_days = Gauge(
+    "sentinel_fire_extinguisher_expiry_days",
+    "Days until extinguisher expiry",
+    labelnames=["site_id", "extinguisher_id"],
+    registry=REGISTRY,
+)
+
+sentinel_fire_evacuation_status = Gauge(
+    "sentinel_fire_evacuation_status",
+    "Evacuation status (0=safe, 1=evacuate)",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# Security
+sentinel_security_zone_breaches = Gauge(
+    "sentinel_security_zone_breaches",
+    "Security breaches by zone",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_security_camera_uptime_percent = Gauge(
+    "sentinel_security_camera_uptime_percent",
+    "Security camera uptime percentage",
+    labelnames=["site_id", "camera_id"],
+    registry=REGISTRY,
+)
+
+sentinel_security_access_events_total = Counter(
+    "sentinel_security_access_events_total",
+    "Total access events by type",
+    labelnames=["site_id", "event_type"],
+    registry=REGISTRY,
+)
+
+sentinel_security_alarm_status = Gauge(
+    "sentinel_security_alarm_status",
+    "Alarm status by zone (0=normal, 1=alarm)",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+# Space
+sentinel_space_occupancy_percent = Gauge(
+    "sentinel_space_occupancy_percent",
+    "Space occupancy percentage",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_space_utilization_percent = Gauge(
+    "sentinel_space_utilization_percent",
+    "Space utilization percentage",
+    labelnames=["site_id", "zone_id"],
+    registry=REGISTRY,
+)
+
+sentinel_space_bookable_desks = Gauge(
+    "sentinel_space_bookable_desks",
+    "Number of bookable desks",
+    labelnames=["site_id", "floor_id"],
+    registry=REGISTRY,
+)
+
+sentinel_space_occupied_desks = Gauge(
+    "sentinel_space_occupied_desks",
+    "Number of occupied desks",
+    labelnames=["site_id", "floor_id"],
+    registry=REGISTRY,
+)
+
+# Fuel
+sentinel_fuel_generator_runtime_hours = Gauge(
+    "sentinel_fuel_generator_runtime_hours",
+    "Generator runtime in hours",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_fuel_level_percent = Gauge(
+    "sentinel_fuel_level_percent",
+    "Fuel tank level percentage",
+    labelnames=["site_id", "tank_id"],
+    registry=REGISTRY,
+)
+
+sentinel_fuel_consumption_lph = Gauge(
+    "sentinel_fuel_consumption_lph",
+    "Fuel consumption in liters per hour",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_fuel_cost_zar = Gauge(
+    "sentinel_fuel_cost_zar",
+    "Total fuel cost in ZAR",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+# ESG
+sentinel_esg_carbon_footprint_kg = Gauge(
+    "sentinel_esg_carbon_footprint_kg",
+    "Carbon footprint in kg CO2",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_esg_renewable_percent = Gauge(
+    "sentinel_esg_renewable_percent",
+    "Renewable energy percentage",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_esg_energy_intensity_kwh_per_sqm = Gauge(
+    "sentinel_esg_energy_intensity_kwh_per_sqm",
+    "Energy intensity kWh per sqm",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_esg_water_intensity_l_per_sqm = Gauge(
+    "sentinel_esg_water_intensity_l_per_sqm",
+    "Water intensity liters per sqm",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_esg_waste_kg = Gauge(
+    "sentinel_esg_waste_kg",
+    "Waste in kg",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+
+# ---------------------------------------------------------------------------
+# Phase 212 — Discipline Metrics Collection
+# ---------------------------------------------------------------------------
+
+
+def _collect_discipline_metrics() -> None:
+    """Collect HVAC/Energy/Lighting/Water/Security/Fire/Space/Fuel metrics from bridge sensor data.
+
+    Reads latest values from equipment_sensor_readings table (written by SIMBIOT bridge)
+    and exposes them as Prometheus gauges for the discipline dashboards.
+    """
+    import logging
+
+    logger = logging.getLogger("sentinel.metrics")
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        if not client:
+            return
+    except Exception:
+        return
+
+    SITE_ID = "site-002"
+
+    # Shared dict for latest sensor values across metric blocks below
+    latest: dict[str, float] = {}
+
+    # — Latest reading timestamp for data freshness —
+    try:
+        fresh_resp = (
+            client.table("equipment_sensor_readings")
+            .select("recorded_at")
+            .eq("site_id", SITE_ID)
+            .order("recorded_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if fresh_resp.data:
+            last_ts = datetime.fromisoformat(fresh_resp.data[0]["recorded_at"].replace("Z", "+00:00"))
+            age_seconds = (datetime.now(UTC) - last_ts).total_seconds()
+            sentinel_data_freshness_seconds.labels(site_id=SITE_ID).set(age_seconds)
+    except Exception as e:
+        logger.debug(f"Discipline metrics: freshness query failed: {e}")
+
+    # — Zone temperature (room_temp sensor, keyed by equipment_id) —
+    try:
+        zone_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, value")
+            .eq("site_id", SITE_ID)
+            .eq("sensor_type", "room_temp")
+            .execute()
+        )
+        zone_count = 0
+        for row in zone_resp.data or []:
+            zone_id = row.get("equipment_id", "unknown")
+            val = row.get("value")
+            if val is not None:
+                sentinel_hvac_zone_temp_celsius.labels(site_id=SITE_ID, zone_id=zone_id).set(val)
+                zone_count += 1
+        if zone_count > 0:
+            sentinel_zone_coverage_percent.labels(site_id=SITE_ID).set(zone_count / 50.0)  # approx 50 zones max
+    except Exception as e:
+        logger.warning(f"Discipline metrics: zone temp query failed: {e}")
+
+    # — HVAC energy from CHILLER-AGG kWh readings (rate from counters) —
+    try:
+        hvac_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, sensor_type, value, recorded_at")
+            .eq("site_id", SITE_ID)
+            .in_("sensor_type", ["hvac_kw", "lighting_kw", "total_kw"])
+            .order("recorded_at", desc=True)
+            .execute()
+        )
+        # Latest value per type
+        for row in hvac_resp.data or []:
+            st = row.get("sensor_type", "")
+            if st not in latest:
+                latest[st] = row.get("value", 0) or 0
+
+        if "hvac_kw" in latest:
+            sentinel_energy_total_kwh.labels(site_id=SITE_ID).set(latest["hvac_kw"])
+        if "lighting_kw" in latest:
+            sentinel_energy_lighting_kwh.labels(site_id=SITE_ID).set(latest["lighting_kw"])
+        if "total_kw" in latest:
+            sentinel_energy_demand_kw.labels(site_id=SITE_ID).set(latest["total_kw"])
+    except Exception as e:
+        logger.debug(f"Discipline metrics: energy query failed: {e}")
+
+    # — AHU status from fan_speed sensor —
+    try:
+        ahu_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, value")
+            .eq("site_id", SITE_ID)
+            .ilike("equipment_id", "%AHU%")
+            .eq("sensor_type", "fan_speed")
+            .execute()
+        )
+        for row in ahu_resp.data or []:
+            ahu_id = row.get("equipment_id", "unknown")
+            val = row.get("value", 0) or 0
+            # fan_speed > 0 means running
+            sentinel_hvac_ahu_status.labels(site_id=SITE_ID, ahu_id=ahu_id).set(1 if val > 0 else 0)
+    except Exception as e:
+        logger.debug(f"Discipline metrics: AHU query failed: {e}")
+
+    # — CO2 / occupancy for space metrics —
+    try:
+        occ_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, value")
+            .eq("site_id", SITE_ID)
+            .in_("sensor_type", ["co2_ppm", "occupied_zones", "total_occupancy"])
+            .execute()
+        )
+        occ_zones = 0
+        occ_total = 0
+        for row in occ_resp.data or []:
+            st = row.get("sensor_type", "")
+            val = row.get("value", 0) or 0
+            if st == "occupied_zones":
+                occ_zones = val
+                sentinel_space_occupancy_percent.labels(site_id=SITE_ID, zone_id="aggregate").set(val)
+            elif st == "total_occupancy":
+                occ_total = val
+        if occ_zones > 0 and occ_total > 0:
+            # utilization estimate
+            sentinel_space_utilization_percent.labels(site_id=SITE_ID, zone_id="aggregate").set(
+                min(100, occ_total / (occ_zones * 10) * 100)
+            )
+    except Exception as e:
+        logger.debug(f"Discipline metrics: occupancy query failed: {e}")
+
+    # — Security — access events from access_denied_count —
+    try:
+        sec_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, value")
+            .eq("site_id", SITE_ID)
+            .in_("sensor_type", ["access_denied_count", "forced_door_count", "entry_count"])
+            .execute()
+        )
+        for row in sec_resp.data or []:
+            eq = row.get("equipment_id", "unknown")
+            st = row.get("sensor_type", "")
+            val = row.get("value", 0) or 0
+            event_type = st.replace("_count", "").replace("_", " ")
+            sentinel_security_access_events_total.labels(site_id=SITE_ID, event_type=event_type).set(val)
+            if st in ("access_denied_count", "forced_door_count") and val > 0:
+                # Zone breach: extract zone from equipment_id (e.g. S002-DOOR-MAIN-ENT → MAIN-ENT)
+                zone = eq.split("-")[-1] if "-" in eq else eq
+                sentinel_security_zone_breaches.labels(site_id=SITE_ID, zone_id=zone).set(val)
+    except Exception as e:
+        logger.debug(f"Discipline metrics: security query failed: {e}")
+
+    # — Water from flow_rate_lpm sensor —
+    try:
+        water_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, value")
+            .eq("site_id", SITE_ID)
+            .in_("sensor_type", ["flow_rate_lpm", "total_consumption_m3"])
+            .execute()
+        )
+        for row in water_resp.data or []:
+            eq = row.get("equipment_id", "")
+            st = row.get("sensor_type", "")
+            val = row.get("value", 0) or 0
+            if st == "flow_rate_lpm":
+                sentinel_water_flow_rate_lph.labels(site_id=SITE_ID).set(val * 60)  # lpm → lph
+            elif st == "total_consumption_m3":
+                sentinel_water_consumption_kl_total.labels(site_id=SITE_ID).set(val * 1000)  # m3 → kL
+    except Exception as e:
+        logger.debug(f"Discipline metrics: water query failed: {e}")
+
+    # — FCU status from fan_speed (FCU units) —
+    try:
+        fcu_resp = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id, value")
+            .eq("site_id", SITE_ID)
+            .ilike("equipment_id", "%FCU%")
+            .eq("sensor_type", "fan_speed")
+            .execute()
+        )
+        for row in fcu_resp.data or []:
+            eq = row.get("equipment_id", "")
+            val = row.get("value", 0) or 0
+            # Zone temp for FCU zones using room_temp readings filtered to same equipment_id base
+            zone_id = eq
+            if val > 0:
+                sentinel_hvac_zone_temp_celsius.labels(site_id=SITE_ID, zone_id=zone_id).set(
+                    row.get("value", 22)  # fallback if no separate room_temp
+                )
+    except Exception as e:
+        logger.debug(f"Discipline metrics: FCU query failed: {e}")
+
+    # — Energy cost, peak demand, carbon from sensor data —
+    try:
+        # Use latest total_kw × flat tariff rate for cost estimation
+        total_kw = latest.get("total_kw", 0)
+        tariff_rate = 0.63  # ZAR/kWh (City Power 2026 blended rate)
+        est_cost = total_kw * tariff_rate
+        sentinel_energy_cost_zar.labels(site_id=SITE_ID).set(round(est_cost, 2))
+
+        # Peak demand: max total_kw from recent readings
+        peak_resp = (
+            client.table("equipment_sensor_readings")
+            .select("value")
+            .eq("site_id", SITE_ID)
+            .eq("sensor_type", "total_kw")
+            .order("recorded_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+        peak_kw = 0
+        if peak_resp.data:
+            vals = [float(r.get("value", 0) or 0) for r in peak_resp.data]
+            peak_kw = max(vals)
+        sentinel_energy_peak_demand_kw.labels(site_id=SITE_ID).set(peak_kw)
+
+        # Carbon: kWh × grid emission factor
+        grid_factor = 1.06  # kg CO2/kWh (South African grid average)
+        sentinel_energy_carbon_kg.labels(site_id=SITE_ID).set(round(total_kw * grid_factor, 2))
+    except Exception as e:
+        logger.debug(f"Discipline metrics: cost/peak/carbon calc failed: {e}")
+
+    # — ESG: renewable %, energy intensity, water intensity, waste —
+    try:
+        site_resp = client.table("sites").select("sqm").eq("code", SITE_ID).limit(1).execute()
+        sqm = float(site_resp.data[0]["sqm"]) if site_resp.data and site_resp.data[0].get("sqm") else 4500.0
+
+        # Latest total_kw for intensity
+        esg_kwh = float(latest.get("total_kw", 0))
+
+        # Water from consumption sensor
+        water_l = 0
+        water_resp = (
+            client.table("equipment_sensor_readings")
+            .select("value")
+            .eq("site_id", SITE_ID)
+            .eq("sensor_type", "total_consumption_m3")
+            .order("recorded_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if water_resp.data:
+            water_l = float(water_resp.data[0].get("value", 0) or 0) * 1000  # m3 → L
+
+        # Renewable: solar generation as % of total
+        renewable_kw = 0
+        solar_resp = (
+            client.table("equipment_sensor_readings")
+            .select("value")
+            .eq("site_id", SITE_ID)
+            .eq("sensor_type", "solar_pv_kw")
+            .order("recorded_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if solar_resp.data:
+            renewable_kw = float(solar_resp.data[0].get("value", 0) or 0)
+        renewable_pct = (renewable_kw / esg_kwh * 100) if esg_kwh > 0 else 0
+
+        sentinel_esg_renewable_percent.labels(site_id=SITE_ID).set(round(renewable_pct, 1))
+        sentinel_esg_energy_intensity_kwh_per_sqm.labels(site_id=SITE_ID).set(round(esg_kwh / sqm, 4) if sqm > 0 else 0)
+        sentinel_esg_water_intensity_l_per_sqm.labels(site_id=SITE_ID).set(round(water_l / sqm, 4) if sqm > 0 else 0)
+        sentinel_esg_waste_kg.labels(site_id=SITE_ID).set(0)
+    except Exception as e:
+        logger.warning(f"Discipline metrics: ESG calc failed: {e}")
+
+    logger.debug(f"Discipline metrics: collected for site {SITE_ID}")
+
+
 _site_name_cache: dict[str, str] = {}
 
 
@@ -717,7 +1333,7 @@ def _collect_fm_metrics() -> None:
                 else:
                     state = "healthy"
 
-                sentinel_equipment_health.labels(building=site, equipment=code, health=state).set(1)
+                sentinel_equipment_health.labels(building=site, equipment=code, health=state).set(health)
 
                 # Populate issues table for degrading/critical
                 if state in ("critical", "degrading"):
@@ -949,6 +1565,7 @@ async def prometheus_metrics(
     """
     # Signal health to Prometheus/Grafana scraper
     sentinel_backend_up.set(1)
+    sentinel_metrics_last_updated_timestamp.labels(job="sentinel-governance").set(int(datetime.now(UTC).timestamp()))
 
     # Collect live FM metrics from Supabase (media wall dashboard)
     try:
@@ -965,6 +1582,12 @@ async def prometheus_metrics(
     # Collect DDMP / Demand Response metrics (Phase 211 — IES/LTM integration)
     try:
         _collect_ddmp_metrics()
+    except Exception:
+        pass  # Never let metrics collection crash the endpoint
+
+    # Collect HVAC/Energy/Lighting/Water/Security discipline metrics from bridge sensor data
+    try:
+        _collect_discipline_metrics()
     except Exception:
         pass  # Never let metrics collection crash the endpoint
 

@@ -162,6 +162,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
   const [energyLastUpdated, setEnergyLastUpdated] = useState<Date | null>(null);
+  const [isFallbackEnergyData, setIsFallbackEnergyData] = useState(false);
 
   // KPI card order (draggable)
   const [kpiOrder, setKpiOrder] = useState<KPICardId[]>([
@@ -271,8 +272,10 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
           const fallbackSeries = buildFallbackEnergySeries(preferredSite, selectedDays, rawTelemetry?.power);
           setEnergyData(fallbackSeries);
           setEnergyLastUpdated(new Date());
+          setIsFallbackEnergyData(true);
         } else {
           setEnergyData([]);
+          setIsFallbackEnergyData(false);
         }
       } catch (err) {
         console.error("Failed to load energy data:", err);
@@ -716,6 +719,25 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                       title={energyLastUpdated.toLocaleString()}
                     >
                       {formatTimeAgo(energyLastUpdated)}
+                    </span>
+                  )}
+
+                  {/* Demo Data Indicator */}
+                  {isFallbackEnergyData && (
+                    <span
+                      title="Real telemetry unavailable — showing estimated values"
+                      style={{
+                        fontSize: 10,
+                        color: "var(--color-sentinel-amber)",
+                        background: "color-mix(in oklch, var(--color-sentinel-amber) 10%, transparent)",
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        border: "1px solid color-mix(in oklch, var(--color-sentinel-amber) 30%, transparent)",
+                        fontWeight: 600,
+                        letterSpacing: "0.5px",
+                      }}
+                    >
+                      DEMO DATA
                     </span>
                   )}
                 </div>

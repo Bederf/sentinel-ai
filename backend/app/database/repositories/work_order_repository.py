@@ -93,6 +93,14 @@ class WorkOrderRepository:
             if site_id:
                 payload["site_id"] = site_id
 
+            # New fields for recommendation-based WOs (dedup support)
+            if work_order.get("action_point"):
+                payload["action_point"] = work_order["action_point"]
+            if work_order.get("action_value") is not None:
+                payload["action_value"] = str(work_order["action_value"])
+            if work_order.get("recommendation_id"):
+                payload["recommendation_id"] = work_order["recommendation_id"]
+
             # Insert with retry on duplicate code collision (DB trigger generates code)
             max_retries = 3
             for attempt in range(max_retries):
@@ -417,7 +425,7 @@ class WorkOrderRepository:
                 self.client.table("work_orders")
                 .select(self._LIST_COLUMNS)
                 .eq("equipment_id", equipment_id)
-                .in_("status", ["scheduled", "assigned", "in_progress", "pending"])
+                .in_("status", ["open", "scheduled", "assigned", "in_progress", "pending"])
                 .order("created_at", desc=True)
                 .limit(10)
                 .execute()
@@ -427,6 +435,99 @@ class WorkOrderRepository:
         except Exception as e:
             logger.error(f"Error getting open work orders for {equipment_code}: {e}")
             return []
+
+    async def get_open_urgent_work_orders(self, site_id: str) -> list[dict[str, Any]]:
+        """Get all open urgent/critical work orders for a site.
+
+        Used by AI optimizer to prevent recommending operational adjustments
+        on equipment that already has an active fault condition.
+
+        Args:
+            site_id: Site code (e.g., "site-002")
+
+        Returns:
+            List of open work orders with priority urgent/critical
+        """
+        if not self.client:
+            return []
+
+        try:
+            # Resolve site code → UUID (same pattern used throughout the codebase)
+            site_resp = self.client.table("sites").select("id").eq("code", site_id).execute()
+            if not site_resp.data:
+                return []
+            site_uuid = site_resp.data[0]["id"]
+
+            result = (
+                self.client.table("work_orders")
+                .select(self._LIST_COLUMNS)
+                .eq("site_id", site_uuid)
+                .in_("status", ["open", "scheduled", "assigned", "in_progress", "pending"])
+                .in_("priority", ["urgent", "critical"])
+                .order("created_at", desc=True)
+                .limit(50)
+                .execute()
+            )
+            wos = result.data or []
+
+            # Resolve equipment_id → code via equipment table lookup
+            if wos:
+                eq_ids = list(set(wo["equipment_id"] for wo in wos if wo.get("equipment_id")))
+                if eq_ids:
+                    eq_resp = self.client.table("equipment").select("id, code").in_("id", eq_ids).execute()
+                    eq_map = {e["id"]: e["code"] for e in (eq_resp.data or [])}
+                    for wo in wos:
+                        if wo.get("equipment_id") in eq_map:
+                            wo["equipment_code"] = eq_map[wo["equipment_id"]]
+
+            return wos
+
+        except Exception as e:
+            logger.error(f"Error getting urgent work orders for {site_id}: {e}")
+            return []
+
+    async def get_open_for_equipment_action(
+        self,
+        equipment_code: str,
+        action_point: str,
+        action_value: str,
+    ) -> dict[str, Any] | None:
+        """Get open WO for exact equipment + point + value combination.
+
+        Used to prevent duplicate WOs for identical recommendations.
+        Only matches open/scheduled/in_progress/pending WOs.
+        """
+        if not self.client:
+            return None
+
+        try:
+            # Resolve equipment_code → equipment_id (UUID)
+            eq_result = (
+                self.client.table("equipment")
+                .select("id")
+                .eq("code", equipment_code)
+                .limit(1)
+                .execute()
+            )
+            if not eq_result.data:
+                return None
+            equipment_id = eq_result.data[0]["id"]
+
+            result = (
+                self.client.table("work_orders")
+                .select("id, code, title, status, action_point, action_value, created_at")
+                .eq("equipment_id", equipment_id)
+                .eq("action_point", action_point)
+                .eq("action_value", action_value)
+                .in_("status", ["open", "scheduled", "assigned", "in_progress", "pending"])
+                .limit(1)
+                .execute()
+            )
+            return result.data[0] if result.data else None
+
+        except Exception as e:
+            logger.error(f"Error getting exact WO match for {equipment_code}/{action_point}/{action_value}: {e}")
+            return None
 
 
 # Singleton instance

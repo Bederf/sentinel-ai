@@ -83,37 +83,37 @@ class ActiveDirectoryService:
             # 07... form
             elif normalised.startswith("+") and len(normalised) == 12:
                 index["0" + normalised[3:]] = host
-        # Also index from technicians_whatsapp.json as fallback
-        self._index_technicians_mobile(index)
+        # Also index from Supabase technicians table
+        self._index_technicians_from_db(index)
         return index
 
-    def _index_technicians_mobile(self, index: dict[str, dict]) -> None:
-        """Supplement mobile index with technicians_whatsapp.json data."""
+    def _index_technicians_from_db(self, index: dict[str, dict]) -> None:
+        """Index technicians from Supabase."""
         try:
-            tech_path = DATA_DIR / "technicians_whatsapp.json"
-            if not tech_path.exists():
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            if not client:
                 return
-            with open(tech_path) as f:
-                data = json.load(f)
-            for tech in data.get("technicians", []):
-                mobile = tech.get("whatsapp_number", "").replace("whatsapp:", "").replace(" ", "").strip()
+            result = client.table("technicians").select("*").eq("active", True).execute()
+            for tech in result.data:
+                mobile = (tech.get("phone") or "").replace("whatsapp:", "").replace(" ", "").strip()
                 if not mobile:
                     continue
                 if mobile not in index:
                     index[mobile] = {
                         "name": tech.get("name"),
                         "email": tech.get("email"),
-                        "mobile_number": tech.get("whatsapp_number"),
+                        "mobile_number": tech.get("phone"),
                         "department": tech.get("specialty"),
                     }
-                normalised = mobile.replace("whatsapp:", "").replace(" ", "").strip()
+                normalised = mobile.replace(" ", "").strip()
                 index[normalised] = index[mobile]
                 if normalised.startswith("0") and len(normalised) == 10:
                     index["+" + normalised[1:]] = index[mobile]
                 elif normalised.startswith("+") and len(normalised) == 12:
                     index["0" + normalised[3:]] = index[mobile]
         except Exception as e:
-            logger.warning(f"Failed to index technicians_whatsapp.json for mobile lookup: {e}")
+            logger.warning(f"Failed to index technicians from Supabase: {e}")
 
     # ------------------------------------------------------------------
     # Public API

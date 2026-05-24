@@ -1205,6 +1205,25 @@ export interface MonthlySavingsSummary {
   applied_recommendations: number;
 }
 
+// ROI summary from executed recommendations (verified vs estimated)
+export interface ROISummaryResponse {
+  metric: string;
+  value_zar: number;
+  verified_savings_zar: number;
+  estimated_savings_zar: number;
+  verified_count: number;
+  recommendation_count: number;
+  confidence: number;
+  comparison_to_baseline_pct: number;
+  time_period: string;
+  breakdown?: {
+    energy_kwh?: number;
+    energy_cost_zar?: number;
+    maintenance_saved_zar?: number;
+    uptime_improvement_pct?: number;
+  };
+}
+
 // Full optimization status response
 export interface OptimizationStatusResponse {
   site_id: string;
@@ -1536,6 +1555,30 @@ export async function streamChat(
 }
 
 /**
+ * Obtain an OpenAI Realtime-2 ephemeral session token.
+ * The token is scoped to a single session and has a short TTL (~1 hour).
+ * The frontend uses this token to connect directly to OpenAI's WebSocket.
+ */
+export async function getRealtimeSessionToken(): Promise<{
+  token: string;
+  expires_in: number;
+  model: string;
+}> {
+  const token = getAccessToken();
+  const response = await fetch(`${API_BASE_URL}/api/chat/realtime/connect`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Realtime connect error: ${response.status} ${response.statusText}`);
+  }
+  return response.json() as Promise<{ token: string; expires_in: number; model: string }>;
+}
+
+/**
  * API Methods
  */
 export const api = {
@@ -1854,7 +1897,9 @@ export const api = {
     siteId?: string,
     equipmentType?: string,
     severity?: string,
-    minProbability?: number
+    minProbability?: number,
+    minConfidence?: string,
+    hasLastReading?: boolean
   ): Promise<PredictionsResponse> {
     const params = new URLSearchParams();
     if (siteId) {
@@ -1868,6 +1913,12 @@ export const api = {
     }
     if (minProbability !== undefined) {
       params.append("min_probability", minProbability.toString());
+    }
+    if (minConfidence) {
+      params.append("min_confidence", minConfidence);
+    }
+    if (hasLastReading) {
+      params.append("has_last_reading", "true");
     }
     const queryString = params.toString();
     return fetchApi<PredictionsResponse>(
@@ -2032,6 +2083,32 @@ export const api = {
           last_recommendation: null,
           last_optimization: null,
           optimization_history: [],
+        };
+      }
+      throw error;
+    }
+  },
+
+  /**
+   * Get ROI summary for executed recommendations (verified vs estimated savings)
+   * @param siteId - Site ID
+   * @param days - Number of days to look back (default 30)
+   */
+  async getROISummary(siteId: string, days = 30): Promise<ROISummaryResponse> {
+    try {
+      return await fetchApi<ROISummaryResponse>(`/api/optimization/roi-summary/${siteId}?days=${days}`);
+    } catch (error) {
+      if (isExpectedApiError(error)) {
+        return {
+          metric: "all",
+          value_zar: 0,
+          verified_savings_zar: 0,
+          estimated_savings_zar: 0,
+          verified_count: 0,
+          recommendation_count: 0,
+          confidence: 0,
+          comparison_to_baseline_pct: 0,
+          time_period: "Last 30 days",
         };
       }
       throw error;

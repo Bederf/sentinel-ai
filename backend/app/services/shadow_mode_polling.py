@@ -283,6 +283,30 @@ class ShadowModePollingService:
         except Exception as e:
             logger.warning(f"[SHADOW] Failed to load object catalog: {e}")
 
+    def _normalize_to_db_code(self, code: str) -> str:
+        """Normalize a bridge equipment code to the SENTINEL DB format.
+
+        Bridge returns codes like S002-CHILLER-B1-001, but the DB stores
+        S002-CHILLER-B01. Applies the same normalization as _sync_equipment_status.
+        """
+        c = code.replace("_", "-")
+        prefix = f"{self._site_prefix}-"
+        if c.startswith(prefix):
+            c = c[len(prefix):]
+        m = re.match(r"^(.+)-B1-", c)
+        if m:
+            return f"{prefix}{m.group(1)}-B01"
+        m = re.match(r"^(.+)-R-\d{3}$", c)
+        if m:
+            return f"{prefix}{m.group(1)}-R01"
+        m = re.match(r"^(.+)-L(\d)-([A-Z])$", c)
+        if m:
+            floor = int(m.group(2))
+            zone_num = ord(m.group(3)) - ord("A") + 1
+            if 1 <= zone_num <= 5:
+                return f"{prefix}{m.group(1)}-{floor * 100 + zone_num:03d}"
+        return code
+
     async def poll(self) -> dict[str, Any]:
         """Poll bridge and feed data to ML pipeline. Call this on each poll cycle."""
         self._poll_count += 1
@@ -912,6 +936,16 @@ class ShadowModePollingService:
         for code, state in points_result.get("meter_states", {}).items():
             equipment_states[code] = state
 
+        # Normalize equipment codes: bridge codes like S002-CHILLER-B1-001
+        # become S002-CHILLER-B01 so they match the DB equipment table codes.
+        normalized = {}
+        for code, state in equipment_states.items():
+            db_code = self._normalize_to_db_code(code)
+            if db_code != code:
+                logger.debug("[SHADOW] Normalized equipment code: %s → %s", code, db_code)
+            normalized[db_code] = state
+        equipment_states = normalized
+
         if not equipment_states:
             logger.warning(f"[SHADOW] Poll {self._poll_count}: no data — errors={errors}")
             result["errors"] = errors
@@ -1037,7 +1071,7 @@ class ShadowModePollingService:
                     "alarm_code": alarm_code,
                     "event_type": event_type,
                     "severity": alarm.get("severity") or alarm.get("priority", "warning"),
-                    "message": message[:500],  # Truncate to avoid overflow
+                    "message_text": message[:500],  # Truncate to avoid overflow
                     "recorded_at": recorded_at,
                     "raw_data": alarm,
                 }

@@ -23,7 +23,7 @@ import {
 import { OptimizationToggle } from "./OptimizationToggle";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import { formatRelativeTime } from "../lib/timeFormat";
-import api from '@/lib/api';
+import api, { type ROISummaryResponse } from '@/lib/api';
 import type {
   OptimizationStatusResponse,
   OptimizationRecommendation,
@@ -49,6 +49,7 @@ export function OptimizationInfoCard({
   const [currentRecommendation, setCurrentRecommendation] =
     useState<OptimizationRecommendation | null>(null);
   const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsSummary | null>(null);
+  const [roiData, setRoiData] = useState<ROISummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRecommendationModal, setShowRecommendationModal] = useState(false);
   const [mode, setMode] = useState("supervised");
@@ -105,7 +106,17 @@ export function OptimizationInfoCard({
       }
     };
 
+    const fetchROI = async () => {
+      try {
+        const roi = await api.getROISummary(siteId);
+        setRoiData(roi);
+      } catch (error) {
+        console.error("[OptimizationInfoCard] Failed to fetch ROI summary:", error);
+      }
+    };
+
     fetchStatus();
+    fetchROI();
     const interval = setInterval(fetchStatus, 30000);
     return () => clearInterval(interval);
   }, [siteId, optimizationEnabled]);
@@ -300,22 +311,44 @@ export function OptimizationInfoCard({
                 This Month
               </span>
             </div>
-            <div
-              className="text-lg font-semibold"
-              style={{ color: "var(--color-sentinel-text-primary)" }}
-            >
-              R{monthlySavings?.monthly_savings_zar?.toLocaleString() || "0"}
-            </div>
-            <div
-              className="text-xs"
-              style={{ color: "var(--color-sentinel-text-secondary)" }}
-            >
-              {monthlySavings?.applied_recommendations
-                ? `${monthlySavings.applied_recommendations} optimizations`
-                : effectivePhase === "shadow_live" || effectivePhase === "advisory"
-                  ? "Advisory mode — pending phase promotion"
-                  : "No optimizations yet"}
-            </div>
+            {roiData && (roiData.verified_savings_zar > 0 || roiData.estimated_savings_zar > 0) ? (
+              <>
+                <div
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  R{roiData.verified_savings_zar.toLocaleString()}
+                </div>
+                <div
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  verified
+                  {roiData.estimated_savings_zar > 0 && (
+                    <span> · +R{roiData.estimated_savings_zar.toLocaleString()} estimated</span>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div
+                  className="text-lg font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  R{monthlySavings?.monthly_savings_zar?.toLocaleString() || "0"}
+                </div>
+                <div
+                  className="text-xs"
+                  style={{ color: "var(--color-sentinel-text-secondary)" }}
+                >
+                  {monthlySavings?.applied_recommendations
+                    ? `${monthlySavings.applied_recommendations} optimizations`
+                    : effectivePhase === "shadow_live" || effectivePhase === "advisory"
+                      ? "Advisory mode — pending phase promotion"
+                      : "No optimizations yet"}
+                </div>
+              </>
+            )}
           </div>
 
           <div

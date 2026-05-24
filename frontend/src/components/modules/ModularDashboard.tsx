@@ -154,7 +154,7 @@ export function ModularDashboard({
         <IntegrationStatusBar />
 
         {showRecommendations && criticalRecs.length > 0 && (
-          <AIRecommendationsPanel compact maxItems={3} sitePhase={sitePhase} />
+          <AIRecommendationsPanel compact maxItems={3} siteId={siteId} sitePhase={sitePhase} />
         )}
 
         <Suspense fallback={<LoadingFallback />}>
@@ -209,7 +209,7 @@ export function ModularDashboard({
       {activeTabId === 'overview' && (
         <div className="grid grid-cols-2 gap-4">
           <div className="col-span-2 lg:col-span-1">
-            <AIRecommendationsPanel maxItems={5} sitePhase={sitePhase} />
+            <AIRecommendationsPanel maxItems={5} siteId={siteId} sitePhase={sitePhase} />
           </div>
           <div className="space-y-4">
             {activeModules.map(m => (

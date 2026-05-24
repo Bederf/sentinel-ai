@@ -65,16 +65,16 @@ SENTINEL is an AI-powered Building Management System (BMS) Intelligence Platform
 10. **diagnose_comfort_complaint** - Full comfort diagnosis with root cause analysis
 11. **get_optimization_recommendations** - AI-generated HVAC and lighting recommendations
 
-### Voice Chat (Phase 110)
-- **Speech-to-Text input:** Browser-native Web Speech API (Chrome, Edge, Safari)
+### Voice Chat (Phase 110 / Path C-Surgical)
+- **Speech-to-Text input:** Browser-native Web Speech API (Chrome, Edge, Safari) for simple single-utterance mode; continuous capture via MediaRecorder + Silero-VAD for system docs mode
 - Default language: en-ZA (South African English), single utterance per mic press
 - Mic button auto-hidden on unsupported browsers (graceful degradation)
-- **Text-to-Speech output:** ElevenLabs API for summarized audio playback
+- **Text-to-Speech output:** ElevenLabs API (Rachel voice, `21m00Tcm4TlvDq8ikWAM`) for summarized audio playback — MP3 audio cached in Redis (SHA256 content hash, 1hr TTL)
 - Claude summarizes AI response to 1-2 spoken sentences; full text still displayed
-- MP3 audio cached in Redis (SHA256 content hash, 1hr TTL) to avoid duplicate API calls
 - Speaker button on each assistant message: Listen / Loading... / Playing...
 - Requires `ELEVENLABS_API_KEY` + `ELEVENLABS_TTS_ENABLED=true` in `.env`
-- See: [`docs/04-features/110-voice-chat.md`](docs/04-features/110-voice-chat.md)
+- **OpenAI Realtime-2 path (Path C-Surgical, 2026-05):** Replaces STT/VAD with OpenAI Realtime-2 WebSocket while keeping ElevenLabs TTS and Claude Sonnet. Enable via `VITE_REALTIME_VOICE_ENABLED=true` + `OPENAI_REALTIME_API_KEY` + `realtime_voice_enabled=true`
+- See: [`docs/03-api-reference/chat-api.md`](docs/03-api-reference/chat-api.md)
 
 ### Hybrid AI Routing
 - Tier 1 (Ollama - FREE): Simple lookups, data queries, status checks

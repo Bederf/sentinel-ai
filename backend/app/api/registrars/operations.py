@@ -74,6 +74,7 @@ from app.api import (
     sentry_webhooks,
     service_feedback,
     service_records,
+    spare_parts,
     servicenow,
     signal_replay,
     space,
@@ -100,6 +101,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(checklists.router, tags=["checklists"])
     app.include_router(complaints.router, tags=["comfort-complaints"])
     app.include_router(parts_orders.router, tags=["parts-orders"])
+    app.include_router(spare_parts.router, prefix="/api", tags=["spare-parts"])
 
     # Workflow orchestration
     app.include_router(workflow.router, tags=["workflow"])

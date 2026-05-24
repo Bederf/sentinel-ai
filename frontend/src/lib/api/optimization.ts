@@ -25,11 +25,14 @@ export interface Recommendation {
   description?: string
   reason: string
   expected_impact: Record<string, number>
+  actual_saving_zar?: number
+  outcome_validated?: boolean
   confidence: string | number
   profile: string
   multi_objective_score: number
   status: string
   timestamp: string
+  executed_at?: string
   outcome?: Outcome
 }
 

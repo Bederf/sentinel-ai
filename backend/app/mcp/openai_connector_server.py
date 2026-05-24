@@ -26,6 +26,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from app.services.demand_response_service import get_demand_response_service
+from app.services.odse_service import odse_service
+
 logger = logging.getLogger(__name__)
 
 # Data paths (fallback)
@@ -163,7 +166,7 @@ class SupabaseDataLoader:
         try:
             response = (
                 self.client.table("work_orders")
-                .select("*, equipment(name, code, type), sites(name, code)")
+                .select("*")
                 .order("created_at", desc=True)
                 .limit(100)
                 .execute()
@@ -180,7 +183,7 @@ class SupabaseDataLoader:
                 self.client.table("documents")
                 .select(
                     "id, code, title, document_type, equipment_type, manufacturer, model, "
-                    "summary, keywords, failure_modes, source_url"
+                    "summary, keywords, source, full_text"
                 )
                 .order("created_at", desc=True)
                 .limit(1000)
@@ -468,14 +471,14 @@ def _build_tech_document(doc: dict, source: str = "supabase") -> dict[str, Any]:
         text_parts.append(f"Summary: {doc['summary']}")
     if doc.get("keywords"):
         text_parts.append(f"Keywords: {', '.join(doc['keywords'])}")
-    if doc.get("failure_modes"):
-        text_parts.append(f"Failure Modes: {', '.join(doc['failure_modes'])}")
+    if doc.get("full_text"):
+        text_parts.append(f"Full Text: {doc['full_text']}")
 
     return {
-        "id": f"document-{doc_id}",
+        "id": str(doc_id),  # Use raw UUID so fetch can match search results directly
         "title": f"Document: {doc.get('title', doc_id)}",
         "text": "\n".join(text_parts),
-        "url": doc.get("source_url") or f"{BASE_URL}/api/documents/{doc_id}",
+        "url": doc.get("source") or f"{BASE_URL}/api/documents/{doc_id}",
         "doc_type": "technical_document",
         "metadata": {
             "document_id": str(doc_id),
@@ -690,9 +693,34 @@ class OpenAIConnectorMCPServer:
                     "properties": {
                         "site_id": {
                             "type": "string",
-                            "description": "Site identifier (e.g., S002, S005)",
-                            "enum": ["S001", "S002", "S005"],
+                            "description": "Site identifier (e.g., S002)",
+                            "enum": ["S002"],
                         }
+                    },
+                    "required": ["site_id"],
+                },
+            },
+            {
+                "name": "get_recommendations",
+                "description": "Get top active recommendations for a site with action, priority, and projected savings.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "site_id": {
+                            "type": "string",
+                            "description": "Site identifier (e.g., S002)",
+                        },
+                        "limit": {
+                            "type": "integer",
+                            "description": "Maximum recommendations to return",
+                            "default": 5,
+                        },
+                        "status": {
+                            "type": "string",
+                            "description": "Filter by recommendation status",
+                            "enum": ["pending", "executed", "auto_executed", "all"],
+                            "default": "pending",
+                        },
                     },
                     "required": ["site_id"],
                 },
@@ -778,6 +806,56 @@ class OpenAIConnectorMCPServer:
                     "required": ["metric"],
                 },
             },
+            {
+                "name": "get_curtailable_load",
+                "description": "Get real-time curtailable HVAC load signal for a site — how much load can be safely shed, for how long, and with what confidence.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "site_id": {
+                            "type": "string",
+                            "description": "Site identifier (e.g., S002)",
+                        },
+                        "min_priority": {
+                            "type": "integer",
+                            "description": "Minimum zone priority to include (1=critical/never shed, 5=lowest/shed first). Default 3.",
+                            "default": 3,
+                        },
+                        "include_zones": {
+                            "type": "boolean",
+                            "description": "Include per-zone breakdown in response",
+                            "default": False,
+                        },
+                    },
+                    "required": ["site_id"],
+                },
+            },
+            {
+                "name": "get_odse_export",
+                "description": "Export Sentinel energy timeseries data in ODS-E v0.4.0 compliant format for eSUMS ingestion.",
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "site_id": {
+                            "type": "string",
+                            "description": "Site identifier (e.g., S002)",
+                        },
+                        "start": {
+                            "type": "string",
+                            "description": "Start of export window (ISO 8601 UTC)",
+                        },
+                        "end": {
+                            "type": "string",
+                            "description": "End of export window (ISO 8601 UTC)",
+                        },
+                        "equipment_id": {
+                            "type": "string",
+                            "description": "Optional: filter to single equipment UUID",
+                        },
+                    },
+                    "required": ["site_id", "start", "end"],
+                },
+            },
             # Category B: RAG Knowledge (2 tools)
             {
                 "name": "search_knowledge",
@@ -822,49 +900,7 @@ class OpenAIConnectorMCPServer:
                     "required": ["topic"],
                 },
             },
-            # Category C: Work Orders + Controls
-            {
-                "name": "submit_complaint",
-                "description": "Handle a comfort complaint by desk location. Maps desk to HVAC zone, diagnoses the issue, and returns actionable suggestions including equipment that can be adjusted. Use this when someone says they're too hot, too cold, stuffy, or drafty at a specific desk.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "desk_id": {"type": "string", "description": "Desk identifier (e.g., '204', 'L12-25', 'Desk 25'). Accepts partial formats like just the desk number."},
-                        "complaint_type": {"type": "string", "description": "Type of discomfort", "enum": ["too_hot", "too_cold", "stuffy", "drafty"]},
-                    },
-                    "required": ["desk_id", "complaint_type"],
-                },
-            },
-            {
-                "name": "control_equipment",
-                "description": "Write a control value to BMS equipment (setpoint, state, etc.) when in supervised mode. Returns updated value with COV verification. Use after submit_complaint to action a suggestion. Example: 'Set cooling setpoint to 22°C on Zone-201'.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "equipment_id": {"type": "string", "description": "Equipment ID to control (e.g., 'Zone-201', 'S002-FCU-L2-C'). Get from submit_complaint zone output."},
-                        "point": {"type": "string", "description": "Point name to write (e.g., 'cooling_setpoint', 'occupied_setpoint', ' airflow')"},
-                        "value": {"type": "number", "description": "Value to write (e.g., 22.0)"},
-                        "reason": {"type": "string", "description": "Reason for the control action (for audit log)"},
-                    },
-                    "required": ["equipment_id", "point", "value"],
-                },
-            },
-            {
-                "name": "create_work_order",
-                "description": "Create a new work order for equipment maintenance or repair.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "site_id": {"type": "string", "description": "Site identifier (e.g., S002)"},
-                        "equipment_id": {"type": "string", "description": "Equipment code (e.g., S002-CHILLER-B01)"},
-                        "title": {"type": "string", "description": "Work order title"},
-                        "description": {"type": "string", "description": "Detailed description of work needed"},
-                        "priority": {"type": "string", "description": "Priority level", "enum": ["low", "medium", "high", "urgent"]},
-                        "assigned_to": {"type": "string", "description": "Technician name to assign to"},
-                    },
-                    "required": ["site_id", "title", "description"],
-                },
-            },
+            # Category C: Work Orders (read-only for advisory mode)
             {
                 "name": "get_work_orders",
                 "description": "List work orders for a site with optional status filter.",
@@ -890,23 +926,56 @@ class OpenAIConnectorMCPServer:
                 },
             },
             {
-                "name": "update_work_order",
-                "description": "Update a work order's status or milestone.",
+                "name": "ping",
+                "description": "Lightweight health check for the Sentinel MCP connector. Returns connection status, index state, and server metadata. Use to verify the connector is operational before running other tools.",
                 "inputSchema": {
                     "type": "object",
-                    "properties": {
-                        "work_order_id": {"type": "string", "description": "Work order UUID"},
-                        "status": {"type": "string", "description": "New status", "enum": ["scheduled", "in_progress", "resolved", "verified"]},
-                        "notes": {"type": "string", "description": "Work notes or resolution details"},
-                    },
-                    "required": ["work_order_id"],
+                    "properties": {},
                 },
             },
         ]
 
+    async def ping(self) -> dict[str, Any]:
+        """
+        Lightweight health check for the Sentinel MCP connector.
+
+        Returns:
+            {
+                "status": "ok",
+                "tools_registered": 17,
+                "documents_indexed": 564,
+                "supabase_connected": true,
+                "version": "1.0.0",
+                "mcp_version": "2024-11-05",
+            }
+        """
+        self._ensure_index()
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            client.table("sites").select("code").limit(1).execute()
+            supabase_ok = True
+        except Exception:
+            supabase_ok = False
+
+        return {
+            "status": "ok",
+            "tools_registered": len(self.list_tools()),
+            "documents_indexed": len(self._documents) if self._documents else 0,
+            "supabase_connected": supabase_ok,
+            "version": "1.0.0",
+            "mcp_version": "2024-11-05",
+        }
+
     async def search(self, query: str) -> dict[str, Any]:
         """
-        Search for documents matching query.
+        Search for documents matching query using HyDE-enhanced hybrid search.
+
+        HyDE (Hypothetical Document Embedding) generates a brief hypothetical
+        answer with Haiku, embeds that, and searches with it. This resolves
+        vocabulary mismatches between informal queries and formal documents.
+        Raw embedding fallback for table_row filtered queries where vocabulary
+        is already precise.
 
         Returns:
             {
@@ -916,11 +985,29 @@ class OpenAIConnectorMCPServer:
                 ]
             }
         """
-        self._ensure_index()
+        vector_db = self._get_vector_db_service()
 
-        matching_docs = _simple_text_search(query, self._documents, limit=15)
-
-        results = [{"id": doc["id"], "title": doc["title"], "url": doc["url"]} for doc in matching_docs]
+        if not vector_db:
+            # Fallback to simple text search if VectorDB unavailable
+            self._ensure_index()
+            matching_docs = _simple_text_search(query, self._documents, limit=15)
+            results = [{"id": doc["id"], "title": doc["title"], "url": doc["url"]} for doc in matching_docs]
+        else:
+            try:
+                search_results = await vector_db.hybrid_search(query=query, n_results=15, use_hyde=True)
+                results = [
+                    {
+                        "id": r.get("document_id", r.get("id", "")),
+                        "title": r.get("title", r.get("document_title", "Untitled")),
+                        "url": r.get("url", ""),
+                    }
+                    for r in search_results
+                ]
+            except Exception as e:
+                logger.warning(f"VectorDB search failed, falling back to text search: {e}")
+                self._ensure_index()
+                matching_docs = _simple_text_search(query, self._documents, limit=15)
+                results = [{"id": doc["id"], "title": doc["title"], "url": doc["url"]} for doc in matching_docs]
 
         logger.info(f"OpenAI Connector search: '{query}' -> {len(results)} results")
 
@@ -939,9 +1026,16 @@ class OpenAIConnectorMCPServer:
                 "metadata": {...}
             }
         """
-        self._ensure_index()
+        if not id:
+            return {"id": "", "title": "Invalid ID", "text": "No ID provided", "url": "", "metadata": {"error": "bad_input"}}
 
+        # Try in-memory index first (fast path for tech docs indexed at startup)
+        self._ensure_index()
         doc = self._document_index.get(id)
+
+        if not doc:
+            # Fallback: query documents table directly by UUID
+            doc = self._fetch_doc_from_db(id)
 
         if not doc:
             logger.warning(f"OpenAI Connector fetch: document not found: {id}")
@@ -954,7 +1048,6 @@ class OpenAIConnectorMCPServer:
             }
 
         logger.info(f"OpenAI Connector fetch: {id}")
-
         return {
             "id": doc["id"],
             "title": doc["title"],
@@ -962,6 +1055,43 @@ class OpenAIConnectorMCPServer:
             "url": doc["url"],
             "metadata": doc.get("metadata", {}),
         }
+
+    def _fetch_doc_from_db(self, doc_uuid: str) -> dict[str, Any] | None:
+        """Fetch a document directly from Supabase by UUID."""
+        client = _get_supabase_client()
+        if not client:
+            return None
+        try:
+            # Try fetching from documents table by id (UUID)
+            result = (
+                client.table("documents")
+                .select("id, code, title, document_type, equipment_type, manufacturer, model, summary, keywords, source, full_text")
+                .eq("id", doc_uuid)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                raw = result.data[0]
+                return _build_tech_document(raw, "supabase")
+        except Exception as e:
+            logger.debug(f"Document fetch by UUID failed: {e}")
+
+        # Try fetching by code (some docs use code as identifier)
+        try:
+            result = (
+                client.table("documents")
+                .select("id, code, title, document_type, equipment_type, manufacturer, model, summary, keywords, source, full_text")
+                .eq("code", doc_uuid)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                raw = result.data[0]
+                return _build_tech_document(raw, "supabase")
+        except Exception as e:
+            logger.debug(f"Document fetch by code failed: {e}")
+
+        return None
 
     def _get_vector_db_service(self):
         """Get VectorDB service for RAG operations."""
@@ -979,9 +1109,9 @@ class OpenAIConnectorMCPServer:
         if not site_id:
             return ""
         # Already in correct format
-        if site_id.lower() in ("site-001", "site-002", "site-005"):
+        if site_id.lower() in ("site-002"):
             return site_id.lower()
-        if site_id.upper() in ("S001", "S002", "S005"):
+        if site_id.upper() in ("S002"):
             return f"site-{site_id[-3:].lower()}"
         # Try to resolve UUID to code
         try:
@@ -1056,7 +1186,7 @@ class OpenAIConnectorMCPServer:
             # Get equipment at risk (equipment uses site UUID)
             equip_result = (
                 client.table("equipment")
-                .select("id, code, name, health_score, status")
+                .select("id, code, name, health_score, status, health_confidence, health_trend")
                 .eq("site_id", site_uuid)
                 .in_("status", ["warning", "critical", "fault"])
                 .order("health_score", desc=False)
@@ -1070,6 +1200,9 @@ class OpenAIConnectorMCPServer:
                         "id": eq.get("code") or eq.get("id"),
                         "name": eq.get("name"),
                         "risk_level": "high" if eq.get("status") == "critical" else "medium",
+                        "health_score": eq.get("health_score"),
+                        "health_confidence": eq.get("health_confidence", "unknown"),
+                        "health_trend": eq.get("health_trend", "unknown"),
                     })
 
             # Determine overall status
@@ -1106,6 +1239,178 @@ class OpenAIConnectorMCPServer:
             }
         except Exception as e:
             logger.error(f"get_site_status failed: {e}")
+            return {"error": str(e)}
+
+    async def get_recommendations(self, site_id: str, limit: int = 5, status: str = "pending") -> dict[str, Any]:
+        """Get top active recommendations for a site."""
+        client = _get_supabase_client()
+        if not client:
+            return {"error": "Supabase not available"}
+
+        site_code = self._get_site_code(site_id)
+        if not site_code:
+            return {"error": "Invalid site_id"}
+
+        try:
+            # Build query — recommendations table uses site-002 format
+            # Columns: id, site_id, timestamp, action_type, risk_level, action, expected_impact, status
+            query = (
+                client.table("recommendations")
+                .select(
+                    "id, action_type, risk_level, action, expected_impact, status, timestamp, "
+                    "confidence_score, target_equipment, reason, profile"
+                )
+                .eq("site_id", site_code)
+                .eq("shadow_mode", False)
+                .order("timestamp", desc=True)
+            )
+            if status != "all":
+                query = query.eq("status", status)
+            query = query.limit(limit)
+            result = query.execute()
+
+            recommendations = []
+            if result.data:
+                for rec in result.data:
+                    ei = rec.get("expected_impact") or {}
+                    risk_level = rec.get("risk_level", "medium")
+                    priority = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}.get(risk_level, "medium")
+                    confidence = rec.get("confidence_score") or rec.get("confidence") or 0.5
+                    # Extract projected saving from expected_impact
+                    projected_saving_zar = None
+                    if isinstance(ei, dict):
+                        projected_saving_zar = ei.get("cost_zar") or ei.get("saving_zar")
+                    # Build the recommended_action from action dict
+                    action_obj = rec.get("action") or {}
+                    if isinstance(action_obj, dict):
+                        point = action_obj.get("point", "")
+                        value = action_obj.get("value")
+                        unit = action_obj.get("unit", "")
+                        current = action_obj.get("current_value")
+                        if point and value is not None:
+                            if current is not None:
+                                action_text = f"Set {point} from {current} to {value}{unit}"
+                            else:
+                                action_text = f"Set {point} to {value}{unit}"
+                        else:
+                            action_text = action_obj.get("type", "") or rec.get("reason", "") or f"Take action: {rec.get('action_type')}"
+                    else:
+                        action_text = str(action_obj) if action_obj else f"Take action: {rec.get('action_type')}"
+                    # The full SENTRY advisory text is in the reason field
+                    full_advisory = rec.get("reason") or ""
+                    # Equipment this recommendation applies to
+                    equipment = rec.get("target_equipment") or ""
+                    # Optimisation goal (cost/comfort/profile)
+                    goal = rec.get("profile") or rec.get("action_type", "") or None
+                    recommendations.append({
+                        "id": rec.get("id"),
+                        "equipment": equipment,
+                        "action_type": rec.get("action_type", "unknown"),
+                        "status": rec.get("status"),
+                        "priority": priority,
+                        "confidence": confidence,
+                        "recommended_action": action_text,
+                        "full_advisory": full_advisory,
+                        "goal": goal,
+                        "projected_saving_zar": projected_saving_zar,
+                        "created_at": rec.get("timestamp"),
+                    })
+
+            return {
+                "site_id": site_code,
+                "count": len(recommendations),
+                "status_filter": status,
+                "recommendations": recommendations,
+            }
+        except Exception as e:
+            logger.error(f"get_recommendations failed: {e}")
+            return {"error": str(e)}
+
+    async def get_curtailable_load(
+        self,
+        site_id: str,
+        min_priority: int = 3,
+        include_zones: bool = False,
+    ) -> dict[str, Any]:
+        """Get real-time curtailable HVAC load signal for a site."""
+        site_code = self._get_site_code(site_id)
+        if not site_code:
+            return {"error": "Invalid site_id"}
+        try:
+            service = get_demand_response_service()
+            result = await service.get_curtailable_load(
+                site_id=site_code,
+                min_priority=min_priority,
+                include_zones=include_zones,
+            )
+            return {
+                "site_id": site_code,
+                "curtailable_load_kw": result.curtailable_load_kw,
+                "safe_duration_minutes": result.safe_duration_minutes,
+                "confidence": result.confidence,
+                "limiting_factor": result.limiting_factor,
+                "ddmp_eligible": result.ddmp_eligible,
+                "ddmp_threshold_kw": 500,
+                "zone_breakdown": [
+                    {"zone_id": z.zone_id, "zone_name": z.zone_name, "curtailable_kw": z.curtailable_kw}
+                    for z in (result.zone_breakdown or [])
+                ] if include_zones else [],
+                "data_freshness": "live",
+            }
+        except Exception as e:
+            err_str = str(e)
+            # Graceful degradation: 503 means no live sensor data
+            if "503" in err_str or "Insufficient live sensor data" in err_str:
+                return {
+                    "site_id": site_code,
+                    "curtailable_load_kw": None,
+                    "safe_duration_minutes": None,
+                    "confidence": 0.0,
+                    "limiting_factor": "no_live_sensor_data",
+                    "ddmp_eligible": False,
+                    "ddmp_threshold_kw": 500,
+                    "data_freshness": "unavailable",
+                    "data_freshness_warning": (
+                        "Live sensor data unavailable for demand response calculation. "
+                        "Connect BMS integration for real-time curtailable load signal."
+                    ),
+                    "zone_breakdown": [],
+                }
+            logger.error(f"get_curtailable_load failed: {e}")
+            return {"error": err_str}
+
+    async def get_odse_export(
+        self,
+        site_id: str,
+        start: str,
+        end: str,
+        equipment_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Export energy timeseries data in ODS-E v0.4.0 format."""
+        site_code = self._get_site_code(site_id)
+        if not site_code:
+            return {"error": "Invalid site_id"}
+        try:
+            start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
+            end_dt = datetime.fromisoformat(end.replace("Z", "+00:00"))
+            result = await odse_service.export_timeseries(
+                site_id=site_code,
+                start=start_dt,
+                end=end_dt,
+                equipment_id=equipment_id,
+            )
+            return {
+                "site_id": site_code,
+                "schema_version": result.schema_version,
+                "record_count": result.record_count,
+                "exported_at": result.exported_at,
+                "first_records": [
+                    {"timestamp": r.timestamp, "kWh": r.kWh, "direction": r.direction}
+                    for r in result.records[:3]
+                ],
+            }
+        except Exception as e:
+            logger.error(f"get_odse_export failed: {e}")
             return {"error": str(e)}
 
     async def trace_recommendation(self, recommendation_id: str) -> dict[str, Any]:
@@ -1229,10 +1534,12 @@ class OpenAIConnectorMCPServer:
             open_alerts = len(alerts_result.data) if alerts_result.data else 0
 
             # Get active predictions count (predictions use equipment UUID)
+            # ⚠️ MUST filter by status='active' — resolved/work_order_raised are not current risks
             preds_result = (
                 client.table("predictions")
                 .select("id, probability_percent, severity, timeframe_days")
                 .eq("equipment_id", equip_uuid)
+                .eq("status", "active")
                 .order("probability_percent", desc=True)
                 .execute()
             )
@@ -1245,17 +1552,156 @@ class OpenAIConnectorMCPServer:
                         "timeframe_days": p.get("timeframe_days"),
                     })
 
-            # Calculate failure risk
+            # Calculate failure risk — use all signals, not just >70 threshold
             failure_risk = {"score": 0.0, "reason": "No risk factors detected", "timeline_hours": None}
-            if active_predictions:
-                highest_prob = max(p.get("probability_percent", 0) for p in active_predictions)
-                if highest_prob > 70:
-                    failure_risk["score"] = highest_prob / 100
+            if active_predictions or open_alerts > 0:
+                # Factor in prediction count, highest probability, and open alerts
+                pred_count = len(active_predictions)
+                highest_prob = max((p.get("probability_percent", 0) for p in active_predictions), default=0)
+                # Score: weighted combination — 60% highest prob, 40% pred count signal
+                base_score = (highest_prob * 0.6) + (min(pred_count * 15, 30) * 0.4)
+                failure_risk["score"] = round(min(base_score / 100, 0.99), 2)
+                if highest_prob >= 70:
                     failure_risk["reason"] = "High failure probability predicted"
-                    for p in active_predictions:
-                        if p.get("probability") == highest_prob:
-                            failure_risk["timeline_hours"] = (p.get("timeframe_days") or 30) * 24
-                            break
+                elif pred_count >= 2:
+                    failure_risk["reason"] = f"{pred_count} active predictions — equipment requires attention"
+                else:
+                    failure_risk["reason"] = "Elevated risk — open alerts and predictions present"
+                # Use the most urgent prediction timeline
+                for p in active_predictions:
+                    if p.get("probability_percent", 0) == highest_prob:
+                        failure_risk["timeline_hours"] = (p.get("timeframe_days") or 30) * 24
+                        break
+
+            # Start with equipment state fields; live readings override below
+            current_readings = {
+                "run_status": equip.get("status", "unknown"),
+                "health_score": equip.get("health_score"),
+                "health_confidence": equip.get("health_confidence", "unknown"),
+                "health_trend": equip.get("health_trend", "unknown"),
+                "data_freshness_minutes": equip.get("data_freshness_minutes"),
+                "last_ml_update": equip.get("last_ml_update"),
+            }
+            # If equipment has operating_data from SIMBIOT bridge, include it
+            operating_data = equip.get("operating_data") or {}
+            has_live_telemetry = bool(operating_data)
+            if operating_data:
+                for k, v in operating_data.items():
+                    if v is not None:
+                        current_readings[k] = v
+
+            # Query live sensor readings from Supabase (WireGuard bridge data)
+            # equipment_sensor_readings table: equipment_id=equipment code, sensor_type, value
+            try:
+                sensor_map = {}
+                equip_type = equip.get("type", "").lower()
+                if "chiller" in equip_type:
+                    sensor_map = {
+                        "supply_temp_c": "chw_supply_temp",
+                        "return_temp_c": "chw_return_temp",
+                    }
+                elif "ahu" in equip_type or "air" in equip_type:
+                    sensor_map = {
+                        "supply_temp_c": "supply_air_temp",
+                        "return_temp_c": "return_air_temp",
+                        "fan_speed": "fan_speed_pct",
+                    }
+                elif "cooling_tower" in equip_type or "ct" in equip_type:
+                    sensor_map = {
+                        "fan_speed": "fan_speed_pct",
+                    }
+
+                if sensor_map:
+                    # Map equipment code to sensor reading ID (WireGuard bridge uses abbreviated codes)
+                    # Fallback chain tries common abbreviation patterns
+                    sensor_equip_id = equipment_id
+
+                    if equipment_id.endswith("-B01"):
+                        base = equipment_id[:-4]  # S002-CHILLER-B01 → S002-CHILLER or S002-CT-B01 → S002-CT
+                        for variant in (f"{base}-B1-001", f"{base}-R-001", f"{base}-001", equipment_id):
+                            check = (
+                                client.table("equipment_sensor_readings")
+                                .select("id")
+                                .eq("equipment_id", variant)
+                                .limit(1)
+                                .execute()
+                            )
+                            if check.data:
+                                sensor_equip_id = variant
+                                break
+                    elif equipment_id.endswith("-R01"):
+                        base = equipment_id[:-4]
+                        for variant in (f"{base}-R-001", f"{base}-001", equipment_id):
+                            check = (
+                                client.table("equipment_sensor_readings")
+                                .select("id")
+                                .eq("equipment_id", variant)
+                                .limit(1)
+                                .execute()
+                            )
+                            if check.data:
+                                sensor_equip_id = variant
+                                break
+
+                    for field_key, sensor_type in sensor_map.items():
+                        if current_readings.get(field_key) is None:
+                            reading = (
+                                client.table("equipment_sensor_readings")
+                                .select("value, recorded_at")
+                                .eq("equipment_id", sensor_equip_id)
+                                .eq("sensor_type", sensor_type)
+                                .order("recorded_at", desc=True)
+                                .limit(1)
+                                .execute()
+                            )
+                            if reading.data:
+                                current_readings[field_key] = reading.data[0]["value"]
+                    current_readings["data_source"] = "supabase"
+
+                # Also get aggregate HVAC power from S002-CHILLER-AGG meter.
+                # NOTE: This is TOTAL HVAC power for the building, not just this unit.
+                # Label clearly so downstream consumers don't misattribute.
+                if current_readings.get("power_kw") is None and ("chiller" in equip_type or "ahu" in equip_type):
+                    power_reading = (
+                        client.table("equipment_sensor_readings")
+                        .select("value")
+                        .eq("equipment_id", "S002-CHILLER-AGG")
+                        .eq("sensor_type", "hvac_kw")
+                        .order("recorded_at", desc=True)
+                        .limit(1)
+                        .execute()
+                    )
+                    if power_reading.data:
+                        current_readings["power_kw"] = power_reading.data[0]["value"]
+                        current_readings["power_source"] = "aggregate_hvac_kw"
+                        current_readings["power_note"] = "Total HVAC power for building, not specific to this unit"
+
+            except Exception as e:
+                logger.debug(f"Failed to query equipment_sensor_readings: {e}")
+                current_readings["data_source"] = current_readings.get("data_source", "unavailable")
+
+            # Legacy InfluxDB fallback (token_present=False in production)
+            if current_readings.get("data_source") == "unavailable" or current_readings.get("data_source") == "influxdb_unavailable":
+                try:
+                    from app.services.influxdb_service import get_influxdb_service
+                    influx = get_influxdb_service()
+                    if influx._available and influx._client and influx._token_present:
+                        eq_uuid = equip.get("id")
+                        influx_sensor_map = {
+                            "supply_temp_c": "supply_water_temp",
+                            "return_temp_c": "return_water_temp",
+                            "power_kw": "active_power",
+                            "run_hours": "run_hours",
+                        }
+                        for field_key, sensor_type in influx_sensor_map.items():
+                            if current_readings.get(field_key) is None:
+                                readings = influx.query_raw(eq_uuid, sensor_type)
+                                if readings:
+                                    latest = readings[-1]
+                                    current_readings[field_key] = latest.get("value")
+                        current_readings["data_source"] = "influxdb"
+                except Exception:
+                    pass
 
             # Get last updated from hvac_zones if applicable
             last_updated = equip.get("updated_at") or equip.get("created_at")
@@ -1266,7 +1712,7 @@ class OpenAIConnectorMCPServer:
                 "age_years": age_years,
                 "manufacturer": equip.get("manufacturer"),
                 "model": equip.get("model"),
-                "current_readings": {},  # Would join hvac_zones if equipment has zone linkage
+                "current_readings": current_readings,
                 "health_score": equip.get("health_score"),
                 "status": equip.get("status"),
                 "maintenance_history": {"last_service": equip.get("last_service")},
@@ -1290,7 +1736,7 @@ class OpenAIConnectorMCPServer:
             # Get executed recommendations with expected_impact (recommendations uses site-002 format)
             recs_result = (
                 client.table("recommendations")
-                .select("expected_impact, action_type, timestamp, executed_at")
+                .select("expected_impact, actual_saving_zar, actual_value_set, action_type, timestamp, executed_at")
                 .eq("site_id", site_code)
                 .in_("status", ["executed", "auto_executed"])
                 .eq("shadow_mode", False)
@@ -1300,16 +1746,29 @@ class OpenAIConnectorMCPServer:
             )
 
             total_savings_zar = 0.0
+            verified_savings_zar = 0.0
+            estimated_savings_zar = 0.0
             total_energy_kwh = 0.0
             maintenance_saved_zar = 0.0
             uptime_improvement = 0.0
             count = len(recs_result.data) if recs_result.data else 0
+            verified_count = 0
 
             if recs_result.data:
                 for rec in recs_result.data:
                     ei = rec.get("expected_impact") or {}
-                    if isinstance(ei, dict):
+                    actual = rec.get("actual_saving_zar")
+                    if actual:
+                        # Verified — actual saving measured after outcome verification
+                        total_savings_zar += float(actual)
+                        verified_savings_zar += float(actual)
+                        verified_count += 1
+                    elif isinstance(ei, dict) and ei.get("cost_zar"):
+                        # Estimated — predicted at recommendation creation, not yet verified
                         total_savings_zar += float(ei.get("cost_zar", 0))
+                        estimated_savings_zar += float(ei.get("cost_zar", 0))
+                    # Accumulate secondary metrics from expected_impact regardless
+                    if isinstance(ei, dict):
                         total_energy_kwh += float(ei.get("energy_kwh", 0))
                         maintenance_saved_zar += float(ei.get("maintenance_saved_zar", 0))
                         uptime_improvement += float(ei.get("uptime_hours", 0))
@@ -1333,6 +1792,10 @@ class OpenAIConnectorMCPServer:
             result = {
                 "metric": metric,
                 "value_zar": total_savings_zar,
+                "verified_savings_zar": round(verified_savings_zar, 2),
+                "estimated_savings_zar": round(estimated_savings_zar, 2),
+                "verified_count": verified_count,
+                "recommendation_count": count,
                 "confidence": confidence,
                 "comparison_to_baseline_pct": round((confidence - 0.5) * 100, 1) if confidence > 0.5 else 0,
                 "time_period": time_period,
@@ -1660,7 +2123,7 @@ class OpenAIConnectorMCPServer:
                 parts = equipment_id.split("-")
                 if len(parts) >= 2 and parts[0] == "site":
                     site_code = f"{parts[0]}-{parts[1]}"
-                elif len(parts) >= 2 and parts[0] in ("S001", "S002", "S005"):
+                elif len(parts) >= 2 and parts[0] in ("S002"):
                     site_code = f"site-{parts[0][-3:].lower()}"
                 else:
                     # Default to site-002 for zone-level equipment
@@ -1672,6 +2135,18 @@ class OpenAIConnectorMCPServer:
                 if not site_result.data:
                     return {"error": f"Site not found: {site_code}"}
                 control_enabled = site_result.data[0].get("control_enabled", False)
+
+            # Phase gate: control writes require supervised or automatic mode
+            from app.models.onboarding_phase import effective_phase, phase_allows
+
+            current_phase = await effective_phase(site_code)
+            if not phase_allows(current_phase, "approve_reject"):
+                return {
+                    "success": False,
+                    "error": f"Control not permitted in {current_phase} phase — requires supervised or automatic mode.",
+                    "site_code": site_code,
+                    "current_phase": current_phase,
+                }
 
             if not control_enabled:
                 return {
@@ -1705,44 +2180,6 @@ class OpenAIConnectorMCPServer:
             }
         except Exception as e:
             logger.error(f"control_equipment failed: {e}")
-            return {"error": str(e)}
-
-    async def create_work_order(
-        self,
-        site_id: str,
-        equipment_id: str,
-        title: str,
-        description: str,
-        priority: str = "medium",
-        assigned_to: str | None = None,
-    ) -> dict[str, Any]:
-        """Create a new work order."""
-        repo = self._get_work_order_repo()
-        if not repo:
-            return {"error": "Work order service unavailable"}
-
-        try:
-            work_order_data = {
-                "title": title,
-                "description": description,
-                "priority": priority,
-                "site_id": site_id,
-                "equipment_code": equipment_id if equipment_id else None,
-                "assigned_to": assigned_to,
-                "created_by": "SENTINEL-MCP",
-            }
-            result = await repo.create_work_order(work_order_data)
-            if result:
-                return {
-                    "work_order_id": result.get("id"),
-                    "code": result.get("code"),
-                    "status": result.get("status", "scheduled"),
-                    "created_at": result.get("created_at"),
-                    "message": f"Work order {result.get('code')} created successfully",
-                }
-            return {"error": "Failed to create work order"}
-        except Exception as e:
-            logger.error(f"create_work_order failed: {e}")
             return {"error": str(e)}
 
     async def get_work_orders(
@@ -1846,6 +2283,12 @@ class OpenAIConnectorMCPServer:
             return await self.fetch(kwargs.get("id", ""))
         elif tool_name == "get_site_status":
             return await self.get_site_status(kwargs.get("site_id", ""))
+        elif tool_name == "get_recommendations":
+            return await self.get_recommendations(
+                kwargs.get("site_id", ""),
+                kwargs.get("limit", 5),
+                kwargs.get("status", "pending"),
+            )
         elif tool_name == "trace_recommendation":
             return await self.trace_recommendation(kwargs.get("recommendation_id", ""))
         elif tool_name == "inspect_equipment":
@@ -1856,19 +2299,23 @@ class OpenAIConnectorMCPServer:
             return await self.analyze_impact(kwargs.get("recommendation_id", ""))
         elif tool_name == "compare_sites":
             return await self.compare_sites(kwargs.get("metric", "status"))
+        elif tool_name == "get_curtailable_load":
+            return await self.get_curtailable_load(
+                kwargs.get("site_id", ""),
+                kwargs.get("min_priority", 3),
+                kwargs.get("include_zones", False),
+            )
+        elif tool_name == "get_odse_export":
+            return await self.get_odse_export(
+                kwargs.get("site_id", ""),
+                kwargs.get("start", ""),
+                kwargs.get("end", ""),
+                kwargs.get("equipment_id"),
+            )
         elif tool_name == "search_knowledge":
             return await self.search_knowledge(kwargs.get("query", ""), kwargs.get("doc_type"), kwargs.get("limit", 5))
         elif tool_name == "get_knowledge_detail":
             return await self.get_knowledge_detail(kwargs.get("topic", ""), kwargs.get("detail_level", "full"))
-        elif tool_name == "create_work_order":
-            return await self.create_work_order(
-                kwargs.get("site_id", ""),
-                kwargs.get("equipment_id", ""),
-                kwargs.get("title", ""),
-                kwargs.get("description", ""),
-                kwargs.get("priority", "medium"),
-                kwargs.get("assigned_to"),
-            )
         elif tool_name == "get_work_orders":
             return await self.get_work_orders(
                 kwargs.get("site_id", ""),
@@ -1877,24 +2324,8 @@ class OpenAIConnectorMCPServer:
             )
         elif tool_name == "get_work_order":
             return await self.get_work_order(kwargs.get("work_order_id", ""))
-        elif tool_name == "update_work_order":
-            return await self.update_work_order(
-                kwargs.get("work_order_id", ""),
-                kwargs.get("status"),
-                kwargs.get("notes"),
-            )
-        elif tool_name == "submit_complaint":
-            return await self.submit_complaint(
-                kwargs.get("desk_id", ""),
-                kwargs.get("complaint_type", ""),
-            )
-        elif tool_name == "control_equipment":
-            return await self.control_equipment(
-                kwargs.get("equipment_id", ""),
-                kwargs.get("point", ""),
-                kwargs.get("value", 0),
-                kwargs.get("reason", "MCP direct control"),
-            )
+        elif tool_name == "ping":
+            return await self.ping()
         else:
             raise ValueError(f"Unknown tool: {tool_name}")
 

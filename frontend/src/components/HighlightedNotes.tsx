@@ -69,7 +69,7 @@ const KEYWORD_CONFIG = {
       "verified",
       "inspected",
     ],
-    color: "var(--color-grafana-blue)",
+    color: "var(--color-sentinel-blue)",
     bg: "rgba(50, 116, 217, 0.2)",
     icon: Info,
     label: "Observation",
@@ -122,7 +122,7 @@ function highlightText(text: string): React.ReactNode[] {
       );
     } else {
       result.push(
-        <span key={index} style={{ color: "var(--color-grafana-text-primary)" }}>
+        <span key={index} style={{ color: "var(--color-sentinel-text-primary)" }}>
           {part}
         </span>
       );
@@ -181,20 +181,20 @@ export function HighlightedNotes({ notes }: HighlightedNotesProps) {
     <div
       className="rounded-lg overflow-hidden"
       style={{
-        background: "var(--color-grafana-bg-panel)",
-        border: "1px solid var(--color-grafana-border)",
+        background: "var(--color-sentinel-bg-panel)",
+        border: "1px solid var(--color-sentinel-border)",
       }}
     >
       {/* Header */}
       <div
         className="px-4 py-3 flex items-center justify-between"
-        style={{ borderBottom: "1px solid var(--color-grafana-border)" }}
+        style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}
       >
         <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4" style={{ color: "var(--color-grafana-text-secondary)" }} />
+          <FileText className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
           <h3
             className="font-semibold text-sm"
-            style={{ color: "var(--color-grafana-text-primary)" }}
+            style={{ color: "var(--color-sentinel-text-primary)" }}
           >
             Technician Notes Analysis
           </h3>
@@ -226,8 +226,8 @@ export function HighlightedNotes({ notes }: HighlightedNotesProps) {
       <div
         className="px-4 py-2 flex flex-wrap gap-4 text-xs"
         style={{
-          background: "var(--color-grafana-bg-secondary)",
-          borderBottom: "1px solid var(--color-grafana-border)",
+          background: "var(--color-sentinel-bg-secondary)",
+          borderBottom: "1px solid var(--color-sentinel-border)",
         }}
       >
         {Object.entries(KEYWORD_CONFIG).map(([category, config]) => {
@@ -244,7 +244,7 @@ export function HighlightedNotes({ notes }: HighlightedNotesProps) {
             </div>
           );
         })}
-        <span style={{ color: "var(--color-grafana-text-disabled)" }}>
+        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>
           — AI-detected indicators
         </span>
       </div>
@@ -259,18 +259,18 @@ export function HighlightedNotes({ notes }: HighlightedNotesProps) {
             <div key={index} className="flex gap-3">
               <div
                 className="flex-shrink-0 w-8 h-8 rounded flex items-center justify-center"
-                style={{ background: "var(--color-grafana-bg-secondary)" }}
+                style={{ background: "var(--color-sentinel-bg-secondary)" }}
               >
                 <FileText
                   className="h-4 w-4"
-                  style={{ color: "var(--color-grafana-text-disabled)" }}
+                  style={{ color: "var(--color-sentinel-text-disabled)" }}
                 />
               </div>
               <div className="flex-1 min-w-0">
                 {dateLabel && (
                   <div
                     className="text-xs mb-1"
-                    style={{ color: "var(--color-grafana-text-disabled)" }}
+                    style={{ color: "var(--color-sentinel-text-disabled)" }}
                   >
                     {dateLabel}
                   </div>
@@ -286,17 +286,17 @@ export function HighlightedNotes({ notes }: HighlightedNotesProps) {
       <div
         className="px-4 py-3"
         style={{
-          background: "var(--color-grafana-bg-secondary)",
-          borderTop: "1px solid var(--color-grafana-border)",
+          background: "var(--color-sentinel-bg-secondary)",
+          borderTop: "1px solid var(--color-sentinel-border)",
         }}
       >
         <div className="flex items-start gap-2">
           <Info
             className="h-4 w-4 flex-shrink-0 mt-0.5"
-            style={{ color: "var(--color-grafana-cyan)" }}
+            style={{ color: "var(--color-sentinel-cyan)" }}
           />
-          <p className="text-xs" style={{ color: "var(--color-grafana-text-secondary)" }}>
-            <strong style={{ color: "var(--color-grafana-cyan)" }}>AI Insight:</strong> The
+          <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            <strong style={{ color: "var(--color-sentinel-cyan)" }}>AI Insight:</strong> The
             highlighted keywords were automatically extracted by the AI model to identify
             progressive warning signs and maintenance patterns from unstructured technician notes.
           </p>

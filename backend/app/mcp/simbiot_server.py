@@ -115,13 +115,20 @@ def _calculate_site_health(devices: list[dict[str, Any]]) -> dict[str, Any]:
 # ============================================================================
 
 
-async def get_sites_tool(status_filter: str = "all", region: str | None = None) -> dict[str, Any]:
+async def get_sites_tool(
+    site_id: str | None = None,
+    status_filter: str = "all",
+    region: str | None = None,
+) -> dict[str, Any]:
     """
     List sites with status summary.
 
     MCP Tool: get_sites
 
     Args:
+        site_id: Optional site ID to filter to a single site.
+                 When provided, only that site's data is returned.
+                 When None, all sites are returned (caller must scope results).
         status_filter: Filter by status - "all", "critical", "warning", "healthy"
         region: Filter by region (e.g., "Gauteng", "Western Cape", "KwaZulu-Natal")
 
@@ -136,25 +143,25 @@ async def get_sites_tool(status_filter: str = "all", region: str | None = None) 
     if guard:
         return guard
 
-    sites = _load_sites()
+    all_sites = _load_sites()
     devices = _load_devices()
 
     # Group devices by site
     devices_by_site: dict[str, list[dict[str, Any]]] = {}
     for device in devices:
-        site_id = device.get("site_id", "unknown")
-        if site_id not in devices_by_site:
-            devices_by_site[site_id] = []
-        devices_by_site[site_id].append(device)
+        s = device.get("site_id", "unknown")
+        if s not in devices_by_site:
+            devices_by_site[s] = []
+        devices_by_site[s].append(device)
 
-    sites = []
-    for site in sites:
-        site_id = site.get("id")
-        site_devices = devices_by_site.get(site_id, [])
+    results = []
+    for site in all_sites:
+        site_id_val = site.get("id")
+        site_devices = devices_by_site.get(site_id_val, [])
         health_metrics = _calculate_site_health(site_devices)
 
-        site = {
-            "id": site_id,
+        result = {
+            "id": site_id_val,
             "name": site.get("name"),
             "address": site.get("address"),
             "region": site.get("region"),
@@ -169,17 +176,25 @@ async def get_sites_tool(status_filter: str = "all", region: str | None = None) 
             "optimization_enabled": site.get("optimization_enabled", False),
         }
 
+        # Apply site_id filter (BOLA prevention)
+        if site_id is not None and site_id_val != site_id:
+            continue
+
         # Apply region filter
         if region and site.get("region", "").lower() != region.lower():
             continue
 
         # Apply status filter
-        if (status_filter == "critical" and health_metrics["critical_alarms"] == 0) or (status_filter == "warning" and health_metrics["warnings"] == 0 and health_metrics["critical_alarms"] == 0) or (status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0)):
+        if (
+            (status_filter == "critical" and health_metrics["critical_alarms"] == 0)
+            or (status_filter == "warning" and health_metrics["warnings"] == 0 and health_metrics["critical_alarms"] == 0)
+            or (status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0))
+        ):
             continue
 
-        sites.append(site)
+        results.append(result)
 
-    return {"sites": sites, "total": len(sites), "filtered": len(sites)}
+    return {"sites": results, "total": len(results), "filtered": len(results)}
 
 
 async def get_assets_tool(
@@ -260,7 +275,11 @@ async def get_assets_tool(
     return {"assets": assets, "site_id": site_id, "total": len(assets)}
 
 
-async def get_asset_detail_tool(asset_id: str, include: list[str] | None = None) -> dict[str, Any]:
+async def get_asset_detail_tool(
+    asset_id: str,
+    site_id: str | None = None,
+    include: list[str] | None = None,
+) -> dict[str, Any]:
     """
     Get comprehensive asset details.
 
@@ -268,6 +287,8 @@ async def get_asset_detail_tool(asset_id: str, include: list[str] | None = None)
 
     Args:
         asset_id: Asset/device ID (required)
+        site_id: Site ID to validate asset belongs to (BOLA prevention).
+                 If provided, the asset's site_id must match or access is denied.
         include: Optional list of sections to include: "health_breakdown", "recent_alarms", "current_readings"
 
     Returns:
@@ -291,6 +312,13 @@ async def get_asset_detail_tool(asset_id: str, include: list[str] | None = None)
 
     if not device_data:
         return {"error": f"Asset {asset_id} not found", "asset": None}
+
+    # BOLA prevention: validate site ownership
+    if site_id is not None and device_data.get("site_id") != site_id:
+        return {
+            "error": f"Access denied to asset {asset_id} on site {site_id}",
+            "asset": None,
+        }
 
     metadata = device_data.get("metadata", {})
     location = device_data.get("device_location", {})
@@ -2640,6 +2668,21 @@ async def add_site_devices_tool(
                 eq_repo.upsert_many(supabase_equipment)
                 supabase_written = True
                 logger.info(f"Wrote {len(supabase_equipment)} equipment to Supabase for {site_id}")
+
+                for dev in new_devices:
+                    metadata = dev.get("metadata", {}) or {}
+                    mfr = metadata.get("manufacturer") if isinstance(metadata, dict) else None
+                    model_val = metadata.get("model") if isinstance(metadata, dict) else None
+                    if mfr and model_val:
+                        import asyncio
+                        asyncio.ensure_future(
+                            _populate_parts_background(
+                                equipment_code=dev["device_id"],
+                                equipment_type=dev.get("device_type", "").upper(),
+                                manufacturer=mfr,
+                                model=model_val,
+                            )
+                        )
     except Exception as e:
         logger.warning(f"Supabase equipment write failed, will use JSON only: {e}")
 
@@ -4628,6 +4671,41 @@ async def get_solar_diagnostics_tool(site_id: str | None = None) -> dict[str, An
     except Exception as e:
         logger.error(f"get_solar_diagnostics error: {e}")
         return {"error": str(e)}
+
+
+async def _populate_parts_background(
+    equipment_code: str,
+    equipment_type: str,
+    manufacturer: str,
+    model: str,
+) -> None:
+    """Background task to populate spare parts for newly onboarded equipment.
+
+    Fires after add_site_devices_tool saves equipment to Supabase.
+    Uses Firecrawl OEM scraping first, falls back to curated data.
+    """
+    try:
+        from app.database.repositories.equipment_repository import EquipmentRepository
+
+        eq = EquipmentRepository().get_by_id(equipment_code)
+        if not eq:
+            logger.warning("[PARTS] Equipment %s not found for parts population", equipment_code)
+            return
+
+        from app.services.spare_parts_service import populate_parts_for_equipment
+
+        count = await populate_parts_for_equipment(
+            equipment_id=eq["id"],
+            equipment_type=equipment_type.lower(),
+            manufacturer=manufacturer,
+            model=model,
+        )
+        if count:
+            logger.info("[ONBOARDING] Populated %d spare parts for %s", count, equipment_code)
+        else:
+            logger.info("[ONBOARDING] No spare parts found for %s", equipment_code)
+    except Exception as e:
+        logger.warning("[ONBOARDING] Parts population failed for %s: %s", equipment_code, e)
 
 
 # ============================================================================

@@ -135,12 +135,12 @@ estimated_read_time: 10
 
 ```
 message
-  ├── Pattern: /WO_<code>              -> handle_wo_command()
-  ├── Pattern: /WO_minor_<code>        -> handle_wo_minor_command()
-  ├── Pattern: /WO_major_<code>        -> handle_wo_major_command()
-  ├── Pattern: /WO_inspect_<code>      -> handle_wo_inspect_command()
-  ├── Pattern: /note_<code>            -> handle_note_command()
-  ├── Pattern: /info_<code>            -> handle_info_command()
+  ├── Pattern: /WO-<code>              -> handle_wo_command()
+  ├── Pattern: /WO-minor-<code>        -> handle_wo_minor_command()
+  ├── Pattern: /WO-major-<code>        -> handle_wo_major_command()
+  ├── Pattern: /WO-inspect-<code>      -> handle_wo_inspect_command()
+  ├── Pattern: /note-<code>            -> handle_note_command()
+  ├── Pattern: /info-<code>            -> handle_info_command()
   ├── Pattern: SR-XXXX-XXXXXX + "done" -> handle_work_order_initial()
   ├── Pattern: Desk complaint regex    -> diagnose_comfort_issue()
   ├── Active call log conversation     -> continue_call_log()
@@ -437,7 +437,7 @@ Format & return to user
 ```
 Sentry Bot (operator)
     |
-/WO_inspect_<code> command
+/WO-inspect-<code> command
     |
 POST /api/work-orders/supabase
     |

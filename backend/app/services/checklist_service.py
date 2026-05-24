@@ -17,9 +17,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import anthropic
+
+from app.config.settings import settings
 from app.database.repositories.checklist_template_repository import (
     get_checklist_template_repository,
 )
+from app.services.issue_classifier import CALL_LOG_TAXONOMY, classify_issue
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +201,99 @@ class ChecklistService:
             except Exception as e:
                 logger.warning(f"Supabase OEM template lookup failed: {e}")
         return None  # No OEM fallback in JSON
+
+    async def generate_checklist(
+        self,
+        equipment_type: str,
+        description: str = "",
+        fault_code: str | None = None,
+    ) -> dict[str, Any]:
+        """Generate a targeted inspection checklist for a specific issue.
+
+        Uses the 46-category issue taxonomy + optional fault code
+        to generate 4-8 specific checklist items via LLM.
+
+        Falls back to static template if LLM generation fails.
+        """
+        # Classify the issue using the taxonomy
+        issue = None
+        if description:
+            issue = classify_issue(description)
+
+        # Build LLM prompt
+        tax_hint = ""
+        if issue:
+            tax_hint = f"\nIssue category: {issue['discipline']} / {issue['sub_category']}"
+        fc_hint = f"\nFault code: {fault_code}" if fault_code else ""
+
+        # Get static template as fallback
+        fallback = self.get_template_for_inspection(equipment_type.lower(), "routine")
+
+        prompt = f"""Generate a targeted maintenance inspection checklist for a {equipment_type} with this issue.
+
+WO Description: {description}{tax_hint}{fc_hint}
+
+Return 4-8 specific checklist items as a JSON array. Each item must have:
+- "item_id": snake_case identifier
+- "question": short question the technician can answer yes/no or with a simple observation
+- "options": ["ok", "warning", "critical"] (the three standard statuses)
+- "category": short group name (e.g. "Drain", "Electrical", "Mechanical")
+- "item_type": "checklist"
+
+Focus on diagnosing and verifying THIS specific issue, not a general PM checklist.
+Each item should be a concrete physical check a technician can perform on-site.
+
+Return ONLY valid JSON, no other text."""
+
+        try:
+            client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+            resp = client.messages.create(
+                model=settings.claude_model or "claude-sonnet-4-20250514",
+                max_tokens=2000,
+                temperature=0.3,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = resp.content[0].text.strip()
+            # Strip markdown code fences if present
+            if text.startswith("```"):
+                text = text.split("\n", 1)[-1]
+                text = text.rsplit("\n", 1)[0] if text.endswith("```") else text
+            items = json.loads(text)
+            if not isinstance(items, list):
+                raise ValueError("LLM did not return a list")
+        except Exception as e:
+            logger.warning(f"[CHECKLIST] LLM generation failed for {equipment_type}: {e}")
+            if fallback:
+                return {
+                    "found": True,
+                    "equipment_type": equipment_type,
+                    "template_name": fallback.get("template_name", f"{equipment_type} Inspection"),
+                    "estimated_minutes": fallback.get("estimated_duration_minutes", 30),
+                    "items": fallback.get("checklist_items", []),
+                    "source": "static_fallback",
+                }
+            return {
+                "found": False,
+                "equipment_type": equipment_type,
+                "checklist_text": f"No inspection checklist available for {equipment_type}.",
+                "items": [],
+                "source": "none",
+            }
+
+        # Build response matching the same format as the endpoint expects
+        name = f"Targeted Inspection: {equipment_type}"
+        if issue:
+            name += f" ({issue['sub_category']})"
+
+        return {
+            "found": True,
+            "equipment_type": equipment_type,
+            "template_name": name,
+            "estimated_minutes": len(items) * 3,
+            "items": items,
+            "source": "generated",
+            "issue_classification": issue,
+        }
 
     def list_all_templates(self) -> list[dict[str, Any]]:
         """

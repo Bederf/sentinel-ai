@@ -23,32 +23,24 @@ class WhatsAppHandler:
         self.enabled = self.service.enabled
 
     def _load_technician_mapping(self) -> dict[str, dict[str, Any]]:
-        """Load technician WhatsApp phone numbers and details."""
+        """Load technician WhatsApp phone numbers from Supabase."""
         try:
-            # Try to load from config file
-            config_paths = [
-                "backend/app/data/technicians_whatsapp.json",
-                "/opt/bms-intelligence/backend/app/data/technicians_whatsapp.json",
-                "app/data/technicians_whatsapp.json",
-            ]
-
-            for config_path in config_paths:
-                if os.path.exists(config_path):
-                    with open(config_path) as f:
-                        data = json.load(f)
-                        mapping = {}
-                        for tech in data.get("technicians", []):
-                            mapping[tech["id"]] = {
-                                "phone": tech.get("whatsapp_number"),
-                                "name": tech.get("name", "Unknown"),
-                                "specialty": tech.get("specialty", "general"),
-                            }
-                        logger.info(f"Loaded {len(mapping)} technicians from {config_path}")
-                        return mapping
-
-            logger.warning("technicians_whatsapp.json not found, using local fallback data")
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            if client:
+                result = client.table("technicians").select("*").eq("active", True).execute()
+                if result.data:
+                    mapping = {}
+                    for tech in result.data:
+                        mapping[tech["code"]] = {
+                            "phone": tech.get("phone"),
+                            "name": tech.get("name", "Unknown"),
+                            "specialty": tech.get("specialty", "general"),
+                        }
+                    logger.info(f"Loaded {len(mapping)} technicians from Supabase")
+                    return mapping
+            logger.warning("Supabase unavailable for technician mapping")
             return {}
-
         except Exception as e:
             logger.error(f"Error loading technician mapping: {e}")
             return {}

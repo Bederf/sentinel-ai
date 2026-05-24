@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4.1-nano"  # Tier 1: fast/cheap for routine queries
     openai_model_heavy: str = "gpt-4.1-mini"  # Tier 2: complex reasoning & diagnostics
     openai_base_url: str = "https://api.openai.com/v1"
+    # OpenAI Realtime-2 voice (Path C surgical — replaces ElevenLabs STT only)
+    openai_realtime_api_key: str = ""
+    realtime_voice_enabled: bool = False
     local_ai_only: bool = False  # Force local-only AI mode (no Anthropic/Claude calls)
     popia_require_cross_border_consent: bool = True  # Block cloud LLM without explicit cross-border consent
     popia_dsr_sla_days: int = 30  # POPIA response SLA for data subject requests

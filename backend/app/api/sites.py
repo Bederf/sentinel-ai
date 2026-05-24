@@ -1564,6 +1564,15 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                 raise HTTPException(status_code=500, detail=f"Phase update failed: no rows affected for {site_id}")
             supabase_ok = True
             logger.info(f"Onboarding phase set to '{requested}' for {site_id} (Supabase)")
+
+            # Sync control_enabled with phase — control is only allowed in supervised+
+            CONTROL_ALLOWED = {"supervised", "automatic"}
+            new_control_enabled = requested in CONTROL_ALLOWED
+            try:
+                client.table("sites").update({"control_enabled": new_control_enabled}).eq("code", site_id).execute()
+                logger.info(f"control_enabled synced to {new_control_enabled} for {site_id} (phase={requested})")
+            except Exception as ctrl_err:
+                logger.warning(f"Failed to sync control_enabled for {site_id}: {ctrl_err}")
         except Exception as e:
             logger.error(f"Supabase phase update failed for {site_id}: {e}")
             raise HTTPException(status_code=500, detail=f"Supabase write failed: {e}") from e

@@ -9,7 +9,10 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
+import sys
 from datetime import datetime
+from pathlib import Path
+from typing import Optional
 
 from app.services.issue_classifier import (
     DISCIPLINE_TO_CATEGORY,
@@ -26,9 +29,77 @@ from app.services.telegram_message_sender import (
     InlineButton,
     InlineKeyboard,
     get_telegram_sender,
+    TelegramMessageSender,
 )
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Voice Response Integration
+# ---------------------------------------------------------------------------
+
+_VOICE_COORDINATOR: Optional["VoiceResponseCoordinator"] = None
+
+
+def _get_voice_coordinator():
+    """Lazy-load VoiceResponseCoordinator from sentry tools."""
+    global _VOICE_COORDINATOR
+    if _VOICE_COORDINATOR is None:
+        try:
+            sentry_tools = Path("/home/bederf/.sentry/tools")
+            if sentry_tools.exists():
+                sys.path.insert(0, str(sentry_tools))
+                from voice_response import VoiceResponseCoordinator
+
+                _VOICE_COORDINATOR = VoiceResponseCoordinator()
+                logger.info("VoiceResponseCoordinator loaded successfully")
+            else:
+                logger.warning("Sentry tools not found at %s", sentry_tools)
+        except Exception as e:
+            logger.warning("Failed to load VoiceResponseCoordinator: %s", e)
+    return _VOICE_COORDINATOR
+
+
+async def _send_response(
+    chat_id: str,
+    text: str,
+    sender: TelegramMessageSender,
+    keyboard: InlineKeyboard | None = None,
+    force_voice: bool = False,
+) -> None:
+    """Send a response, using voice if a trigger is detected or force_voice=True.
+
+    Args:
+        chat_id: Target Telegram chat ID
+        text: Response text
+        sender: TelegramMessageSender instance
+        keyboard: Optional inline keyboard
+        force_voice: If True, always generate voice (for auto-voice responses)
+    """
+    coordinator = _get_voice_coordinator()
+
+    voice_params: dict = {}
+    should_use_voice = force_voice
+
+    if coordinator and not force_voice:
+        analysis = coordinator.analyze_message_for_voice(text)
+        should_use_voice = analysis.get("should_use_voice", False)
+        voice_params = analysis.get("voice_params", {})
+
+    if should_use_voice and coordinator:
+        voice_name = voice_params.get("voice_name")
+        audio_path = coordinator.get_voice_response(text, voice_name=voice_name)
+
+        if audio_path and not isinstance(audio_path, dict):
+            try:
+                await sender.send_voice(chat_id, audio_path, caption=text[:200])
+                logger.debug("Voice response sent for chat %s", chat_id)
+                return
+            except Exception as e:
+                logger.warning("Voice send failed, falling back to text: %s", e)
+
+    # Fallback to text
+    await sender.send_text(chat_id, text, keyboard=keyboard)
 
 # ---------------------------------------------------------------------------
 # Category mapping for complaint buttons
@@ -227,9 +298,10 @@ async def handle_client_complaint(
                 session.current_step = 1
                 mgr.update_session(session)
                 # Skip category selection, ask for location
-                await sender.send_text(
+                await _send_response(
                     chat_id,
                     f"Got it -- <b>{classification['sub_category']}</b>.\n\nWhich floor or area is this on?",
+                    sender,
                 )
                 return
 
@@ -251,9 +323,10 @@ async def handle_client_complaint(
         )
         session.answers["original_text"] = text or ""
         mgr.update_session(session)
-        await sender.send_text(
+        await _send_response(
             chat_id,
             "Hi! I've picked up your message. What best describes the issue?",
+            sender,
             keyboard=kb,
         )
         return
@@ -275,22 +348,23 @@ async def handle_client_complaint(
                     break
 
         if not category:
-            await sender.send_text(
+            await _send_response(
                 chat_id,
                 "I didn't catch that. Please tap a button or type the category (e.g. 'plumbing', 'electrical').",
+                sender,
             )
             return
 
         session.answers["category"] = category
         session.current_step = 1
         mgr.update_session(session)
-        await sender.send_text(chat_id, "Which floor or area is this on?")
+        await _send_response(chat_id, "Which floor or area is this on?", sender)
         return
 
     # Step 2: Location received
     if session.current_step == 1:
         if not text:
-            await sender.send_text(chat_id, "Please type the floor or area (e.g. 'Level 2', 'kitchen').")
+            await _send_response(chat_id, "Please type the floor or area (e.g. 'Level 2', 'kitchen').", sender)
             return
 
         floor = extract_floor_from_message(text)
@@ -315,7 +389,7 @@ async def handle_client_complaint(
                 ],
             ]
         )
-        await sender.send_text(chat_id, "How long has this been happening?", keyboard=kb)
+        await _send_response(chat_id, "How long has this been happening?", sender, keyboard=kb)
         return
 
     # Step 3: Duration received
@@ -342,7 +416,7 @@ async def handle_client_complaint(
                     duration = "several_days"
 
         if not duration:
-            await sender.send_text(chat_id, "Please tap a button or describe how long this has been going on.")
+            await _send_response(chat_id, "Please tap a button or describe how long this has been going on.", sender)
             return
 
         session.answers["duration"] = duration
@@ -354,7 +428,7 @@ async def handle_client_complaint(
                 [InlineButton("Skip", "complaint:photo:skip")],
             ]
         )
-        await sender.send_text(chat_id, "Can you send a photo? (Optional)", keyboard=kb)
+        await _send_response(chat_id, "Can you send a photo? (Optional)", sender, keyboard=kb)
         return
 
     # Step 4: Photo or skip -> create WO
@@ -373,20 +447,22 @@ async def handle_client_complaint(
         wo_code = await _create_complaint_wo(session, priority)
 
         if wo_code:
-            await sender.send_text(
+            await _send_response(
                 chat_id,
                 f"Logged! Ref: <b>{wo_code}</b>\n"
                 f"Issue: {session.answers.get('category', 'general').title()}\n"
                 f"Location: {session.answers.get('location_text', 'Not specified')}\n"
                 "Our team has been notified.",
+                sender,
             )
         else:
-            await sender.send_text(
+            await _send_response(
                 chat_id,
                 "Your report has been logged.\n"
                 f"Issue: {session.answers.get('category', 'general').title()}\n"
                 f"Location: {session.answers.get('location_text', 'Not specified')}\n"
                 "Our team has been notified.",
+                sender,
             )
 
         mgr.end_session(chat_id)
@@ -421,9 +497,10 @@ async def handle_technician_report(
             session = mgr.create_session(chat_id, TelegramIntent.TECHNICIAN_REPORT, "technician_report")
             session.current_step = -1  # waiting for equipment ID
             mgr.update_session(session)
-            await sender.send_text(
+            await _send_response(
                 chat_id,
                 "Which equipment are you inspecting? Please provide the equipment code (e.g. S002-AHU-L2-001).",
+                sender,
             )
             return
 
@@ -442,14 +519,15 @@ async def handle_technician_report(
     # Waiting for equipment ID
     if session.current_step == -1:
         if not text:
-            await sender.send_text(chat_id, "Please type the equipment code.")
+            await _send_response(chat_id, "Please type the equipment code.", sender)
             return
 
         m = _EQUIPMENT_ID_RE.search(text)
         if not m:
-            await sender.send_text(
+            await _send_response(
                 chat_id,
                 "I couldn't find an equipment code in that. Please use the format S002-AHU-L2-001.",
+                sender,
             )
             return
 
@@ -542,7 +620,7 @@ async def handle_technician_report(
         mgr.update_session(session)
 
         kb = InlineKeyboard(rows=[[InlineButton(label, cb) for label, cb in followup["options"]]])
-        await sender.send_text(chat_id, followup["question"], keyboard=kb)
+        await _send_response(chat_id, followup["question"], sender, keyboard=kb)
         return
 
     # Non-Good answer without follow-up: auto-create WO
@@ -571,7 +649,7 @@ async def _send_checklist_question(chat_id: str, session: ConversationSession, i
     kb = InlineKeyboard(rows=[[InlineButton(label, cb) for label, cb in q["options"]]])
 
     header = f"<b>{session.equipment_id}</b>\n\n" if index == 0 else ""
-    await sender.send_text(chat_id, f"{header}{q['question']}", keyboard=kb)
+    await _send_response(chat_id, f"{header}{q['question']}", sender, keyboard=kb)
 
 
 async def _send_inspection_summary(chat_id: str, session: ConversationSession) -> None:
@@ -608,7 +686,7 @@ async def _send_inspection_summary(chat_id: str, session: ConversationSession) -
         for code in session.wo_codes:
             lines.append(f"  {code}")
 
-    await sender.send_text(chat_id, "\n".join(lines))
+    await _send_response(chat_id, "\n".join(lines), sender)
 
 
 # ===================================================================
@@ -641,19 +719,29 @@ async def handle_wo_update(
                 "blocked": "Blocked",
             }.get(status_value, status_value)
 
-            await sender.send_text(
+            await _send_response(
                 chat_id,
                 f"<b>{session.wo_id}</b> updated to: {status_label}",
+                sender,
             )
             mgr.end_session(chat_id)
+        return
+
+    # Handle "Create Work Order" button from advisory notifications
+    if callback_data and callback_data.startswith("wo:rec_id:"):
+        rec_uuid = callback_data.split(":")[-1]
+        if message_id:
+            await sender.edit_message_reply_markup(chat_id, message_id)
+        await _handle_create_wo_from_rec(chat_id, rec_uuid, sender)
         return
 
     # Extract WO number
     wo_match = _WO_RE.search(text or "")
     if not wo_match:
-        await sender.send_text(
+        await _send_response(
             chat_id,
             "I couldn't find a work order number. Please include the WO reference (e.g. WO-2026-0045).",
+            sender,
         )
         return
 
@@ -661,7 +749,7 @@ async def handle_wo_update(
     wo_data = await _lookup_wo(wo_code)
 
     if not wo_data:
-        await sender.send_text(chat_id, f"Work order <b>{wo_code}</b> not found.")
+        await _send_response(chat_id, f"Work order <b>{wo_code}</b> not found.", sender)
         return
 
     # Check if text contains "done"/"completed"
@@ -671,7 +759,7 @@ async def handle_wo_update(
     if has_done:
         # Quick complete
         await _update_wo_status(wo_code, "completed")
-        await sender.send_text(chat_id, f"<b>{wo_code}</b> marked as completed.")
+        await _send_response(chat_id, f"<b>{wo_code}</b> marked as completed.", sender)
         return
 
     # Show WO summary with status buttons
@@ -696,7 +784,69 @@ async def handle_wo_update(
             ],
         ]
     )
-    await sender.send_text(chat_id, summary, keyboard=kb)
+    await _send_response(chat_id, summary, sender, keyboard=kb)
+
+
+# ===================================================================
+# Advisory WO Creation (from "Create Work Order" button on advisory notifications)
+# ===================================================================
+
+
+async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> None:
+    """Create a work order from an advisory recommendation's UUID."""
+    from app.database.repositories.work_order_repository import WorkOrderRepository
+
+    sb = get_supabase_client()
+    if not sb:
+        await _send_response(chat_id, "Database unavailable. Please try again.", sender)
+        return
+
+    # Load the recommendation record
+    rec_result = sb.table("recommendations").select("*").eq("id", rec_uuid).execute()
+    if not rec_result.data:
+        await _send_response(chat_id, "Recommendation not found. It may have already been actioned.", sender)
+        return
+
+    rec = rec_result.data[0]
+    target = rec.get("target_equipment", "")
+    action = rec.get("action") or {}
+    point = action.get("point", "") or rec.get("action_type", "adjustment")
+    value = action.get("value", "")
+    reason = rec.get("reason", "") or rec.get("description", "")
+    priority = rec.get("priority", "medium")
+
+    # Build description from recommendation
+    description = (
+        f"SENTINEL Advisory — AI Optimization Recommendation\n\n"
+        f"Equipment: {target}\n"
+        f"Action: Set {point} to {value}\n\n"
+        f"Reason: {reason[:500]}\n\n"
+        f"Recommendation ID: {rec_uuid}"
+    )
+
+    wo_data = {
+        "title": f"AI Optimization: {target} — {point}",
+        "description": description,
+        "priority": priority,
+        "status": "scheduled",
+        "created_by": "sentinel:telegram:advisory_wo",
+        "equipment_id": target,
+        "recommendation_id": rec_uuid,
+    }
+
+    repo = WorkOrderRepository()
+    created = repo.create_work_order(wo_data)
+    if not created:
+        await _send_response(chat_id, "Failed to create work order. Please try again.", sender)
+        return
+
+    wo_code = created.get("code") or created.get("id", "unknown")
+    await _send_response(
+        chat_id,
+        f"Work order <b>{wo_code}</b> created for {target}.\n"
+        "A technician will be assigned shortly.",
+        sender,
+    )
 
 
 # ===================================================================
@@ -719,12 +869,12 @@ async def handle_adhoc_fault(
         session = mgr.create_session(chat_id, TelegramIntent.AD_HOC_FAULT, "ad_hoc_fault")
         session.answers["original_text"] = text or ""
         mgr.update_session(session)
-        await sender.send_text(chat_id, "Where is this? (floor, area, or desk number)")
+        await _send_response(chat_id, "Where is this? (floor, area, or desk number)", sender)
         return
 
     # Step 1: Location received -> create WO
     if not text:
-        await sender.send_text(chat_id, "Please type the location.")
+        await _send_response(chat_id, "Please type the location.", sender)
         return
 
     floor = extract_floor_from_message(text)
@@ -744,14 +894,16 @@ async def handle_adhoc_fault(
     wo_code = await _create_complaint_wo(session, "medium", category_override=category)
 
     if wo_code:
-        await sender.send_text(
+        await _send_response(
             chat_id,
             f"Logged! Work order <b>{wo_code}</b> created.\nLocation: {text}\n\nSomeone will look into it.",
+            sender,
         )
     else:
-        await sender.send_text(
+        await _send_response(
             chat_id,
             f"Logged your report for: {text}\nA work order will be created shortly.",
+            sender,
         )
 
     mgr.end_session(chat_id)
@@ -778,9 +930,10 @@ async def handle_unknown(
             [InlineButton("Check work order", "menu:start:wo_check")],
         ]
     )
-    await sender.send_text(
+    await _send_response(
         chat_id,
         "Hi! How can I help?\n\nTap an option below or describe your issue.",
+        sender,
         keyboard=kb,
     )
 
@@ -801,12 +954,12 @@ async def handle_ghost_room(
     sender = get_telegram_sender()
 
     if not callback_data:
-        await sender.send_text(chat_id, "Invalid button press.")
+        await _send_response(chat_id, "Invalid button press.", sender)
         return
 
     parts = callback_data.split(":")
     if len(parts) != 3 or parts[0] != "ghost":
-        await sender.send_text(chat_id, "Unknown ghost room action.")
+        await _send_response(chat_id, "Unknown ghost room action.", sender)
         return
 
     action, finding_id = parts[1], parts[2]
@@ -814,7 +967,7 @@ async def handle_ghost_room(
     # Look up finding
     finding = occupancy_store.get_ghost_finding_by_id(finding_id)
     if not finding:
-        await sender.send_text(chat_id, "Finding not found or already resolved.")
+        await _send_response(chat_id, "Finding not found or already resolved.", sender)
         return
 
     confirmed_by = f"telegram:{chat_id}"
@@ -839,7 +992,7 @@ async def handle_ghost_room(
         status_text = "empty"
 
     if updated is None:
-        await sender.send_text(chat_id, f"{finding.room_code} was already resolved.")
+        await _send_response(chat_id, f"{finding.room_code} was already resolved.", sender)
         return
 
     # Update inline buttons to show selection
@@ -854,9 +1007,10 @@ async def handle_ghost_room(
     with contextlib.suppress(Exception):
         await sender.edit_message_reply_markup(chat_id, message_id, keyboard=None)
 
-    await sender.send_text(
+    await _send_response(
         chat_id,
         f"Recorded: {finding.room_code} marked {status_text}. Thank you!",
+        sender,
     )
 
     # Mark related signal resolved
@@ -881,12 +1035,12 @@ async def handle_focus_room(
     sender = get_telegram_sender()
 
     if not callback_data:
-        await sender.send_text(chat_id, "Invalid button press.")
+        await _send_response(chat_id, "Invalid button press.", sender)
         return
 
     parts = callback_data.split(":")
     if len(parts) != 3 or parts[0] != "focus":
-        await sender.send_text(chat_id, "Unknown focus room action.")
+        await _send_response(chat_id, "Unknown focus room action.", sender)
         return
 
     action, room_code = parts[1], parts[2]
@@ -938,9 +1092,10 @@ async def handle_focus_room(
     with contextlib.suppress(Exception):
         await sender.edit_message_reply_markup(chat_id, message_id, keyboard=None)
 
-    await sender.send_text(
+    await _send_response(
         chat_id,
         f"Recorded: {room_code} marked {status_text}. Thank you!",
+        sender,
     )
 
 
@@ -985,9 +1140,10 @@ async def _handle_checklist_reply(
     if not session:
         # Session expired
         sender = get_telegram_sender()
-        await sender.send_text(
+        await _send_response(
             chat_id,
             "Your previous session has expired. Let's start fresh.",
+            sender,
         )
         await handle_unknown(chat_id, text, callback_data, message_id)
         return
@@ -1119,9 +1275,6 @@ async def _create_complaint_wo(
             except Exception as e:
                 logger.warning("Complaint WO notification failed: %s", e)
 
-        # Notify manager (FM) via Telegram — direct send bypassing technician routing
-        await _notify_manager_of_complaint_wo(wo_code, title, category, location, priority, str(wo_uuid) if wo_uuid else None)
-
         # Email facilities desk
         await _email_facilities_desk(wo_code, title, category, location, priority, description)
 
@@ -1249,7 +1402,7 @@ async def _handle_staff_wo_status(
     # Extract WO code from message (e.g., "/status_WO-2026-0004" -> "WO-2026-0004")
     m = re.match(r"^/status_WO[-_]\s*([A-Za-z0-9][\w-]*)\s*$", text.strip(), re.DOTALL)
     if not m:
-        await sender.send_text(chat_id, "Usage: /status_WO-{code} (e.g. /status_WO-2026-0004)")
+        await _send_response(chat_id, "Usage: /status_WO-{code} (e.g. /status_WO-2026-0004)", sender)
         return
 
     raw_code = m.group(1).strip()
@@ -1277,9 +1430,10 @@ async def _handle_staff_wo_status(
         data = {}
 
     if not data.get("found"):
-        await sender.send_text(
+        await _send_response(
             chat_id,
             f"Couldn't find work order `{wo_code}`. Please check the reference number and try again.",
+            sender,
         )
         return
 
@@ -1319,7 +1473,7 @@ async def _handle_staff_wo_status(
     if notes:
         lines.append(f"**Notes:** {notes}")
 
-    await sender.send_text(chat_id, "\n".join(lines))
+    await _send_response(chat_id, "\n".join(lines), sender)
 
 
 async def _notify_manager_of_complaint_wo(

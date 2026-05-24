@@ -6,8 +6,11 @@
  * Navy (#1A2B4C), Amber (#F59E0B), Green (#10B981), Red (#DC2626), Blue (#3B82F6)
  */
 
-/* Google Fonts - Inter, JetBrains Mono, Matrix Theme Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
+/* Google Fonts - loaded per-theme to reduce initial payload
+ * Inter + JetBrains Mono: sentinel, ops, glass themes
+ * Share Tech Mono + Orbitron: matrix theme
+ * Syne: teal theme
+ */
 
 /* Default SENTINEL theme tokens must exist as actual CSS variables at runtime.
  * Tailwind v4's @theme block does not guarantee emission of custom app tokens
@@ -597,14 +600,14 @@
 
   /* Button styles */
   .btn-primary {
-    background: linear-gradient(180deg, var(--color-grafana-blue) 0%, #2961bd 100%);
+    background: linear-gradient(180deg, var(--color-sentinel-blue) 0%, color-mix(in srgb, var(--color-sentinel-blue) 70%, black) 100%);
     color: white;
     border: none;
     @apply px-4 py-2 rounded transition-all font-medium;
   }
 
   .btn-primary:hover {
-    background: linear-gradient(180deg, #3b85e6 0%, var(--color-grafana-blue) 100%);
+    background: linear-gradient(180deg, var(--color-sentinel-blue-light) 0%, var(--color-sentinel-blue) 100%);
   }
 
   .btn-secondary {

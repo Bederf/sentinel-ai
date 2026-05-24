@@ -7,14 +7,23 @@
  */
 
 import { WorkOrderHistoryList } from './WorkOrderHistoryList';
+import { EquipmentPartsList } from './EquipmentPartsList';
 
 interface MaintenanceHistoryTabsProps {
   equipmentId: string;
+  equipmentCode?: string;
 }
 
-export function MaintenanceHistoryTabs({ equipmentId }: MaintenanceHistoryTabsProps) {
+export function MaintenanceHistoryTabs({ equipmentId, equipmentCode }: MaintenanceHistoryTabsProps) {
   return (
     <div>
+      {/* Spare Parts */}
+      {equipmentCode && (
+        <div className="mb-4">
+          <EquipmentPartsList equipmentCode={equipmentCode} />
+        </div>
+      )}
+
       {/* Title */}
       <h3
         className="text-sm font-semibold mb-3"

@@ -492,11 +492,11 @@ class NotificationService:
         requested_by_telegram_id: str,
     ) -> dict:
         """Create a work order from an AI optimization recommendation callback."""
-        parts = callback_data.split(":", 1)
-        if len(parts) != 2 or parts[0] != "wo" or not parts[1]:
+        if not callback_data.startswith("wo:"):
             return {"success": False, "error": "invalid_callback_data"}
 
-        recommendation_id = parts[1]
+        # callback_data format: wo:rec_id:{uuid} or wo:{uuid}
+        recommendation_id = callback_data.split(":")[-1]
 
         try:
             from app.database.repositories.recommendation_repository import get_recommendation_repository
@@ -550,7 +550,37 @@ class NotificationService:
                 }
 
             equipment_code = rec.target_equipment
-            if equipment_code:
+            action = rec.action or {}
+            action_point = action.get("point")
+            action_value = action.get("value")
+
+            if equipment_code and action_point and action_value is not None:
+                # Tier 1: Exact dedup — same equipment + point + value → block duplicate
+                exact_match = await work_order_repo.get_open_for_equipment_action(
+                    equipment_code=equipment_code,
+                    action_point=action_point,
+                    action_value=str(action_value),
+                )
+                if exact_match:
+                    return {
+                        "success": True,
+                        "action": "duplicate_work_order_exists",
+                        "recommendation_id": recommendation_id,
+                        "work_order": exact_match,
+                    }
+
+                # Tier 2: Same equipment + same point (different value) → allow
+                # (conditions changed, new target is valid)
+                open_wos = await work_order_repo.get_open_work_orders_for_equipment(equipment_code)
+                if open_wos:
+                    return {
+                        "success": True,
+                        "action": "open_work_order_exists",
+                        "recommendation_id": recommendation_id,
+                        "work_order": open_wos[0],
+                    }
+            elif equipment_code:
+                # No specific point/value — fall back to equipment-level dedup (legacy)
                 open_wos = await work_order_repo.get_open_work_orders_for_equipment(equipment_code)
                 if open_wos:
                     return {
@@ -560,13 +590,10 @@ class NotificationService:
                         "work_order": open_wos[0],
                     }
 
-            action = rec.action or {}
             impact = rec.expected_impact or {}
-            point = action.get("point") or "recommended adjustment"
-            value = action.get("value")
-            unit = impact.get("unit") or ""
+            unit = impact.get("unit", "")
             current_value = impact.get("current_value")
-            recommended_value = impact.get("recommended_value", value)
+            recommended_value = impact.get("recommended_value", action_value)
             current_line = (
                 f"Current value: {current_value}{unit}\n"
                 if current_value is not None
@@ -576,12 +603,31 @@ class NotificationService:
             description = (
                 f"Created from SENTINEL AI advisory recommendation {recommendation_id}.\n\n"
                 f"Equipment: {equipment_code or 'Unknown'}\n"
-                f"Action: Set {point} to {recommended_value}{unit}\n"
+                f"Action: Set {action_point or 'recommended adjustment'} to {recommended_value}{unit}\n"
                 f"{current_line}"
                 f"Goal: {(rec.profile or 'optimization').replace('_', ' ').title()}\n"
                 f"Confidence: {round((rec.confidence_score or rec.get_numeric_confidence()) * 100)}%\n\n"
                 f"Reason:\n{rec.reason}"
             )
+
+            # Lookup technician by specialty BEFORE creating the WO (so assigned_to is persisted)
+            tech_telegram_id = None
+            tech_email = None
+            tech_name = None
+            assigned_to = None
+            assigned_team = None
+            try:
+                from app.database.repositories.technician_repository import TechnicianRepository
+                tech_repo = TechnicianRepository()
+                technician = await tech_repo.get_technician_for_equipment_code(equipment_code)
+                if technician:
+                    tech_name = technician.get("name", "Unassigned")
+                    tech_telegram_id = technician.get("telegram_chat_id") or technician.get("telegram_id")
+                    tech_email = technician.get("email")
+                    assigned_to = tech_name
+                    assigned_team = technician.get("specialty")
+            except Exception as tech_err:
+                logger.warning("[CERTIFIED] Could not find technician for %s: %s", equipment_code, tech_err)
 
             created_wo = await work_order_repo.create_work_order(
                 {
@@ -594,6 +640,11 @@ class NotificationService:
                     "created_by": "SENTINEL_AI_RECOMMENDATION",
                     "milestone_status": "assigned",
                     "estimated_duration_hours": 1,
+                    "assigned_to": assigned_to,
+                    "assigned_team": assigned_team,
+                    "action_point": action_point,
+                    "action_value": str(action_value) if action_value is not None else None,
+                    "recommendation_id": recommendation_id,
                 }
             )
 
@@ -616,11 +667,36 @@ class NotificationService:
                 recommendation_id,
                 requested_by_telegram_id,
             )
+
+            # Notify assigned technician via WorkOrderNotifier (technician bot, not FM bot)
+            wo_code = created_wo.get("code")
+            priority = created_wo.get("priority", "medium")
+            if wo_code:
+                from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+                notifier = WorkOrderNotifier()
+                wo_notify_data = {
+                    "work_order_id": created_wo.get("id"),
+                    "code": wo_code,
+                    "site_id": rec.site_id,
+                    "equipment_code": equipment_code,
+                    "equipment_name": equipment_code,
+                    "criticality": (priority or "medium").upper(),
+                    "service_type": "callout",
+                    "technician_id": tech_telegram_id,
+                    "technician_name": tech_name or "Pending",
+                    "description": description,
+                    "technician_email": tech_email,
+                    "create_service_record": False,
+                }
+                asyncio.create_task(notifier.notify_technician(wo_notify_data))
+
             return {
                 "success": True,
                 "action": "work_order_created",
                 "recommendation_id": recommendation_id,
                 "work_order": created_wo,
+                "equipment_code": equipment_code,
             }
         except Exception as e:
             logger.warning("[CERTIFIED] Failed to create work order from %s: %s", recommendation_id, e)
@@ -899,6 +975,61 @@ class NotificationService:
             )
         except Exception as e:
             logger.warning(f"[CERTIFIED] Escalation check failed for {notification_id}: {e}")
+
+    async def _notify_technician(
+        self,
+        wo_code: str,
+        equipment_code: str,
+        tech_telegram_id: str | None,
+        tech_email: str | None,
+        tech_name: str | None,
+        priority: str = "medium",
+    ) -> None:
+        """Send Telegram + email notification to the assigned technician.
+
+        Mirrors slash_command_router._notify_technician for work orders created
+        from AI advisory button presses.
+        """
+        code_underscored = equipment_code.replace("-", "_")
+
+        # --- Telegram via sentry CLI ---
+        if tech_telegram_id:
+            from app.services.telegram_message_sender import get_telegram_sender
+
+            sender = get_telegram_sender()
+            assigned = tech_name or "Pending"
+            msg = (
+                f"Work Order Created #{wo_code}\n"
+                f"Assigned: {assigned}\n"
+                f"Priority: {priority.upper()}"
+            )
+            try:
+                await sender.send_text(chat_id=str(tech_telegram_id), text=msg)
+                logger.info("Telegram sent to %s for %s", tech_telegram_id, wo_code)
+            except Exception as exc:
+                logger.warning("Telegram notification failed for %s: %s", wo_code, exc)
+
+        # --- Email via SMTP (workorder@sentinel-ai.co.za) ---
+        if tech_email:
+            try:
+                from app.services.email_reply_service import get_email_reply_service
+
+                svc = get_email_reply_service()
+                if svc.is_configured():
+                    subject = f"SENTINEL {wo_code} — Work Order"
+                    result = await svc.send_reply(
+                        to_email=tech_email,
+                        to_name=tech_name,
+                        subject=subject,
+                        body_plain=f"Work Order Created #{wo_code}\nAssigned: {tech_name or 'Pending'}\nPriority: {priority.upper()}\n\nPlease acknowledge receipt.",
+                        body_html=None,
+                    )
+                    if result.sent:
+                        logger.info("Email sent to %s for %s", tech_email, wo_code)
+                    else:
+                        logger.warning("SMTP send failed for %s: %s", wo_code, result.error)
+            except Exception as exc:
+                logger.warning("Email notification failed for %s: %s", wo_code, exc)
 
     async def _escalate(
         self,
