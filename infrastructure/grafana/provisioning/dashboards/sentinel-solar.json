@@ -256,7 +256,7 @@
         {
           "refId": "A",
           "expr": "sentinel_solar_pv_generation_kw or vector(0)",
-          "legendFormat": "{{panel_group}} ({{site_id}})"
+          "legendFormat": "kW"
         }
       ],
       "fieldConfig": {
@@ -291,7 +291,7 @@
         {
           "refId": "A",
           "expr": "sentinel_bess_current_charge_kw or vector(0)",
-          "legendFormat": "{{bess_unit}} ({{site_id}})"
+          "legendFormat": "kW"
         }
       ],
       "fieldConfig": {
@@ -326,7 +326,7 @@
         {
           "refId": "A",
           "expr": "rate(sentinel_solar_total_generation_kwh_total[1h]) * 1000 or vector(0)",
-          "legendFormat": "{{site_id}}"
+          "legendFormat": "kWh"
         }
       ],
       "fieldConfig": {
@@ -361,7 +361,7 @@
         {
           "refId": "A",
           "expr": "rate(sentinel_solar_export_kwh_total[1h]) * 1000 or vector(0)",
-          "legendFormat": "Export {{site_id}}"
+          "legendFormat": "Export kWh"
         }
       ],
       "fieldConfig": {
