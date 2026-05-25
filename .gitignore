@@ -114,3 +114,4 @@ backend/app/data/policies/
 backend/app/data/bacnet_audit/*.jsonl
 .serena/
 site_id Building Document Sub Class Docu.tsv
+*.bak
