@@ -165,7 +165,7 @@ export function OverviewCockpitHost({
   onMainTabChange,
   isModuleActive,
 }: OverviewCockpitHostProps) {
-  const { payload, hvacOverview, energyTelemetry, lastUpdatedAt } = useBuildingStatePayload(siteId)
+  const { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt } = useBuildingStatePayload(siteId)
   const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
   const [modelReadiness, setModelReadiness] = useState<ModelReadiness | null>(null)
 

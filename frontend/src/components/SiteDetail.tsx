@@ -320,29 +320,10 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         } as SiteDetailData);
         setSitePhase((siteData.onboarding_phase as OnboardingPhase) ?? "shadow");
 
-        // Live runtime bridge status: status/telemetry endpoints are source of truth
-        // over possibly stale persisted bridge_* metadata.
-        // Use authorizedFetch for consistent auth with refresh interceptor
-        const authHeaders: Record<string, string> = {};
-        const token = getAccessToken();
-        if (token) authHeaders["Authorization"] = `Bearer ${token}`;
-        try {
-          const [statusRes, telemetryRes] = await Promise.all([
-            fetch(`/api/sites/${encodeURIComponent(siteId)}/status`, { headers: authHeaders }),
-            fetch(`/api/sites/${encodeURIComponent(siteId)}/telemetry`, { headers: authHeaders }),
-          ]);
-          const statusJson = statusRes.ok ? await statusRes.json() : null;
-          const telemetryJson = telemetryRes.ok ? await telemetryRes.json() : null;
-          const statusConnected = Boolean(statusJson?.site_available) && Boolean(statusJson?.telemetry_fresh);
-          const telemetryConnected = telemetryRes.ok && Boolean(telemetryJson?.timestamp);
-          setLiveBridgeConnected(statusConnected || telemetryConnected);
-          setLiveBridgeLastSync(telemetryJson?.timestamp ?? statusJson?.last_telemetry_at ?? null);
-          setLiveBridgeSource(telemetryJson?.source_mode === "live" ? "remote_bridge" : (siteData.bridge_data_source ?? null));
-        } catch {
-          setLiveBridgeConnected(null);
-          setLiveBridgeLastSync(null);
-          setLiveBridgeSource(null);
-        }
+        // Bridge status from site data (status/telemetry endpoints were removed with Cloudflare Worker)
+        setLiveBridgeConnected(siteData.sentinel_processing_enabled ? true : null);
+        setLiveBridgeLastSync(siteData.last_telemetry_at ?? null);
+        setLiveBridgeSource(siteData.bridge_data_source ?? null);
 
         // When SENTINEL is off, don't pull any BMS data
         if (siteData.sentinel_processing_enabled === false) {
