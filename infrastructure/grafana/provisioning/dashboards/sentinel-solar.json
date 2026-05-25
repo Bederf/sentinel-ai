@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(245, 135, 30, 0.59)",
@@ -12,7 +15,7 @@
       }
     ]
   },
-  "description": "SENTINEL Solar & BESS monitoring — PV generation, battery state of charge, self-consumption, export.",
+  "description": "SENTINEL Solar & BESS monitoring \u2014 PV generation, battery state of charge, self-consumption, export.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -23,15 +26,66 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}", "legendFormat": "{{instance}}" }],
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
-          "color": { "mode": "thresholds" },
-          "mappings": [{ "type": "value", "options": { "0": { "text": "Down", "color": "#ef4444" } } }, { "type": "value", "options": { "1": { "text": "Up", "color": "#10b981" } } }],
-          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.15)" }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "#ef4444"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up",
+                  "color": "#10b981"
+                }
+              }
+            }
+          ],
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
         }
       }
     },
@@ -39,16 +93,48 @@
       "id": 2,
       "title": "PV Generation",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 3, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sum(sentinel_solar_pv_generation_kw) or vector(0)", "legendFormat": "kW" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 3,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_solar_pv_generation_kw) or vector(0)",
+          "legendFormat": "kW"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#f59e0b", "value": null }, { "color": "#10b981", "value": 5 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#f59e0b",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 5
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "unit": "kwatth",
           "decimals": 2,
-          "sparkline": { "displayMode": "area", "lineColor": "#f59e0b", "fillColor": "rgba(245, 158, 11, 0.15)" }
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.15)"
+          }
         }
       }
     },
@@ -56,16 +142,48 @@
       "id": 3,
       "title": "Self-Consumption",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 5, "x": 8, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "avg(sentinel_solar_self_consumption_percent) or vector(0)", "legendFormat": "Avg %" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(sentinel_solar_self_consumption_percent) or vector(0)",
+          "legendFormat": "Avg %"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 50 }, { "color": "#10b981", "value": 75 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 50
+              },
+              {
+                "color": "#10b981",
+                "value": 75
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 1
         }
       }
@@ -74,16 +192,48 @@
       "id": 4,
       "title": "BESS State of Charge",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 5, "x": 13, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "avg(sentinel_bess_state_of_charge_percent) or vector(0)", "legendFormat": "SoC %" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 13,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(sentinel_bess_soc_percent) or vector(0)",
+          "legendFormat": "SoC %"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 20 }, { "color": "#10b981", "value": 50 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 20
+              },
+              {
+                "color": "#10b981",
+                "value": 50
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 1
         }
       }
@@ -92,14 +242,33 @@
       "id": 5,
       "title": "PV Generation",
       "type": "timeseries",
-      "gridPos": { "h": 9, "w": 14, "x": 0, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_solar_pv_generation_kw", "legendFormat": "{{panel_group}} ({{site_id}})" }],
+      "gridPos": {
+        "h": 9,
+        "w": 14,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_solar_pv_generation_kw or vector(0)",
+          "legendFormat": "{{panel_group}} ({{site_id}})"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 2
         }
       }
@@ -108,14 +277,33 @@
       "id": 6,
       "title": "BESS Charge / Discharge",
       "type": "timeseries",
-      "gridPos": { "h": 9, "w": 10, "x": 14, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_bess_current_charge_kw", "legendFormat": "{{bess_unit}} ({{site_id}})" }],
+      "gridPos": {
+        "h": 9,
+        "w": 10,
+        "x": 14,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_bess_current_charge_kw or vector(0)",
+          "legendFormat": "{{bess_unit}} ({{site_id}})"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 2
         }
       }
@@ -124,14 +312,33 @@
       "id": 7,
       "title": "Total Generation",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "rate(sentinel_solar_total_generation_kwh_total[1h]) * 1000", "legendFormat": "{{site_id}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(sentinel_solar_total_generation_kwh_total[1h]) * 1000 or vector(0)",
+          "legendFormat": "{{site_id}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": { "lineWidth": 1, "fillOpacity": 28 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 28
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 1
         }
       }
@@ -140,14 +347,33 @@
       "id": 8,
       "title": "Export vs Self-Consumption",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "rate(sentinel_solar_export_kwh_total[1h]) * 1000", "legendFormat": "Export {{site_id}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(sentinel_solar_export_kwh_total[1h]) * 1000 or vector(0)",
+          "legendFormat": "Export {{site_id}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "kwatth",
-          "custom": { "lineWidth": 1, "fillOpacity": 28 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 28
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 1
         }
       }
@@ -156,28 +382,77 @@
       "id": 9,
       "title": "BESS Charge Cycles",
       "type": "stat",
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 13 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sum(sentinel_bess_charge_cycles) or vector(0)", "legendFormat": "Cycles" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 13
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_bess_charge_cycles) or vector(0)",
+          "legendFormat": "Cycles"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 1000 }, { "color": "#ef4444", "value": 5000 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 1000
+              },
+              {
+                "color": "#ef4444",
+                "value": 5000
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 0,
-          "sparkline": { "displayMode": "area", "lineColor": "#f59e0b", "fillColor": "rgba(245, 158, 11, 0.1)" }
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.1)"
+          }
         }
       }
     }
   ],
   "refresh": "10s",
-  "tags": ["solar", "bess", "sentinel", "building"],
+  "tags": [
+    "solar",
+    "bess",
+    "sentinel",
+    "building"
+  ],
   "templating": {
     "list": [
-      { "name": "site", "type": "query", "query": "label_values(sentinel_solar_pv_generation_kw, site_id)", "multi": true }
+      {
+        "name": "site",
+        "type": "query",
+        "query": "label_values(sentinel_solar_pv_generation_kw, site_id)",
+        "multi": true
+      }
     ]
   },
-  "time": { "from": "now-24h", "to": "now" },
-  "title": "SENTINEL — Solar & BESS",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "title": "SENTINEL \u2014 Solar & BESS",
   "uid": "sentinel-solar",
   "version": 2
 }
