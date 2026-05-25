@@ -1,0 +1,665 @@
+{
+  "title": "SENTINEL BMS",
+  "uid": "sentinel-home",
+  "version": 1,
+  "schemaVersion": 39,
+  "editable": false,
+  "timezone": "Africa/Johannesburg",
+  "tags": [
+    "sentinel",
+    "home"
+  ],
+  "style": "dark",
+  "graphTooltip": 0,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {
+    "hidden": true,
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Executive",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "dashlist",
+      "title": "",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "options": {
+        "folderUID": "",
+        "includeVars": false,
+        "keepTime": false,
+        "maxItems": 10,
+        "query": "Building Intelligence",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "": {
+                  "text": "Building Intelligence at a Glance\nSingle-screen executive dashboard: health score, equipment status, energy vs baseline, ML predictions, top recommendations."
+                }
+              }
+            }
+          ]
+        }
+      },
+      "description": "Live building health, energy, and AI recommendations"
+    },
+    {
+      "type": "dashlist",
+      "title": "",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "options": {
+        "folderUID": "",
+        "includeVars": false,
+        "keepTime": false,
+        "maxItems": 10,
+        "query": "AI Governance",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ],
+      "description": "Quality gates, safety, model drift, approvals, AI cost"
+    },
+    {
+      "type": "dashlist",
+      "title": "",
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "options": {
+        "folderUID": "",
+        "includeVars": false,
+        "keepTime": false,
+        "maxItems": 10,
+        "query": "PARASITE",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ],
+      "description": "PARASITE decision pipeline: tier routing, approvals, auto-execute events"
+    },
+    {
+      "type": "row",
+      "title": "Building Disciplines",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      }
+    },
+    {
+      "type": "dashlist",
+      "title": "HVAC",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 8
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "HVAC",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Energy",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 8
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Energy",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Lighting",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 8
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Lighting",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Solar & BESS",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 8
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Solar",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Water",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 8
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Water",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Fire Safety",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 20,
+        "y": 8
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Fire Safety",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Operations",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      }
+    },
+    {
+      "type": "dashlist",
+      "title": "Security",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 13
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "SENTINEL \u2014 Security",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Backend Uptime",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 13
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Backend Uptime",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Database",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 13
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Database",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Security Operations",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 13
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "SENTINEL \u2014 Security Operations",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "MCP Security",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 13
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "MCP Security",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "row",
+      "title": "Monitoring",
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      }
+    },
+    {
+      "type": "dashlist",
+      "title": "AI Governance Live",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 0,
+        "y": 18
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "SENTINEL \u2014 AI Governance Live",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Building UI",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 4,
+        "y": 18
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Building UI",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "ESG",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 8,
+        "y": 18
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "ESG",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Fuel & Generator",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 12,
+        "y": 18
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Fuel & Generator",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "dashlist",
+      "title": "Space Optimization",
+      "gridPos": {
+        "h": 4,
+        "w": 4,
+        "x": 16,
+        "y": 18
+      },
+      "options": {
+        "maxItems": 1,
+        "query": "Space Optimization",
+        "showHeadings": false,
+        "showRecentlyViewed": false,
+        "showSearch": false,
+        "showStarred": false,
+        "tags": []
+      },
+      "pluginVersion": "10.4.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "refresh": "30s",
+  "links": []
+}

@@ -199,6 +199,7 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
       attentionScore: 0.1,
       activeConditionCount: 0,
       emergingRiskCount: 0,
+      equipmentWarningCount: 0,
       evidenceStrength: 'limited',
     },
     primaryMetric: {
@@ -703,6 +704,7 @@ export function mapCockpitState(
       attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
       activeConditionCount: narrative ? 1 : 0,
       emergingRiskCount: secondaryTensions.length + equipmentWarnings.length,
+      equipmentWarningCount: equipmentWarnings.length,
       evidenceStrength: narrative ? 'moderate' : 'strong',
     },
     primaryMetric: {
@@ -735,7 +737,7 @@ export function mapCockpitState(
       impact: locationSummary(narrative),
       summary: isShadowPhase ? 'Observe telemetry flow and model calibration.' : (narrative?.action ?? 'No action needed.'),
       tradeoff: equipmentWarnings.length > 0
-      ? `${equipmentWarnings.length} equipment at health warning: ${equipmentWarnings.map((e) => `${e.equipmentCode} (${e.healthScore}/100)`).join(', ')}`
+      ? `${equipmentWarnings.length} equipment at health warning: ${equipmentWarnings.map((e) => `${e.code} (${e.health_score}/100)`).join(', ')}`
       : secondarySummary,
       confidence: isShadowPhase ? 'Shadow training mode' : payload.operator_guidance.headline,
     },

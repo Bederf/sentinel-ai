@@ -508,6 +508,44 @@ class ShadowModePollingService:
                     },
                 }
 
+            # ── Map BESS telemetry to battery equipment ──────────────────────
+            bess_data = data.get("bess", {})
+            if bess_data:
+                bess_readings: dict[str, float] = {}
+                bess_field_map = {
+                    "soc_percent": "soc_pct",
+                    "charge_discharge_power_kw": "power_kw",
+                    "energy_stored_kwh": "energy_kwh",
+                    "battery_module_temp_max_c": "temp_max_c",
+                    "battery_voltage_dc_v": "voltage_v",
+                    "battery_current_dc_a": "current_a",
+                    "c_rate": "c_rate",
+                    "grid_frequency_hz": "grid_frequency_hz",
+                    "power_factor": "power_factor",
+                    "ambient_temp_c": "ambient_temp_c",
+                }
+                for bridge_key, op_key in bess_field_map.items():
+                    val = bess_data.get(bridge_key)
+                    if val is not None:
+                        bess_readings[op_key] = float(val)
+
+                system_status = bess_data.get("system_status", "")
+                if system_status:
+                    bess_readings["system_status"] = 1.0 if system_status in ("online", "running", "charging", "discharging") else 0.0
+
+                if bess_readings:
+                    agg_states[f"{self._site_prefix}-BESS-B1-001"] = {
+                        "type": "bess",
+                        "sensor_readings": bess_readings,
+                    }
+                    logger.info(
+                        "[SHADOW] BESS telemetry ingested: SOC=%.1f%%, power=%.1fkW, energy=%.1fkWh for %s",
+                        bess_readings.get("soc_pct", 0),
+                        bess_readings.get("power_kw", 0),
+                        bess_readings.get("energy_kwh", 0),
+                        f"{self._site_prefix}-BESS-B1-001",
+                    )
+
             # ── Map security telemetry to access control system ──────────────
             security_data = data.get("security", {})
             if security_data:

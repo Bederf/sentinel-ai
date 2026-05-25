@@ -9,7 +9,8 @@ export interface CockpitSitePulse extends CockpitMetricTone {
   attentionScore: number
   activeConditionCount: number
   emergingRiskCount: number
-  evidenceStrength: 'strong' | 'moderate' | 'limited'
+  equipmentWarningCount: number
+  evidenceStrength: 'weak' | 'moderate' | 'strong'
 }
 
 export interface CockpitPrimaryMetric extends CockpitMetricTone {

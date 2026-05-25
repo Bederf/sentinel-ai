@@ -572,12 +572,18 @@ class PredictionGeneratorService:
         """
         Query equipment with health score below threshold.
 
+        Only mechanical equipment types generate predictions — non-mechanical
+        types (lighting, access control, weather stations, DALI, etc.) are excluded.
+
         Args:
             threshold: Health score threshold (equipment below this is at-risk)
 
         Returns:
-            List of equipment records with health below threshold
+            List of mechanical equipment records with health below threshold
         """
+        MECHANICAL_TYPES = {
+            "ahu", "chiller", "cooling_tower", "fcu", "pump", "vav", "boiler", "generator",
+        }
         try:
             response = (
                 self.supabase.table("equipment")
@@ -586,7 +592,8 @@ class PredictionGeneratorService:
                 .execute()
             )
 
-            return response.data or []
+            all_at_risk = response.data or []
+            return [eq for eq in all_at_risk if eq.get("type", "").lower() in MECHANICAL_TYPES]
 
         except Exception as e:
             logger.error(f"Failed to query at-risk equipment: {e}")

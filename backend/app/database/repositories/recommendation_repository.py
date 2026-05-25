@@ -193,6 +193,7 @@ class RecommendationRepository:
                 .select("*")
                 .eq("site_id", site_id)
                 .eq("status", status.value)
+                .eq("action_type", "ai_optimization")  # AI optimization recs only
                 .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
                 .order("risk_level", desc=True)
                 .order("timestamp", desc=True)
@@ -234,6 +235,7 @@ class RecommendationRepository:
                 self.client.table("recommendations")
                 .select("*")
                 .eq("site_id", site_id)
+                .eq("action_type", "ai_optimization")  # AI optimization recs only
                 .neq("status", "pending")
                 .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
                 .order("timestamp", desc=True)

@@ -210,7 +210,12 @@ function siteSummary(state: CockpitState) {
   if (isWaitingState(state)) return 'Waiting for live state'
   const modules = activeModuleLabels(state).join(' + ')
   const energyKw = state.visualTwin.energyCentre?.online ? `${Math.round(state.visualTwin.energyCentre.totalKw)}kw` : 'energy n/a'
-  return `${state.sitePulse.activeConditionCount} active, ${state.sitePulse.emergingRiskCount} secondary, ${modules}, ${energyKw}, ${state.site.dataFreshnessLabel.toLowerCase()}`
+  const ew = state.sitePulse.equipmentWarningCount
+  const st = state.sitePulse.emergingRiskCount - ew
+  const warnings = ew > 0 ? `${ew} equipment warnings` : ''
+  const tensions = st > 0 ? `${st} rising signals` : ''
+  const secondary = [warnings, tensions].filter(Boolean).join(', ')
+  return `${state.sitePulse.activeConditionCount} active${secondary ? ', ' + secondary : ''}, ${modules}, ${energyKw}, ${state.site.dataFreshnessLabel.toLowerCase()}`
 }
 
 function timeToImpact(state: CockpitState) {
