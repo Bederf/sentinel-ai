@@ -467,17 +467,21 @@ class ComplianceRepository:
         limit: int = 50,
     ) -> list[ComplianceAudit]:
         """Get compliance audit history."""
-        query = self.supabase.table("compliance_audits").select("*").eq("site_id", site_code)
+        try:
+            query = self.supabase.table("compliance_audits").select("*").eq("site_id", site_code)
 
-        if compliance_type:
-            query = query.eq("compliance_type", compliance_type)
+            if compliance_type:
+                query = query.eq("compliance_type", compliance_type)
 
-        if status:
-            query = query.eq("status", status)
+            if status:
+                query = query.eq("status", status)
 
-        result = query.order("created_at", desc=True).limit(limit).execute()
+            result = query.order("created_at", desc=True).limit(limit).execute()
 
-        return [ComplianceAudit(**row) for row in result.data]
+            return [ComplianceAudit(**row) for row in result.data]
+        except Exception:
+            logger.warning("compliance_audits table not available, returning empty")
+            return []
 
     # ========================================================================
     # Overall Status

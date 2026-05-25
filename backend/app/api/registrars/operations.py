@@ -109,6 +109,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(equipment_baselines.router, tags=["equipment-baselines"])
     app.include_router(onboarding.router, tags=["onboarding"])
     app.include_router(condition.router, tags=["condition"])
+    app.include_router(compliance.router, tags=["compliance"])
 
     # Remote operations
     app.include_router(remote_ops.router, tags=["remote-ops"])

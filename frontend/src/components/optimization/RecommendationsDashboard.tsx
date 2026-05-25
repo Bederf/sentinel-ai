@@ -186,7 +186,7 @@ export const RecommendationsDashboard: React.FC<
                 className="text-base font-semibold"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
-                {(rec.recommendation_type || rec.action_type || "Recommendation").replace(/_/g, " ")}
+                {(rec.recommendation_type || rec.action_type || "Recommendation").replace(/_/g, " ").replace(/\b(ai|hvac|chw)\b/gi, (s) => s.toUpperCase())}
               </h3>
               <p
                 className="text-sm"
@@ -254,16 +254,17 @@ export const RecommendationsDashboard: React.FC<
 
           {/* Actions */}
           {isAdvisory ? (
-            <div
-              className="p-3 rounded text-center text-sm"
+            <button
+              onClick={() => handleCreateWorkOrder(rec)}
+              className="w-full p-3 rounded text-sm font-medium transition-all hover:brightness-110 cursor-pointer"
               style={{
                 background: "rgba(245, 158, 11, 0.1)",
                 border: "1px solid rgba(245, 158, 11, 0.3)",
                 color: "var(--color-sentinel-amber)",
               }}
             >
-              Review and apply manually in BMS
-            </div>
+              Create a work order
+            </button>
           ) : (
           <div className="flex gap-3">
             <button

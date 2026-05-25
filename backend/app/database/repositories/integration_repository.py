@@ -76,14 +76,14 @@ class IntegrationRepository:
         error: str | None = None,
     ) -> None:
         """Update last sync status for a log source."""
-        self.client.table("log_sources").update(
-            {
-                "last_sync_at": datetime.utcnow().isoformat(),
-                "last_sync_status": status,
-                "last_sync_records": records,
-                "last_sync_error": error,
-            }
-        ).eq("id", source_id).execute()
+        update_fields = {
+            "last_sync_at": datetime.utcnow().isoformat(),
+            "last_sync_status": status,
+            "last_sync_records": records,
+        }
+        if error is not None:
+            update_fields["last_sync_error"] = error
+        self.client.table("log_sources").update(update_fields).eq("id", source_id).execute()
 
     # ==================== Column Mappings ====================
 
