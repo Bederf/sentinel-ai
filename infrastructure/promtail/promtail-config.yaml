@@ -14,23 +14,22 @@ clients:
 
 scrape_configs:
   # ============================================================
-  # 0. Systemd Journal — SENTINEL Backend service logs
+  # 0. SENTINEL Backend App Logs (systemd service journal output)
   #    Enables dashboards querying {job="systemd-journal", unit="sentinel-backend.service"}
   # ============================================================
-  - job_name: journal
-    journal:
-      path: /var/log/journal
-      labels:
-        job: systemd-journal
+  - job_name: sentinel-backend
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: systemd-journal
+          unit: sentinel-backend.service
+          __path__: /var/log/sentinel/backend.log
     pipeline_stages:
-      - drop:
-          source: "_SYSTEMD_UNIT"
-          value: ""
-      - template:
-          source: unit
-          template: '{{ ._SYSTEMD_UNIT }}'
+      - regex:
+          expression: '(?P<level>INFO|WARNING|ERROR|CRITICAL|DEBUG)'
       - labels:
-          unit:
+          level:
 
   # ============================================================
   # 1. Docker Container Logs (all SENTINEL containers)
