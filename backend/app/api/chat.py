@@ -5,6 +5,7 @@ import logging
 from collections.abc import AsyncGenerator
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi import Request as FastAPIRequest
 from fastapi.responses import Response, StreamingResponse
@@ -13,11 +14,11 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.config.settings import SENTINEL_BOT_DEFAULT_CLASS, settings
-from app.middleware.auth_middleware import get_current_auth
+from app.middleware.auth_middleware import get_current_auth, optional_auth
 from app.models.auth import AuthContext
 from app.repositories.chat_context_repository import chat_context_repository
 from app.security.constants import MAX_CHAT_MESSAGE_LENGTH
-from app.security.pipeline import prompt_guard, require_role
+from app.security.pipeline import prompt_guard
 from app.security.sse_buffer import SecureSSEBuffer
 from app.services import slash_command_router
 from app.services.claude_service import claude_service
@@ -482,9 +483,7 @@ async def generate_sse_stream(
                 for p in prefs:
                     days_ago = (now - p.created_at).days if p.created_at else 0
                     summary = _format_preference_summary(p)
-                    pref_lines.append(
-                        f"- {summary} (confidence {p.confidence:.0%}, set {days_ago} days ago)"
-                    )
+                    pref_lines.append(f"- {summary} (confidence {p.confidence:.0%}, set {days_ago} days ago)")
                 pref_context = "\n".join(pref_lines)
                 # Inject as a system message before the conversation history
                 messages.insert(0, {"role": "system", "content": pref_context})
@@ -692,7 +691,7 @@ async def chat(
     request: FastAPIRequest,
     chat_request: ChatRequest,
     background_tasks: BackgroundTasks,
-    auth: AuthContext = Depends(require_role(1)),
+    auth: AuthContext | None = Depends(optional_auth),
     guarded_message: str = Depends(prompt_guard(field="message", source="direct")),
 ) -> StreamingResponse:
     """

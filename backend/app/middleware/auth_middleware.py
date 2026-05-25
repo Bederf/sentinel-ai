@@ -743,6 +743,41 @@ def get_current_auth(request: Request) -> AuthContext | None:
 require_operator = require_auth(AuthLevel.OPERATOR)
 
 
+def optional_auth(request: Request) -> AuthContext | None:
+    """FastAPI dependency that returns auth context if available, None otherwise.
+
+    Unlike require_role() which rejects unauthenticated requests, this allows
+    the endpoint to work for both authenticated and anonymous users.
+
+    Usage:
+        @router.post("/api/public-endpoint")
+        async def handler(auth: AuthContext | None = Depends(optional_auth)):
+            ...
+    """
+    try:
+        ctx = _authenticate_request_sync(request)
+        return ctx
+    except Exception:
+        return None
+
+
+def _authenticate_request_sync(request: Request) -> AuthContext | None:
+    """Sync helper that extracts auth context from request state.
+
+    Checks both the middleware-injected state (from agent_security) and
+    the auth module's state for flexibility.
+    """
+    state = getattr(request, "state", None)
+    if state:
+        auth = getattr(state, "auth", None)
+        if auth:
+            return auth
+        auth_ctx = getattr(state, "auth_ctx", None)
+        if auth_ctx:
+            return auth_ctx
+    return None
+
+
 # =============================================================================
 # Site Access Control (BOLA Prevention)
 # =============================================================================
