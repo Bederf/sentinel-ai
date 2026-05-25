@@ -1206,6 +1206,14 @@ async def _create_complaint_wo(
         wo_uuid = created.get("id")
         equipment_code = created.get("equipment_code", "") or wo_data.get("equipment_code", "")
 
+        # Extract desk number from location for Info button zone lookup
+        desk_number = ""
+        if not equipment_code:
+            import re
+            m = re.search(r"(?:desk|Desk)\s*(\d{3})", location)
+            if m:
+                desk_number = m.group(1)
+
         # Look up technician by category / specialty for site-002
         tech = None
         try:
@@ -1273,6 +1281,7 @@ async def _create_complaint_wo(
                     "service_type": "callout",
                     "criticality": priority.upper(),
                     "problem_description": description,
+                    "desk_number": desk_number,
                 })
             except Exception as e:
                 logger.warning("Complaint WO notification failed: %s", e)

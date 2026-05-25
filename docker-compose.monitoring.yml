@@ -127,6 +127,7 @@ services:
     volumes:
       - ./infrastructure/promtail/promtail-config.yaml:/etc/promtail/promtail-config.yaml:ro
       - /var/log:/var/log:ro
+      - /var/log/journal:/var/log/journal:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /opt/bms-intelligence/backend/app/data:/opt/bms-intelligence/backend/app/data:ro
     depends_on:

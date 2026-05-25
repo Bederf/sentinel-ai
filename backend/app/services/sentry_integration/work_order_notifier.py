@@ -851,8 +851,12 @@ class WorkOrderNotifier:
             # Build inline buttons for the technician
             import json
 
-            info_value = f"/info-{code_dashed}" if code_dashed else ""
-            note_value = f"/note-{code_dashed}" if code_dashed else ""
+            # For complaint WOs without specific equipment, use desk number for zone lookup
+            desk_number = work_order_data.get("desk_number", "")
+            info_ref = code_dashed or (desk_number if desk_number.isdigit() else "")
+            note_ref = code_dashed or ""
+            info_value = f"/info-{info_ref}" if info_ref else ""
+            note_value = f"/note-{note_ref}" if note_ref else ""
             done_value = f"done #{wo_ref}"
             # Buttons as separate rows attached to the message
             btn_rows = []
