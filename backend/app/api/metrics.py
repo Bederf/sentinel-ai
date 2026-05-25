@@ -942,7 +942,7 @@ def _collect_discipline_metrics() -> None:
     try:
         occ_resp = (
             client.table("equipment_sensor_readings")
-            .select("equipment_id, value")
+            .select("equipment_id, sensor_type, value")
             .eq("site_id", SITE_ID)
             .in_("sensor_type", ["co2_ppm", "occupied_zones", "total_occupancy"])
             .execute()
