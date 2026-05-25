@@ -416,6 +416,8 @@ class AiUsageTracker:
                     route=source,
                     site_id=site_key,
                     provider=provider,
+                    model=model,
+                    task_class=task_class,
                     tokens=input_tokens + output_tokens,
                     cost=cost,
                 )

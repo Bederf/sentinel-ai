@@ -4,7 +4,7 @@ type: "api-reference"
 status: "complete"
 version: "1.2.0"
 created: "2026-02-09"
-updated: "2026-04-03"
+updated: "2026-05-25"
 author: "SENTINEL Development Team"
 tags: ["api", "recommendations", "optimization", "approval-workflow", "background-jobs"]
 domain: "optimization"
@@ -18,23 +18,23 @@ related: ["../08-ai-ml/ai-recommendation-system.md", "../08-ai-ml/background-rec
 
 **Base URL:** `http://localhost:9095/api`
 **Authentication:** JWT bearer token in `Authorization` header
-**Auto-Generation:** Recommendations are generated automatically every 10 minutes. See [Background Recommendation Generation](../08-ai-ml/background-recommendation-generation.md) for details.
+**Auto-Generation:** Recommendations are generated automatically every 30 minutes. See [Background Recommendation Generation](../08-ai-ml/background-recommendation-generation.md) for details.
 
 ---
 
 ## Endpoints Overview
 
-### Profile Management (4 endpoints)
-- `GET /optimization/settings/{site_id}` - Get site profile configuration
-- `PUT /optimization/settings/{site_id}` - Update site profile
-- `POST /optimization/profiles` - List available profiles
-- `GET /optimization/profiles/{name}` - Get profile details
+### Profile Management (3 endpoints)
+- `GET /api/optimization/settings/{site_id}` - Get site profile configuration
+- `PUT /api/optimization/settings/{site_id}` - Update site profile
+- `GET /api/optimization/profiles` - List available profiles
 
-### Recommendations (4 endpoints)
-- `GET /modules/site/{site_id}/recommendations` - Get pending recommendations (returns list directly)
-- `POST /recommendations/{rec_id}/approve` - Approve recommendation
-- `POST /recommendations/{rec_id}/reject` - Reject recommendation
-- `GET /recommendations/{rec_id}` - Get recommendation details
+### Recommendations (5 endpoints)
+- `GET /api/recommendations/{site_id}` - Get pending recommendations
+- `POST /api/recommendations/{rec_id}/approve` - Approve recommendation
+- `POST /api/recommendations/{rec_id}/reject` - Reject recommendation
+- `GET /api/recommendations/detail/{rec_id}` - Get recommendation details
+- `POST /api/recommendations/{site_id}/process-pending` - Trigger agent processing
 
 ### Analysis (1 endpoint)
 - `POST /optimization/analyze` - Run AI optimizer
@@ -115,14 +115,14 @@ Update profile configuration for a site.
 ```
 
 **Validation:**
-- `active_profile`: Must be "sweat_assets", "comfort_first", or "cost_saving"
+- `active_profile`: Must be a valid profile enum value (e.g., "balanced", "comfort", "cost", "sweat_assets")
 - `control_tier`: Must be "monitor", "human_in_loop", or "auto_execute"
 - `zone_overrides[].zone_id`: Must match existing zone in building
 - `zone_overrides[].profile`: Must be valid profile name
 
 ---
 
-#### POST /optimization/profiles
+#### GET /api/optimization/profiles
 List available optimization profiles.
 
 **Parameters:** None
@@ -173,49 +173,11 @@ List available optimization profiles.
 
 ---
 
-#### GET /optimization/profiles/{name}
-Get detailed information about a specific profile.
-
-**Parameters:**
-- `name` (path, required): Profile name ("sweat_assets", "comfort_first", "cost_saving")
-
-**Response:**
-```json
-{
-  "name": "cost_saving",
-  "display_name": "Cost Saving",
-  "description": "Minimize operational spend and energy usage",
-  "weights": {
-    "runtime": 0.15,
-    "comfort": 0.07,
-    "cost": 0.45,
-    "maintenance": 0.03,
-    "energy": 0.30
-  },
-  "thresholds": {
-    "hvac_temp_min": 16,
-    "hvac_temp_max": 28,
-    "empty_zone_setback_c": 3.0,
-    "low_occ_setback_c": 1.5,
-    "lighting_min_lux": 300,
-    "lighting_max_lux": 500,
-    "empty_zone_lighting_percent": 20,
-    "low_occ_lighting_percent": 50,
-    "generator_usage": "standby"
-  },
-  "use_cases": [
-    "Light commercial (shops, warehouses)",
-    "Cost-conscious facilities",
-    "Load shedding scenarios"
-  ]
-}
-```
-
 ---
 
 ### Recommendations
 
-#### GET /recommendations/{site_id}
+#### GET /api/recommendations/{site_id}
 Get pending recommendations requiring operator action (Tier 2 mode).
 
 **Parameters:**
@@ -265,7 +227,7 @@ Get pending recommendations requiring operator action (Tier 2 mode).
 
 ---
 
-#### POST /recommendations/{rec_id}/approve
+#### POST /api/recommendations/{rec_id}/approve
 Approve a pending recommendation for execution.
 
 **Parameters:**
@@ -318,7 +280,7 @@ Approve a pending recommendation for execution.
 
 ---
 
-#### POST /recommendations/{rec_id}/reject
+#### POST /api/recommendations/{rec_id}/reject
 Reject a pending recommendation (triggers learning).
 
 **Parameters:**
@@ -368,7 +330,7 @@ When 3+ rejections of same action type detected in 30 days:
 
 ---
 
-#### GET /recommendations/{rec_id}
+#### GET /api/recommendations/detail/{rec_id}
 Get detailed information about a specific recommendation, including execution outcome.
 
 **Parameters:**
@@ -704,7 +666,7 @@ curl -X POST http://localhost:9095/api/optimization/analyze \
 
 ### Agent Trigger
 
-#### POST /recommendations/{site_id}/process-pending
+#### POST /api/recommendations/{site_id}/process-pending
 Trigger the LangGraph recommendation agent to process pending recommendations for a site.
 
 The agent validates, assesses impact, checks schedule conflicts, routes through the tier engine, and either auto-executes (Tier 3), requests approval (Tier 2), or logs as advisory (Tier 1).

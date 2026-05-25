@@ -457,7 +457,7 @@ class AIOptimizerService:
 
                 client = get_supabase_client()
                 phase_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
-                mode = phase_row.data[0].get("onboarding_phase", "shadow_live") if phase_row.data else "shadow_live"
+                mode = phase_row.data[0].get("onboarding_phase", "commissioning") if phase_row.data else "commissioning"
             except Exception:
                 mode = app_settings.resolved_ingestion_mode.value
             metrics = await evaluator.collect_metrics(site_id)

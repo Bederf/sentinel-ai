@@ -90,14 +90,17 @@ class TierRoutingEngine:
         """Route a recommendation to the appropriate autonomy tier.
 
         Implements the complete routing logic:
-        1. Master switch check (parasite_enabled)
+        1. Extract and normalize confidence score
         2. Phase gate check (onboarding_phase caps autonomy)
-        3. Extract and normalize confidence score
-        4. Get thresholds from settings and DB, use stricter
-        5. Risk level override (critical/high never auto-execute)
-        6. Tier 3 gate (disabled if not enabled)
-        7. Rate limit check (hourly auto-executions)
-        8. Route to tier and log decision
+        3. Master switch check (parasite_enabled)
+        4. Actionability gate (no device action = Tier 1 advisory)
+        5. Optimizer gate (ai_optimization recs = Tier 1, optimizer handles notification)
+        6. Get thresholds from settings and DB, use stricter
+        7. Onboarding phase override (phase < supervised caps at Tier 2)
+        8. Risk level override (critical/high never auto-execute)
+        9. Tier 3 gate (disabled if not enabled)
+        10. Rate limit check (hourly auto-executions)
+        11. Route to tier and log decision
 
         Args:
             recommendation: Dict with keys:
@@ -118,7 +121,8 @@ class TierRoutingEngine:
         confidence_score = self._extract_confidence(recommendation)
         correlation_id = recommendation.get("correlation_id", "")
 
-        # 2. Phase gate check: cap autonomy based on onboarding_phase
+        # 2. Phase gate check: resolve site onboarding phase for later autonomy capping
+        caps_auto_execute: bool = False  # True when phase < supervised (cap at Tier 2)
         try:
             from app.models.onboarding_phase import phase_allows as _phase_allows
             from app.database.supabase_client import get_supabase_client
@@ -139,9 +143,9 @@ class TierRoutingEngine:
                     risk_level=risk_level,
                     correlation_id=correlation_id,
                 )
-            if not _phase_allows(site_phase, "approve_reject"):
-                logger.info("Phase %s caps Tier 2 (no auto-execute) for %s", site_phase, recommendation.get("site_id"))
-                tier3_threshold = 999.0  # Impossible to reach Tier 3
+            caps_auto_execute = not _phase_allows(site_phase, "approve_reject")
+            if caps_auto_execute:
+                logger.info("Phase %s caps at Tier 2 (no auto-execute) for %s", site_phase, recommendation.get("site_id"))
         except Exception as exc:
             logger.debug("Phase gate check failed, proceeding without: %s", exc)
 
@@ -161,23 +165,64 @@ class TierRoutingEngine:
                 correlation_id=correlation_id,
             )
 
-        # 4. Get thresholds from TWO sources, use stricter (lazy-load model_registry)
+        # 4. Actionability gate: recs without a device action point are advisory only
+        action = recommendation.get("action", {}) or {}
+        control_point = action.get("point", "") if isinstance(action, dict) else ""
+        if not control_point:
+            logger.debug("No control point in action — routing to Tier 1 advisory")
+            return TierRoutingResult(
+                tier=TierLevel.TIER1.value,
+                action="advisory",
+                confidence_score=confidence_score,
+                threshold_source="actionability_gate",
+                tier2_threshold=self.settings.parasite_confidence_tier2_min,
+                tier3_threshold=self.settings.parasite_confidence_tier3_min,
+                reason="Recommendation has no device control action — advisory only",
+                equipment_type=equipment_type,
+                risk_level=risk_level,
+                correlation_id=correlation_id,
+            )
+
+        # 5. Optimizer gate: ai_optimization recs are already notified by the AI optimizer
+        #    with inline "Create work order" buttons — skip Tier 2/3 approval flow
+        action_type = recommendation.get("action_type", "")
+        if action_type == "ai_optimization":
+            logger.debug("ai_optimization rec — routing to Tier 1 advisory (optimizer handles notification)")
+            return TierRoutingResult(
+                tier=TierLevel.TIER1.value,
+                action="advisory",
+                confidence_score=confidence_score,
+                threshold_source="optimizer_gate",
+                tier2_threshold=self.settings.parasite_confidence_tier2_min,
+                tier3_threshold=self.settings.parasite_confidence_tier3_min,
+                reason="AI optimization recommendation — notified via optimizer path",
+                equipment_type=equipment_type,
+                risk_level=risk_level,
+                correlation_id=correlation_id,
+            )
+
+        # 6. Get thresholds from TWO sources, use stricter (lazy-load model_registry)
         #    Only reached if PARASITE is enabled
         if self.model_registry is None:
             self.model_registry = await get_model_registry()
         tier2_threshold, tier3_threshold, threshold_source = await self.get_effective_thresholds(equipment_type)
 
-        # 5. Risk level override: critical/high never auto-execute
+        # 6. Onboarding phase override: phase < supervised never auto-executes
+        if caps_auto_execute:
+            logger.debug("Onboarding phase caps at Tier 2 (no auto-execute)")
+            tier3_threshold = 999.0
+
+        # 7. Risk level override: critical/high never auto-execute
         if risk_level in ("critical", "high"):
             logger.info(f"Risk level {risk_level} overrides to Tier 2 minimum (never auto-execute critical actions)")
             tier3_threshold = 999.0  # Impossible to reach Tier 3
 
-        # 6. Tier 3 gate: disabled if not enabled in settings
+        # 8. Tier 3 gate: disabled if not enabled in settings
         if not self.settings.parasite_tier3_enabled:
             logger.debug("Tier 3 disabled via settings, capping at Tier 2")
             tier3_threshold = 999.0  # Impossible to reach Tier 3
 
-        # 7. Rate limit check: if auto-executions this hour >= limit, cap at Tier 2
+        # 9. Rate limit check: if auto-executions this hour >= limit, cap at Tier 2
         if self._should_reset_hourly_counter():
             self._auto_executions_this_hour = 0
             self._hour_start = datetime.utcnow()
@@ -192,7 +237,7 @@ class TierRoutingEngine:
             )
             tier3_threshold = 999.0  # Impossible to reach Tier 3
 
-        # 8. Route to appropriate tier
+        # 10. Route to appropriate tier
         if confidence_score < tier2_threshold:
             tier = TierLevel.TIER1.value
             tier_num = 1

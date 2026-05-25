@@ -224,7 +224,7 @@ Recommendations generated after ML context injection include richer reasoning th
 
 ## Implementation
 
-- Core optimization: `backend/app/api/ai_recommendations.py`
+- Core optimization: `backend/app/api/optimization.py`
 - Load shedding: `backend/app/api/optimization.py`
 - Tier router: `backend/app/services/optimization_tier_router.py`
 - M&V service: `backend/app/services/mv_verification_service.py`

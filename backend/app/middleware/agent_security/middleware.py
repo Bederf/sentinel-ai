@@ -71,6 +71,7 @@ PATH_TOOL_MAP: list[tuple[str, AgentToolName]] = [
 BYPASS_PREFIXES: tuple[str, ...] = (
     "/api/auth/",
     "/api/health",
+    "/api/buildings",
     "/health",
     "/docs",
     "/openapi.json",

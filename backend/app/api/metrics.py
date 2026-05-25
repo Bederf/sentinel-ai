@@ -448,16 +448,16 @@ sentinel_demand_response_duration_seconds = Histogram(
 # 30. Token usage by route and site
 sentinel_ai_tokens_by_route_total = Counter(
     "sentinel_ai_tokens_by_route_total",
-    "AI tokens consumed by route, site, and provider",
-    labelnames=["route", "site_id", "provider"],
+    "AI tokens consumed by route, site, provider, and model",
+    labelnames=["route", "site_id", "provider", "model"],
     registry=REGISTRY,
 )
 
-# 31. Cost by route and site
+# 31. Cost by route, site, model, and task class
 sentinel_ai_cost_by_route_total = Counter(
     "sentinel_ai_cost_by_route_total",
-    "AI cost in USD by route and site",
-    labelnames=["route", "site_id"],
+    "AI cost in USD by route, site, model, and task class",
+    labelnames=["route", "site_id", "model", "task_class"],
     registry=REGISTRY,
 )
 
@@ -1320,6 +1320,10 @@ def _collect_fm_metrics() -> None:
             for eq in equip_resp.data:
                 health = eq.get("health_score")
                 if health is None:
+                    continue
+                code = eq.get("code", "unknown")
+                # Skip lighting (LTG) and DALI controllers — no meaningful health metric
+                if code.startswith(("S002-LTG-", "S002-DALI-")):
                     continue
                 site = _resolve_site_name(client, eq.get("site_id", ""))
                 code = eq.get("code", "unknown")

@@ -307,7 +307,7 @@
         {
           "refId": "A",
           "expr": "sum by (decision) (rate(sentinel_approval_decisions_total[1h])) or vector(0)",
-          "legendFormat": "{{decision}}"
+          "legendFormat": "Approval Rate"
         }
       ],
       "fieldConfig": {
@@ -338,7 +338,7 @@
         {
           "refId": "A",
           "expr": "sentinel_model_drift_alerts{source=\"supabase\"}",
-          "legendFormat": "{{site_id}}/{{model_type}} [{{data_quality}}]"
+          "legendFormat": "{{site_id}}/{{model_type}}"
         }
       ],
       "fieldConfig": {
@@ -456,7 +456,7 @@
         {
           "refId": "A",
           "expr": "sum by (equipment_type) (rate(sentinel_rollback_total[1h])) or vector(0)",
-          "legendFormat": "{{equipment_type}}"
+          "legendFormat": "Rollback Rate"
         }
       ],
       "fieldConfig": {
@@ -596,7 +596,7 @@
         {
           "refId": "A",
           "expr": "sentinel_model_drift_score{source=\"supabase\"}",
-          "legendFormat": "{{model_id}} ({{model_type}}) [{{data_quality}}]"
+          "legendFormat": "{{model_id}} ({{model_type}})"
         }
       ],
       "fieldConfig": {
@@ -678,7 +678,7 @@
         {
           "refId": "A",
           "expr": "sum by (error_type) (rate(sentinel_tool_call_errors_total[5m])) or vector(0)",
-          "legendFormat": "{{error_type}}"
+          "legendFormat": "Error Rate"
         }
       ],
       "fieldConfig": {
@@ -752,8 +752,8 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (route) (sentinel_ai_cost_by_route_total)",
-          "legendFormat": "{{route}}"
+          "expr": "sum by (model, task_class) (sentinel_ai_cost_by_route_total)",
+          "legendFormat": "{{model}} ({{task_class}})"
         }
       ],
       "fieldConfig": {
@@ -790,119 +790,6 @@
       "options": {
         "mode": "markdown",
         "content": "## POPIA Monthly Evidence\n\nGenerated on-demand via API:\n\n`GET /api/governance/popia-evidence`\n\nCovers: consent metrics, retention enforcement, DSR completion, access control audit.\n\nEvidence packs stored in `popia_evidence_packs.json` (24-month FIFO)."
-      }
-    },
-    {
-      "id": 17,
-      "title": "Retrieval Latency p95/p99",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 14,
-        "x": 0,
-        "y": 44
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, retrieval_path, fallback) (rate(sentinel_retrieval_latency_seconds_bucket[5m])))",
-          "legendFormat": "p95 {{retrieval_path}}/{{fallback}}"
-        },
-        {
-          "refId": "B",
-          "expr": "histogram_quantile(0.99, sum by (le, retrieval_path, fallback) (rate(sentinel_retrieval_latency_seconds_bucket[5m])))",
-          "legendFormat": "p99 {{retrieval_path}}/{{fallback}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 12,
-            "stacking": {
-              "mode": "none"
-            }
-          },
-          "unit": "s",
-          "decimals": 3
-        }
-      }
-    },
-    {
-      "id": 18,
-      "title": "Retrieval Hits/sec",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 5,
-        "x": 14,
-        "y": 44
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (retrieval_path, fallback) (rate(sentinel_retrieval_hits_total[1m]))",
-          "legendFormat": "{{retrieval_path}}/{{fallback}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 12
-          },
-          "unit": "ops",
-          "decimals": 2
-        }
-      }
-    },
-    {
-      "id": 19,
-      "title": "Fallback Rate",
-      "type": "timeseries",
-      "gridPos": {
-        "h": 8,
-        "w": 5,
-        "x": 19,
-        "y": 44
-      },
-      "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "sum by (fallback) (rate(sentinel_retrieval_fallbacks_total[5m]))",
-          "legendFormat": "{{fallback}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "lineWidth": 1,
-            "fillOpacity": 12
-          },
-          "unit": "ops",
-          "decimals": 2
-        }
       }
     }
   ],

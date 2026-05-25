@@ -183,8 +183,10 @@ class GovernanceMetricsCollector:
         provider: str,
         tokens: int,
         cost: float,
+        model: str = "unknown",
+        task_class: str = "",
     ) -> None:
-        """Increment token and cost counters by route and site.
+        """Increment token and cost counters by route, site, model, and task class.
 
         Args:
             route: Source/route category (will be normalised to bounded set).
@@ -192,6 +194,8 @@ class GovernanceMetricsCollector:
             provider: AI provider name.
             tokens: Total tokens (input + output).
             cost: Cost in USD.
+            model: Model ID string (e.g. claude-sonnet-4-6, deepseek-chat).
+            task_class: Task class for routing (e.g. medium, chat_ai, extraction).
         """
         try:
             from app.api.metrics import (
@@ -202,13 +206,17 @@ class GovernanceMetricsCollector:
             safe_route = _normalise_route(route)
             safe_site = str(site_id or "unknown")[:32]
             safe_provider = str(provider or "unknown")[:32]
+            safe_model = str(model or "unknown")[:48]
+            safe_task_class = str(task_class or "unknown")[:24]
             safe_tokens = max(0, int(tokens))
             safe_cost = max(0.0, float(cost))
 
-            sentinel_ai_tokens_by_route_total.labels(route=safe_route, site_id=safe_site, provider=safe_provider).inc(
-                safe_tokens
-            )
-            sentinel_ai_cost_by_route_total.labels(route=safe_route, site_id=safe_site).inc(safe_cost)
+            sentinel_ai_tokens_by_route_total.labels(
+                route=safe_route, site_id=safe_site, provider=safe_provider, model=safe_model
+            ).inc(safe_tokens)
+            sentinel_ai_cost_by_route_total.labels(
+                route=safe_route, site_id=safe_site, model=safe_model, task_class=safe_task_class
+            ).inc(safe_cost)
         except Exception:
             logger.debug("Failed to record AI usage metric", exc_info=True)
 

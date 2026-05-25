@@ -114,7 +114,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT e.name AS \"Equipment\", e.health_score AS \"Health\", e.status AS \"Status\" FROM equipment e WHERE e.site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) ORDER BY e.health_score ASC NULLS LAST LIMIT 15",
+          "rawSql": "SELECT e.code AS \"Equipment ID\", e.health_score AS \"Health\", CASE WHEN e.health_score >= 90 THEN 'healthy' WHEN e.health_score < 50 THEN 'critical' ELSE 'warning' END AS \"Status\" FROM equipment e WHERE e.site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) AND e.code NOT LIKE '%-LTG-%' AND e.code NOT LIKE '%-DALI-%' AND (e.type IS NULL OR e.type NOT IN ('lighting', 'luminaire', 'Lighting', 'Luminaire', 'LTG', 'DALI', 'dali')) ORDER BY e.health_score ASC NULLS LAST LIMIT 15",
           "refId": "A",
           "format": "table"
         }
@@ -407,7 +407,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM recommendations WHERE site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) AND status = 'pending'",
+          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM recommendations WHERE site_id = 'site-002' AND status = 'pending' AND source = 'ai_optimizer' AND action_type = 'ai_optimization'",
           "refId": "A",
           "format": "table"
         }
@@ -469,7 +469,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT target_equipment AS \"Equipment\", substring(reason, 1, 100) AS \"Advisory\", COALESCE(NULLIF(risk_level, ''), 'medium') AS \"Priority\", to_char(timestamp AT TIME ZONE 'Africa/Johannesburg', 'DD Mon HH24:MI') AS \"Time\" FROM recommendations WHERE site_id = 'site-002' AND status = 'pending' ORDER BY timestamp DESC LIMIT 5",
+          "rawSql": "SELECT target_equipment AS \"Equipment\", substring(reason, 1, 100) AS \"Advisory\", COALESCE(NULLIF(risk_level, ''), 'medium') AS \"Priority\", to_char(timestamp AT TIME ZONE 'Africa/Johannesburg', 'DD Mon HH24:MI') AS \"Time\" FROM recommendations WHERE site_id = 'site-002' AND status = 'pending' AND source = 'ai_optimizer' AND action_type = 'ai_optimization' ORDER BY timestamp DESC LIMIT 5",
           "refId": "A",
           "format": "table"
         }

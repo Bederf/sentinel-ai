@@ -1599,6 +1599,8 @@ class OpenAIConnectorMCPServer:
                     sensor_map = {
                         "supply_temp_c": "chw_supply_temp",
                         "return_temp_c": "chw_return_temp",
+                        "compressor_current_1": "compressor_current_1",
+                        "compressor_current_2": "compressor_current_2",
                     }
                 elif "ahu" in equip_type or "air" in equip_type:
                     sensor_map = {
@@ -1658,23 +1660,25 @@ class OpenAIConnectorMCPServer:
                                 current_readings[field_key] = reading.data[0]["value"]
                     current_readings["data_source"] = "supabase"
 
-                # Also get aggregate HVAC power from S002-CHILLER-AGG meter.
-                # NOTE: This is TOTAL HVAC power for the building, not just this unit.
-                # Label clearly so downstream consumers don't misattribute.
+                # Per-equipment power estimation for chillers (Option C):
+                # If compressor current readings exist, estimate power_kw from them.
+                if "chiller" in equip_type:
+                    c1 = current_readings.get("compressor_current_1")
+                    c2 = current_readings.get("compressor_current_2")
+                    if c1 is not None and c2 is not None:
+                        VOLTAGE = 380.0
+                        POWER_FACTOR = 0.85
+                        estimated_power_kw = (float(c1) + float(c2)) * VOLTAGE * 1.732 * POWER_FACTOR / 1000.0
+                        current_readings["power_kw"] = round(estimated_power_kw, 2)
+                        current_readings["power_source"] = "estimated_from_compressor_current"
+                        current_readings["power_note"] = "Estimated from compressor current readings — ±15% accuracy"
+
+                # Fallback for chillers/AHUs without compressor current data:
+                # don't attribute aggregate building HVAC power to individual equipment.
                 if current_readings.get("power_kw") is None and ("chiller" in equip_type or "ahu" in equip_type):
-                    power_reading = (
-                        client.table("equipment_sensor_readings")
-                        .select("value")
-                        .eq("equipment_id", "S002-CHILLER-AGG")
-                        .eq("sensor_type", "hvac_kw")
-                        .order("recorded_at", desc=True)
-                        .limit(1)
-                        .execute()
-                    )
-                    if power_reading.data:
-                        current_readings["power_kw"] = power_reading.data[0]["value"]
-                        current_readings["power_source"] = "aggregate_hvac_kw"
-                        current_readings["power_note"] = "Total HVAC power for building, not specific to this unit"
+                    current_readings["power_kw"] = None
+                    current_readings["power_source"] = "not_metered_individually"
+                    current_readings["power_note"] = "Individual equipment power metering not configured for this site"
 
             except Exception as e:
                 logger.debug(f"Failed to query equipment_sensor_readings: {e}")

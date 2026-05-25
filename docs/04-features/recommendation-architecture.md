@@ -4,7 +4,7 @@ type: "spec"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-05-25"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -30,7 +30,7 @@ The system implements a **two-tier recommendation architecture** that separates 
   - HVAC maintenance (R15,000 → R42,025/year savings)
   - Water efficiency retrofit (R35,000 → R10,700/year savings)
 - **Output**: Ranked list with ROI%, payback period, implementation timeline
-- **API**: `/api/recommendations/ai`, `/api/recommendations/dashboard`
+- **API**: `POST /api/recommendations` (create), `GET /api/recommendations/{site_id}` (list)
 - **File**: `backend/app/services/ai_recommendation_engine.py`
 
 ### ROI Calculation Model
@@ -76,7 +76,7 @@ Priority = Rank by ROI descending, confidence, difficulty
   - Lighting control: DALI brightness 80% → 40% (high daylight)
   - Load shedding: Disable non-critical loads during peak hours
 - **Output**: Device-specific control action with approval tier
-- **API**: `/api/recommendations` (POST/GET)
+- **API**: `GET /api/recommendations/{site_id}` (list), `POST /api/recommendations` (create)
 - **File**: `backend/app/services/recommendation_service.py`
 
 ### Tactical Recommendation Example
@@ -212,18 +212,15 @@ class RecommendationAdapter:
 ### Strategic (AIRecommendationEngine)
 
 ```
-POST /api/recommendations/ai
-  - Generate AI recommendations
-  - Params: site_id, metrics (lighting_kwh, water_liters, hvac_cop)
-  - Returns: Ranked list with ROI analysis
+POST /api/recommendations
+  - Create new recommendation
+  - Params: site_id, action_type, target_equipment, action, reason, risk_level
+  - Returns: Recommendation object with approval status
 
-GET /api/recommendations/dashboard
-  - Dashboard summary of all recommendations
-  - Returns: Totals, average payback, cost/benefit
-
-GET /api/recommendations/by-type?type=lighting_optimization
-  - Filter recommendations by type
-  - Returns: Filtered list with implementation details
+GET /api/recommendations/{site_id}
+  - Get pending recommendations for a site
+  - Params: site_id, limit, risk_level (optional filters)
+  - Returns: Paginated list for operator review
 ```
 
 ### Tactical (RecommendationService)

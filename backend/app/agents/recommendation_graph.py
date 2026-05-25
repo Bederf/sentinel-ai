@@ -415,7 +415,7 @@ async def request_approval_node(state: RecommendationAgentState) -> dict:
     # Format approval request for appropriate channel
     if channel == "whatsapp":
         response = format_approval_request_whatsapp(rec, impact, tier_result)
-    elif channel == "telegram":
+    elif channel in ("telegram", "system"):
         response = format_approval_request_telegram(rec, impact, tier_result)
     else:
         response = format_approval_request_whatsapp(rec, impact, tier_result)

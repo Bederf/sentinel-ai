@@ -4,7 +4,7 @@ type: "technical"
 status: "complete"
 version: "1.2.0"
 created: "2026-02-11"
-updated: "2026-04-28"
+updated: "2026-05-25"
 author: "Sentinel Development Team"
 tags: ["ai", "recommendations", "background-jobs", "scheduler", "autonomous"]
 related: ["./ai-recommendation-system.md", "../04-features/lifecycle-simulation.md", "../03-api-reference/recommendations-api.md"]
@@ -16,22 +16,34 @@ estimated_read_time: 15
 
 # Background Recommendation Generation
 
-**Automatic AI recommendations run 24/7 without manual intervention or simulations.** The background scheduler continuously monitors equipment health and generates actionable recommendations every 15 minutes.
+**Automatic AI recommendations run 24/7 without manual intervention or simulations for sites in advisory phase or above.** Sites in shadow/commissioning phases train ML models and collect data only — no recommendations are generated until exit criteria are met.
 
 ## Overview
 
 The recommendation system operates as **autonomous background jobs** that:
-- Run on a fixed schedule (every 10 minutes)
-- Process ALL equipment automatically
+- Run on a fixed schedule (every 30 minutes) for sites in `advisory` phase+
 - Generate recommendations based on REAL data
 - Store results in Supabase for immediate dashboard display
 - Require NO simulations or manual triggers
 
+### Phase Gate Requirement
+
+Recommendation generation is gated by the site's onboarding phase. During `shadow_live`, the system collects telemetry, discovers equipment, and trains ML models (LSTM, Isolation Forest, anomaly detection) — but **no recommendations of any type are generated**. This ensures Sentinel earns the right to advise through the shadow exit criteria:
+
+1. **ML hours ≥ 72h** — models have meaningful training data (trust weight > 0)
+2. **Zero safety violations** in last 24h — no dangerous recommendations
+3. **IF anomaly rate < 15%** — model understands normal vs abnormal
+4. **≥ 3 completed recommendation cycles** — pipeline proven end-to-end
+5. **No failed Tier 3 auto-executions** — recommendations are sound
+
+Only when all gates pass and the site transitions to `advisory` phase does generation begin.
+
 ```mermaid
 graph LR
-    A["Background Scheduler<br/>(APScheduler)"] -->|Every 15 min| B["Recommendation<br/>Generation Job"]
+    A["Background Scheduler<br/>(APScheduler)"] -->|Every 30 min| B["Recommendation<br/>Generation Job"]
     C["Real Equipment Data<br/>(Health, Alerts, Service History)"] --> B
     M["ML Models<br/>(LSTM, Anomaly, Classifier)"] -->|Phase 132| B
+    P["Phase Gate<br/>(shadow_live? skip)"] --> B
     B -->|Analyze & Score| D["Maintenance Recommender<br/>Engine"]
     D -->|Generate| E["Recommendations<br/>(Supabase)"]
     E -->|Display| F["Dashboard UI<br/>(Real-time)"]
@@ -44,16 +56,16 @@ graph LR
 When the backend starts, the scheduler is initialized:
 
 ```python
-# backend/app/startup/events.py - Lines 88-107
+# backend/app/startup/events.py - Lines 319-346
 
-# Initialize background scheduler
+# Start scheduler (already running with registered jobs)
 scheduler_service.start()
 
-# Add recommendation generation job (every 10 minutes)
-scheduler_service.add_recommendation_generation_job(interval_seconds=600)
+# Add recommendation generation job (every 30 minutes)
+scheduler_service.add_recommendation_generation_job(interval_seconds=1800)
 
-# Add optimization analysis job (every 15 minutes)
-scheduler_service.add_optimization_analysis_job(interval_seconds=900)
+# Add optimization analysis job (every 30 minutes)
+scheduler_service.add_optimization_analysis_job(interval_seconds=1800)
 
 # Add prediction generation job (every 5 minutes)
 scheduler_service.add_prediction_generation_job(interval_seconds=300)
@@ -61,7 +73,7 @@ scheduler_service.add_prediction_generation_job(interval_seconds=300)
 
 ### 2. Recurring Job Execution
 
-Every 10 minutes, the scheduler executes:
+Every 30 minutes, the scheduler executes:
 
 ```
 Time: 12:00:00 → Start recommendation generation
@@ -71,7 +83,7 @@ Time: 12:00:00 → Start recommendation generation
   └─ Generate recommendations for each
   └─ Store in Supabase
   └─ Complete: ~2-5 seconds
-Time: 12:10:00 → Start recommendation generation
+Time: 12:30:00 → Start recommendation generation
   └─ (repeat)
 ```
 
@@ -163,7 +175,7 @@ Recommendations are stored in Supabase and immediately available:
   "estimated_cost": 15000,
   "estimated_downtime_hours": 8,
   "created_at": "2026-02-11T12:00:00Z",
-  "status": "pending | approved | rejected | implemented"
+  "status": "pending | approved | rejected | auto_executed | expired | executed"
 }
 ```
 
@@ -179,10 +191,10 @@ Dashboard components query this data:
 
 | Job | Interval | Purpose | Service Impact |
 |-----|----------|---------|-----------------|
-| **Recommendation Generation** | Every 10 min | Scan all equipment, generate recommendations | LOW (2-5 sec) |
-| **Optimization Analysis** | Every 15 min | Analyze sites with optimization enabled | LOW |
+| **Recommendation Generation** | Every 30 min | Scan all equipment, generate recommendations | LOW (2-5 sec) |
+| **Optimization Analysis** | Every 30 min | Analyze sites with optimization enabled | LOW |
 | **Prediction Generation** | Every 5 min | Generate health predictions | LOW (1-2 sec) |
-| **Demo Data Generation** | Every 60 sec | Generate demo metrics (demo mode only) | LOW |
+| ~~**Demo Data Generation**~~ | ~~Every 60 sec~~ | ~~Generate demo metrics (demo mode only)~~ | ~~LOW~~ |
 | **Health Snapshots** | Every 5 min | Store system health history | LOW (<1 sec) |
 | **Model Freshness Check** | Every 24 hours | Check ML model age and accuracy | LOW |
 | **Performance Monitor** | Every 1 hour | Evaluate prediction accuracy | LOW |
@@ -194,14 +206,13 @@ Dashboard components query this data:
 00:00 - System starts, all jobs initialized
 00:05 - First health snapshot stored
 00:05 - First prediction generation
-00:10 - First recommendation generation
-00:15 - First optimization analysis
-00:30 - Second recommendation generation
-00:40 - Second prediction generation
-01:00 - Second optimization analysis
+00:05 - First recommendation processing (lifecycle agent)
+00:30 - First recommendation generation + first optimization analysis
+01:00 - Second prediction generation
+01:00 - Second recommendation processing
+01:30 - Third recommendation processing + second recommendation generation
 ...
 12:00 - Model freshness check (daily)
-24:00 - Error auto-resolve (daily)
 ```
 
 ## Real Data vs Simulated Data
@@ -270,8 +281,8 @@ class BackgroundSchedulerService:
         """Start the scheduler at application startup."""
         self.scheduler.start()
 
-    def add_recommendation_generation_job(self, interval_seconds=600):
-        """Add 10-minute interval job for recommendation generation."""
+    def add_recommendation_generation_job(self, interval_seconds=1800):
+        """Add 30-minute interval job for recommendation generation."""
         self.scheduler.add_job(
             func=self._run_recommendation_generation,
             trigger=IntervalTrigger(seconds=interval_seconds),
@@ -310,7 +321,7 @@ class MaintenanceRecommender:
 
 ### 3. Startup Events Handler
 
-**File:** `backend/app/startup/events.py` (Lines 20-107)
+**File:** `backend/app/startup/events.py` (Lines 319-346)
 
 Initializes scheduler and all background jobs on application startup:
 
@@ -321,21 +332,19 @@ async def startup_event(app: FastAPI):
     # Start scheduler
     scheduler_service.start()
 
-    # Add all jobs with intervals
-    scheduler_service.add_demo_data_job(interval_seconds=60)
-    scheduler_service.add_optimization_analysis_job(interval_seconds=900)
+    # Add recommendation lifecycle jobs
+    scheduler_service.add_optimization_analysis_job(interval_seconds=1800)
     scheduler_service.add_prediction_generation_job(interval_seconds=300)
-    scheduler_service.add_recommendation_generation_job(interval_seconds=600)
-
-    # Start system health snapshots
-    # Start error auto-resolution
+    scheduler_service.add_recommendation_generation_job(interval_seconds=1800)
+    scheduler_service.add_recommendation_processing_job(interval_seconds=300)
+    scheduler_service.add_recommendation_expiry_job(interval_seconds=21600)
 ```
 
 ## Troubleshooting
 
 ### Recommendations Not Appearing
 
-**Symptom:** Dashboard shows no recommendations after 10+ minutes
+**Symptom:** Dashboard shows no recommendations after 30+ minutes
 
 **Diagnosis Steps:**
 
@@ -374,12 +383,12 @@ async def startup_event(app: FastAPI):
 |-------|----------|
 | Scheduler not running | Restart backend: `sudo systemctl restart sentinel-backend.service` |
 | No at-risk equipment | All equipment has health ≥ 90%. Create an alert to degrade health. |
-| Job not triggered | Check if interval is too long. Reduce from 600s to 60s for testing. |
+| Job not triggered | Check if interval is too long. Reduce from 1800s to 60s for testing. |
 | Supabase errors | Check database connectivity, rate limits, authentication |
 
 ### Manual Triggering (For Testing)
 
-To test recommendation generation without waiting 10 minutes:
+To test recommendation generation without waiting 30 minutes:
 
 ```python
 # In Python shell with backend context
@@ -482,19 +491,19 @@ scheduler_service.add_job(
 
 ## Related Documentation
 
-- **AI Recommendation System** - Overall architecture and zone-aware optimization
 - **Recommendations API** - Endpoints for querying and approving recommendations
 - **Profile-Based Optimization (Phase 72)** - Health scoring and recommendation types
+- **Onboarding Phase Model** - `backend/app/models/onboarding_phase.py` — phase definitions, gates, exit criteria
 - **Lifecycle Simulation** - Optional simulation mode for testing
 - **Service Feedback System** - How feedback updates recommendations
 
 ## Summary
 
-✅ **Recommendations run automatically every 10 minutes**
-✅ **No simulations needed for real recommendations**
+✅ **Recommendations run automatically every 30 minutes** (advisory phase+ only)
+✅ **Shadow phase trains models only** — gates must pass before any generation
 ✅ **Real data from equipment health, alerts, service history**
 ✅ **Results displayed immediately on dashboard**
 ✅ **Low performance impact (~2-5 seconds per cycle)**
 ✅ **Full error handling and retry logic**
 
-The system is designed for **set-and-forget operation** - it continuously analyzes equipment and generates recommendations without any manual intervention.
+The system is designed for **set-and-forget operation** — it only begins recommending once it has earned the right through the shadow exit criteria gates.

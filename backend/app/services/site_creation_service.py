@@ -74,7 +74,7 @@ class SiteCreationService:
         gross_floor_area: float | None = None,
         site_code: str | None = None,
         enabled: bool = True,
-        onboarding_phase: str = "advisory",
+        onboarding_phase: str = "shadow_live",
     ) -> dict[str, Any]:
         """
         Create a new site record.
@@ -86,7 +86,7 @@ class SiteCreationService:
             gross_floor_area: Square metres
             site_code: Optional manual override (auto-generated if None)
             enabled: Whether site is active
-            onboarding_phase: Initial phase (default: monitoring)
+            onboarding_phase: Initial phase (default: shadow_live)
 
         Returns:
             Created site record dict including auto-generated site_code

@@ -4,7 +4,7 @@ type: "technical"
 status: "approved"
 version: "3.1.0"
 created: "2026-02-02"
-updated: "2026-04-28"
+updated: "2026-05-25"
 author: "Sentinel Development Team"
 tags: ["ai", "optimization", "recommendations", "claude", "zone-aware", "background-jobs"]
 related: ["./background-recommendation-generation.md", "../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md", "../03-api-reference/recommendations-api.md"]
@@ -18,7 +18,7 @@ estimated_read_time: 25
 
 SENTINEL's AI Recommendation System analyzes building telemetry, weather forecasts, and energy pricing to generate optimal HVAC setpoint recommendations. The system combines Claude AI analysis with rule-based fallbacks and zone-aware optimization for intelligent, context-aware recommendations.
 
-**🎯 Key Feature:** Recommendations are generated **automatically every 10 minutes** without manual intervention. See [Background Recommendation Generation](./background-recommendation-generation.md) for the autonomous scheduling system.
+**🎯 Key Feature:** Recommendations are generated **automatically every 30 minutes** without manual intervention. See [Background Recommendation Generation](./background-recommendation-generation.md) for the autonomous scheduling system.
 
 ## Overview
 
@@ -89,7 +89,8 @@ graph TB
 
 | Component | File | Responsibility |
 |-----------|------|----------------|
-| **Optimization API** | `backend/app/api/ai_recommendations.py` | REST endpoints for optimization |
+| **Optimization API** | `backend/app/api/optimization.py` | REST endpoints for optimization |
+| **Recommendations API** | `backend/app/api/recommendations.py` | REST endpoints for recommendations CRUD |
 | **AI Optimizer Service** | `backend/app/services/ai_optimizer.py` | Core recommendation logic + ML context injection |
 | **ML Context Bridge** | `backend/app/services/ai_optimizer.py` | `_gather_ml_context()` — collects ML model outputs for Claude |
 | **Feature Engineering** | `backend/app/services/feature_engineering_service.py` | Building-level features (EUI, BLI, CDD, Efficiency Score) |
@@ -107,7 +108,7 @@ graph TB
 | **Optimization Page** | `frontend/src/pages/OptimizationPage.tsx` | Full-page optimization view (3 tabs: Load Shedding, Profile, Validation) |
 | **Optimization Panel** | `frontend/src/components/OptimizationPanel.tsx` | Three-column layout |
 | **Recommendation Modal** | `frontend/src/components/OptimizationRecommendationModal.tsx` | Approval dialog |
-| **Energy Comparison** | `frontend/src/components/EnergyComparisonPanel.tsx` | Actual vs SENTINEL comparison (in Validation tab) |
+| ~~**Energy Comparison**~~ | ~~Not yet implemented~~ | Actual vs SENTINEL comparison (in Validation tab) |
 | **ROI Summary** | `frontend/src/components/ROISummaryCard.tsx` | Risk intelligence from predictions (in Validation tab) |
 
 ---
@@ -142,7 +143,7 @@ AI-OPT produces **operational advisory recommendations**. Maintenance recommenda
 | System | Output | Audience | Cadence |
 |--------|--------|----------|---------|
 | Health rule engine | "AHU-2 at 78% — schedule inspection" | Maintenance technician | When health drops below threshold |
-| AI-OPT | "AHU-2 is degraded — reduce load, shift to AHU-1 to protect it" | Building operator | Every 15 minutes |
+| AI-OPT | "AHU-2 is degraded — reduce load, shift to AHU-1 to protect it" | Building operator | Every 30 minutes |
 
 AI-OPT asks: "given current conditions, what should the operator adjust right now?" Degraded equipment informs the urgency of an operational recommendation — it does not trigger a maintenance ticket.
 
@@ -166,16 +167,26 @@ class ZoneType(Enum):
     LOBBY = "lobby"                  # Entrance areas
     PLANT_ROOM = "plant_room"        # Equipment areas
     PARKING = "parking"              # Parking garages
+    RECEPTION = "reception"          # Visitor-facing areas
+    KITCHEN = "kitchen"              # Staff amenity
+    CORRIDOR = "corridor"            # Circulation
+    RESTROOM = "restroom"            # Hygiene areas
+    STAIRWELL = "stairwell"          # Minimal HVAC
+    STORAGE = "storage"              # Minimal HVAC
+    ROOF = "roof"                    # Equipment only
+    BASEMENT = "basement"            # Varies by use
+    UNKNOWN = "unknown"              # Default for unclassified
 ```
 
 #### Zone Priorities
 
 ```
 P1 (Critical)   → Executive, Server Rooms - Tightest comfort bands, never sacrifice cooling
-P2 (High)       → Meeting Rooms - Pre-conditioning before scheduled meetings
-P3 (Medium)     → Banking Hall, Lobby - Standard comfort range
-P4 (Low)        → Open Office - Can accept wider temperature range
-P5 (Lowest)     → Parking, Plant Rooms - Aggressive optimization for energy savings
+P2 (High)       → Meeting Rooms, Reception, Kitchen - Pre-conditioning, visitor-facing
+P3 (Medium)     → Banking Hall, Lobby, Restroom - Standard comfort range
+P4 (Low)        → Open Office, Corridor - Can accept wider temperature range
+P5 (Very Low)   → Parking, Basement - Aggressive optimization
+P6 (Minimal)    → Plant Rooms, Storage, Stairwell, Roof - Minimal HVAC required
 ```
 
 #### Exposure Directions (Southern Hemisphere)
@@ -373,7 +384,7 @@ response = await claude_service.stream_response([{"role": "user", "content": pro
 When Claude is unavailable, rule-based optimization provides consistent recommendations:
 
 ```python
-def _analyze_with_rules(site_id, conditions, weather, prices, devices):
+def _analyze_with_rules(site_id, current_conditions, weather_forecast, energy_prices, equipment_inventory, lighting_zones=None, profile=None):
     recommendations = []
 
     # Rule 1: Zone temperature optimization (zone-aware)
@@ -558,7 +569,7 @@ POST /api/optimization/mv/verify
 |------|---------|
 | `backend/app/services/mv_verification_service.py` | Core M&V service |
 | `backend/app/models/outcome.py` | Outcome model (predicted vs actual) |
-| `backend/app/data/mv_verifications.json` | Verification task storage |
+| Supabase `recommendations` table | Verification task storage (outcome columns) |
 
 ---
 
@@ -1118,6 +1129,7 @@ START → fetch_pending
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.0.1 | 2026-05-25 | Fixed ZoneType enum (17 types, 6 priority levels); corrected file refs (ai_recommendations.py→optimization.py, EnergyComparisonPanel removed); updated M&V storage (JSON→Supabase); fixed _analyze_with_rules signature; 10min→30min interval |
 | 4.0.0 | 2026-02-27 | Phase 132: ML Context Injection — LSTM forecasts, anomaly scores, fault classifications, health trends injected into Claude prompt; Feature Engineering Service (EUI, BLI, CDD, Efficiency Score); Inspection Priority Scoring; updated architecture diagram |
 | 3.0.0 | 2026-02-19 | Added Recommendation Validation & Execution Agent (LangGraph): 13-node StateGraph, 3-tier routing, WhatsApp/Telegram approval flow, ML feedback loop, 72 tests |
 | 2.0.0 | 2026-02-19 | Fixed Southern Hemisphere exposure (NORTH=max gain); top-floor modifier (0.7→1.2x); sensor-health confidence penalty; schedule-aware savings; M&V verification loop; humidity seasonal guard |

@@ -436,7 +436,7 @@ class BackgroundSchedulerService:
                     except Exception:
                         current_stage = "commissioning"
 
-                    GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
+                    GENERATION_ALLOWED = {"advisory", "supervised", "automatic"}
                     if current_stage not in GENERATION_ALLOWED:
                         logger.info(
                             "[AI-OPT] Skipping — site=%s mode=%s (generation requires %s)",
@@ -1441,7 +1441,7 @@ class BackgroundSchedulerService:
             try:
                 processed = loop.run_until_complete(self._run_recommendation_processing_async())
                 if processed:
-                    logger.info("[REC-PROC] Processed %d recommendation batches", processed)
+                    logger.warning("[REC-PROC] Processed %d recommendation batches", processed)
             finally:
                 loop.close()
         except Exception as e:
@@ -1478,13 +1478,40 @@ class BackgroundSchedulerService:
                 )
                 if result and result.get("processing_complete"):
                     processed += 1
-                    logger.info(f"[REC-PROC] Completed processing for {site_id}")
+                    logger.warning(f"[REC-PROC] Completed processing for {site_id}")
+                elif result and result.get("needs_input"):
+                    # Tier 2 — send approval request via Telegram
+                    response_text = result.get("response", "")
+                    if response_text:
+                        await self._send_tier2_telegram_notification(site_id, response_text)
+                    processed += 1
+                    logger.warning(f"[REC-PROC] Tier 2 approval requested for {site_id}")
                 else:
                     logger.debug(f"[REC-PROC] No recommendations to process for {site_id}")
             except Exception as e:
                 logger.warning(f"[REC-PROC] Failed to process {site_id}: {e}")
 
         return processed
+
+    async def _send_tier2_telegram_notification(self, site_id: str, message: str) -> None:
+        """Send a Tier 2 approval request as a Telegram notification."""
+        try:
+            from app.config.settings import settings
+
+            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
+                settings, "sentry_fm_chat_id", None
+            )
+            if not chat_id:
+                logger.debug(f"[REC-PROC] No Telegram chat ID configured for {site_id}")
+                return
+
+            from app.services.telegram_message_sender import get_telegram_sender
+
+            sender = get_telegram_sender()
+            await sender.send_text(str(chat_id), message, parse_mode="Markdown")
+            logger.warning(f"[REC-PROC] Tier 2 approval request sent via Telegram for {site_id}")
+        except Exception as e:
+            logger.warning(f"[REC-PROC] Failed to send Tier 2 Telegram notification: {e}")
 
     def add_milestone_timer_job(self, interval_seconds: int = 300):
         """Add job to check recommendation SLA milestone deadlines every 5 minutes.
@@ -1704,9 +1731,9 @@ class BackgroundSchedulerService:
             logger.warning("Running scheduled AI recommendation generation...")
 
             # Mode gate: build sets for generation + visibility control
-            # Generation runs for shadow_live/supervised/automatic (not commissioning)
-            # Visibility is False in shadow_live (recommendations stored but hidden from UI)
-            GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
+            # Generation runs for advisory/supervised/automatic only
+            # Shadow mode collects data and trains ML models only — no recommendations
+            GENERATION_ALLOWED = {"advisory", "supervised", "automatic"}
             generation_site_ids: set[str] = set()
             shadow_site_ids: set[str] = set()
             try:
@@ -5097,7 +5124,7 @@ class BackgroundSchedulerService:
                 return
 
             repo = get_recommendation_repository()
-            GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
+            GENERATION_ALLOWED = {"advisory", "supervised", "automatic"}
 
             for site_id in site_ids:
                 try:
@@ -5445,10 +5472,10 @@ def _run_rooms_email_intake_poll():
 
 
 def _run_daily_health_sweep_sync():
-    """Sync wrapper for daily health sweep — evaluates all sites for promotion gates.
+    """Sync wrapper for daily health sweep — evaluates sites for promotion gates.
 
-    Iterates all sites in 'shadow_live' or 'advisory' phase and runs a full
-    equipment sweep on each, then persists recommendations and notifies on Telegram.
+    Iterates all sites in 'advisory' or above and runs a full equipment sweep
+    on each, then persists recommendations and notifies on Telegram.
     """
     import asyncio
 
@@ -5462,7 +5489,7 @@ def _run_daily_health_sweep_sync():
         optimizer = get_ai_optimizer()
 
         # Get sites in onboarding phases that need active monitoring
-        active_phases = ["shadow_live", "advisory", "supervised"]
+        active_phases = ["advisory", "supervised"]
         all_sites = repo.get_all()
         target_sites = [s for s in all_sites if s.get("onboarding_phase", "").lower() in active_phases]
 
@@ -5527,7 +5554,7 @@ def _run_daily_health_sweep_sync():
                         f"*SENTINEL Health Sweep*\n"
                         f"{total_recs} recommendations generated across {len(target_sites)} active sites"
                     )
-                    await sender.send_text(str(chat_id), body, parse_mode="HTML")
+                    await sender.send_text(str(chat_id), body, parse_mode="Markdown")
             except Exception as tf_err:
                 logger.warning(f"[HEALTH-SWEEP] Telegram notification failed: {tf_err}")
 
@@ -5770,12 +5797,12 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                             ],
                         ]
                     )
-                    await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="HTML")
+                    await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="Markdown")
             else:
                 lines.append("*AI Recommendations:* None pending")
 
             digest = "\n".join(lines)
-            await sender.send_text(str(chat_id), digest, parse_mode="HTML")
+            await sender.send_text(str(chat_id), digest, parse_mode="Markdown")
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
