@@ -209,7 +209,7 @@
         {
           "refId": "A",
           "expr": "sentinel_space_occupancy_percent or vector(0)",
-          "legendFormat": "{{area_name}} ({{site_id}})"
+          "legendFormat": "Occupancy %"
         }
       ],
       "fieldConfig": {
@@ -246,7 +246,7 @@
         {
           "refId": "A",
           "expr": "sentinel_space_utilization_percent or vector(0)",
-          "legendFormat": "{{zone_id}}"
+          "legendFormat": "Utilization %"
         }
       ],
       "fieldConfig": {

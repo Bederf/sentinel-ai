@@ -229,19 +229,29 @@ class ChecklistService:
         # Get static template as fallback
         fallback = self.get_template_for_inspection(equipment_type.lower(), "routine")
 
-        prompt = f"""Generate a targeted maintenance inspection checklist for a {equipment_type} with this issue.
+        eq_context = f" for a {equipment_type}" if equipment_type else ""
+        type_context = f"\nEquipment type: {equipment_type}" if equipment_type else ""
 
-WO Description: {description}{tax_hint}{fc_hint}
+        prompt = f"""Generate a targeted maintenance inspection checklist{eq_context} with this issue.
+WO Description: {description}{type_context}{tax_hint}{fc_hint}
 
 Return 4-8 specific checklist items as a JSON array. Each item must have:
 - "item_id": snake_case identifier
 - "question": short question the technician can answer yes/no or with a simple observation
 - "options": ["ok", "warning", "critical"] (the three standard statuses)
-- "category": short group name (e.g. "Drain", "Electrical", "Mechanical")
+- "category": short group name (e.g. "Temperature", "Airflow", "Controls")
 - "item_type": "checklist"
 
 Focus on diagnosing and verifying THIS specific issue, not a general PM checklist.
 Each item should be a concrete physical check a technician can perform on-site.
+The technician is responding to a staff complaint — verify the root cause and confirm the fix.
+
+For temperature complaints without specific equipment, include items like:
+- Zone temperature reading vs setpoint
+- Supply air temperature at nearest diffuser
+- Thermostat calibration and operation
+- Damper/valve position for the zone
+- Local FCU or VAV operation if applicable
 
 Return ONLY valid JSON, no other text."""
 
