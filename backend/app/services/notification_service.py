@@ -428,8 +428,10 @@ class NotificationService:
 
         if callback_action == "ack":
             callback_data = f"ack:{notification_id}:{reference_id or ''}"
+        elif reference_id and reference_id not in callback_action:
+            callback_data = f"{callback_action}:{reference_id}"
         else:
-            callback_data = f"{callback_action}:{reference_id or notification_id}"
+            callback_data = callback_action
 
         keyboard = InlineKeyboard(rows=[[InlineButton(label=action_label, callback_data=callback_data)]])
 

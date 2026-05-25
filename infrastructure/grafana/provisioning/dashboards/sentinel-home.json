@@ -17,197 +17,39 @@
   "panels": [
     {
       "type": "row",
-      "title": "Executive Dashboards",
+      "title": "",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
     },
     {
-      "type": "dashlist",
-      "title": "Building Intelligence at a Glance",
-      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 1 },
+      "type": "text",
+      "title": "",
+      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
       "options": {
-        "maxItems": 1,
-        "query": "Building Intelligence at a Glance",
-        "showHeadings": false,
-        "showRecentlyViewed": false,
-        "showSearch": false,
-        "showStarred": false,
-        "tags": []
+        "mode": "html",
+        "content": "<div style=\"display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px;\">\n  <svg width=\"120\" height=\"120\" viewBox=\"0 0 120 120\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" style=\"margin-bottom: 24px;\">\n    <circle cx=\"60\" cy=\"60\" r=\"56\" stroke=\"#10b981\" stroke-width=\"2\" fill=\"none\" opacity=\"0.3\"/>\n    <circle cx=\"60\" cy=\"60\" r=\"56\" stroke=\"#10b981\" stroke-width=\"2\" fill=\"none\" stroke-dasharray=\"88 264\" transform=\"rotate(-90 60 60)\"/>\n    <text x=\"60\" y=\"68\" text-anchor=\"middle\" fill=\"#10b981\" font-family=\"system-ui, sans-serif\" font-size=\"24\" font-weight=\"700\">S</text>\n  </svg>\n  <h1 style=\"margin: 0; font-size: 36px; font-weight: 300; letter-spacing: 0.15em; color: #e2e8f0; text-transform: uppercase;\">SENTINEL</h1>\n  <p style=\"margin: 8px 0 0 0; font-size: 13px; color: #64748b; letter-spacing: 0.08em;\">Building Intelligence Platform</p>\n  <p style=\"margin: 32px 0 0 0; font-size: 12px; color: #475569;\">Site-002 · Sandton City Office Tower</p>\n</div>"
       },
       "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "AI Governance",
-      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 1 },
-      "options": {
-        "maxItems": 1,
-        "query": "AI Governance",
-        "showHeadings": false,
-        "showRecentlyViewed": false,
-        "showSearch": false,
-        "showStarred": false,
-        "tags": []
-      },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "PARASITE Decision Pipeline",
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 1 },
-      "options": {
-        "maxItems": 1,
-        "query": "PARASITE",
-        "showHeadings": false,
-        "showRecentlyViewed": false,
-        "showSearch": false,
-        "showStarred": false,
-        "tags": []
-      },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
+      "transparent": true,
+      "fieldConfig": { "defaults": {} }
     },
     {
       "type": "row",
-      "title": "Building Disciplines",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }
+      "title": "Dashboards",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }
     },
     {
       "type": "dashlist",
-      "title": "HVAC",
-      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 6 },
-      "options": { "maxItems": 1, "query": "HVAC", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Energy",
-      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 6 },
-      "options": { "maxItems": 1, "query": "SENTINEL — Energy", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Lighting",
-      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 6 },
-      "options": { "maxItems": 1, "query": "SENTINEL — Lighting", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Solar & BESS",
-      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 6 },
-      "options": { "maxItems": 1, "query": "Solar", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Water",
-      "gridPos": { "h": 3, "w": 4, "x": 16, "y": 6 },
-      "options": { "maxItems": 1, "query": "SENTINEL — Water", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Fire Safety",
-      "gridPos": { "h": 3, "w": 4, "x": 20, "y": 6 },
-      "options": { "maxItems": 1, "query": "Fire Safety", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "row",
-      "title": "Operations",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 9 }
-    },
-    {
-      "type": "dashlist",
-      "title": "Security",
-      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 10 },
-      "options": { "maxItems": 1, "query": "SENTINEL — Security", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Security Operations",
-      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 10 },
-      "options": { "maxItems": 1, "query": "SENTINEL — Security Operations", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Backend Uptime",
-      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 10 },
-      "options": { "maxItems": 1, "query": "Backend Uptime", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Database",
-      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 10 },
-      "options": { "maxItems": 1, "query": "Database", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "MCP Security",
-      "gridPos": { "h": 3, "w": 4, "x": 16, "y": 10 },
-      "options": { "maxItems": 1, "query": "MCP Security", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "row",
-      "title": "Monitoring",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 }
-    },
-    {
-      "type": "dashlist",
-      "title": "AI Governance Live",
-      "gridPos": { "h": 3, "w": 4, "x": 0, "y": 14 },
-      "options": { "maxItems": 1, "query": "AI Governance Live", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Building UI",
-      "gridPos": { "h": 3, "w": 4, "x": 4, "y": 14 },
-      "options": { "maxItems": 1, "query": "Building UI", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "ESG",
-      "gridPos": { "h": 3, "w": 4, "x": 8, "y": 14 },
-      "options": { "maxItems": 1, "query": "ESG", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Fuel & Generator",
-      "gridPos": { "h": 3, "w": 4, "x": 12, "y": 14 },
-      "options": { "maxItems": 1, "query": "Fuel & Generator", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
-      "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
-    },
-    {
-      "type": "dashlist",
-      "title": "Space Optimization",
-      "gridPos": { "h": 3, "w": 4, "x": 16, "y": 14 },
-      "options": { "maxItems": 1, "query": "Space Optimization", "showHeadings": false, "showRecentlyViewed": false, "showSearch": false, "showStarred": false, "tags": [] },
+      "title": "",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "options": {
+        "maxItems": 30,
+        "query": "",
+        "showHeadings": false,
+        "showRecentlyViewed": true,
+        "showSearch": false,
+        "showStarred": true,
+        "tags": ["sentinel"]
+      },
       "pluginVersion": "10.4.1",
       "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
     }
