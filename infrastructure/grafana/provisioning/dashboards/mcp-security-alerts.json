@@ -37,7 +37,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP rate limit|MCP auth failure|MCP manifest drift\" [1h])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP rate limit|MCP auth failure|MCP manifest drift\" [1h]) or vector(0)",
           "legendFormat": "MCP Security Events (1h)",
           "refId": "A"
         }
@@ -103,7 +103,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP rate limit\" [1m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP rate limit\" [1m]) or vector(0)",
           "legendFormat": "Rate Limit Hits",
           "refId": "A"
         }
@@ -187,7 +187,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP auth failure|invalid MCP token|Invalid MCP authentication\" [1m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP auth failure|invalid MCP token|Invalid MCP authentication\" [1m]) or vector(0)",
           "legendFormat": "Auth Failures",
           "refId": "A"
         }
@@ -272,7 +272,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"Tool execution error|internal_error|TIMEOUT\" |~ \"mcp\" [1m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"Tool execution error|internal_error|TIMEOUT\" |~ \"mcp\" [1m]) or vector(0)",
           "legendFormat": "Tool Errors",
           "refId": "A"
         }
@@ -357,7 +357,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP manifest drift\" [5m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"MCP manifest drift\" [5m]) or vector(0)",
           "legendFormat": "Manifest Drift",
           "refId": "A"
         }
@@ -441,17 +441,17 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"read\" [5m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"read\" [5m]) or vector(0)",
           "legendFormat": "Read",
           "refId": "A"
         },
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"mutating\" [5m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"mutating\" [5m]) or vector(0)",
           "legendFormat": "Mutating",
           "refId": "B"
         },
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"high_risk\" [5m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"mcp_tool_call\" | json | risk_tier=\"high_risk\" [5m]) or vector(0)",
           "legendFormat": "High Risk",
           "refId": "C"
         }
@@ -492,7 +492,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"I2: Rejected non-localhost\" [5m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"I2: Rejected non-localhost\" [5m]) or vector(0)",
           "legendFormat": "Host/Origin Rejections",
           "refId": "A"
         }
@@ -544,7 +544,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"Concurrency limit reached\" [5m])",
+          "expr": "count_over_time({job=\"systemd-journal\", unit=\"sentinel-backend.service\"} |~ \"Concurrency limit reached\" [5m]) or vector(0)",
           "legendFormat": "Concurrency Limit",
           "refId": "A"
         }

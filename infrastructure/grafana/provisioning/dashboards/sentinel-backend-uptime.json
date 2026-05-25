@@ -152,7 +152,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "time() - sentinel_metrics_last_updated_timestamp{job=\"sentinel-governance\"}",
+          "expr": "time() - sentinel_metrics_last_updated_timestamp{job=\"sentinel-governance\"} or vector(0)",
           "legendFormat": "{{site_id}}"
         }
       ],
@@ -201,7 +201,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_http_requests_total{job=\"sentinel-governance\", path=\"/api/health\", status_code=\"200\"} > 0",
+          "expr": "sentinel_http_requests_total{job=\"sentinel-governance\", path=\"/api/health\", status_code=\"200\"} > 0 or vector(0)",
           "legendFormat": "MCP Health"
         }
       ],
@@ -262,7 +262,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "rate(sentinel_http_requests_total{job=\"sentinel-governance\"}[5m])",
+          "expr": "rate(sentinel_http_requests_total{job=\"sentinel-governance\"}[5m]) or vector(0)",
           "legendFormat": "{{method}} {{path}} {{status_code}}"
         }
       ],
@@ -341,12 +341,12 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, rate(sentinel_db_query_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, rate(sentinel_db_query_duration_seconds_bucket[5m])) or vector(0)",
           "legendFormat": "p95"
         },
         {
           "refId": "B",
-          "expr": "histogram_quantile(0.50, rate(sentinel_db_query_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.50, rate(sentinel_db_query_duration_seconds_bucket[5m])) or vector(0)",
           "legendFormat": "p50"
         }
       ],
@@ -437,7 +437,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_backend_up",
+          "expr": "sentinel_backend_up or vector(0)",
           "legendFormat": "Backend"
         }
       ],

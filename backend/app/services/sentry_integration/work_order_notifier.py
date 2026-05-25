@@ -839,17 +839,13 @@ class WorkOrderNotifier:
             tech_name = work_order_data.get("technician_name", "Technician")
             equipment_code = work_order_data.get("equipment_code", "")
             code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
-            eq_cmds = f"/info-{code_dashed} - Equipment details\n" if code_dashed else ""
-            note_cmd = f"/note-{code_dashed} - Add note"
+            eq_line = f"\nEquipment: {equipment_code}" if equipment_code else ""
 
             msg = (
                 f"Work Order Created #{wo_ref}\n"
                 f"Assigned: {tech_name}\n"
-                f"Priority: {pri}\n"
-                f"Equipment: {equipment_code}\n"
-                f"─────────────────\n"
-                f"{eq_cmds}{note_cmd}\n"
-                f"done #{wo_ref} - Complete work order"
+                f"Priority: {pri}"
+                f"{eq_line}"
             )
 
             # Build inline buttons for the technician

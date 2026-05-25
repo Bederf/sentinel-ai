@@ -39,7 +39,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_building_tab_active",
+          "expr": "sentinel_building_tab_active or vector(0)",
           "legendFormat": "{{site_id}} - {{tab_id}}",
           "format": "table"
         }
@@ -108,7 +108,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_building_card_visible",
+          "expr": "sentinel_building_card_visible or vector(0)",
           "legendFormat": "{{site_id}} - {{card_id}}",
           "format": "table"
         }
@@ -177,7 +177,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(sentinel_building_tab_active)",
+          "expr": "sum(sentinel_building_tab_active) or vector(0)",
           "legendFormat": "Active Tabs"
         }
       ],
@@ -245,7 +245,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(sentinel_building_card_visible)",
+          "expr": "sum(sentinel_building_card_visible) or vector(0)",
           "legendFormat": "Visible Cards"
         }
       ],
@@ -313,7 +313,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (site_id) (sentinel_building_tab_active)",
+          "expr": "sum by (site_id) (sentinel_building_tab_active) or vector(0)",
           "legendFormat": "{{site_id}}"
         }
       ],
@@ -365,7 +365,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (site_id) (sentinel_building_card_visible)",
+          "expr": "sum by (site_id) (sentinel_building_card_visible) or vector(0)",
           "legendFormat": "{{site_id}}"
         }
       ],

@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(245, 135, 30, 0.59)",
@@ -12,7 +15,7 @@
       }
     ]
   },
-  "description": "SENTINEL Fuel & Generator monitoring — runtime hours, fuel level, consumption rate, autonomy.",
+  "description": "SENTINEL Fuel & Generator monitoring \u2014 runtime hours, fuel level, consumption rate, autonomy.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -23,15 +26,66 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}", "legendFormat": "{{instance}}" }],
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
-          "color": { "mode": "thresholds" },
-          "mappings": [{ "type": "value", "options": { "0": { "text": "Down", "color": "#ef4444" } } }, { "type": "value", "options": { "1": { "text": "Up", "color": "#10b981" } } }],
-          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.15)" }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "#ef4444"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up",
+                  "color": "#10b981"
+                }
+              }
+            }
+          ],
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
         }
       }
     },
@@ -39,16 +93,48 @@
       "id": 2,
       "title": "Fuel Level",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 5, "x": 3, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "avg(sentinel_fuel_level_percent) or vector(0)", "legendFormat": "Avg %" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 3,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(sentinel_fuel_level_percent) or vector(0)",
+          "legendFormat": "Avg %"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 20 }, { "color": "#10b981", "value": 50 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 20
+              },
+              {
+                "color": "#10b981",
+                "value": 50
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 1
         }
       }
@@ -57,16 +143,52 @@
       "id": 3,
       "title": "Autonomy",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 8, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sum(sentinel_fuel_autonomy_hours) or vector(0)", "legendFormat": "Hours remaining" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 8,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_fuel_autonomy_hours) or vector(0)",
+          "legendFormat": "Hours remaining"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 24 }, { "color": "#10b981", "value": 72 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 24
+              },
+              {
+                "color": "#10b981",
+                "value": 72
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "unit": "none",
           "decimals": 0,
-          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.12)" }
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.12)"
+          }
         }
       }
     },
@@ -74,14 +196,33 @@
       "id": 4,
       "title": "Generator Runtime",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_fuel_generator_runtime_hours", "legendFormat": "{{generator_id}} ({{site_id}})" }],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_fuel_generator_runtime_hours or vector(0)",
+          "legendFormat": "{{generator_id}} ({{site_id}})"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 1
         }
       }
@@ -90,17 +231,52 @@
       "id": 5,
       "title": "Fuel Level by Tank",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_fuel_level_percent", "legendFormat": "{{tank_id}}" }],
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_fuel_level_percent or vector(0)",
+          "legendFormat": "{{tank_id}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 20 }, { "color": "#10b981", "value": 50 }] },
-          "color": { "mode": "thresholds" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 20
+              },
+              {
+                "color": "#10b981",
+                "value": 50
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 1
         }
       }
@@ -109,14 +285,33 @@
       "id": 6,
       "title": "Fuel Consumption",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_fuel_consumption_lph", "legendFormat": "{{generator_id}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_fuel_consumption_lph or vector(0)",
+          "legendFormat": "{{generator_id}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": { "lineWidth": 1, "fillOpacity": 28 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 28
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 2
         }
       }
@@ -125,28 +320,60 @@
       "id": 7,
       "title": "Fuel Cost",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_fuel_cost_zar", "legendFormat": "{{site_id}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_fuel_cost_zar or vector(0)",
+          "legendFormat": "{{site_id}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "currencyZAR",
-          "custom": { "lineWidth": 1, "fillOpacity": 28 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 28
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 0
         }
       }
     }
   ],
   "refresh": "60s",
-  "tags": ["fuel", "generator", "sentinel", "building"],
+  "tags": [
+    "fuel",
+    "generator",
+    "sentinel",
+    "building"
+  ],
   "templating": {
     "list": [
-      { "name": "site", "type": "query", "query": "label_values(sentinel_fuel_generator_runtime_hours, site_id)", "multi": true }
+      {
+        "name": "site",
+        "type": "query",
+        "query": "label_values(sentinel_fuel_generator_runtime_hours, site_id)",
+        "multi": true
+      }
     ]
   },
-  "time": { "from": "now-24h", "to": "now" },
-  "title": "SENTINEL — Fuel & Generator",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "title": "SENTINEL \u2014 Fuel & Generator",
   "uid": "sentinel-fuel",
   "version": 2
 }

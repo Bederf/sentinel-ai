@@ -37,7 +37,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"sentinel-docker\"} |= \"SLOW_QUERY\"",
+          "expr": "{job=\"sentinel-docker\"} |= \"SLOW_QUERY\" or vector(0)",
           "legendFormat": "",
           "refId": "A"
         }
@@ -67,7 +67,7 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"SLOW_QUERY\" [24h])",
+          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"SLOW_QUERY\" [24h]) or vector(0)",
           "legendFormat": "Slow Queries",
           "refId": "A"
         }
@@ -134,12 +134,12 @@
       },
       "targets": [
         {
-          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"hit\" [24h])",
+          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"hit\" [24h]) or vector(0)",
           "legendFormat": "Cache Hits",
           "refId": "A"
         },
         {
-          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"miss\" [24h])",
+          "expr": "count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"miss\" [24h]) or vector(0)",
           "legendFormat": "Cache Misses",
           "refId": "B"
         }
@@ -206,7 +206,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (repo) (count_over_time({job=\"sentinel-docker\"} |= \"SLOW_QUERY\" | json | repo != \"\" [1h]))",
+          "expr": "sum by (repo) (count_over_time({job=\"sentinel-docker\"} |= \"SLOW_QUERY\" | json | repo != \"\" [1h])) or vector(0)",
           "legendFormat": "{{repo}}",
           "refId": "A"
         }
@@ -257,12 +257,12 @@
       },
       "targets": [
         {
-          "expr": "sum(count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"hit\" [1h]))",
+          "expr": "sum(count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"hit\" [1h])) or vector(0)",
           "legendFormat": "Hits",
           "refId": "A"
         },
         {
-          "expr": "sum(count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"miss\" [1h]))",
+          "expr": "sum(count_over_time({job=\"sentinel-docker\"} |= \"cache\" |= \"miss\" [1h])) or vector(0)",
           "legendFormat": "Misses",
           "refId": "B"
         }
@@ -299,7 +299,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"sentinel-docker\"} |= \"DB archival\" or {job=\"sentinel-docker\"} |= \"archive\"",
+          "expr": "{job=\"sentinel-docker\"} |= \"DB archival\" or {job=\"sentinel-docker\"} |= \"archive\" or vector(0)",
           "legendFormat": "",
           "refId": "A"
         }
@@ -328,7 +328,7 @@
       },
       "targets": [
         {
-          "expr": "{job=\"sentinel-docker\"} |= \"GATEWAY\"",
+          "expr": "{job=\"sentinel-docker\"} |= \"GATEWAY\" or vector(0)",
           "legendFormat": "",
           "refId": "A"
         }

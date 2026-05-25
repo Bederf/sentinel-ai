@@ -37,7 +37,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(sentinel_recommendations_total[24h]))",
+          "expr": "sum(increase(sentinel_recommendations_total[24h])) or vector(0)",
           "legendFormat": "Recommendations",
           "refId": "A"
         }
@@ -104,7 +104,7 @@
       },
       "targets": [
         {
-          "expr": "sum(increase(sentinel_recommendations_total{action=\"auto_execute\"}[24h]))",
+          "expr": "sum(increase(sentinel_recommendations_total{action=\"auto_execute\"}[24h])) or vector(0)",
           "legendFormat": "Auto-Executed",
           "refId": "A"
         }
@@ -234,7 +234,7 @@
       },
       "targets": [
         {
-          "expr": "avg(sentinel_model_drift_score)",
+          "expr": "avg(sentinel_model_drift_score) or vector(0)",
           "legendFormat": "Drift Score",
           "refId": "A"
         }
@@ -301,7 +301,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (action) (increase(sentinel_recommendations_total[24h]))",
+          "expr": "sum by (action) (increase(sentinel_recommendations_total[24h])) or vector(0)",
           "legendFormat": "{{action}}",
           "refId": "A"
         }
@@ -342,7 +342,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (tier) (increase(sentinel_recommendations_total[24h]))",
+          "expr": "sum by (tier) (increase(sentinel_recommendations_total[24h])) or vector(0)",
           "legendFormat": "{{tier}}",
           "refId": "A"
         }
@@ -383,7 +383,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (increase(sentinel_quality_gate_evaluations_total[24h]))",
+          "expr": "sum by (status) (increase(sentinel_quality_gate_evaluations_total[24h])) or vector(0)",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -424,7 +424,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (site_id) (rate(sentinel_recommendations_total[1h]))",
+          "expr": "sum by (site_id) (rate(sentinel_recommendations_total[1h])) or vector(0)",
           "legendFormat": "{{site_id}}",
           "refId": "A"
         }
@@ -461,7 +461,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (status) (rate(sentinel_quality_gate_evaluations_total[1h]))",
+          "expr": "sum by (status) (rate(sentinel_quality_gate_evaluations_total[1h])) or vector(0)",
           "legendFormat": "{{status}}",
           "refId": "A"
         }
@@ -549,7 +549,7 @@
       },
       "targets": [
         {
-          "expr": "avg by (model_type) (sentinel_model_drift_score)",
+          "expr": "avg by (model_type) (sentinel_model_drift_score) or vector(0)",
           "legendFormat": "{{model_type}}",
           "refId": "A"
         }

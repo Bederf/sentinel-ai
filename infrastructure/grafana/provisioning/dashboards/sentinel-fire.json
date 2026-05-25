@@ -154,7 +154,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(sentinel_fire_evacuation_status)",
+          "expr": "sum(sentinel_fire_evacuation_status) or vector(0)",
           "legendFormat": "Evac status"
         }
       ],
@@ -230,7 +230,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_fire_panel_status",
+          "expr": "sentinel_fire_panel_status or vector(0)",
           "format": "table",
           "legendFormat": ""
         }
@@ -308,7 +308,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_fire_detector_faults",
+          "expr": "sentinel_fire_detector_faults or vector(0)",
           "legendFormat": "{{panel_id}}"
         }
       ],
@@ -360,7 +360,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_fire_extinguisher_expiry_days",
+          "expr": "sentinel_fire_extinguisher_expiry_days or vector(0)",
           "format": "table",
           "legendFormat": ""
         }

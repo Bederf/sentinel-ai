@@ -1204,6 +1204,7 @@ async def _create_complaint_wo(
 
         wo_code = created.get("code")
         wo_uuid = created.get("id")
+        equipment_code = created.get("equipment_code", "") or wo_data.get("equipment_code", "")
 
         # Look up technician by category / specialty for site-002
         tech = None
@@ -1263,7 +1264,8 @@ async def _create_complaint_wo(
                 await notifier.notify_technician({
                     "code": wo_code,
                     "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
-                    "equipment_id": f"site-002",
+                    "equipment_code": equipment_code,
+                    "equipment_id": equipment_code or f"site-002",
                     "equipment_name": title,
                     "site_id": "site-002",
                     "technician_id": tech.get("telegram_id"),
