@@ -2136,9 +2136,12 @@ If unsure of the exact code, use the closest match from the valid list.
         prompt_parts = []
 
         # LAYER 1 — ACTIVE GOAL
+        occupied_label = "OCCUPIED" if is_occupied_hours else "UNOCCUPIED (setback)"
         layer1 = f"""=================================================================
 LAYER 1 — ACTIVE GOAL
 =================================================================
+Time: {current_time_str} {current_weekday} — {occupied_label}
+Operating hours: {op_start}–{op_end} weekdays (holidays follow weekend schedule)
 Profile: {active_profile.upper().replace("_", " ")}
 {self._format_profile_intent(profile_name, energy_prices)}"""
 

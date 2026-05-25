@@ -121,6 +121,10 @@ class TierRoutingEngine:
         confidence_score = self._extract_confidence(recommendation)
         correlation_id = recommendation.get("correlation_id", "")
 
+        # Common fields for decision events (all tier paths)
+        _eq_code = recommendation.get("target_equipment", "unknown")
+        _site_id = recommendation.get("site_id", "unknown")
+
         # 2. Phase gate check: resolve site onboarding phase for later autonomy capping
         caps_auto_execute: bool = False  # True when phase < supervised (cap at Tier 2)
         try:
@@ -131,6 +135,15 @@ class TierRoutingEngine:
             site_phase = (phase_row.data[0].get("onboarding_phase") or "commissioning") if phase_row.data else "commissioning"
             if site_phase in ("commissioning", "shadow_live"):
                 logger.info("Phase %s caps Tier 1 (advisory only) for %s", site_phase, recommendation.get("site_id"))
+                emit_decision_event(
+                    "tier_routing.decided",
+                    correlation_id=correlation_id,
+                    equipment_code=_eq_code,
+                    site_id=_site_id,
+                    tier=TierLevel.TIER1.value,
+                    status="advisory",
+                    details={"reason": f"Phase '{site_phase}' limits to Tier 1 advisory only", "confidence_score": confidence_score, "threshold_source": "phase_gate", "risk_level": risk_level},
+                )
                 return TierRoutingResult(
                     tier=TierLevel.TIER1.value,
                     action="advisory",
@@ -152,6 +165,15 @@ class TierRoutingEngine:
         # 3. Master switch check
         if not self.settings.parasite_enabled:
             logger.debug("PARASITE disabled globally, routing to Tier 1 advisory")
+            emit_decision_event(
+                "tier_routing.decided",
+                correlation_id=correlation_id,
+                equipment_code=_eq_code,
+                site_id=_site_id,
+                tier=TierLevel.TIER1.value,
+                status="advisory",
+                details={"reason": "PARASITE master switch is disabled", "confidence_score": confidence_score, "threshold_source": "settings", "risk_level": risk_level},
+            )
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,
                 action="advisory",
@@ -170,6 +192,15 @@ class TierRoutingEngine:
         control_point = action.get("point", "") if isinstance(action, dict) else ""
         if not control_point:
             logger.debug("No control point in action — routing to Tier 1 advisory")
+            emit_decision_event(
+                "tier_routing.decided",
+                correlation_id=correlation_id,
+                equipment_code=_eq_code,
+                site_id=_site_id,
+                tier=TierLevel.TIER1.value,
+                status="advisory",
+                details={"reason": "Recommendation has no device control action — advisory only", "confidence_score": confidence_score, "threshold_source": "actionability_gate", "risk_level": risk_level},
+            )
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,
                 action="advisory",
@@ -188,6 +219,15 @@ class TierRoutingEngine:
         action_type = recommendation.get("action_type", "")
         if action_type == "ai_optimization":
             logger.debug("ai_optimization rec — routing to Tier 1 advisory (optimizer handles notification)")
+            emit_decision_event(
+                "tier_routing.decided",
+                correlation_id=correlation_id,
+                equipment_code=_eq_code,
+                site_id=_site_id,
+                tier=TierLevel.TIER1.value,
+                status="advisory",
+                details={"reason": "AI optimization recommendation — notified via optimizer path", "confidence_score": confidence_score, "threshold_source": "optimizer_gate", "risk_level": risk_level},
+            )
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,
                 action="advisory",

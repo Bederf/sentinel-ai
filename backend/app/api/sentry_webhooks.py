@@ -1753,6 +1753,23 @@ async def sentry_wo_status(
             if reporter_telegram_id not in created_by:
                 return WoStatusResponse(success=True, found=False, code=code)
 
+        # Also fetch equipment notes if equipment exists on the WO
+        equipment_notes = ""
+        equipment_id = wo.get("equipment_id")
+        if equipment_id and len(str(equipment_id)) > 5:
+            try:
+                from app.database.supabase_client import get_supabase_client
+                sb = get_supabase_client()
+                eq_result = sb.table("equipment").select("notes").eq("id", equipment_id).limit(1).execute()
+                if eq_result.data and eq_result.data[0].get("notes"):
+                    equipment_notes = eq_result.data[0]["notes"]
+            except Exception:
+                pass
+
+        notes = wo.get("notes") or ""
+        if equipment_notes:
+            notes = (notes + "\n" + equipment_notes).strip()
+
         return WoStatusResponse(
             success=True,
             found=True,
@@ -1762,7 +1779,7 @@ async def sentry_wo_status(
             category=wo.get("category") or "",
             title=wo.get("title") or "",
             description=wo.get("description") or "",
-            notes=wo.get("notes") or "",
+            notes=notes,
             assigned_to=wo.get("assigned_to") or "",
             created_at=str(wo.get("created_at") or ""),
             updated_at=str(wo.get("updated_at") or ""),
