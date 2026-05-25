@@ -12,6 +12,20 @@
         "iconColor": "rgba(245, 135, 30, 0.59)",
         "name": "Annotations & Alerts",
         "type": "dashboard"
+      },
+      {
+        "builtIn": 0,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": false,
+        "iconColor": "#ef4444",
+        "name": "Demand Spike \u2014 24 May",
+        "type": "manual",
+        "content": "Peak demand event ~80kW. Investigate: chiller staging, load shedding, or HVAC fault?",
+        "time": null
       }
     ]
   },
@@ -85,8 +99,9 @@
       }
     },
     {
-      "title": "Equipment Health Heatmap",
-      "type": "bargauge",
+      "title": "Equipment Health Status",
+      "type": "table",
+      "description": "Equipment health scores for site-002, sorted by lowest health first",
       "gridPos": {
         "h": 8,
         "w": 10,
@@ -94,15 +109,14 @@
         "y": 0
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "postgres",
+        "uid": "PFE7CEB7816ED0E35"
       },
       "targets": [
         {
-          "expr": "sentinel_equipment_issues{building=~\"site-002|S002|Sandton\"}",
-          "format": "table",
-          "legendFormat": "",
-          "refId": "A"
+          "rawSql": "SELECT name AS \"Equipment\", health_score AS \"Health\", status AS \"Status\" FROM equipment WHERE site_id = 'site-002' ORDER BY health_score ASC NULLS LAST LIMIT 15",
+          "refId": "A",
+          "format": "table"
         }
       ],
       "fieldConfig": {
@@ -114,51 +128,64 @@
             "align": "auto",
             "cellOptions": {
               "type": "color-background-solid",
-              "value": true
+              "value": false
             },
             "inspect": false
           },
           "mappings": [],
-          "max": 1,
-          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "#10b981",
+                "color": "#ef4444",
                 "value": null
               },
               {
                 "color": "#f59e0b",
-                "value": 0.5
+                "value": 60
               },
               {
-                "color": "#ef4444",
-                "value": 0.75
+                "color": "#10b981",
+                "value": 80
               }
             ]
           },
           "unit": "none",
           "decimals": 0
-        }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Health"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background-solid",
+                  "value": true
+                }
+              }
+            ]
+          }
+        ]
       },
       "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 10,
-        "minVizWidth": 0.1,
-        "orientation": "horizontal",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+        "showRow": true,
+        "cellHeight": "sm",
+        "footer": {
+          "countRows": false,
           "fields": "",
-          "values": false
-        },
-        "showUnfilled": true
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        }
       }
     },
     {
-      "title": "Active Equipment Issues",
+      "title": "Equipment at Risk",
       "type": "stat",
       "gridPos": {
         "h": 8,
@@ -217,7 +244,8 @@
           "values": false
         },
         "textMode": "auto"
-      }
+      },
+      "description": "Count of equipment with degrading or critical health"
     },
     {
       "title": "ML Predictions \u2014 7d",
@@ -364,8 +392,9 @@
       }
     },
     {
-      "title": "Recommendations \u2014 24h",
+      "title": "Recommendations by Priority",
       "type": "bargauge",
+      "description": "Active recommendations grouped by risk level",
       "gridPos": {
         "h": 8,
         "w": 6,
@@ -373,20 +402,20 @@
         "y": 8
       },
       "datasource": {
-        "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "type": "postgres",
+        "uid": "PFE7CEB7816ED0E35"
       },
       "targets": [
         {
-          "expr": "sum by (tier) (increase(sentinel_recommendations_total{site_id=\"site-002\"}[24h]))",
-          "legendFormat": "{{tier}}",
-          "refId": "A"
+          "rawSql": "SELECT COALESCE(NULLIF(risk_level, ''), 'medium') AS \"Priority\", COUNT(*) AS \"Count\" FROM recommendations WHERE site_id = 'site-002' AND status = 'pending' GROUP BY \"Priority\" ORDER BY \"Count\" DESC",
+          "refId": "A",
+          "format": "table"
         }
       ],
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "palette-classic"
+            "mode": "thresholds"
           },
           "custom": {
             "align": "auto",
@@ -396,9 +425,44 @@
             },
             "inspect": false
           },
-          "mappings": [],
-          "max": 1,
-          "min": 0,
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "critical": {
+                  "color": "#ef4444",
+                  "text": "Critical"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "high": {
+                  "color": "#f97316",
+                  "text": "High"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "medium": {
+                  "color": "#f59e0b",
+                  "text": "Medium"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "low": {
+                  "color": "#10b981",
+                  "text": "Low"
+                }
+              }
+            }
+          ],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -442,7 +506,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT target_equipment, COALESCE(action->>'point', action->>'type', 'n/a') as control_point, action->>'value' as target_value, substring(reason, 1, 80) as advisory, profile as goal, confidence, expected_impact->>'cost_zar' as projected_saving_zar, timestamp FROM recommendations WHERE site_id = 'site-002' AND status = 'active' ORDER BY confidence DESC LIMIT 5",
+          "rawSql": "SELECT target_equipment AS \"Equipment\", substring(reason, 1, 100) AS \"Advisory\", COALESCE(NULLIF(risk_level, ''), 'medium') AS \"Priority\", to_char(timestamp AT TIME ZONE 'Africa/Johannesburg', 'DD Mon HH24:MI') AS \"Time\" FROM recommendations WHERE site_id = 'site-002' AND status = 'pending' ORDER BY timestamp DESC LIMIT 5",
           "refId": "A",
           "format": "table"
         }
