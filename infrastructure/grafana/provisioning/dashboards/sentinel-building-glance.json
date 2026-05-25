@@ -114,7 +114,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT name AS \"Equipment\", health_score AS \"Health\", status AS \"Status\" FROM equipment WHERE site_id = 'site-002' ORDER BY health_score ASC NULLS LAST LIMIT 15",
+          "rawSql": "SELECT e.name AS \"Equipment\", e.health_score AS \"Health\", e.status AS \"Status\" FROM equipment e WHERE e.site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) ORDER BY e.health_score ASC NULLS LAST LIMIT 15",
           "refId": "A",
           "format": "table"
         }
@@ -263,7 +263,7 @@
       "targets": [
         {
           "expr": "sum by (prediction_type) (rate(sentinel_recommendations_total{site_id=\"site-002\", tier=~\"tier2|tier3\"}[1h]))",
-          "legendFormat": "{{prediction_type}}",
+          "legendFormat": "{{action}}",
           "refId": "A"
         }
       ],
@@ -312,12 +312,12 @@
       "targets": [
         {
           "expr": "sentinel_energy_demand_kw{site_id=\"site-002\"}",
-          "legendFormat": "Actual Demand kW",
+          "legendFormat": "Actual Demand",
           "refId": "A"
         },
         {
           "expr": "sentinel_energy_peak_demand_kw{site_id=\"site-002\"}",
-          "legendFormat": "Peak Demand kW",
+          "legendFormat": "Peak Baseline",
           "refId": "B"
         }
       ],
@@ -392,9 +392,9 @@
       }
     },
     {
-      "title": "Recommendations by Priority",
-      "type": "bargauge",
-      "description": "Active recommendations grouped by risk level",
+      "title": "Active Recommendations",
+      "type": "stat",
+      "description": "Total pending recommendations for site-002",
       "gridPos": {
         "h": 8,
         "w": 6,
@@ -407,7 +407,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT COALESCE(NULLIF(risk_level, ''), 'medium') AS \"Priority\", COUNT(*) AS \"Count\" FROM recommendations WHERE site_id = 'site-002' AND status = 'pending' GROUP BY \"Priority\" ORDER BY \"Count\" DESC",
+          "rawSql": "SELECT COUNT(*) AS \"Total\" FROM recommendations WHERE site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) AND status = 'pending'",
           "refId": "A",
           "format": "table"
         }
@@ -417,58 +417,21 @@
           "color": {
             "mode": "thresholds"
           },
-          "custom": {
-            "align": "auto",
-            "cellOptions": {
-              "type": "color-background-solid",
-              "value": true
-            },
-            "inspect": false
-          },
-          "mappings": [
-            {
-              "type": "value",
-              "options": {
-                "critical": {
-                  "color": "#ef4444",
-                  "text": "Critical"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "high": {
-                  "color": "#f97316",
-                  "text": "High"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "medium": {
-                  "color": "#f59e0b",
-                  "text": "Medium"
-                }
-              }
-            },
-            {
-              "type": "value",
-              "options": {
-                "low": {
-                  "color": "#10b981",
-                  "text": "Low"
-                }
-              }
-            }
-          ],
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
                 "color": "#10b981",
                 "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 50
+              },
+              {
+                "color": "#ef4444",
+                "value": 200
               }
             ]
           },
@@ -477,10 +440,10 @@
         }
       },
       "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 10,
-        "minVizWidth": 0.1,
-        "orientation": "horizontal",
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
         "reduceOptions": {
           "calcs": [
             "lastNotNull"
@@ -488,7 +451,7 @@
           "fields": "",
           "values": false
         },
-        "showUnfilled": true
+        "textMode": "auto"
       }
     },
     {
