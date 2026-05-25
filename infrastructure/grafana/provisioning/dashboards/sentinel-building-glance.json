@@ -51,7 +51,7 @@
       },
       "targets": [
         {
-          "expr": "avg(sentinel_equipment_health{building=~\"site-002|S002|Sandton\"})",
+          "expr": "avg(sentinel_equipment_health{building=~\"site-002|S002|Sandton\"}) or vector(0)",
           "legendFormat": "Site Health Score",
           "refId": "A"
         }
@@ -199,7 +199,7 @@
       },
       "targets": [
         {
-          "expr": "count(sentinel_equipment_issues{building=~\"site-002|S002|Sandton\"} > 0)",
+          "expr": "count(sentinel_equipment_issues{building=~\"site-002|S002|Sandton\"} > 0) or vector(0)",
           "legendFormat": "Active Issues",
           "refId": "A"
         }
@@ -262,7 +262,7 @@
       },
       "targets": [
         {
-          "expr": "sum by (prediction_type) (rate(sentinel_recommendations_total{site_id=\"site-002\", tier=~\"tier2|tier3\"}[1h]))",
+          "expr": "sum by (prediction_type) (rate(sentinel_recommendations_total{site_id=\"site-002\", tier=~\"tier2|tier3\"}[1h])) or vector(0)",
           "legendFormat": "{{action}}",
           "refId": "A"
         }
@@ -311,12 +311,12 @@
       },
       "targets": [
         {
-          "expr": "avg(sentinel_energy_demand_kw{site_id=\"site-002\"})",
+          "expr": "avg(sentinel_energy_demand_kw{site_id=\"site-002\"}) or vector(0)",
           "legendFormat": "Actual Demand",
           "refId": "A"
         },
         {
-          "expr": "sentinel_energy_peak_demand_kw{site_id=\"site-002\"}",
+          "expr": "sentinel_energy_peak_demand_kw{site_id=\"site-002\"} or vector(0)",
           "legendFormat": "Peak Baseline",
           "refId": "B"
         }

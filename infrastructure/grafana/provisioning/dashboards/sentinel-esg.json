@@ -3,7 +3,10 @@
     "list": [
       {
         "builtIn": 1,
-        "datasource": { "type": "grafana", "uid": "-- Grafana --" },
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
         "enable": true,
         "hide": true,
         "iconColor": "rgba(245, 135, 30, 0.59)",
@@ -12,7 +15,7 @@
       }
     ]
   },
-  "description": "SENTINEL ESG / Sustainability monitoring — carbon footprint, energy intensity, renewable %, water intensity, waste.",
+  "description": "SENTINEL ESG / Sustainability monitoring \u2014 carbon footprint, energy intensity, renewable %, water intensity, waste.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
@@ -23,15 +26,66 @@
       "id": 1,
       "title": "Scrape Health",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 3, "x": 0, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}", "legendFormat": "{{instance}}" }],
+      "gridPos": {
+        "h": 4,
+        "w": 3,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=~\"sentinel-governance|sentinel-discipline\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#10b981", "value": 1 }] },
-          "color": { "mode": "thresholds" },
-          "mappings": [{ "type": "value", "options": { "0": { "text": "Down", "color": "#ef4444" } } }, { "type": "value", "options": { "1": { "text": "Up", "color": "#10b981" } } }],
-          "sparkline": { "displayMode": "area", "lineColor": "#10b981", "fillColor": "rgba(16, 185, 129, 0.15)" }
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#10b981",
+                "value": 1
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "Down",
+                  "color": "#ef4444"
+                }
+              }
+            },
+            {
+              "type": "value",
+              "options": {
+                "1": {
+                  "text": "Up",
+                  "color": "#10b981"
+                }
+              }
+            }
+          ],
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.15)"
+          }
         }
       }
     },
@@ -39,15 +93,51 @@
       "id": 2,
       "title": "Carbon Footprint",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 6, "x": 3, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sum(sentinel_esg_carbon_footprint_kg) or vector(0)", "legendFormat": "kg CO2e" }],
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 3,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_esg_carbon_footprint_kg) or vector(0)",
+          "legendFormat": "kg CO2e"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 5000 }, { "color": "#ef4444", "value": 20000 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 5000
+              },
+              {
+                "color": "#ef4444",
+                "value": 20000
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 0,
-          "sparkline": { "displayMode": "area", "lineColor": "#f59e0b", "fillColor": "rgba(245, 158, 11, 0.1)" }
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.1)"
+          }
         }
       }
     },
@@ -55,16 +145,48 @@
       "id": 3,
       "title": "Renewable Share",
       "type": "gauge",
-      "gridPos": { "h": 4, "w": 5, "x": 9, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "avg(sentinel_esg_renewable_percent) or vector(0)", "legendFormat": "%" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 9,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(sentinel_esg_renewable_percent) or vector(0)",
+          "legendFormat": "%"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#ef4444", "value": null }, { "color": "#f59e0b", "value": 25 }, { "color": "#10b981", "value": 50 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 25
+              },
+              {
+                "color": "#10b981",
+                "value": 50
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 1
         }
       }
@@ -73,15 +195,51 @@
       "id": 4,
       "title": "Energy Intensity",
       "type": "stat",
-      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 0 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "avg(sentinel_esg_energy_intensity_kwh_per_sqm) or vector(0)", "legendFormat": "kWh/m²" }],
+      "gridPos": {
+        "h": 4,
+        "w": 5,
+        "x": 14,
+        "y": 0
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "avg(sentinel_esg_energy_intensity_kwh_per_sqm) or vector(0)",
+          "legendFormat": "kWh/m\u00b2"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
-          "thresholds": { "mode": "absolute", "steps": [{ "color": "#10b981", "value": null }, { "color": "#f59e0b", "value": 100 }, { "color": "#ef4444", "value": 200 }] },
-          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#10b981",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 100
+              },
+              {
+                "color": "#ef4444",
+                "value": 200
+              }
+            ]
+          },
+          "color": {
+            "mode": "thresholds"
+          },
           "decimals": 1,
-          "sparkline": { "displayMode": "area", "lineColor": "#f59e0b", "fillColor": "rgba(245, 158, 11, 0.1)" }
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#f59e0b",
+            "fillColor": "rgba(245, 158, 11, 0.1)"
+          }
         }
       }
     },
@@ -89,14 +247,33 @@
       "id": 5,
       "title": "Carbon Footprint Over Time",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 14, "x": 0, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_esg_carbon_footprint_kg", "legendFormat": "{{site_id}} {{period}} scope={{scope}}" }],
+      "gridPos": {
+        "h": 8,
+        "w": 14,
+        "x": 0,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_esg_carbon_footprint_kg or vector(0)",
+          "legendFormat": "{{site_id}} {{period}} scope={{scope}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 0
         }
       }
@@ -105,16 +282,35 @@
       "id": 6,
       "title": "Renewable % Over Time",
       "type": "timeseries",
-      "gridPos": { "h": 8, "w": 10, "x": 14, "y": 4 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_esg_renewable_percent or vector(0)", "legendFormat": "{{site_id}} {{period}}" }],
+      "gridPos": {
+        "h": 8,
+        "w": 10,
+        "x": 14,
+        "y": 4
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_esg_renewable_percent or vector(0)",
+          "legendFormat": "{{site_id}} {{period}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percent",
           "min": 0,
           "max": 100,
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 1
         }
       }
@@ -123,14 +319,33 @@
       "id": 7,
       "title": "Energy Intensity Trend",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_esg_energy_intensity_kwh_per_sqm or vector(0)", "legendFormat": "{{site_id}} {{period}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_esg_energy_intensity_kwh_per_sqm or vector(0)",
+          "legendFormat": "{{site_id}} {{period}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 2
         }
       }
@@ -139,14 +354,33 @@
       "id": 8,
       "title": "Water Intensity",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_esg_water_intensity_l_per_sqm or vector(0)", "legendFormat": "{{site_id}} {{period}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_esg_water_intensity_l_per_sqm or vector(0)",
+          "legendFormat": "{{site_id}} {{period}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 2
         }
       }
@@ -155,28 +389,60 @@
       "id": 9,
       "title": "Waste by Category",
       "type": "timeseries",
-      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 12 },
-      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
-      "targets": [{ "refId": "A", "expr": "sentinel_esg_waste_kg or vector(0)", "legendFormat": "{{site_id}} {{category}}" }],
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 12
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sentinel_esg_waste_kg or vector(0)",
+          "legendFormat": "{{site_id}} {{category}}"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "none",
-          "custom": { "lineWidth": 1, "fillOpacity": 25 },
-          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 25
+          },
+          "color": {
+            "mode": "palette-classic"
+          },
           "decimals": 1
         }
       }
     }
   ],
   "refresh": "1h",
-  "tags": ["esg", "sustainability", "sentinel", "building"],
+  "tags": [
+    "esg",
+    "sustainability",
+    "sentinel",
+    "building"
+  ],
   "templating": {
     "list": [
-      { "name": "site", "type": "query", "query": "label_values(sentinel_esg_carbon_footprint_kg, site_id)", "multi": true }
+      {
+        "name": "site",
+        "type": "query",
+        "query": "label_values(sentinel_esg_carbon_footprint_kg, site_id)",
+        "multi": true
+      }
     ]
   },
-  "time": { "from": "now-30d", "to": "now" },
-  "title": "SENTINEL — ESG",
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "title": "SENTINEL \u2014 ESG",
   "uid": "sentinel-esg",
   "version": 2
 }

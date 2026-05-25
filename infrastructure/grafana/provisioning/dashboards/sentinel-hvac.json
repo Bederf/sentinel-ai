@@ -207,7 +207,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_hvac_zone_temp_celsius",
+          "expr": "sentinel_hvac_zone_temp_celsius or vector(0)",
           "legendFormat": "{{zone_id}}"
         }
       ],
@@ -381,7 +381,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_hvac_ahu_status",
+          "expr": "sentinel_hvac_ahu_status or vector(0)",
           "format": "table",
           "legendFormat": ""
         }

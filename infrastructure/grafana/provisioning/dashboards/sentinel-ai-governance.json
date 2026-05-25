@@ -120,7 +120,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (status) (rate(sentinel_quality_gate_evaluations_total[5m]))",
+          "expr": "sum by (status) (rate(sentinel_quality_gate_evaluations_total[5m])) or vector(0)",
           "legendFormat": "{{status}}"
         }
       ],
@@ -272,7 +272,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (tier, action) (rate(sentinel_recommendations_total[5m]))",
+          "expr": "sum by (tier, action) (rate(sentinel_recommendations_total[5m])) or vector(0)",
           "legendFormat": "{{tier}}/{{action}}"
         }
       ],
@@ -337,7 +337,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_model_drift_alerts{source=\"supabase\"}",
+          "expr": "sentinel_model_drift_alerts{source=\"supabase\"} or vector(0)",
           "legendFormat": "{{site_id}}/{{model_type}}"
         }
       ],
@@ -387,7 +387,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_drift_baseline_hours",
+          "expr": "sentinel_drift_baseline_hours or vector(0)",
           "legendFormat": "{{model_id}}"
         }
       ],
@@ -489,7 +489,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_info",
+          "expr": "sentinel_info or vector(0)",
           "format": "table"
         }
       ]
@@ -511,7 +511,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (rule_name, status) (rate(sentinel_quality_gate_rule_evaluations_total[5m]))",
+          "expr": "sum by (rule_name, status) (rate(sentinel_quality_gate_rule_evaluations_total[5m])) or vector(0)",
           "legendFormat": "{{rule_name}} \u2014 {{status}}"
         }
       ],
@@ -595,7 +595,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_model_drift_score{source=\"supabase\"}",
+          "expr": "sentinel_model_drift_score{source=\"supabase\"} or vector(0)",
           "legendFormat": "{{model_id}} ({{model_type}})"
         }
       ],
@@ -719,7 +719,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sentinel_approval_latency_seconds_bucket",
+          "expr": "sentinel_approval_latency_seconds_bucket or vector(0)",
           "legendFormat": "{{le}}s",
           "format": "heatmap"
         }
@@ -752,7 +752,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum by (model, task_class) (sentinel_ai_cost_by_route_total)",
+          "expr": "sum by (model, task_class) (sentinel_ai_cost_by_route_total) or vector(0)",
           "legendFormat": "{{model}} ({{task_class}})"
         }
       ],
