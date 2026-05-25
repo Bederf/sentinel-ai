@@ -1756,17 +1756,17 @@ async def sentry_wo_status(
         return WoStatusResponse(
             success=True,
             found=True,
-            code=wo.get("code", ""),
-            status=wo.get("status", ""),
-            priority=wo.get("priority", ""),
-            category=wo.get("category", ""),
-            title=wo.get("title", ""),
-            description=wo.get("description", ""),
-            notes=wo.get("notes", ""),
-            assigned_to=wo.get("assigned_to", ""),
-            created_at=wo.get("created_at", ""),
-            updated_at=wo.get("updated_at", ""),
-            completed_at=wo.get("completed_at", ""),
+            code=wo.get("code") or "",
+            status=wo.get("status") or "",
+            priority=wo.get("priority") or "",
+            category=wo.get("category") or "",
+            title=wo.get("title") or "",
+            description=wo.get("description") or "",
+            notes=wo.get("notes") or "",
+            assigned_to=wo.get("assigned_to") or "",
+            created_at=str(wo.get("created_at") or ""),
+            updated_at=str(wo.get("updated_at") or ""),
+            completed_at=str(wo.get("completed_at") or ""),
         )
 
     except HTTPException:

@@ -27,9 +27,10 @@ class WorkOrderRepository:
         "scheduled_date, completed_at, created_at, created_by, "
         "estimated_duration_hours, actual_duration_hours, "
         "labor_cost_zar, parts_cost_zar, total_cost_zar, "
-        "notes, category, updated_at, "
+        "notes, updated_at, "
         "milestone_status, assigned_at, in_progress_at, resolved_at, verified_at, "
-        "sla_hours, sla_deadline_at"
+        "sla_hours, sla_deadline_at, "
+        "closed_at, closed_by"
     )
 
     def __init__(self):
