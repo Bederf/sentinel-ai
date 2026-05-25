@@ -2635,6 +2635,24 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 "title": title,
             }
 
+            comfort_delta = rec.get("comfort_delta_c") or rec.get("comfort_delta") or rec.get("comfort_impact_c")
+            try:
+                comfort_delta = float(comfort_delta) if comfort_delta is not None else None
+            except (TypeError, ValueError):
+                comfort_delta = None
+
+            energy_pct = rec.get("energy_savings_percent") or rec.get("energy_saving_percent")
+            try:
+                energy_pct = float(energy_pct) if energy_pct is not None else None
+            except (TypeError, ValueError):
+                energy_pct = None
+
+            expected_impact = {"cost_zar": cost_val} if cost_val > 0 else {"cost_zar": 0}
+            if comfort_delta is not None:
+                expected_impact["comfort_delta"] = round(comfort_delta, 1)
+            if energy_pct is not None:
+                expected_impact["energy_savings_percent"] = round(energy_pct, 1)
+
             canonical = {
                 "target_equipment": eq_id,
                 "action": {
@@ -2645,7 +2663,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 },
                 "reason": reason,
                 "confidence": confidence,
-                "expected_impact": {"cost_zar": cost_val} if cost_val > 0 else {"cost_zar": 0},
+                "expected_impact": expected_impact,
                 "projected_savings": {
                     "cost_zar_per_hour": cost_val,
                     "saving_text": saving,
@@ -2724,6 +2742,21 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 cost_val = float(cost_match.group(1))
                 out["expected_impact"] = {"cost_zar": cost_val}
                 out["projected_savings"] = {"cost_zar_per_hour": cost_val, "saving_text": saving_text}
+
+        # Extract comfort_delta and energy_savings_percent from LLM response if present
+        if "expected_impact" in out:
+            comfort_src = raw.get("comfort_delta_c") or raw.get("comfort_delta") or raw.get("comfort_impact_c")
+            if comfort_src is not None:
+                try:
+                    out["expected_impact"]["comfort_delta"] = round(float(comfort_src), 1)
+                except (TypeError, ValueError):
+                    pass
+            energy_src = raw.get("energy_savings_percent") or raw.get("energy_saving_percent")
+            if energy_src is not None:
+                try:
+                    out["expected_impact"]["energy_savings_percent"] = round(float(energy_src), 1)
+                except (TypeError, ValueError):
+                    pass
 
         return out
 

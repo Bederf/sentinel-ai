@@ -307,6 +307,16 @@ async def send_ghost_booking_alert(
     WhatsApp via sentry/OpenClaw CLI (same as focus room notifier).
     Email via direct SMTP as fallback.
     """
+    # Check if ghost booking notifications are enabled in space settings
+    try:
+        from app.api.space_settings import _load_space_settings
+        space_settings = _load_space_settings()
+        if not space_settings.get("ghost_booking_notifications_enabled", True):
+            logger.info("Ghost booking alerts disabled by space_settings toggle — skipping")
+            return {"whatsapp_sent": False, "whatsapp_message_id": None, "success": False, "skipped": True}
+    except Exception:
+        pass  # Default to sending if settings can't be loaded
+
     whatsapp_sent = False
     whatsapp_message_id: str | None = None
 

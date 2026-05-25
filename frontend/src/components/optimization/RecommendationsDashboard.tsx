@@ -113,6 +113,25 @@ export const RecommendationsDashboard: React.FC<
     }
   }
 
+  const handleCreateWorkOrder = async (rec: any) => {
+    try {
+      await fetch(`/api/work-orders`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          site_id: rec.site_id,
+          equipment_id: rec.target_equipment,
+          title: `Optimization: ${(rec.recommendation_type || rec.action_type || 'recommendation').replace(/_/g, ' ')}`,
+          description: rec.reason || '',
+          severity: rec.risk_level || 'low',
+          source: 'ai_optimizer',
+        }),
+      })
+    } catch (error) {
+      console.error('Failed to create work order:', error)
+    }
+  }
+
   if (loading) {
     return (
       <div
@@ -195,7 +214,13 @@ export const RecommendationsDashboard: React.FC<
                 {rec.title?.split(":")[0]?.trim() || rec.target_equipment || "--"}
               </p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              <span
+                className="text-xs"
+                style={{ color: "var(--color-sentinel-text-secondary)" }}
+              >
+                {rec.timestamp ? new Date(rec.timestamp).toLocaleString() : ''}
+              </span>
               <span
                 className="px-3 py-1 rounded text-sm font-medium"
                 style={getRiskBadgeStyles(rec.priority || rec.risk_level || "low")}
@@ -234,20 +259,20 @@ export const RecommendationsDashboard: React.FC<
           <div className="grid grid-cols-3 gap-3 mb-4">
             <div className="p-3 rounded" style={{ background: "rgba(16, 185, 129, 0.08)" }}>
               <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Cost Saving</p>
-              <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-green)" }}>
+              <p className="font-semibold text-sm">
                 {rec.expected_impact?.cost_zar ? `R${Number(rec.expected_impact.cost_zar).toFixed(2)}` : 'R0'}
               </p>
             </div>
             <div className="p-3 rounded" style={{ background: "rgba(59, 130, 246, 0.08)" }}>
               <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Comfort Impact</p>
-              <p className="text-lg font-bold" style={{ color: "var(--color-sentinel-blue)" }}>
+              <p className="font-semibold text-sm">
                 {rec.expected_impact?.comfort_delta != null ? `${rec.expected_impact.comfort_delta.toFixed(1)}°C` : '0°C'}
               </p>
             </div>
             <div className="p-3 rounded" style={{ background: "rgba(167, 139, 250, 0.08)" }}>
               <p className="text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Energy Saving</p>
-              <p className="text-lg font-bold" style={{ color: "#a78bfa" }}>
-                {rec.expected_impact?.energy_kwh != null ? `${rec.expected_impact.energy_kwh.toFixed(1)} kWh` : '0 kWh'}
+              <p className="font-semibold text-sm">
+                {rec.expected_impact?.energy_savings_percent != null ? `${rec.expected_impact.energy_savings_percent.toFixed(1)}%` : (rec.expected_impact?.energy_kwh != null ? `${rec.expected_impact.energy_kwh.toFixed(1)} kWh` : '0%')}
               </p>
             </div>
           </div>

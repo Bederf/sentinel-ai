@@ -345,13 +345,13 @@ export function EquipmentStatusPanel({ siteId, compact = false, onEquipmentSelec
         </div>
         <div className="flex gap-2">
           <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("green")}>
-            {equipment.filter((e) => e.health_status === "healthy").length} Healthy
-          </span>
-          <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("amber")}>
-            {equipment.filter((e) => e.health_status === "attention").length} Attention
-          </span>
-          <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("red")}>
-            {equipment.filter((e) => e.health_status === "critical").length} Critical
+             {equipment.filter((e) => e.status === "normal").length} Healthy
+           </span>
+           <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("amber")}>
+             {equipment.filter((e) => e.status === "warning").length} Attention
+           </span>
+           <span className="text-sm px-2.5 py-0.5 rounded" style={chipStyle("red")}>
+             {equipment.filter((e) => e.status === "critical" || e.status === "fault").length} Critical
           </span>
         </div>
       </div>

@@ -72,6 +72,7 @@ BYPASS_PREFIXES: tuple[str, ...] = (
     "/api/auth/",
     "/api/health",
     "/api/buildings",
+    "/api/work-orders",
     "/health",
     "/docs",
     "/openapi.json",

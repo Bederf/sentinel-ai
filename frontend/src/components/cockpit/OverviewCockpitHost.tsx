@@ -232,8 +232,12 @@ export function OverviewCockpitHost({
       lastUpdatedAt,
     )
     // Extract floor_id from zone_key (e.g. Zone-L1-1 → L1, Zone-L3-ICU → L3)
+    const MECHANICAL_TYPES = new Set(['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler', 'generator'])
     const equipmentWarnings: EquipmentWarningInput[] = (equipment ?? [])
-      .filter((eq) => eq.health_score < 85)
+      .filter((eq) => {
+        const type = (eq.equipment_type || eq.type || '').toLowerCase()
+        return eq.health_score < 85 && MECHANICAL_TYPES.has(type)
+      })
       .map((eq) => {
         let floorId = ''
         const zoneKey = eq.zone_key ?? ''

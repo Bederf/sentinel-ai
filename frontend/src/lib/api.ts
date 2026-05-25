@@ -5377,6 +5377,7 @@ export interface SpaceGracePeriods {
   early_vacate_threshold_minutes: number;
   sporadic_use_threshold_pct: number;
   brief_occupation_threshold_min: number;
+  ghost_booking_notifications_enabled: boolean;
 }
 
 export interface ConciergeUser {
