@@ -5,42 +5,88 @@
   "schemaVersion": 39,
   "editable": false,
   "timezone": "Africa/Johannesburg",
-  "tags": ["sentinel", "home"],
+  "tags": [
+    "sentinel",
+    "home"
+  ],
   "style": "dark",
   "graphTooltip": 0,
-  "time": { "from": "now-6h", "to": "now" },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
   "timepicker": {
     "hidden": true,
-    "refresh_intervals": ["5s", "10s", "30s", "1m", "5m", "15m", "1h"],
-    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m",
+      "15m",
+      "1h"
+    ],
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
   },
   "panels": [
     {
       "type": "row",
       "title": "",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      }
     },
     {
       "type": "text",
       "title": "",
-      "gridPos": { "h": 6, "w": 24, "x": 0, "y": 1 },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
       "options": {
         "mode": "html",
-        "content": "<div style=\"display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 40px;\">\n  <svg width=\"120\" height=\"120\" viewBox=\"0 0 120 120\" fill=\"none\" xmlns=\"http://www.w3.org/2000/svg\" style=\"margin-bottom: 24px;\">\n    <circle cx=\"60\" cy=\"60\" r=\"56\" stroke=\"#10b981\" stroke-width=\"2\" fill=\"none\" opacity=\"0.3\"/>\n    <circle cx=\"60\" cy=\"60\" r=\"56\" stroke=\"#10b981\" stroke-width=\"2\" fill=\"none\" stroke-dasharray=\"88 264\" transform=\"rotate(-90 60 60)\"/>\n    <text x=\"60\" y=\"68\" text-anchor=\"middle\" fill=\"#10b981\" font-family=\"system-ui, sans-serif\" font-size=\"24\" font-weight=\"700\">S</text>\n  </svg>\n  <h1 style=\"margin: 0; font-size: 36px; font-weight: 300; letter-spacing: 0.15em; color: #e2e8f0; text-transform: uppercase;\">SENTINEL</h1>\n  <p style=\"margin: 8px 0 0 0; font-size: 13px; color: #64748b; letter-spacing: 0.08em;\">Building Intelligence Platform</p>\n  <p style=\"margin: 32px 0 0 0; font-size: 12px; color: #475569;\">Site-002 · Sandton City Office Tower</p>\n</div>"
+        "content": "<div style=\"display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 80px 40px 60px;\">\n  <img src=\"/public/img/sentinel-logo.png\" alt=\"SENTINEL\" style=\"width: 140px; height: auto; margin-bottom: 20px;\" />\n  <h1 style=\"margin: 0; font-size: 32px; font-weight: 300; letter-spacing: 0.18em; color: #e2e8f0; text-transform: uppercase; font-family: -apple-system, sans-serif;\">SENTINEL</h1>\n  <p style=\"margin: 10px 0 0 0; font-size: 13px; color: #64748b; letter-spacing: 0.08em; font-family: -apple-system, sans-serif;\">Building Intelligence Platform</p>\n  <p style=\"margin: 36px 0 0 0; font-size: 12px; color: #475569; font-family: -apple-system, sans-serif;\">Site-002 \u00b7 Sandton City Office Tower</p>\n</div>"
       },
       "pluginVersion": "10.4.1",
       "transparent": true,
-      "fieldConfig": { "defaults": {} }
+      "fieldConfig": {
+        "defaults": {}
+      }
     },
     {
       "type": "row",
       "title": "Dashboards",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 }
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 7
+      }
     },
     {
       "type": "dashlist",
       "title": "",
-      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 8 },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 8
+      },
       "options": {
         "maxItems": 30,
         "query": "",
@@ -48,10 +94,20 @@
         "showRecentlyViewed": true,
         "showSearch": false,
         "showStarred": true,
-        "tags": ["sentinel"]
+        "tags": [
+          "sentinel"
+        ]
       },
       "pluginVersion": "10.4.1",
-      "targets": [{ "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" }, "refId": "A" }]
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "PBFA97CFB590B2093"
+          },
+          "refId": "A"
+        }
+      ]
     }
   ],
   "refresh": "30s",
