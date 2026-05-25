@@ -540,7 +540,7 @@ export function mapCockpitState(
     water:    [],
     fire:     [],
     security: [],
-    solar_bess: ['energy_pressure'],
+     "solar-bess": ['energy_pressure'],
   }
   const matchVoices = systemFilter ? (SYSTEM_VOICE_MAP[systemFilter] ?? []) : []
   // When a tab is active but has no mapped voices (e.g. lighting, water),
@@ -654,7 +654,7 @@ export function mapCockpitState(
       { zoneId: 'Zone-L1-A', floorId: 'L1', label: 'DALI Controller L1', level: 'stable' },
       { zoneId: 'Zone-L2-B', floorId: 'L2', label: 'DALI Controller L2', level: 'stable' },
     ],
-    solar_bess: [
+    "solar-bess": [
       { zoneId: 'Zone-B1-001', floorId: 'B1', label: 'Solar & BESS', level: 'stable' },
     ],
   }
@@ -703,9 +703,9 @@ export function mapCockpitState(
       tone,
       attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
       activeConditionCount: narrative ? 1 : 0,
-      emergingRiskCount: secondaryTensions.length + equipmentWarnings.length,
+      emergingRiskCount: secondaryTensions.length + (equipmentWarnings?.length ?? 0),
       equipmentWarningCount: equipmentWarnings.length,
-      evidenceStrength: narrative ? 'moderate' : 'strong',
+      evidenceStrength: narrative ? 'moderate' : 'weak',
     },
     primaryMetric: {
       tone,
@@ -828,6 +828,6 @@ export function mapCockpitState(
       faultType: eq.fault_type,
       zoneId: eq.zone_id,
     })),
-    systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null,
+    systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar-bess' | null,
   }
 }
