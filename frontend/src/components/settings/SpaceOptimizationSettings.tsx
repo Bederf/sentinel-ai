@@ -139,6 +139,7 @@ export function SpaceOptimizationSettings({
       (defaults as unknown as Record<string, number>)[f.key] = f.default;
     }
     defaults.ghost_booking_notifications_enabled = true;
+    defaults.focus_room_notifications_enabled = true;
     return defaults;
   });
   const [graceSaving, setGraceSaving] = useState(false);
@@ -469,6 +470,33 @@ export function SpaceOptimizationSettings({
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${graceValues.ghost_booking_notifications_enabled ? "translate-x-6" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Focus Room Notifications Toggle */}
+      <div className="glass-panel flat overflow-hidden">
+        <div className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Focus Room Notifications
+              </p>
+              <p className="text-sm mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Send concierge alerts when focus room overstays are detected
+              </p>
+            </div>
+            <button
+              onClick={() => handleGraceChange("focus_room_notifications_enabled", !graceValues.focus_room_notifications_enabled)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${graceValues.focus_room_notifications_enabled ? "bg-blue-600" : "bg-gray-600"}`}
+              aria-checked={graceValues.focus_room_notifications_enabled}
+              role="switch"
+              type="button"
+            >
+              <span
+                className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${graceValues.focus_room_notifications_enabled ? "translate-x-6" : "translate-x-1"}`}
               />
             </button>
           </div>

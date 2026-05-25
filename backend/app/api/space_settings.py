@@ -40,6 +40,7 @@ DEFAULT_SPACE_SETTINGS: dict[str, Any] = {
     "sporadic_use_threshold_pct": 25,
     "brief_occupation_threshold_min": 30,
     "ghost_booking_notifications_enabled": True,
+    "focus_room_notifications_enabled": True,
 }
 
 # Valid setting keys and their allowed ranges

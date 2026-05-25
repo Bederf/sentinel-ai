@@ -386,6 +386,17 @@ class HealthRatingCalculator:
         Returns:
             Health score 0-100, or None if insufficient data
         """
+        # Gate: skip non-scoreable equipment types
+        try:
+            from app.config.health_config import get_scoreability
+            eq_type = equipment.get("type", "")
+            score_cfg = get_scoreability(eq_type)
+            if not score_cfg.get("scoreable", False):
+                logger.debug(f"[HEALTH-SENSORS] Skipping {equipment.get('code','?')} ({eq_type}): {score_cfg.get('reason', 'not scoreable')}")
+                return None
+        except Exception:
+            pass
+
         if not sensor_readings and not operating_data:
             return None
 
@@ -515,6 +526,7 @@ class HealthRatingCalculator:
                 client.table("alerts")
                 .select("severity")
                 .eq("equipment_id", equipment_id)
+                .neq("status", "resolved")  # Only count unresolved faults
                 .gte("created_at", cutoff)
                 .execute()
             )
