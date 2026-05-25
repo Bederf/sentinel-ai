@@ -27,6 +27,7 @@ from app.api import (
     complaints,
     compliance,
     concept,
+    equipment_inspection,
     concept_rag,
     concierge,
     condition,
@@ -110,6 +111,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(onboarding.router, tags=["onboarding"])
     app.include_router(condition.router, tags=["condition"])
     app.include_router(compliance.router, tags=["compliance"])
+    app.include_router(equipment_inspection.router, tags=["inspection"])
 
     # Remote operations
     app.include_router(remote_ops.router, tags=["remote-ops"])

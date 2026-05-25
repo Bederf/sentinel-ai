@@ -328,6 +328,23 @@ class HealthRatingCalculator:
         health_score = self.calculate_health_score(
             baseline_score, service_score, runtime_score, fault_score, trend_score
         )
+
+        # --- Inspection modifier (additive, non-destructive) ---
+        try:
+            from app.services.inspection_telemetry_service import InspectionTelemetryService
+
+            insp_svc = InspectionTelemetryService()
+            insp_score, insp_age = await insp_svc.get_latest_inspection_score(equipment_id)
+            insp_modifier = insp_svc.calculate_inspection_modifier(insp_score, insp_age)
+            if insp_modifier != 0.0:
+                health_score = round(max(0.0, min(100.0, health_score + insp_modifier)), 1)
+                logger.debug(
+                    f"[HEALTH] {equipment_id} inspection modifier {insp_modifier:+.1f} "
+                    f"→ adjusted score {health_score} (inspection_score={insp_score}, age={insp_age}d)"
+                )
+        except Exception as e:
+            logger.debug(f"[HEALTH] Inspection modifier skipped for {equipment_id}: {e}")
+
         health_status = self.get_health_status(health_score)
 
         # --- Data quality ---
