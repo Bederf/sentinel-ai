@@ -410,8 +410,17 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
     )
   }
 
-  // Shadow + Advisory phase: no hold-to-confirm action UI (read-only observation)
-  if (state.site.onboardingPhase === 'shadow' || state.site.onboardingPhase === 'advisory') {
+  // Advisory phase: read-only observation with explicit explanation
+  if (state.site.onboardingPhase === 'advisory') {
+    return (
+      <div className="border-t border-white/8 px-5 py-4 text-sm leading-6" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+        Advisory mode — SENTINEL observes and recommends. Operator action is manual.
+      </div>
+    )
+  }
+
+  // Shadow phase: no action UI
+  if (state.site.onboardingPhase === 'shadow') {
     return null
   }
 
@@ -791,7 +800,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
               transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
               transformOrigin: '50% 0',
               width: '100%',
-              height: '260px',
+              height: `${260 * zoomLevel}px`,
             }}
           >
             <div className="w-full h-full">
