@@ -674,16 +674,31 @@ class AiUsageTracker:
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         try:
             result = self._supabase.table("ai_usage_daily").select(
-                "feature,calls,input_tokens,output_tokens,cost_usd"
+                "sources,calls,input_tokens,output_tokens,cost_usd"
             ).gte("date", cutoff).execute()
             by_feature: dict = {}
             for row in result.data:
-                feature = row.get("feature") or "unknown"
-                if feature not in by_feature:
-                    by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
-                by_feature[feature]["calls"] += row.get("calls", 0) or 0
-                by_feature[feature]["tokens"] += (row.get("input_tokens", 0) or 0) + (row.get("output_tokens", 0) or 0)
-                by_feature[feature]["cost_usd"] += row.get("cost_usd", 0.0) or 0.0
+                sources = row.get("sources", {}) or {}
+                call_count = row.get("calls", 0) or 0
+                in_tok = row.get("input_tokens", 0) or 0
+                out_tok = row.get("output_tokens", 0) or 0
+                cost = row.get("cost_usd", 0.0) or 0.0
+                tokens = in_tok + out_tok
+
+                if isinstance(sources, dict) and sources:
+                    for feature in sources:
+                        if feature not in by_feature:
+                            by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+                        by_feature[feature]["calls"] += call_count
+                        by_feature[feature]["tokens"] += tokens
+                        by_feature[feature]["cost_usd"] += cost
+                else:
+                    feature = "unknown"
+                    if feature not in by_feature:
+                        by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
+                    by_feature[feature]["calls"] += call_count
+                    by_feature[feature]["tokens"] += tokens
+                    by_feature[feature]["cost_usd"] += cost
             return by_feature
         except Exception as exc:
             logger.warning("Failed to get feature stats from DB, falling back to JSON: %s", exc)
@@ -703,7 +718,8 @@ class AiUsageTracker:
                 for key, entry in entries.items():
                     if str(key).startswith("_"):
                         continue
-                    feature = entry.get("feature", "unknown")
+                    src_map = entry.get("sources", {}) or {}
+                    feature = entry.get("feature") or entry.get("source") or (list(src_map.keys())[0] if src_map else "unknown")
                     if feature not in by_feature:
                         by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
                     by_feature[feature]["calls"] += entry.get("calls", 0)

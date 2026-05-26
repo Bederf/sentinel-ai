@@ -70,6 +70,9 @@ _PUBLIC_PREFIXES = (
     "/api/debug/",  # Debug endpoints for non-production inspection (guarded by environment=production check)
     "/api/buildings",  # Building/site data — used by SIMBIOT wizard and frontend during onboarding
     "/api/work-orders",  # Work order creation from optimization page (user-initiated, no JWT)
+    "/api/chat",  # Chat endpoint — uses internal rate limiting and prompt guards
+    "/api/modules/",  # Module site recommendations and config
+    "/api/sites",  # Site listing — required by frontend for navigation
 )
 _PUBLIC_READ_PATHS = {
     "/api/block-bookings/alerts",
