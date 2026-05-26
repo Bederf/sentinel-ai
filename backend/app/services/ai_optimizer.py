@@ -2396,6 +2396,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 max_tokens=settings.optimization_max_tokens,
                 stream=False,
                 source="ai_optimizer",
+                site_id=site_id,
             )
 
             # Parse JSON response

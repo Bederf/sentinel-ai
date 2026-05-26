@@ -1533,7 +1533,7 @@ export async function streamChat(
     body: JSON.stringify({
       message,
       conversation_id: conversationId,
-      site_id: siteId,
+      ...(siteId ? { site_id: siteId } : {}),
       include_system_docs: includeSystemDocs ?? false,
     }),
   });

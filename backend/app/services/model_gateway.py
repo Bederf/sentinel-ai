@@ -75,6 +75,7 @@ class ModelGateway:
         stream: bool = False,
         tools: list | None = None,
         source: str = "gateway",
+        site_id: str | None = None,
     ) -> str | AsyncGenerator:
         """
         Route an LLM call based on task_class and active profile.
@@ -299,6 +300,7 @@ class ModelGateway:
                         input_tokens=getattr(u, "input_tokens", 0),
                         output_tokens=getattr(u, "output_tokens", 0),
                         source=source,
+                        site_id=site_id or "unknown",
                         cache_read_tokens=getattr(u, "cache_read_input_tokens", 0),
                         cache_creation_tokens=getattr(u, "cache_creation_input_tokens", 0),
                     )
@@ -356,6 +358,7 @@ class ModelGateway:
                         input_tokens=usage.get("prompt_tokens", 0),
                         output_tokens=usage.get("completion_tokens", 0),
                         source=source,
+                        site_id=site_id or "unknown",
                     )
                 except Exception:
                     pass
@@ -418,6 +421,7 @@ class ModelGateway:
                                             output_tokens=usage.get("completion_tokens", 0),
                                             source=source,
                                             feature="gsd_orchestrator",
+                                            site_id=site_id or "unknown",
                                         )
 
                 return stream_gen()
@@ -436,6 +440,7 @@ class ModelGateway:
                         output_tokens=usage.get("completion_tokens", 0),
                         source=source,
                         feature="gsd_orchestrator",
+                        site_id=site_id or "unknown",
                     )
                 except Exception:
                     pass
@@ -501,6 +506,7 @@ class ModelGateway:
                     input_tokens=usage.get("prompt_tokens", 0),
                     output_tokens=usage.get("completion_tokens", 0),
                     source=source,
+                    site_id=site_id or "unknown",
                     feature="ai_optimizer",
                 )
             except Exception:
