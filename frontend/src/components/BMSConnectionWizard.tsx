@@ -790,10 +790,10 @@ export function BMSConnectionWizard({
                 <Locate className="w-4 h-4" />
               </button>
             </div>
-            {state.latitude !== null && state.longitude !== null && (
+            {state.latitude != null && state.longitude != null && (
               <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 📍 {state.latitude.toFixed(5)}, {state.longitude.toFixed(5)}
-                {state.orientation_degrees !== null && ` • ↗ ${state.orientation_degrees}°`}
+                {state.orientation_degrees != null && ` • ↗ ${state.orientation_degrees}°`}
               </p>
             )}
           </div>

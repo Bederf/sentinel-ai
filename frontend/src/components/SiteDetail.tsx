@@ -670,14 +670,13 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
   // Calculate summary stats — status field tracks BMS comms, health_score tracks equipment condition
   // Critical = health degradation (operational). Offline = comms loss (BMS not reporting, may be healthy).
-  const healthyEquipment = equipment.filter((e) => e.status === "normal" || (e.status as string) === "online").length;
-  const warningEquipment = equipment.filter((e) => e.status === "warning").length;
-  // critical = health_score < 60 (actual degradation, not comms state)
+  const healthyEquipment = equipment.filter((e) => (e.status === "normal" || (e.status as string) === "online") && ((e.health_score ?? 100) >= 80)).length;
+  const warningEquipment = equipment.filter((e) => e.status === "warning" || ((e.health_score ?? 100) >= 60 && (e.health_score ?? 100) < 80)).length;
   const criticalEquipment = equipment.filter((e) => (e.health_score ?? 100) < 60).length;
-  // offline = BMS comms lost (separate from health state — do not conflate with critical)
   const offlineEquipment = equipment.filter((e) => (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
-  const avgHealth = equipment.length > 0
-    ? Math.round(equipment.reduce((sum, e) => sum + (e.health_score || (e as any).health || 0), 0) / equipment.length)
+  const healthValues = equipment.map((e) => e.health_score ?? (e as any).health).filter((v) => typeof v === "number" && v > 0);
+  const avgHealth = healthValues.length > 0
+    ? Math.round(healthValues.reduce((sum, v) => sum + v, 0) / healthValues.length)
     : 0;
 
   const statusConfig = site.status
@@ -1154,36 +1153,64 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         {/* Tab Content */}
         <div className="p-4 md:p-6">
           {/* Equipment Tab */}
-          {activeTab === "equipment" && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => setEquipmentExpanded(!equipmentExpanded)}
-                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                    style={{ background: "none", border: "none", cursor: "pointer", padding: 0 }}
-                  >
-                    {equipmentExpanded ? (
-                      <ChevronDown className="h-5 w-5" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-                    ) : (
-                      <ChevronRight className="h-5 w-5" style={{ color: "var(--color-sentinel-text-secondary)" }} />
-                    )}
-                    <h3
-                      className="text-lg font-semibold"
-                      style={{ color: "var(--color-sentinel-text-primary)" }}
-                    >
-                      Equipment
-                    </h3>
-                  </button>
-                  <div
-                    className="px-2 py-1 rounded text-xs font-medium"
-                    style={{
-                      background: "rgba(59, 130, 246, 0.15)",
-                      color: "var(--color-sentinel-blue)",
-                    }}
-                  >
-                    {equipment.length} Total
-                  </div>
+                  {activeTab === "equipment" && (
+                    <div className="space-y-4">
+                      {/* Equipment Controls Row */}
+                      <div className="flex items-center justify-between mb-1">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setEquipmentExpanded(!equipmentExpanded)}
+                            className="flex items-center gap-2 text-sm font-medium transition-colors hover:opacity-80"
+                            style={{ color: "var(--color-sentinel-text-primary)" }}
+                          >
+                            <ChevronRight
+                              className={`h-4 w-4 transition-transform ${equipmentExpanded ? "rotate-90" : ""}`}
+                            />
+                            <h3
+                              className="text-lg font-semibold"
+                              style={{ color: "var(--color-sentinel-text-primary)" }}
+                            >
+                              Equipment
+                            </h3>
+                          </button>
+                          {equipment.length > 0 && (
+                          <div
+                            className="px-2 py-1 rounded text-xs font-medium"
+                            style={{
+                              background: "rgba(59, 130, 246, 0.15)",
+                              color: "var(--color-sentinel-blue)",
+                            }}
+                          >
+                            {equipment.length} Total
+                          </div>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(healthyEquipment > 0 || equipment.length === 0) && (
+                          <div
+                            className="px-2 py-1 rounded text-xs font-medium"
+                            style={{
+                              background: "rgba(16, 185, 129, 0.15)",
+                              color: "var(--color-sentinel-green)",
+                            }}
+                          >
+                            {healthyEquipment} OK
+                          </div>
+                          )}
+                          <div
+                            className="px-2 py-1 rounded text-xs font-medium flex items-center gap-1"
+                            style={{
+                              background: "rgba(59, 130, 246, 0.15)",
+                              color: "var(--color-sentinel-blue)",
+                            }}
+                            title="Equipment with BMS controls"
+                          >
+                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            {equipment.filter(e => e.controllable).length} Controllable
+                          </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <div

@@ -73,11 +73,11 @@
               },
               {
                 "color": "#f59e0b",
-                "value": 60
+                "value": 50
               },
               {
                 "color": "#10b981",
-                "value": 80
+                "value": 75
               }
             ]
           },
@@ -114,7 +114,7 @@
       },
       "targets": [
         {
-          "rawSql": "SELECT e.code AS \"Equipment ID\", e.health_score AS \"Health\", CASE WHEN e.health_score >= 90 THEN 'healthy' WHEN e.health_score < 50 THEN 'critical' ELSE 'warning' END AS \"Status\" FROM equipment e WHERE e.site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) AND e.code NOT LIKE '%-LTG-%' AND e.code NOT LIKE '%-DALI-%' AND (e.type IS NULL OR e.type NOT IN ('lighting', 'luminaire', 'Lighting', 'Luminaire', 'LTG', 'DALI', 'dali')) AND e.code NOT LIKE '%-LTG-%' AND e.code NOT LIKE '%-DALI-%' AND (e.type IS NULL OR e.type NOT IN ('zone', 'Zone', 'scene', 'Scene', 'sensor', 'Sensor', 'door', 'Door', 'gate', 'Gate', 'weather', 'Weather', 'meter', 'Meter')) ORDER BY e.health_score ASC NULLS LAST LIMIT 15",
+          "rawSql": "SELECT e.code AS \"Equipment ID\", e.health_score AS \"Health\", CASE WHEN e.health_score >= 75 THEN 'healthy' WHEN e.health_score < 30 THEN 'critical' ELSE 'warning' END AS \"Status\" FROM equipment e WHERE e.site_id = (SELECT id FROM sites WHERE code = 'site-002' LIMIT 1) AND e.code NOT LIKE '%-LTG-%' AND e.code NOT LIKE '%-DALI-%' AND (e.type IS NULL OR e.type NOT IN ('lighting', 'luminaire', 'Lighting', 'Luminaire', 'LTG', 'DALI', 'dali')) AND e.code NOT LIKE '%-LTG-%' AND e.code NOT LIKE '%-DALI-%' AND (e.type IS NULL OR e.type NOT IN ('zone', 'Zone', 'scene', 'Scene', 'sensor', 'Sensor', 'door', 'Door', 'gate', 'Gate', 'weather', 'Weather', 'meter', 'Meter')) ORDER BY e.health_score ASC NULLS LAST LIMIT 15",
           "refId": "A",
           "format": "table"
         }

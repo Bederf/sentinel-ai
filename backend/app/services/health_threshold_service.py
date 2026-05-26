@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 CACHE_TTL = 300  # 5 minutes
 
 # Default thresholds (used as ultimate fallback)
-DEFAULT_THRESHOLDS = {"healthy": 90, "warning": 70, "critical": 50}
+DEFAULT_THRESHOLDS = {"healthy": 75, "warning": 50, "critical": 30}
 
 
 class HealthThresholdService:
