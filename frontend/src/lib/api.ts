@@ -4532,6 +4532,24 @@ export interface SimbiotCapabilitiesResponse {
   devices: Array<Record<string, unknown>>;
 }
 
+const _PROTOCOL_FROM_VENDOR: Record<string, string> = {
+  niagara: "obix",
+  bacnet: "bacnet",
+  desigo: "bacnet",
+  metasys: "bacnet",
+  honeywell: "bacnet",
+  schneider: "bacnet",
+  trend: "bacnet",
+  generic: "bacnet",
+  obix: "obix",
+  modbus: "modbus",
+  bridge: "bridge",
+};
+
+export function resolveSimbiotProtocol(bmsVendor: string): string {
+  return _PROTOCOL_FROM_VENDOR[bmsVendor] || "bacnet";
+}
+
 export const niagaraApi = {
   configureOBIX: (config: NiagaraOBIXConfig) =>
     fetchApi<NiagaraConfigResponse>('/api/niagara/obix/config', {
@@ -4554,11 +4572,15 @@ export const niagaraApi = {
     host?: string;
     port?: number;
     commissioning?: boolean;
+    username?: string;
+    password?: string;
   }) => {
     const query = new URLSearchParams();
     query.set("bms_vendor", params.bms_vendor);
     if (params.host) query.set("host", params.host);
     if (typeof params.port === "number") query.set("port", String(params.port));
+    if (params.username) query.set("username", params.username);
+    if (params.password) query.set("password", params.password);
     query.set("commissioning", String(params.commissioning ?? true));
     return fetchApi<SimbiotCapabilitiesResponse>(
       `/api/simbiot/sites/${encodeURIComponent(params.site_id)}/capabilities?${query.toString()}`
@@ -4584,6 +4606,21 @@ export const niagaraApi = {
     fetchApi<{ success: boolean; corrections: string[]; message: string }>(
       `/api/niagara/mappings/${discoveryId}/correct`,
       { method: 'POST', body: JSON.stringify(correction) },
+    ),
+
+  saveSimbiotAdapterConfig: (params: {
+    site_id: string;
+    protocol: string;
+    config: Record<string, unknown>;
+    enabled?: boolean;
+    poll_interval_seconds?: number;
+  }) =>
+    fetchApi<{ status: string; message: string }>(
+      `/api/simbiot/sites/${encodeURIComponent(params.site_id)}/adapters/${encodeURIComponent(params.protocol)}/config?enabled=${params.enabled ?? true}&poll_interval_seconds=${params.poll_interval_seconds ?? 300}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(params.config),
+      },
     ),
 };
 

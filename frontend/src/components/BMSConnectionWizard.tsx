@@ -24,7 +24,7 @@ import type {
 import { sitesApi } from '@/lib/api/sites';
 import { siteGeocodeApi } from '@/lib/api/zone_ingestion';
 import { siteProfileApi } from '@/lib/api/sites';
-import { api, niagaraApi } from '@/lib/api';
+import { api, niagaraApi, resolveSimbiotProtocol } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
 import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
@@ -40,6 +40,7 @@ const BMS_VENDORS = [
   { value: "schneider" as const, label: "Schneider EcoStruxure", protocol: "BACnet/IP" },
   { value: "trend" as const, label: "Trend Controls IQ4", protocol: "BACnet/IP" },
   { value: "generic" as const, label: "Generic BACnet/IP", protocol: "BACnet/IP" },
+  { value: "bridge" as const, label: "SIMBIOT Bridge (HTTP)", protocol: "Bridge API" },
 ];
 
 // ============= BMS Vendor Help Text =============
@@ -51,7 +52,8 @@ const VENDOR_HELP_TEXT: Record<BMSVendor, string> = {
   honeywell: "Honeywell EBI (Enterprise Building Integrator) uses BACnet/IP for communications. Ensure the EBI gateway is accessible over the network. Verify BACnet services are enabled in your EBI configuration.",
   schneider: "Schneider EcoStruxure uses BACnet/IP for device discovery. Provide the IP address of your EcoStruxure gateway or controller. Ensure network connectivity and firewall rules allow BACnet communication.",
   trend: "Trend Controls IQ4 uses BACnet/IP for point access. Configure your IQ4 controller to accept BACnet queries. Enter the controller IP address and ensure UDP 47808 is accessible.",
-  generic: "For generic BACnet/IP systems, provide the controller or gateway IP address. The system will discover points using standard BACnet protocol. Works with any BACnet/IP-compliant device.",
+  generic: "For generic BACnet/IP systems, provide the controller or gateway IP address. The system will discover points using standard BACnet protocol. Enter credentials if your BMS or gateway requires authentication.",
+  bridge: "SIMBIOT Bridge uses HTTP REST to connect through the WireGuard bridge (port 8080). Enter the bridge IP and API token. No BACnet/UDP required — works through any tunnel.",
 };
 
 // ============= Types =============
@@ -327,7 +329,7 @@ export function BMSConnectionWizard({
     // BMS connection
     bmsVendor: "niagara",
     host: "",
-    port: 80,
+    port: "",
     username: "",
     password: "",
     useHttps: false,
@@ -455,11 +457,19 @@ export function BMSConnectionWizard({
       return;
     }
 
+    const portNum = Number(state.port);
+    const portFallback = isNiagara ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
+    const safePort = state.port && Number.isFinite(portNum) && portNum > 0 && portNum <= 65535
+      ? portNum
+      : portFallback;
+
     try {
+      const isBridge = state.bmsVendor === 'bridge';
+
       if (state.bmsVendor === 'niagara') {
         const res = await niagaraApi.configureOBIX({
           host: state.host,
-          port: state.port,
+          port: safePort,
           username: state.username,
           password: state.password,
           use_https: state.useHttps,
@@ -475,12 +485,30 @@ export function BMSConnectionWizard({
         }
       }
 
-      const res = await niagaraApi.testBACnetConnection({
-        timeout: 5,
-        host: state.host.trim(),
-      });
+      let bacnetDevices: BACnetDevice[] = [];
+      if (!isBridge && state.bmsVendor !== 'niagara') {
+        try {
+          const bacnetRes = await niagaraApi.testBACnetConnection({
+            timeout: 5,
+            host: state.host.trim(),
+          });
+          bacnetDevices = bacnetRes.devices || [];
+        } catch (bacErr) {
+          console.warn("BACnet discovery skipped or failed for", state.bmsVendor, bacErr);
+        }
+      }
 
-      if (res.count === 0) {
+      let resolvedSiteId = "";
+      if (isBridge || state.bmsVendor === 'niagara' || bacnetDevices.length > 0) {
+        resolvedSiteId = await ensureSiteCreated();
+        const selectedDeviceId = state.bmsVendor === 'niagara' || isBridge ? null : pickDefaultDeviceId(bacnetDevices, state.host);
+        dispatch({ type: "SET_BACNET_DEVICES", devices: bacnetDevices, selectedDeviceId });
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "connected",
+          message: isBridge ? "Bridge connection ready" : state.bmsVendor === 'niagara' ? "Niagara oBIX connection successful" : buildConnectionMessage(bacnetDevices, selectedDeviceId),
+        });
+      } else {
         dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
         dispatch({
           type: "SET_CONNECTION_STATUS",
@@ -490,22 +518,15 @@ export function BMSConnectionWizard({
         });
         return;
       }
-
-      const resolvedSiteId = await ensureSiteCreated();
-      const selectedDeviceId = pickDefaultDeviceId(res.devices, state.host);
-      dispatch({ type: "SET_BACNET_DEVICES", devices: res.devices, selectedDeviceId });
-      dispatch({
-        type: "SET_CONNECTION_STATUS",
-        status: "connected",
-        message: buildConnectionMessage(res.devices, selectedDeviceId),
-      });
       try {
         const capabilities = await niagaraApi.getSimbiotCapabilities({
           site_id: resolvedSiteId,
           bms_vendor: state.bmsVendor,
           host: state.host.trim(),
-          port: state.port,
+          port: safePort,
           commissioning: true,
+          ...(state.username && { username: state.username }),
+          ...(state.password && { password: state.password }),
         });
         dispatch({ type: "SET_CAPABILITIES", summary: capabilities.summary, error: null });
       } catch (capErr) {
@@ -514,6 +535,30 @@ export function BMSConnectionWizard({
           summary: null,
           error: capErr instanceof Error ? capErr.message : "Could not load capabilities",
         });
+      }
+
+      // Persist per-site adapter config so the backend can reconnect later.
+      try {
+        const adapterProtocol = resolveSimbiotProtocol(state.bmsVendor);
+        const adapterConfig = isBridge
+          ? { base_url: `http://${state.host.trim()}:${safePort}`, token: state.password || state.username || "" }
+          : {
+              host: state.host.trim(),
+              port: safePort,
+              ...(state.username && { username: state.username }),
+              ...(state.password && { password: state.password }),
+              use_https: state.useHttps,
+              bms_vendor: state.bmsVendor,
+            };
+        await niagaraApi.saveSimbiotAdapterConfig({
+          site_id: resolvedSiteId,
+          protocol: adapterProtocol,
+          config: adapterConfig,
+          poll_interval_seconds: 300,
+        });
+        console.log("Saved adapter config for", resolvedSiteId);
+      } catch (saveErr) {
+        console.warn("Failed to save adapter config for", resolvedSiteId, saveErr);
       }
     } catch (err) {
       dispatch({
@@ -944,11 +989,6 @@ export function BMSConnectionWizard({
               });
               dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
               dispatch({ type: "SET_CAPABILITIES", summary: null, error: null });
-              dispatch({
-                type: "SET_FIELD",
-                field: "port",
-                value: e.target.value === "niagara" ? 80 : 47808,
-              });
               dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
             }}
             className="w-full rounded px-3 py-2 text-sm"
@@ -1011,23 +1051,25 @@ export function BMSConnectionWizard({
               <input
                 type="number"
                 value={state.port}
-                onChange={(e) =>
-                  dispatch({
-                    type: "SET_FIELD",
-                    field: "port",
-                    value: parseInt(e.target.value, 10) || (isNiagara ? 80 : 47808),
-                  })
-                }
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  if (raw === "") {
+                    dispatch({ type: "SET_FIELD", field: "port", value: "" });
+                    return;
+                  }
+                  const parsed = parseInt(raw, 10);
+                  if (Number.isFinite(parsed)) {
+                    dispatch({ type: "SET_FIELD", field: "port", value: Math.min(Math.max(parsed, 1), 65535) });
+                  }
+                }}
                 className="w-full rounded px-3 py-2 text-sm"
                 style={inputStyle}
               />
             </div>
-            {isNiagara && (
-              <>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
-                <span>Username</span>
-                <Tooltip content="oBIX credential (required for Niagara). Leave blank for BACnet-only systems.">
+                <span>Username / API Key</span>
+                <Tooltip content="Optional credential for BMS or bridge authentication. Required if your BMS or gateway requires login.">
                   <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
                 </Tooltip>
               </label>
@@ -1048,8 +1090,8 @@ export function BMSConnectionWizard({
             </div>
             <div className="col-span-2 sm:col-span-1">
               <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
-                <span>Password</span>
-                <Tooltip content="oBIX credential (required for Niagara). Encrypted and never stored in logs.">
+                <span>Password / Token</span>
+                <Tooltip content="Optional credential or API token for BMS or bridge authentication. Encrypted and never stored in logs.">
                   <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
                 </Tooltip>
               </label>
@@ -1067,6 +1109,7 @@ export function BMSConnectionWizard({
                 style={inputStyle}
               />
             </div>
+            {isNiagara && (
             <div className="col-span-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -1086,7 +1129,6 @@ export function BMSConnectionWizard({
                 </span>
               </label>
             </div>
-              </>
             )}
             {state.discoveredDevices.length > 0 && (
               <div className="col-span-2">
@@ -1130,7 +1172,7 @@ export function BMSConnectionWizard({
               color: "var(--color-sentinel-text-secondary)",
             }}
           >
-            No credentials are required for {vendorLabel}. SENTINEL will verify BACnet connectivity,
+            Credentials are optional for {vendorLabel}. SENTINEL will verify BACnet connectivity,
             list matching controllers for the host you entered, and use your selected device for discovery.
           </div>
         )}

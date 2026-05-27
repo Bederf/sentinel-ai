@@ -64,8 +64,9 @@ async def discover_devices(request: BACnetDiscoverRequest = BACnetDiscoverReques
         )
 
     try:
-        discovered = await client.discover_devices(timeout=request.timeout)
-        if request.host:
+        target = request.host.strip() if request.host else None
+        discovered = await client.discover_devices(timeout=request.timeout, target_host=target)
+        if not target and request.host:
             normalized_host = request.host.strip().lower()
             discovered = [device for device in discovered if device.ip_address.lower().startswith(normalized_host)]
 
@@ -117,8 +118,12 @@ async def test_bacnet_connection(
             )
 
     try:
-        discovered = await client.discover_devices(timeout=request.timeout)
-        if request.host:
+        target = request.host.strip() if request.host else None
+        discovered = await client.discover_devices(timeout=request.timeout, target_host=target)
+        # When a directed Who-Is was used, the responses may come from devices on
+        # a different subnet behind a BACnet router/bridge — skip IP prefix filter.
+        # Only filter by IP when doing a broadcast Who-Is.
+        if not target and request.host:
             normalized_host = request.host.strip().lower()
             discovered = [device for device in discovered if device.ip_address.lower().startswith(normalized_host)]
 
@@ -271,8 +276,8 @@ async def write_point(
     object_type: str,
     instance: int,
     request: BACnetPointWriteRequest,
-    site_id: str = Query("site-002", description="Site code for policy enforcement"),
-    bms_vendor: str = Query("bacnet", description="BMS vendor/adapter alias"),
+    site_id: str = "site-002",
+    bms_vendor: str = "bacnet",
 ):
     """
     Write a value to a BACnet point with priority array support.

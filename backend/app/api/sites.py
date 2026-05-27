@@ -500,9 +500,9 @@ def get_sites_from_supabase(
 
             client = get_supabase_client()
             modules_result = client.table("site_modules").select("site_id").execute()
-            onboarded_sites = {row["site_id"] for row in (modules_result.data or [])}
-            if onboarded_sites:
-                buildings = [b for b in buildings if b.get("code") in onboarded_sites]
+            onboarded_site_uuids = {row["site_id"] for row in (modules_result.data or [])}
+            if onboarded_site_uuids:
+                buildings = [b for b in buildings if b.get("id") in onboarded_site_uuids]
         except Exception as e:
             logger.warning(f"Could not filter by onboarded sites: {e}")
 
@@ -619,7 +619,10 @@ async def list_sites(
             # Merge live bridge status so SiteCard shows correct connectivity
             sentinel_enabled = site.get("sentinel_processing_enabled", True)
             bridge_status = _get_bridge_status(sentinel_enabled=sentinel_enabled)
-            site_with_bridge = {**site, **bridge_status}
+
+            # Remove fields that will be passed explicitly to avoid duplicate kwargs
+            site_clean = {k: v for k, v in site.items() if k not in ("status",)}
+            site_with_bridge = {**site_clean, **bridge_status}
 
             result.append(
                 SiteResponse(

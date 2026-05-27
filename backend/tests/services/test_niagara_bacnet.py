@@ -9,7 +9,7 @@ Tests cover:
 - Point cache management
 """
 
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -40,10 +40,11 @@ def client():
 def mock_bac0():
     """Create a mock BAC0 lite instance."""
     mock = MagicMock()
-    mock.whois.return_value = [
+    bacnet_devices = [
         ("192.168.1.100", 1234),
         ("192.168.1.101", 5678),
     ]
+    mock.who_is = AsyncMock(return_value=bacnet_devices)
     mock.read.return_value = 22.5
     mock.write.return_value = None
     mock.disconnect.return_value = None
@@ -174,14 +175,14 @@ class TestDeviceDiscovery:
     @pytest.mark.asyncio
     async def test_discover_empty_network(self, started_client, mock_bac0):
         """Discovery on empty network should return empty list."""
-        mock_bac0.whois.return_value = []
+        mock_bac0.who_is = AsyncMock(return_value=[])
         devices = await started_client.discover_devices()
         assert devices == []
 
     @pytest.mark.asyncio
     async def test_discover_handles_none_response(self, started_client, mock_bac0):
         """Discovery should handle None response gracefully."""
-        mock_bac0.whois.return_value = None
+        mock_bac0.who_is = AsyncMock(return_value=None)
         devices = await started_client.discover_devices()
         assert devices == []
 

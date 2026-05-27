@@ -25,6 +25,8 @@ async def get_site_capabilities(
     port: int | None = Query(None, description="Optional BMS port"),
     device_id: str | None = Query(None, description="Optional single-device filter"),
     commissioning: bool = Query(True, description="Allow onboarding-time capability discovery"),
+    username: str | None = Query(None, description="Optional credential for bridge/Niagara auth"),
+    password: str | None = Query(None, description="Optional credential or token for bridge/Niagara auth"),
 ) -> dict:
     """Return normalized capability map for a site."""
     adapter = create_bms_adapter(adapter_type=bms_vendor, bms_vendor=bms_vendor, device_ip=host)
@@ -33,7 +35,11 @@ async def get_site_capabilities(
         source_type=bms_vendor,
         host=host,
         port=port,
-        metadata={"commissioning": commissioning},
+        metadata={
+            "commissioning": commissioning,
+            "bms_vendor": bms_vendor,
+            "token": password or username or "",
+        },
     )
 
     try:

@@ -291,10 +291,45 @@ router = APIRouter(prefix="/api/buildings", tags=["Building Management"])
 DATA_PATH = Path(__file__).parent.parent / "data" / "buildings"
 
 
+def _next_site_id() -> str:
+    """Find the next available site ID across disk and Supabase."""
+    import re
+
+    base = Path(__file__).parent.parent / "data"
+    existing: set[int] = set()
+
+    for data_dir in [base / "buildings", base / "sites"]:
+        if not data_dir.exists():
+            continue
+        for d in data_dir.iterdir():
+            if d.is_dir() and d.name.startswith("site-"):
+                m = re.match(r"^site-(\d+)$", d.name)
+                if m:
+                    existing.add(int(m.group(1)))
+
+    # Also check Supabase for existing site codes
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        result = client.table("sites").select("code").execute()
+        for row in result.data or []:
+            m = re.match(r"^site-(\d+)$", row.get("code", ""))
+            if m:
+                existing.add(int(m.group(1)))
+    except Exception:
+        pass
+
+    n = 1
+    while n in existing:
+        n += 1
+    return f"site-{n:03d}"
+
+
 class BuildingCreate(BaseModel):
     """Request model for creating a building."""
 
-    id: str
+    id: str | None = None
     name: str
     display_name: str | None = None
     address: str | None = ""
@@ -663,18 +698,21 @@ async def create_building(building: BuildingCreate) -> dict:
     Creates the building folder structure and config files.
     Building is NOT activated by default - call /activate after setup.
     """
-    site_path = DATA_PATH / building.id
+    # Auto-generate a site code from the name if not provided
+    site_id = building.id or _next_site_id()
+    site_path = DATA_PATH / site_id
 
-    # Check if already exists
-    if site_path.exists():
-        raise HTTPException(status_code=409, detail=f"Building '{building.id}' already exists")
+    # If the ID is taken, keep trying the next one
+    while site_path.exists():
+        site_id = _next_site_id()
+        site_path = DATA_PATH / site_id
 
     # Create folder structure
     site_path.mkdir(parents=True, exist_ok=True)
 
     # Create building.json
     site_data = {
-        "id": building.id,
+        "id": site_id,
         "name": building.name,
         "display_name": building.display_name or building.name,
         "address": building.address,
@@ -702,17 +740,17 @@ async def create_building(building: BuildingCreate) -> dict:
     with open(site_path / "zones.json", "w") as f:
         json.dump([], f, indent=2)
 
-    logger.info(f"Created building: {building.id}")
+    logger.info(f"Created building: {site_id}")
 
     return {
-        "id": building.id,
+        "id": site_id,
         "name": building.name,
         "status": "created",
         "message": "Building created. Upload desks/zones, then call /activate.",
         "next_steps": [
-            f"POST /api/buildings/{building.id}/desks - Upload desk data",
-            f"POST /api/buildings/{building.id}/zones - Upload zone data",
-            f"POST /api/buildings/{building.id}/activate - Activate building",
+            f"POST /api/buildings/{site_id}/desks - Upload desk data",
+            f"POST /api/buildings/{site_id}/zones - Upload zone data",
+            f"POST /api/buildings/{site_id}/activate - Activate building",
         ],
     }
 

@@ -45,12 +45,18 @@ logger = logging.getLogger("sentinel.simbiot.bridge")
 class BridgeBmsAdapter(BmsAdapter):
     """SIMBIOT adapter for the Shadow Bridge REST proxy."""
 
-    def __init__(self, base_url: str, token: str, timeout_seconds: float = 10.0) -> None:
-        self._base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str = "", token: str = "", timeout_seconds: float = 10.0) -> None:
+        self._base_url = base_url.rstrip("/") if base_url else ""
         self._token = token
         self._timeout = timeout_seconds
         self._site_id: str = ""
         self._connected: bool = False
+
+    @staticmethod
+    def _resolve_base_url(config: BmsConnectionConfig) -> str:
+        host = config.host or ""
+        port = config.port or 8080
+        return f"http://{host}:{port}"
 
     @property
     def adapter_id(self) -> str:
@@ -69,10 +75,24 @@ class BridgeBmsAdapter(BmsAdapter):
 
     @property
     def _headers(self) -> dict[str, str]:
-        return {"Authorization": f"Bearer {self._token}"}
+        if self._token:
+            return {"Authorization": f"Bearer {self._token}"}
+        return {}
 
     async def connect(self, config: BmsConnectionConfig) -> BmsConnectionStatus:
         self._site_id = config.site_id
+        if not self._base_url:
+            self._base_url = self._resolve_base_url(config)
+        if not self._token:
+            self._token = str(config.metadata.get("token", "")) if config.metadata else ""
+        if not self._token:
+            return BmsConnectionStatus(
+                connected=False,
+                site_id=config.site_id,
+                source_type="bridge",
+                status="error",
+                message="Bridge API token is required — enter it in the Password/Token field",
+            )
         try:
             async with httpx.AsyncClient(timeout=self._timeout) as client:
                 resp = await client.get(

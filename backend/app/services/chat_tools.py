@@ -3520,6 +3520,26 @@ CHAT_TOOLS = [
             "required": ["equipment_code"],
         },
     },
+    {
+        "name": "respond_in_voice",
+        "description": (
+            "Convert text to speech and send as a Telegram voice message. "
+            "Use this when the user asks you to 'respond in voice', "
+            "'say it', 'reply in voice', or similar. "
+            "Takes the text you want to speak, synthesizes it via ElevenLabs, "
+            "and sends it as an audio voice message via Telegram."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "text": {
+                    "type": "string",
+                    "description": "The text to convert to speech and send as voice",
+                },
+            },
+            "required": ["text"],
+        },
+    },
     # ---------------------------------------------------------------------------
     # ServiceNow Integration Tools (Phase 138-02)
     # ---------------------------------------------------------------------------
@@ -4318,6 +4338,55 @@ async def close_work_order_chat(
         return {"success": False, "error": str(e)}
 
 
+async def respond_in_voice_chat(
+    text: str,
+    chat_id: str | None = None,
+) -> dict[str, Any]:
+    """Generate and send a voice (TTS) version of the response text via Telegram.
+
+    Uses ElevenLabs to synthesize speech and sends as a voice message.
+    The text response will also be sent as text fallback.
+    """
+    try:
+        from app.services.telegram_message_sender import get_telegram_sender
+        from app.services.tts_service import get_tts_service
+
+        tts = get_tts_service()
+        if not tts.is_configured():
+            return {"success": False, "error": "TTS not configured — no ElevenLabs API key"}
+
+        audio_bytes = await tts.text_to_speech(text)
+        if not audio_bytes:
+            return {"success": False, "error": "Speech synthesis failed"}
+
+        # Save audio bytes to temp file
+        import tempfile
+        import uuid
+        audio_path = f"/tmp/sentry_voice_{uuid.uuid4()}.mp3"
+        with open(audio_path, "wb") as f:
+            f.write(audio_bytes)
+
+        try:
+            sender = get_telegram_sender()
+            # Send to the current chat — telegram_message_sender knows the chat from context
+            if chat_id:
+                result = await sender.send_voice(chat_id, audio_path, caption=text[:200])
+                if result.get("ok"):
+                    return {"success": True, "message": "Voice response sent"}
+                return {"success": False, "error": str(result)}
+            return {"success": False, "error": "No chat_id provided"}
+        finally:
+            # Clean up temp file
+            import os
+            try:
+                os.remove(audio_path)
+            except Exception:
+                pass
+    except Exception as e:
+        logger.warning(f"respond_in_voice_chat failed: {e}", exc_info=True)
+        return {"success": False, "error": str(e)}
+
+
 async def create_work_order_chat(
     description: str,
     equipment_code: str | None = None,
@@ -4892,6 +4961,7 @@ TOOL_HANDLERS = {
     "approve_recommendation": approve_recommendation_chat,
     "reject_recommendation": reject_recommendation_chat,
     "reset_equipment_fault": reset_equipment_fault_chat,
+    "respond_in_voice": respond_in_voice_chat,
     "search_documents": search_documents,
     "search_system_documents": search_system_documents,
     "get_hybrid_context": get_hybrid_context,

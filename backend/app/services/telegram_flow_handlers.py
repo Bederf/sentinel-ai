@@ -66,6 +66,7 @@ async def _send_response(
     sender: TelegramMessageSender,
     keyboard: InlineKeyboard | None = None,
     force_voice: bool = False,
+    user_message: str = "",
 ) -> None:
     """Send a response, using voice if a trigger is detected or force_voice=True.
 
@@ -75,6 +76,7 @@ async def _send_response(
         sender: TelegramMessageSender instance
         keyboard: Optional inline keyboard
         force_voice: If True, always generate voice (for auto-voice responses)
+        user_message: The user's original message text to check for voice triggers
     """
     coordinator = _get_voice_coordinator()
 
@@ -82,7 +84,17 @@ async def _send_response(
     should_use_voice = force_voice
 
     if coordinator and not force_voice:
-        analysis = coordinator.analyze_message_for_voice(text)
+        # Try to get user's original message from active session
+        if not user_message:
+            try:
+                from app.services.telegram_conversation_manager import get_conversation_manager
+                session = get_conversation_manager().get_session(chat_id)
+                if session:
+                    user_message = session.answers.get("original_text", "") or ""
+            except Exception:
+                pass
+        trigger_text = user_message or text
+        analysis = coordinator.analyze_message_for_voice(trigger_text)
         should_use_voice = analysis.get("should_use_voice", False)
         voice_params = analysis.get("voice_params", {})
 
@@ -1112,6 +1124,15 @@ async def route_to_handler(
     message_id: int | None = None,
 ) -> None:
     """Route to the correct flow handler based on intent."""
+    # Store user's message text for voice trigger detection in _send_response
+    try:
+        mgr = get_conversation_manager()
+        session = mgr.get_session(chat_id)
+        if session and text and not session.answers.get("original_text"):
+            session.answers["original_text"] = text
+    except Exception:
+        pass
+
     handlers = {
         TelegramIntent.CLIENT_COMPLAINT: handle_client_complaint,
         TelegramIntent.TECHNICIAN_REPORT: handle_technician_report,

@@ -59,7 +59,9 @@ def _register_default_adapters() -> None:
         return
 
     from .bacnet_bms_adapter import BacnetBmsAdapter
+    from .bridge_bms_adapter import BridgeBmsAdapter
 
     register_bms_adapter("bacnet", BacnetBmsAdapter)
     register_bms_adapter("obix", ObixBmsAdapter)
     register_bms_adapter("modbus", ModbusBmsAdapter)
+    register_bms_adapter("bridge", BridgeBmsAdapter)

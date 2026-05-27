@@ -8,7 +8,7 @@ Note: TestClient is incompatible with httpx 0.28.x + starlette 0.36.x,
 so API endpoint functions are tested directly with mocked dependencies.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -119,21 +119,21 @@ class TestDeviceDiscoveryEndpoint:
         assert result.devices == []
 
     @pytest.mark.asyncio
-    async def test_discover_filters_devices_by_host(self, mock_bacnet_client):
+    async def test_discover_directed_whois(self, mock_bacnet_client):
         from app.api.niagara_bacnet import discover_devices
         from app.models.niagara import BACnetDiscoverRequest
 
         mock_devices = [
             DiscoveredDevice(device_id=1000, ip_address="192.168.1.100:47808", vendor_name="Tridium"),
-            DiscoveredDevice(device_id=2000, ip_address="192.168.1.101:47808", vendor_name="Tridium"),
+            DiscoveredDevice(device_id=2000, ip_address="10.0.0.50:47808", vendor_name="Tridium"),
         ]
         mock_bacnet_client.discover_devices = AsyncMock(return_value=mock_devices)
 
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             result = await discover_devices(BACnetDiscoverRequest(timeout=5.0, host="192.168.1.100"))
 
-        assert result.count == 1
-        assert result.devices[0].device_id == 1000
+        # Directed Who-Is to the host — no IP prefix filter, all responses included
+        assert result.count == 2
 
     @pytest.mark.asyncio
     async def test_discover_client_not_started(self, mock_bacnet_client):
@@ -196,8 +196,8 @@ class TestBACnetConnectionEndpoint:
         with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
             result = await test_bacnet_connection(BACnetTestConnectionRequest(timeout=5, host="192.168.1.101"))
 
-        assert result.count == 1
-        assert result.devices[0].device_id == 2000
+        # Directed Who-Is to the host — no IP prefix filter, all responses included
+        assert result.count == 2
 
 
 # ---------------------------------------------------------------------------
@@ -366,14 +366,21 @@ class TestPointReadEndpoint:
 class TestPointWriteEndpoint:
     """Tests for write_point endpoint function."""
 
+    @pytest.fixture
+    def mock_adapter(self):
+        """Create a mock BMS adapter for write_point tests."""
+        mock = AsyncMock()
+        mock.connect = AsyncMock(return_value=MagicMock(connected=True))
+        return mock
+
     @pytest.mark.asyncio
-    async def test_write_point_value(self, mock_bacnet_client):
+    async def test_write_point_value(self, mock_adapter):
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
 
-        mock_bacnet_client.write_point = AsyncMock(return_value=True)
+        mock_adapter.write_point = AsyncMock(return_value=True)
 
-        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+        with patch("app.api.niagara_bacnet.create_bms_adapter", return_value=mock_adapter):
             result = await write_point(
                 device_id=1000,
                 object_type="analogOutput",
@@ -386,13 +393,13 @@ class TestPointWriteEndpoint:
         assert result.priority == 8
 
     @pytest.mark.asyncio
-    async def test_write_point_default_priority(self, mock_bacnet_client):
+    async def test_write_point_default_priority(self, mock_adapter):
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
 
-        mock_bacnet_client.write_point = AsyncMock(return_value=True)
+        mock_adapter.write_point = AsyncMock(return_value=True)
 
-        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+        with patch("app.api.niagara_bacnet.create_bms_adapter", return_value=mock_adapter):
             result = await write_point(
                 device_id=1000,
                 object_type="analogOutput",
@@ -400,24 +407,23 @@ class TestPointWriteEndpoint:
                 request=BACnetPointWriteRequest(value=22.5),
             )
 
-        mock_bacnet_client.write_point.assert_called_once_with(
-            device_id=1000,
-            object_type="analogOutput",
-            instance=1,
-            value=22.5,
-            priority=8,
-        )
+        mock_adapter.write_point.assert_called_once()
+        call_kwargs = mock_adapter.write_point.call_args[0][0]
+        assert call_kwargs.value == 22.5
+        assert call_kwargs.priority == 8
+        assert call_kwargs.device_id == "1000"
 
     @pytest.mark.asyncio
-    async def test_write_point_error(self, mock_bacnet_client):
+    async def test_write_point_error(self, mock_adapter):
         from fastapi import HTTPException
 
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
+        from app.services.niagara.bacnet_client import BACnetWriteError
 
-        mock_bacnet_client.write_point = AsyncMock(side_effect=BACnetWriteError("Write rejected"))
+        mock_adapter.write_point = AsyncMock(side_effect=BACnetWriteError("Write rejected"))
 
-        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+        with patch("app.api.niagara_bacnet.create_bms_adapter", return_value=mock_adapter):
             with pytest.raises(HTTPException) as exc_info:
                 await write_point(
                     device_id=1000,
@@ -428,15 +434,16 @@ class TestPointWriteEndpoint:
             assert exc_info.value.status_code == 502
 
     @pytest.mark.asyncio
-    async def test_write_point_timeout(self, mock_bacnet_client):
+    async def test_write_point_timeout(self, mock_adapter):
         from fastapi import HTTPException
 
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
+        from app.services.niagara.bacnet_client import BACnetTimeoutError
 
-        mock_bacnet_client.write_point = AsyncMock(side_effect=BACnetTimeoutError("Timed out"))
+        mock_adapter.write_point = AsyncMock(side_effect=BACnetTimeoutError("Timed out"))
 
-        with patch("app.api.niagara_bacnet.get_bacnet_client", return_value=mock_bacnet_client):
+        with patch("app.api.niagara_bacnet.create_bms_adapter", return_value=mock_adapter):
             with pytest.raises(HTTPException) as exc_info:
                 await write_point(
                     device_id=1000,

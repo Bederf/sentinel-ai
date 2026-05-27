@@ -329,21 +329,27 @@ class NiagaraBACnetClient:
     # Device discovery
     # ------------------------------------------------------------------
 
-    async def discover_devices(self, timeout: float = DISCOVERY_TIMEOUT_SECONDS) -> list[DiscoveredDevice]:
+    async def discover_devices(
+        self,
+        timeout: float = DISCOVERY_TIMEOUT_SECONDS,
+        target_host: str | None = None,
+    ) -> list[DiscoveredDevice]:
         """Discover BACnet devices on the network using WhoIs/IAm.
 
         Args:
             timeout: Seconds to wait for IAm responses (default 5).
+            target_host: Optional specific host IP for directed Who-Is (unicast
+                instead of broadcast — required through WireGuard tunnels).
 
         Returns:
             List of discovered BACnet devices.
         """
         self._ensure_started()
 
-        logger.info(f"Discovering BACnet devices (timeout={timeout}s)...")
+        logger.info(f"Discovering BACnet devices (timeout={timeout}s, target={target_host or 'broadcast'})...")
         try:
             raw_devices = await asyncio.wait_for(
-                asyncio.get_event_loop().run_in_executor(None, self._bacnet.whois),
+                self._bacnet.who_is(address=target_host) if target_host else self._bacnet.who_is(),
                 timeout=timeout,
             )
         except TimeoutError:
@@ -366,9 +372,19 @@ class NiagaraBACnetClient:
         return devices
 
     def _parse_discovered_device(self, raw: Any) -> DiscoveredDevice:
-        """Parse a raw BAC0 WhoIs response into a DiscoveredDevice."""
-        # BAC0 whois() returns tuples of (address, device_id) or
-        # device-like objects depending on version
+        """Parse a raw BAC0/bacpypes3 WhoIs response into a DiscoveredDevice."""
+        # bacpypes3 IAmRequest: has pduSource + iAmDeviceIdentifier
+        if hasattr(raw, "iAmDeviceIdentifier"):
+            addr = str(getattr(raw, "pduSource", raw))
+            dev_id_obj = raw.iAmDeviceIdentifier
+            device_id = dev_id_obj.deviceInstance if hasattr(dev_id_obj, "deviceInstance") else int(dev_id_obj)
+            vendor_id = getattr(raw, "iAmVendorID", None)
+            return DiscoveredDevice(
+                device_id=device_id,
+                ip_address=addr,
+                vendor_name=f"Vendor#{vendor_id}" if vendor_id else "Unknown",
+            )
+        # BAC0 legacy: tuples of (address, device_id)
         if isinstance(raw, (tuple, list)):
             address = str(raw[0]) if len(raw) > 0 else "unknown"
             device_id = int(raw[1]) if len(raw) > 1 else 0

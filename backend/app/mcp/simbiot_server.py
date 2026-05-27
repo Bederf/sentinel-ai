@@ -2070,6 +2070,16 @@ async def create_site_tool(
             repo.create(supabase_record)
             supabase_written = True
             logger.info(f"Created site in Supabase: {site_id}")
+
+            # Seed only base modules. Add-ons remain inactive until explicitly activated.
+            try:
+                from app.services.module_registry_service import module_registry
+
+                seeded = module_registry.ensure_base_modules(site_id, name)
+                if seeded:
+                    logger.info("Seeded base modules for %s via MCP: %s", site_id, seeded)
+            except Exception as mod_err:
+                logger.warning("Failed to seed base modules for %s: %s", site_id, mod_err)
     except Exception as e:
         logger.warning(f"Supabase write failed, will use JSON only: {e}")
 
@@ -2187,6 +2197,22 @@ async def activate_site_tool(
     # Reload
     loader = get_site_loader()
     loader.load(force=True)
+
+    # Seed base modules if missing (idempotent — safe for already-seeded sites)
+    try:
+        from app.services.module_registry_service import module_registry
+
+        site_data_path = site_path / "site.json"
+        site_name = site_id
+        if site_data_path.exists():
+            with open(site_data_path) as f:
+                site_data = json.load(f)
+                site_name = site_data.get("name", site_id)
+        seeded = module_registry.ensure_base_modules(site_id, site_name)
+        if seeded:
+            logger.info("Seeded base modules for %s on activate: %s", site_id, seeded)
+    except Exception as mod_err:
+        logger.warning("Failed to seed base modules on activate for %s: %s", site_id, mod_err)
 
     logger.info(f"Activated site via MCP: {site_id}")
 

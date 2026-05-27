@@ -73,6 +73,21 @@ async def create_site(request: CreateSiteRequest):
             gross_floor_area=request.gross_floor_area,
             site_code=request.site_code,
         )
+
+        # Seed only base modules. Add-ons remain inactive until explicitly activated.
+        try:
+            from app.services.module_registry_service import module_registry
+
+            site_code = site["code"]
+            seeded = module_registry.ensure_base_modules(site_code, request.site_name)
+            if seeded:
+                logger.info(
+                    "Seeded base modules for %s via SIMBIOT wizard: %s",
+                    site_code, seeded,
+                )
+        except Exception as mod_err:
+            logger.warning("Failed to seed base modules for %s: %s", site.get("code"), mod_err)
+
         return {
             "site_code": site["code"],
             "site_id": site["id"],
