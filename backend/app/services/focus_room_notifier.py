@@ -44,7 +44,7 @@ async def send_focus_overstay_alert(
     try:
         from app.api.space_settings import _load_space_settings
         space_settings = _load_space_settings()
-        if not space_settings.get("focus_room_notifications_enabled", True):
+        if not space_settings.get("focus_room_notifications_enabled", False):
             logger.info("Focus room alerts disabled by space_settings toggle — skipping")
             return {"success": False, "skipped": True}
     except Exception:

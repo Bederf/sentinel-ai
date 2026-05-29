@@ -166,7 +166,7 @@ class Settings(BaseSettings):
     jwt_expiry_days: int = 30  # DEPRECATED: legacy compatibility only
 
     # JWT access token TTL (Phase 193: short-lived tokens for XSS risk reduction)
-    jwt_access_token_ttl_minutes: int = 12  # 12 minutes — balance UX vs security
+    jwt_access_token_ttl_minutes: int = 480  # 8 hours — long enough for onboarding wizard sessions
 
     # JWT refresh token TTL (Phase 65-02: long-lived refresh tokens)
     jwt_refresh_token_ttl_days: int = 7  # 7 days for refresh tokens
@@ -743,6 +743,10 @@ class Settings(BaseSettings):
         )
         normalized = field_name.lower()
         return any(marker in normalized for marker in sensitive_markers)
+
+    # Google Custom Search for building photo scraping
+    google_cse_api_key: str = ""
+    google_cse_engine_id: str = ""
 
     @staticmethod
     def _sensitive_value_marker(value: Any) -> str:

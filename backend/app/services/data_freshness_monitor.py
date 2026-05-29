@@ -56,23 +56,25 @@ class DataFreshnessMonitor:
         try:
             # Get all unique sites registered in data_freshness table
             sites_result = supabase.table("data_freshness").select("site_id").execute()
-            sites = list({row["site_id"] for row in sites_result.data})
+            sites = set(row["site_id"] for row in sites_result.data)
 
-            # Fallback: discover active sites from bridge adapter config when data_freshness
-            # has no rows yet (first run before any seeding). MultiSitePollingCoordinator uses
-            # the same table to find sites it should poll.
+            # Also discover sites from active bridge adapters — handles sites that
+            # haven't been seeded into data_freshness yet (new site deployments).
+            adapter_result = (
+                supabase.table("site_adapter_config")
+                .select("site_id")
+                .eq("enabled", True)
+                .execute()
+            )
+            for row in (adapter_result.data or []):
+                if row.get("site_id"):
+                    sites.add(row["site_id"])
+
             if not sites:
-                adapter_result = (
-                    supabase.table("site_adapter_config")
-                    .select("site_id")
-                    .eq("protocol", "ShadowBridge")
-                    .eq("enabled", True)
-                    .execute()
-                )
-                sites = list({row["site_id"] for row in (adapter_result.data or []) if row.get("site_id")})
-                logger.info(
-                    f"Freshness cycle: no data_freshness rows — discovered {len(sites)} sites from ShadowBridge adapters"  # noqa: E501
-                )
+                logger.warning("Freshness cycle: no sites found in data_freshness or bridge adapters")
+                return {}
+
+            sites = sorted(sites)
 
             logger.debug(f"Freshness cycle: {len(sites)} sites → {sites}")
 
@@ -154,11 +156,17 @@ class DataFreshnessMonitor:
             # Determine SLI pass/fail
             sli_pass = age_seconds is not None and age_seconds <= sli_target
 
+            # Sync SLI target from code in case it changed since seeding
+            code_target = self._STANDARD_SOURCES.get(data_source)
+            if code_target is not None and code_target != sli_target:
+                sli_target = code_target
+
             # Update age, SLI, and derived last_updated in data_freshness so the
             # column stays current even when the bridge bypasses it directly.
             update_payload = {
                 "age_seconds": age_seconds,
                 "sli_pass": sli_pass,
+                "sli_target_seconds": sli_target,
                 "updated_at": now.isoformat(),
             }
             if effective_last_updated is not None:
@@ -249,10 +257,13 @@ class DataFreshnessMonitor:
             supabase.table("data_freshness_breaches").insert(
                 {
                     "site_id": site_id,
+                    "metric_name": data_source,
+                    "breach_type": "data_freshness",
+                    "severity": "medium",
+                    "detected_at": now.isoformat(),
                     "data_source": data_source,
                     "age_seconds": age_seconds,
                     "sli_target": target,
-                    "breach_time": now.isoformat(),
                     "alert_sent": False,
                 }
             ).execute()

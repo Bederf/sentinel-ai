@@ -500,9 +500,9 @@ def get_sites_from_supabase(
 
             client = get_supabase_client()
             modules_result = client.table("site_modules").select("site_id").execute()
-            onboarded_site_uuids = {row["site_id"] for row in (modules_result.data or [])}
-            if onboarded_site_uuids:
-                buildings = [b for b in buildings if b.get("id") in onboarded_site_uuids]
+            onboarded_codes = {row["site_id"] for row in (modules_result.data or [])}
+            if onboarded_codes:
+                buildings = [b for b in buildings if b.get("code") in onboarded_codes]
         except Exception as e:
             logger.warning(f"Could not filter by onboarded sites: {e}")
 
@@ -1367,6 +1367,30 @@ async def toggle_site_processing(
         logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id} (JSON fallback only)")
 
     return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
+
+
+@router.post("/sites/{site_id}/scrape-geometry")
+async def scrape_site_geometry(
+    site_id: str,
+    body: dict[str, str],
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> dict[str, Any]:
+    """Scrape building photo from web and extract geometry for cockpit twin."""
+    from app.services.building_geometry_scraper import scrape_site_geometry
+
+    site_name = body.get("site_name", site_id)
+    address = body.get("address", "")
+
+    try:
+        geometry = await scrape_site_geometry(
+            site_id=site_id,
+            site_name=site_name,
+            address=address,
+        )
+        return {"status": "ok", "geometry": geometry.to_dict()}
+    except Exception as e:
+        logger.error("Failed to scrape geometry for %s: %s", site_id, e)
+        raise HTTPException(status_code=500, detail=f"Failed to scrape geometry: {e}")
 
 
 @router.get("/sites/{site_id}/telemetry")

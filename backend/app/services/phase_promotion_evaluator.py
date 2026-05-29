@@ -43,6 +43,14 @@ class PhasePromotionEvaluator:
     """
 
     PROMOTION_GATES: dict[str, dict] = {
+        "commissioning": {
+            "target": "shadow_live",
+            "gates": [
+                "hours_since_created >= 24",
+                "bridge_polls_successful >= 50",
+                "data_quality_score >= 0.7",
+            ],
+        },
         "shadow_live": {
             "target": "advisory",
             "gates": [
@@ -107,7 +115,13 @@ class PhasePromotionEvaluator:
         return results
 
     async def evaluate_site(self, site_id: str, current_phase: str) -> PromotionResult:
-        """Check all gates for a site's current phase and surface readiness."""
+        """Check all gates for a site's current phase and surface readiness.
+
+        Commissioning → shadow_live auto-promotes when gates pass (data quality
+        gate protects against data floods). Higher phases require human approval.
+        """
+        from app.config.settings import settings
+        from supabase import create_client
 
         gates_config = self.PROMOTION_GATES.get(current_phase)
         if not gates_config:
@@ -120,6 +134,26 @@ class PhasePromotionEvaluator:
         all_passed = all(g.passed for g in gate_results)
 
         if all_passed:
+            # Commissioning → shadow_live: auto-promote (data quality gates protect pipeline)
+            if current_phase == "commissioning":
+                target = gates_config["target"]
+                try:
+                    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+                    client.table("sites").update({"onboarding_phase": target}).eq("code", site_id).execute()
+                    logger.info("Auto-promoted %s: commissioning → %s (data quality gates passed)", site_id, target)
+                    return PromotionResult(
+                        eligible=True,
+                        promoted=True,
+                        from_phase=current_phase,
+                        to_phase=target,
+                        reason="gate_auto_promoted_data_quality_verified",
+                        gates=gate_results,
+                    )
+                except Exception as e:
+                    logger.error("Auto-promotion failed for %s: %s", site_id, e)
+                    return PromotionResult(eligible=True, promoted=False, reason=str(e), gates=gate_results)
+
+            # Higher phases: set ready flag for human decision
             await self._set_ready_flag(site_id, current_phase, gates_config["target"], gate_results)
             return PromotionResult(
                 eligible=True,
@@ -252,6 +286,65 @@ class PhasePromotionEvaluator:
                 value=round(ml_hours, 1),
                 threshold=threshold,
             )
+
+        # ── hours_since_created >= X (commissioning gate) ──────────────
+        if gate.startswith("hours_since_created >="):
+            threshold = int(gate.split(">=")[1].strip())
+            try:
+                created_row = client.table("sites").select("created_at").eq("code", site_id).limit(1).execute()
+                if created_row.data and created_row.data[0].get("created_at"):
+                    created = datetime.fromisoformat(created_row.data[0]["created_at"].replace("Z", "+00:00"))
+                    hours = (datetime.now(tz=UTC) - created).total_seconds() / 3600
+                    return GateResult(gate=gate, passed=hours >= threshold, value=round(hours, 1), threshold=threshold)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
+            return GateResult(gate=gate, passed=False, value=0, threshold=threshold)
+
+        # ── bridge_polls_successful >= X (commissioning gate) ─────────
+        if gate.startswith("bridge_polls_successful >="):
+            threshold = int(gate.split(">=")[1].strip())
+            try:
+                polls_row = client.table("site_polling_state").select("poll_count").eq("site_id", site_id).limit(1).execute()
+                if polls_row.data and polls_row.data[0].get("poll_count") is not None:
+                    count = int(polls_row.data[0]["poll_count"])
+                    return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+            # Fallback: count from equipment_sensor_readings as polling proxy
+            try:
+                readings = client.table("equipment_sensor_readings").select("id", count="exact").eq("site_id", site_id).execute()
+                count = readings.count if hasattr(readings, "count") else len(readings.data or [])
+                passed = count >= 50  # At least 50 sensor readings = bridge is working
+                return GateResult(gate=gate, passed=passed, value=count, threshold=threshold)
+            except Exception as e:
+                logger.debug("Gate '%s' fallback failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
+
+        # ── data_quality_score >= X (commissioning gate) ──────────────
+        if gate.startswith("data_quality_score >="):
+            threshold = float(gate.split(">=")[1].strip())
+            try:
+                # Check fault-to-normal ratio from equipment_sensor_readings
+                # Good quality = most readings are normal, few are faults/alarms
+                readings = client.table("equipment_sensor_readings").select("sensor_type", count="exact").eq("site_id", site_id).execute()
+                total = readings.count if hasattr(readings, "count") else len(readings.data or [])
+                if total < 10:
+                    return GateResult(gate=gate, passed=False, value=0.0, threshold=threshold)
+                # Count anomaly-related sensor types as potential fault indicators
+                fault_types = client.table("equipment_sensor_readings").select("sensor_type", count="exact").eq("site_id", site_id).in_("sensor_type", ["anomaly_score", "fault_code", "alarm_status"]).execute()
+                fault_count = fault_types.count if hasattr(fault_types, "count") else len(fault_types.data or [])
+                # Also check equipment_fault_events
+                try:
+                    fault_events = client.table("equipment_fault_events").select("id", count="exact").eq("site_id", site_id).execute()
+                    fault_count += fault_events.count if hasattr(fault_events, "count") else len(fault_events.data or [])
+                except Exception:
+                    pass
+                quality = max(0.0, min(1.0, 1.0 - (fault_count / max(total, 1))))
+                return GateResult(gate=gate, passed=quality >= threshold, value=round(quality, 2), threshold=threshold)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
 
         # ── anomaly_scores_writing ──────────────────────────────────────
         # equipment_analytics: ML anomaly scores written by sentinel_data_sync.

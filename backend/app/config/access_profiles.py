@@ -40,6 +40,22 @@ USER_ACCESS_PROFILES: dict[str, AccessProfile] = {
         "viewMode": "operator",
         "description": "Solar & BESS profile for Bederf",
     },
+    "pietvrooyen@gmail.com": {
+        "companyName": "Busamed Gateway",
+        "profileFocus": "hospital",
+        "allowedModules": [
+            "dashboard",
+            "integrations",
+            "hvac",
+            "energy",
+            "lighting",
+            "maintenance",
+        ],
+        "allowedSites": ["site-002"],
+        "defaultView": "dashboard",
+        "viewMode": "operator",
+        "description": "Facilities operator for Busamed Gateway Hospital",
+    },
 }
 
 # Company access profiles (applies to domain-based email matching)

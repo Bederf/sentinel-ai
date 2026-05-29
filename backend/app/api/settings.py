@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.database.supabase_client import get_supabase_client
@@ -264,10 +264,18 @@ async def update_notification_settings(
 
 
 @router.get("/settings/health-thresholds")
-async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) -> dict[str, int]:
-    """Get health score thresholds. Requires AUDITOR (level 1)."""
+async def get_health_thresholds(
+    site_id: str | None = Query(None, description="Site code for per-site thresholds"),
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, int]:
+    """Get health score thresholds. Requires AUDITOR (level 1).
+
+    If site_id is provided, returns site-specific thresholds if they exist,
+    falling back to global defaults.
+    """
+    key = f"healthThresholds_{site_id}" if site_id else "healthThresholds"
     try:
-        return _get_setting("healthThresholds") or {"healthy": 90, "warning": 70, "critical": 0}
+        return _get_setting(key) or {"healthy": 90, "warning": 70, "critical": 0}
     except Exception as e:
         import traceback
         logger.error(f"settings/health-thresholds error: {e}\n{traceback.format_exc()}")
@@ -278,6 +286,7 @@ async def get_health_thresholds(auth: AuthContext = Depends(require_role(1))) ->
 async def update_health_thresholds(
     thresholds: dict[str, int],
     request: Request,
+    site_id: str | None = Query(None, description="Site code for per-site thresholds"),
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, int]:
     """Update health score thresholds. Requires ADMIN (level 4)."""
@@ -301,7 +310,8 @@ async def update_health_thresholds(
     if thresholds["warning"] <= thresholds["critical"]:
         raise HTTPException(status_code=400, detail="warning threshold must be greater than critical threshold")
 
-    _upsert_setting("healthThresholds", thresholds)
+    key = f"healthThresholds_{site_id}" if site_id else "healthThresholds"
+    _upsert_setting(key, thresholds)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip)
@@ -310,15 +320,28 @@ async def update_health_thresholds(
 
 
 @router.get("/settings/risk-thresholds")
-async def get_risk_thresholds(auth: AuthContext = Depends(require_role(1))) -> dict[str, int]:
+async def get_risk_thresholds(
+    site_id: str | None = Query(None, description="Site code for per-site thresholds"),
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, int]:
     """Get risk score thresholds. Requires AUDITOR (level 1)."""
-    return _get_setting("riskThresholds") or {"medium": 31, "high": 61, "critical": 81}
+    key = f"riskThresholds_{site_id}" if site_id else "riskThresholds"
+    result = _get_setting(key)
+    if result:
+        return result
+    # Per-site falls back to global when no custom thresholds exist
+    if site_id:
+        global_result = _get_setting("riskThresholds")
+        if global_result:
+            return global_result
+    return {"medium": 31, "high": 61, "critical": 81}
 
 
 @router.put("/settings/risk-thresholds")
 async def update_risk_thresholds(
     thresholds: dict[str, int],
     request: Request,
+    site_id: str | None = Query(None, description="Site code for per-site thresholds"),
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, int]:
     """Update risk score thresholds. Requires ADMIN (level 4)."""
@@ -342,7 +365,13 @@ async def update_risk_thresholds(
     if thresholds["critical"] <= thresholds["high"]:
         raise HTTPException(status_code=400, detail="critical threshold must be greater than high threshold")
 
-    _upsert_setting("riskThresholds", thresholds)
+    key = f"riskThresholds_{site_id}" if site_id else "riskThresholds"
+    _upsert_setting(key, thresholds)
+
+    # When saving global, also update legacy key;
+    # when saving per-site, do NOT clobber global defaults.
+    if not site_id:
+        _upsert_setting("riskThresholds", thresholds)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change("settings.risk-thresholds", user=auth.user_id, source_ip=source_ip)
@@ -432,7 +461,7 @@ async def get_site_mode(
     try:
         state = svc._load_state(site_id, svc.load_policy(site_id))
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
+        state = {}
     return {
         "site_id": site_id,
         "current_stage": state.get("current_stage"),
@@ -570,7 +599,7 @@ async def get_aegis_settings(
     try:
         state = svc._load_state(site_id, svc.load_policy(site_id))
     except FileNotFoundError:
-        raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
+        state = {}
 
     current_stage = state.get("current_stage", "commissioning")
     execution_allowed = current_stage in ("supervised", "automatic")

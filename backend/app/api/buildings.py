@@ -333,6 +333,9 @@ class BuildingCreate(BaseModel):
     name: str
     display_name: str | None = None
     address: str | None = ""
+    region: str | None = ""
+    type: str | None = "regional_office"
+    sqm: int | None = 0
     timezone: str = "Africa/Johannesburg"
     floors: list[str] = []
     features: dict = {}
@@ -576,7 +579,10 @@ async def update_building_config(
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        existing = client.table("buildings").select("*").eq("code", site_code).single().execute()
+        existing = client.table("sites").select("*").eq("code", site_code).single().execute()
+        if not existing.data:
+            # Also try the buildings table for backward compatibility
+            existing = client.table("buildings").select("*").eq("code", site_code).single().execute()
         if not existing.data:
             raise HTTPException(status_code=404, detail=f"Building '{site_code}' not found in Supabase")
         current = existing.data
@@ -622,19 +628,39 @@ async def update_building_config(
 
     # Contacts
     if config.contacts is not None:
-        if config.contacts.get("facility_manager") is not None:
-            updates["contact_facility_manager"] = config.contacts["facility_manager"]
-            changes["contact_facility_manager"] = {
-                "old": current.get("contact_facility_manager"),
-                "new": config.contacts["facility_manager"],
-            }
+        fm = config.contacts.get("facility_manager")
+        email = config.contacts.get("email")
+        emergency = config.contacts.get("emergency")
+        if email is not None:
+            updates["contact_email"] = email
+            changes["contact_email"] = {"old": current.get("contact_email"), "new": email}
+        if emergency is not None:
+            updates["contact_phone"] = emergency
+            changes["contact_phone"] = {"old": current.get("contact_phone"), "new": emergency}
+        # Store facility_manager and other contacts as JSON in metadata
+        contacts_meta = {}
+        if fm is not None:
+            contacts_meta["facility_manager"] = fm
+        if email is not None:
+            contacts_meta["email"] = email
+        if emergency is not None:
+            contacts_meta["emergency"] = emergency
+        if contacts_meta:
+            existing_meta = current.get("metadata") or {}
+            if isinstance(existing_meta, str):
+                import json as _json
+                try: existing_meta = _json.loads(existing_meta)
+                except: existing_meta = {}
+            existing_meta["contacts"] = contacts_meta
+            updates["metadata"] = existing_meta
+            changes["metadata.contacts"] = {"old": None, "new": contacts_meta}
         if config.contacts.get("email") is not None:
             updates["contact_email"] = config.contacts["email"]
             changes["contact_email"] = {"old": current.get("contact_email"), "new": config.contacts["email"]}
         if config.contacts.get("emergency") is not None:
-            updates["contact_emergency"] = config.contacts["emergency"]
-            changes["contact_emergency"] = {
-                "old": current.get("contact_emergency"),
+            updates["contact_phone"] = config.contacts["emergency"]
+            changes["contact_phone"] = {
+                "old": current.get("contact_phone"),
                 "new": config.contacts["emergency"],
             }
 
@@ -716,6 +742,9 @@ async def create_building(building: BuildingCreate) -> dict:
         "name": building.name,
         "display_name": building.display_name or building.name,
         "address": building.address,
+        "region": building.region or "",
+        "building_type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(building.type or "", building.type or "regional_office"),
+        "sqm": building.sqm or 0,
         "timezone": building.timezone,
         "floors": building.floors,
         "features": building.features
@@ -732,6 +761,16 @@ async def create_building(building: BuildingCreate) -> dict:
     with open(site_path / "building.json", "w") as f:
         json.dump(site_data, f, indent=2)
 
+    # Also write to data/sites/ for the site_loader (frontend uses this path)
+    alt_site_path = Path(__file__).parent.parent / "data" / "sites" / site_id
+    alt_site_path.mkdir(parents=True, exist_ok=True)
+    with open(alt_site_path / "building.json", "w") as f:
+        json.dump(site_data, f, indent=2)
+    with open(alt_site_path / "desks.json", "w") as f:
+        json.dump([], f, indent=2)
+    with open(alt_site_path / "zones.json", "w") as f:
+        json.dump([], f, indent=2)
+
     # Create empty desks.json
     with open(site_path / "desks.json", "w") as f:
         json.dump([], f, indent=2)
@@ -739,6 +778,39 @@ async def create_building(building: BuildingCreate) -> dict:
     # Create empty zones.json
     with open(site_path / "zones.json", "w") as f:
         json.dump([], f, indent=2)
+
+    # Create Supabase record so site-profiles and modules can resolve the site
+    try:
+        import uuid
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        site_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"site-{site_id}"))
+        client.table("sites").upsert(
+            {
+                "id": site_uuid,
+                "code": site_id,
+                "name": building.name,
+                "address": building.address or "",
+                "region": building.region or "",
+                # Map wizard types to Supabase check constraint values
+                "type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(building.type or "", building.type or "regional_office"),
+                "sqm": building.sqm or 0,
+                "optimization_enabled": False,
+                "onboarding_phase": "commissioning",
+            },
+            on_conflict="code",
+        ).execute()
+    except Exception as e:
+        logger.warning(f"Failed to create Supabase record for {site_id}: {e}")
+
+    # Seed only base modules so the site appears in the site listing
+    try:
+        from app.services.module_registry_service import module_registry
+
+        module_registry.ensure_base_modules(site_id, building.name)
+    except Exception as e:
+        logger.warning(f"Failed to seed base modules for {site_id}: {e}")
 
     logger.info(f"Created building: {site_id}")
 

@@ -123,9 +123,17 @@ def get_stats_from_supabase() -> dict | None:
         sites = _rest_query("sites", select="id,region,sqm")
         total_sites = len(sites)
 
-        # Equipment count and status breakdown (bridge fallback not available via REST)
+        # Equipment count from local database
         equipment = _rest_query("equipment", select="status,health_score,type")
         total_equipment = len(equipment)
+
+        # Also count bridge-connected sites' equipment (stored on bridge, not in DB)
+        # Each bridge adapter config represents a site with its full point catalog
+        bridge_configs = _rest_query("site_adapter_config", params="protocol=eq.bridge", select="site_id")
+        # Each bridge site contributes its equipment catalog count
+        # Default to 1 device per bridge site if we can't query the bridge
+        bridge_equipment = len(bridge_configs)  # 1 logical device per bridge site
+        total_equipment += bridge_equipment
         warning_count = sum(1 for e in equipment if e.get("status") == "warning")
         critical_count = sum(1 for e in equipment if e.get("status") == "critical")
         health_scores = [e.get("health_score") for e in equipment if e.get("health_score") is not None]
@@ -175,7 +183,7 @@ def get_stats_from_supabase() -> dict | None:
         # Region aggregation
         region_stats = {}
         for b in sites:
-            region = b.get("region", "Unknown")
+            region = b.get("region") or "Unknown"
             if region not in region_stats:
                 region_stats[region] = {"region": region, "site_count": 0, "equipment_count": 0, "total_sqm": 0, "alert_count": 0}
             region_stats[region]["site_count"] += 1
@@ -308,44 +316,50 @@ async def get_stats() -> StatsResponse:
     supabase_stats = get_stats_from_supabase()
 
     if supabase_stats:
-        # Build response from Supabase data
-        alert_summary = AlertSummary(
-            critical=supabase_stats["alert_critical"],
-            warning=supabase_stats["alert_warning"],
-            info=supabase_stats["alert_info"],
-            total=supabase_stats["alert_total"],
-        )
+        try:
+            # Build response from Supabase data
+            alert_summary = AlertSummary(
+                critical=supabase_stats.get("alert_critical", 0) or 0,
+                warning=supabase_stats.get("alert_warning", 0) or 0,
+                info=supabase_stats.get("alert_info", 0) or 0,
+                total=supabase_stats.get("alert_total", 0) or 0,
+            )
 
-        anomalies = supabase_stats["anomalies"]
-        anomaly_summary = AnomalySummary(
-            total=len(anomalies),
-            total_repair_cost_zar=supabase_stats["total_repair"],
-            total_potential_damage_zar=supabase_stats["total_damage"],
-            potential_savings_zar=supabase_stats["total_damage"] - supabase_stats["total_repair"],
-        )
+            anomalies = supabase_stats.get("anomalies", []) or []
+            anomaly_summary = AnomalySummary(
+                total=len(anomalies),
+                total_repair_cost_zar=float(supabase_stats.get("total_repair", 0) or 0),
+                total_potential_damage_zar=float(supabase_stats.get("total_damage", 0) or 0),
+                potential_savings_zar=float(
+                    (supabase_stats.get("total_damage", 0) or 0) - (supabase_stats.get("total_repair", 0) or 0)
+                ),
+            )
 
-        by_region = [RegionStats(**r) for r in supabase_stats["by_region"]]
-        by_equipment_type = [EquipmentTypeStats(**t) for t in supabase_stats["by_equipment_type"]]
+            by_region = [RegionStats(**r) for r in (supabase_stats.get("by_region", []) or [])]
+            by_equipment_type = [EquipmentTypeStats(**t) for t in (supabase_stats.get("by_equipment_type", []) or [])]
 
-        return StatsResponse(
-            total_sites=supabase_stats["total_sites"],
-            total_equipment=supabase_stats["total_equipment"],
-            total_sensors=supabase_stats["total_sensors"],
-            total_readings=supabase_stats["total_readings"],
-            avg_equipment_health=supabase_stats["avg_equipment_health"],
-            equipment_warning_count=supabase_stats["equipment_warning_count"],
-            equipment_critical_count=supabase_stats["equipment_critical_count"],
-            alerts=alert_summary,
-            active_alerts=alert_summary.total,
-            critical_alerts=alert_summary.critical,
-            anomalies=anomaly_summary,
-            pending_anomalies=len(anomalies),
-            by_region=by_region,
-            by_equipment_type=by_equipment_type,
-            total_sqm=supabase_stats["total_sqm"],
-            data_range_days=30,  # Default for Supabase
-            uptime_percent=None,
-        )
+            return StatsResponse(
+                total_sites=int(supabase_stats.get("total_sites", 0) or 0),
+                total_equipment=int(supabase_stats.get("total_equipment", 0) or 0),
+                total_sensors=int(supabase_stats.get("total_sensors", 0) or 0),
+                total_readings=int(supabase_stats.get("total_readings", 0) or 0),
+                avg_equipment_health=float(supabase_stats.get("avg_equipment_health", 0) or 0),
+                equipment_warning_count=int(supabase_stats.get("equipment_warning_count", 0) or 0),
+                equipment_critical_count=int(supabase_stats.get("equipment_critical_count", 0) or 0),
+                alerts=alert_summary,
+                active_alerts=alert_summary.total,
+                critical_alerts=alert_summary.critical,
+                anomalies=anomaly_summary,
+                pending_anomalies=len(anomalies),
+                by_region=by_region,
+                by_equipment_type=by_equipment_type,
+                total_sqm=int(supabase_stats.get("total_sqm", 0) or 0),
+                data_range_days=30,
+                uptime_percent=None,
+            )
+        except Exception as e:
+            logger.error(f"Failed to build StatsResponse from Supabase data: {e}", exc_info=True)
+            # Fall through to JSON fallback
 
     # Fallback to JSON files
     sites = load_json("sites.json")
@@ -393,7 +407,7 @@ async def get_stats() -> StatsResponse:
     # Stats by region
     region_stats: dict[str, dict] = {}
     for site in sites:
-        region = site["region"]
+        region = site.get("region") or "Unknown"
         if region not in region_stats:
             region_stats[region] = {
                 "region": region,
@@ -458,7 +472,7 @@ async def get_stats() -> StatsResponse:
         dates = [datetime.fromisoformat(ts) for ts in timestamps]
         date_range = (max(dates) - min(dates)).days + 1
     else:
-        date_range = 0
+        date_range = 30
 
     return StatsResponse(
         total_sites=total_sites,

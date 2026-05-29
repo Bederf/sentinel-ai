@@ -99,13 +99,40 @@ class BridgeBmsAdapter(BmsAdapter):
                     f"{self._base_url}/api/sites/{self._site_id}/telemetry",
                     headers=self._headers,
                 )
-            self._connected = resp.status_code in (200, 204)
+            # 200/204 = data available. 404 = bridge is up, site exists but no telemetry yet.
+            # Either way the bridge is reachable and authenticated.
+            self._connected = resp.status_code in (200, 204, 404)
             status = "connected" if self._connected else "error"
-            message = "" if self._connected else f"HTTP {resp.status_code}"
+            if self._connected:
+                message = ""
+            elif resp.status_code == 401:
+                message = (
+                    f"Bridge authentication failed for site {self._site_id} — "
+                    f"check that your API token is correct"
+                )
+            else:
+                message = f"Bridge returned HTTP {resp.status_code} — check the bridge URL and port"
+        except httpx.ConnectTimeout:
+            self._connected = False
+            status = "error"
+            message = (
+                f"Cannot reach bridge at {self._base_url} — connection timed out. "
+                f"Make sure port 8080 is the correct bridge HTTP API port "
+                f"(not the BACnet UDP port 47808)"
+            )
+            logger.warning("[BRIDGE] connect timeout for %s at %s", self._site_id, self._base_url)
+        except httpx.ConnectError:
+            self._connected = False
+            status = "error"
+            message = (
+                f"Cannot reach bridge at {self._base_url} — connection refused. "
+                f"Verify the bridge IP and port (expected HTTP API on port 8080)"
+            )
+            logger.warning("[BRIDGE] connect refused for %s at %s", self._site_id, self._base_url)
         except Exception as exc:
             self._connected = False
             status = "error"
-            message = str(exc)
+            message = f"Bridge connection error: {exc}"
             logger.warning("[BRIDGE] connect failed for %s: %s", self._site_id, exc)
 
         return BmsConnectionStatus(

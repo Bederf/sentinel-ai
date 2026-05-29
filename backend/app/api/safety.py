@@ -31,8 +31,14 @@ async def get_safety_rules(
     device_type: str | None = None,
     device_id: str | None = None,
     enabled: bool | None = None,
+    site_id: str | None = None,
 ):
-    """Get all safety rules with optional filtering."""
+    """Get all safety rules with optional filtering.
+
+    Args:
+        site_id: If provided, only return rules for this site (generic rules
+                 without a site_id are included for all sites).
+    """
     if not safety_engine._initialized:
         await safety_engine.initialize()
 
@@ -45,6 +51,11 @@ async def get_safety_rules(
         filter_dict["enabled"] = enabled
 
     rules = await safety_engine.list_rules(filter_dict)
+
+    # Filter by site_id — include rules with matching site_id OR no site_id (generic rules)
+    if site_id:
+        rules = [r for r in rules if not getattr(r, "site_id", None) or r.site_id == site_id]
+
     return {
         "rules": [rule.to_dict() for rule in rules],
         "count": len(rules),

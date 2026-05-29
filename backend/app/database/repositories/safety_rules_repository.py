@@ -64,6 +64,7 @@ class SafetyRulesRepository:
             "device_id": db_record.get("device_id"),
             "point_name": db_record.get("point_name"),
             "enabled": db_record.get("enabled", True),
+            "site_id": db_record.get("site_id"),
             "metadata": {},
             "created_at": db_record.get("created_at", ""),
             "updated_at": db_record.get("updated_at", ""),

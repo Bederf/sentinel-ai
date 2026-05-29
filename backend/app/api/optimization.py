@@ -8,13 +8,15 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, Body, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.config.settings import settings
 from app.database.repositories import SiteRepository
 from app.database.repositories.recommendation_repository import RecommendationRepository
+from app.middleware.auth_middleware import require_auth
 from app.middleware.rate_limiter import limiter
+from app.models.auth import AuthContext, AuthLevel
 from app.models.audit_log import AuditResultType
 from app.models.module_registry import ModuleType
 from app.models.optimization import (
@@ -262,6 +264,36 @@ def _format_iso_time(iso_string: str) -> str:
         return dt.strftime("%H:%M")
     except (ValueError, TypeError):
         return iso_string
+
+
+@router.get("/optimization/status/{site_id}")
+async def get_optimization_status(
+    site_id: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> dict[str, Any]:
+    """Return optimization status for a site. Used by the frontend OptimizationInfoCard."""
+    try:
+        from app.database.supabase_client import get_supabase_client as _get_supabase
+
+        supabase = _get_supabase()
+        row = supabase.table("sites").select("*").eq("code", site_id).limit(1).execute()
+        if not row.data:
+            raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
+        site = row.data[0]
+        return {
+            "optimization_status": site.get("optimization_status") or "unknown",
+            "optimization_enabled": site.get("optimization_enabled", False),
+            "optimization_settings": site.get("optimization_settings") or {},
+            "onboarding_phase": site.get("onboarding_phase") or "commissioning",
+            "last_optimization": None,
+            "last_recommendation": None,
+            "monthly_savings": None,
+            "active_profile": (site.get("optimization_settings") or {}).get("active_profile") or "balanced",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/optimization/eskomsepush/areas")

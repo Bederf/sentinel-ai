@@ -43,6 +43,7 @@ class SafetyRule(ABC):
     device_id: str | None = None  # Optional: specific device ID
     point_name: str | None = None  # Optional: specific point name
     enabled: bool = True
+    site_id: str | None = None  # Optional: site this rule belongs to (None = generic)
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = ""
     updated_at: str = ""
