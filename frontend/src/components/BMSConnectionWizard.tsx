@@ -12,6 +12,7 @@ import {
   MapPin,
   HelpCircle,
   Locate,
+  Settings,
 } from "lucide-react";
 import type {
   Site,
@@ -24,7 +25,7 @@ import type {
 import { sitesApi } from '@/lib/api/sites';
 import { siteGeocodeApi } from '@/lib/api/zone_ingestion';
 import { siteProfileApi } from '@/lib/api/sites';
-import { api, niagaraApi, resolveSimbiotProtocol } from '@/lib/api';
+import { api, niagaraApi, resolveSimbiotProtocol, buildingConfigApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
 import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
@@ -82,6 +83,11 @@ interface WizardState {
   latitude: number | null;
   longitude: number | null;
   orientation_degrees: number | null;
+  // Site contacts (Step 5)
+  facilityManager: string;
+  contactEmail: string;
+  contactPhone: string;
+  technicianEmails: string;
   // BMS connection
   bmsVendor: BMSVendor;
   host: string;
@@ -212,6 +218,7 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
     { num: 2, label: "Discover", icon: Search },
     { num: 3, label: "Review", icon: ClipboardCheck },
     { num: 4, label: "Approve", icon: ShieldCheck },
+    { num: 5, label: "Configure", icon: Settings },
   ];
 
   return (
@@ -333,6 +340,11 @@ export function BMSConnectionWizard({
     username: "",
     password: "",
     useHttps: false,
+    // Site contacts (Step 5)
+    facilityManager: "",
+    contactEmail: "",
+    contactPhone: "",
+    technicianEmails: "",
     siteId: initialSiteId || "",
     discoveredDevices: [],
     selectedDeviceId: null,
@@ -554,6 +566,7 @@ export function BMSConnectionWizard({
           site_id: resolvedSiteId,
           protocol: adapterProtocol,
           config: adapterConfig,
+          enabled: false,  // New sites: bridge off by default
           poll_interval_seconds: 300,
         });
         console.log("Saved adapter config for", resolvedSiteId);
@@ -575,7 +588,8 @@ export function BMSConnectionWizard({
       dispatch({ type: "SET_ERROR", error: "Create the site before starting discovery" });
       return;
     }
-    if (state.selectedDeviceId == null) {
+    const isBridgeOrNiagara = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+    if (state.selectedDeviceId == null && !isBridgeOrNiagara) {
       dispatch({ type: "SET_ERROR", error: "Select the BACnet device to ingest before discovery" });
       return;
     }
@@ -584,24 +598,58 @@ export function BMSConnectionWizard({
     dispatch({ type: "SET_DISCOVERY_PHASE", phase: 1 }); // Connecting...
 
     try {
-      // Simulate discovery phases with delays
       await new Promise(r => setTimeout(r, 500));
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 2 }); // Scanning points...
 
       await new Promise(r => setTimeout(r, 800));
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
 
-      const res = await niagaraApi.discoverAndClassify({
-        device_ip: state.host,
-        site_id: state.siteId,
-        device_bacnet_id: state.selectedDeviceId ?? undefined,
-        adapter_type: "bacnet",
-        bms_vendor: state.bmsVendor,
-      });
+      if (isBridgeOrNiagara) {
+        // Bridge/Niagara: re-fetch capabilities if state was lost (e.g. page refresh)
+        const isNiagaraNow = state.bmsVendor === 'niagara';
+        const bridgePort = isNiagaraNow ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
+        const discPort = Number(state.port);
+        const discSafePort = state.port && Number.isFinite(discPort) && discPort > 0 && discPort <= 65535 ? discPort : bridgePort;
+        let cap = state.capabilitySummary;
+        if (!cap) {
+          try {
+            const fresh = await niagaraApi.getSimbiotCapabilities({
+              site_id: state.siteId,
+              bms_vendor: state.bmsVendor,
+              host: state.host.trim(),
+              port: discSafePort,
+              commissioning: true,
+              ...(state.username && { username: state.username }),
+              ...(state.password && { password: state.password }),
+            });
+            cap = fresh.summary;
+          } catch { /* use defaults */ }
+        }
+        dispatch({
+          type: "SET_DISCOVERY",
+          id: `discovery-${state.siteId}`,
+          summary: {
+            site_id: state.siteId,
+            discovery_id: `discovery-${state.siteId}`,
+            points_count: cap?.points ?? 0,
+            equipment_count: cap?.devices ?? 0,
+            status: "completed",
+            summary: {},
+          },
+        });
+      } else {
+        const res = await niagaraApi.discoverAndClassify({
+          device_ip: state.host,
+          site_id: state.siteId,
+          device_bacnet_id: state.selectedDeviceId ?? undefined,
+          adapter_type: "bacnet",
+          bms_vendor: state.bmsVendor,
+        });
+        dispatch({ type: "SET_DISCOVERY", id: res.discovery_id, summary: res });
+      }
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 }); // Grouping into zones...
       await new Promise(r => setTimeout(r, 300));
 
-      dispatch({ type: "SET_DISCOVERY", id: res.discovery_id, summary: res });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     } catch (err) {
       dispatch({
@@ -615,19 +663,45 @@ export function BMSConnectionWizard({
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
     if (!state.discoveryId) return;
+    const isBridgeOrNiagara = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
 
     try {
-      const res = await niagaraApi.getMappings(state.discoveryId);
-      dispatch({ type: "SET_MAPPINGS", mappings: res });
+      if (isBridgeOrNiagara) {
+        // Bridge/Niagara: no separate mappings — use capabilities data for UI
+        const cap = state.capabilitySummary || { points: 0, devices: 0, writable_points: 0 };
+        const totalPts = cap.points ?? 0;
+        dispatch({
+          type: "SET_MAPPINGS",
+          mappings: {
+            equipment: [{
+              equipment_id: `bridge-${state.siteId}`,
+              equipment_name: `Bridge Device (${state.siteId})`,
+              equipment_type: "bridge",
+              confidence: "high",
+              points: [],
+              point_count: totalPts,
+              metadata: { zone: {} },
+            }],
+            total_points: totalPts,
+            equipment_count: cap.devices ?? 0,
+            needs_review: 0,
+            writable_points: cap.writable_points ?? 0,
+            confidence_breakdown: { high: 1 },
+          },
+        });
+      } else {
+        const res = await niagaraApi.getMappings(state.discoveryId);
+        dispatch({ type: "SET_MAPPINGS", mappings: res });
+      }
     } catch (err) {
       dispatch({
         type: "SET_ERROR",
         error: err instanceof Error ? err.message : "Failed to load mappings",
       });
     }
-  }, [state.discoveryId]);
+  }, [state.discoveryId, state.bmsVendor]);
 
   // ---------- Step 4: Approve ----------
   const handleApprove = useCallback(async () => {
@@ -635,12 +709,22 @@ export function BMSConnectionWizard({
     dispatch({ type: "SET_APPROVE_STATUS", status: "approving" });
 
     try {
-      const res = await niagaraApi.approveMappings(
-        state.discoveryId,
-        state.approvedBy,
-      );
-      if (res.success && state.siteId) {
-        await api.toggleSiteProcessing(state.siteId, true);
+      const isBridgeOrNiagara = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+      let res;
+      if (isBridgeOrNiagara) {
+        // Bridge/Niagara: skip mappings approval, just enable processing
+        if (state.siteId) {
+          await api.toggleSiteProcessing(state.siteId, true);
+        }
+        res = { success: true, message: "Site activated", equipment_created: 0 };
+      } else {
+        res = await niagaraApi.approveMappings(
+          state.discoveryId,
+          state.approvedBy,
+        );
+        if (res.success && state.siteId) {
+          await api.toggleSiteProcessing(state.siteId, true);
+        }
       }
       dispatch({
         type: "SET_APPROVE_STATUS",
@@ -649,12 +733,15 @@ export function BMSConnectionWizard({
         result: { equipment_created: res.equipment_created },
       });
 
-      // Launch verification wizard on success
+      // On success, advance to Step 5 (Configure) for new sites, or verification for BACnet
       if (res.success) {
-        // Give user a moment to see the success message
         setTimeout(() => {
-          dispatch({ type: "SET_VERIFICATION_WIZARD", show: true });
-        }, 1000);
+          if (isBridgeOrNiagara) {
+            dispatch({ type: "SET_STEP", step: 5 });
+          } else {
+            dispatch({ type: "SET_VERIFICATION_WIZARD", show: true });
+          }
+        }, 800);
       }
     } catch (err) {
       dispatch({
@@ -668,6 +755,10 @@ export function BMSConnectionWizard({
   // ---------- Step navigation ----------
   const goNext = useCallback(async () => {
     const nextStep = state.step + 1;
+    if (nextStep > 5) {
+      onComplete();
+      return;
+    }
     dispatch({ type: "SET_STEP", step: nextStep });
 
     if (nextStep === 2) {
@@ -675,7 +766,7 @@ export function BMSConnectionWizard({
     } else if (nextStep === 3) {
       await handleLoadMappings();
     }
-  }, [state.step, handleDiscover, handleLoadMappings]);
+  }, [state.step, handleDiscover, handleLoadMappings, onComplete]);
 
   const goBack = useCallback(() => {
     dispatch({ type: "SET_STEP", step: Math.max(1, state.step - 1) });
@@ -684,11 +775,19 @@ export function BMSConnectionWizard({
   const canGoNext = (): boolean => {
     switch (state.step) {
       case 1:
-        return state.connectionStatus === "connected" && !!state.siteId && state.selectedDeviceId !== null;
+        return (
+          state.connectionStatus === "connected" &&
+          !!state.siteId &&
+          (state.selectedDeviceId !== null || state.bmsVendor === 'niagara' || state.bmsVendor === 'bridge')
+        );
       case 2:
         return !!state.discoveryId && !state.loading;
       case 3:
         return !!state.mappings && !state.loading;
+      case 4:
+        return state.approveStatus !== "idle";
+      case 5:
+        return true;
       default:
         return false;
     }
@@ -1903,6 +2002,15 @@ export function BMSConnectionWizard({
                 Pre-Approval Checklist
               </h4>
               <div className="space-y-2 text-sm">
+                {state.bmsVendor === 'bridge' ? (
+                  <div className="flex items-center gap-2">
+                    <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
+                    <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Bridge-connected site — equipment mapped via bridge API
+                    </span>
+                  </div>
+                ) : (
+                  <>
                 <div className="flex items-center gap-2">
                   <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
                   <span style={{ color: "var(--color-sentinel-text-primary)" }}>
@@ -1912,7 +2020,7 @@ export function BMSConnectionWizard({
                 <div className="flex items-center gap-2">
                   <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
                   <span style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    Equipment IDs converted to v2.0 standard (S###-TYPE-FLOOR-ZONE)
+                    Equipment IDs converted to v2.0 standard (site-name-zone)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1921,6 +2029,8 @@ export function BMSConnectionWizard({
                     Zones auto-assigned from equipment locations
                   </span>
                 </div>
+                  </>
+                )}
                 <div className="flex items-center gap-2">
                   <span
                     style={{
@@ -2012,9 +2122,134 @@ export function BMSConnectionWizard({
     </div>
   );
 
+  // ============= Step 5: Configure Site Settings =============
+  const renderStep5 = () => {
+    const handleSaveContacts = async () => {
+      if (!state.siteId) return;
+      dispatch({ type: "SET_LOADING", loading: true });
+      try {
+        await buildingConfigApi.updateConfig(state.siteId, {
+          contacts: {
+            facility_manager: state.facilityManager,
+            email: state.contactEmail,
+            emergency: state.contactPhone,
+          },
+        });
+      } catch (e) {
+        console.warn("Failed to save contacts", e);
+      }
+      dispatch({ type: "SET_LOADING", loading: false });
+      onComplete();
+    };
+
+    return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-lg font-semibold mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+          Step 5: Configure Site Settings
+        </h3>
+        <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          Your site is connected. Set up contacts and enable data flow, or skip to finish later.
+        </p>
+      </div>
+
+      <div className="rounded-lg p-4 space-y-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h4 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+          Site Contacts
+        </h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Facility Manager
+            </label>
+            <input type="text" value={state.facilityManager || ""} onChange={(e) => dispatch({ type: "SET_FIELD", field: "facilityManager", value: e.target.value })} className="w-full rounded px-3 py-2 text-sm" placeholder="Name" style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Email
+            </label>
+            <input type="email" value={state.contactEmail || ""} onChange={(e) => dispatch({ type: "SET_FIELD", field: "contactEmail", value: e.target.value })} className="w-full rounded px-3 py-2 text-sm" placeholder="manager@email.com" style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Emergency Phone
+            </label>
+            <input type="tel" value={state.contactPhone || ""} onChange={(e) => dispatch({ type: "SET_FIELD", field: "contactPhone", value: e.target.value })} className="w-full rounded px-3 py-2 text-sm" placeholder="+27 82 555 0101" style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Technicians / Concierge
+            </label>
+            <input type="text" value={state.technicianEmails || ""} onChange={(e) => dispatch({ type: "SET_FIELD", field: "technicianEmails", value: e.target.value })} className="w-full rounded px-3 py-2 text-sm" placeholder="Add email addresses" style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+        <div>
+          <p className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            SIMBIOT Bridge
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Enable data flow from BMS to SENTINEL
+          </p>
+        </div>
+        <label className="relative inline-flex items-center cursor-pointer">
+          <input type="checkbox" className="sr-only peer" defaultChecked={false} />
+          <div className="w-11 h-6 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" style={{ background: "var(--color-sentinel-border)" }} />
+        </label>
+      </div>
+
+      <div className="rounded-lg p-4 space-y-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+        <h4 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+          Building Twin
+        </h4>
+        <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          Generate a 3D building model for the cockpit from a web photo of {state.siteName}.
+        </p>
+          <button
+          onClick={async () => {
+            dispatch({ type: "SET_LOADING", loading: true });
+            try {
+              const { getAccessToken } = await import('@/lib/api');
+              const token = getAccessToken();
+              const resp = await fetch(`/api/sites/${state.siteId}/scrape-geometry`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ site_name: state.siteName, address: state.siteAddress }),
+              });
+              if (resp.ok) alert("Building twin generated! View it in the Cockpit.");
+              else alert("Could not find building photo online.");
+            } catch (e) {
+              console.warn("Failed to scrape geometry", e);
+            }
+            dispatch({ type: "SET_LOADING", loading: false });
+          }}
+          disabled={state.loading}
+          className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
+          style={{ background: "var(--color-sentinel-blue)", color: "#fff" }}
+        >
+          {state.loading ? "Searching..." : "Generate Building Twin"}
+        </button>
+      </div>
+
+      <div className="flex justify-end pt-2">
+        <button
+          onClick={handleSaveContacts}
+          className="flex items-center gap-2 px-5 py-2 rounded text-sm font-medium"
+          style={{ background: "var(--color-sentinel-green)", color: "#fff" }}
+        >
+          <CheckCircle className="w-4 h-4" />
+          Done — go to Dashboard
+        </button>
+      </div>
+    </div>
+    );
+  };
+
   // ============= Main Render =============
 
-  const stepRenderers = [renderStep1, renderStep2, renderStep3, renderStep4];
+  const stepRenderers = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5];
 
   // Extract equipment list for verification wizard
   const discoveredEquipment = state.mappings?.equipment.map((eq) => ({
@@ -2036,7 +2271,7 @@ export function BMSConnectionWizard({
           onClick={() => dispatch({ type: "SET_VERIFICATION_WIZARD", show: false })}
         >
           <div
-            className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-lg shadow-md max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">
@@ -2062,7 +2297,7 @@ export function BMSConnectionWizard({
           onClick={() => dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false })}
         >
           <div
-            className="bg-white rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-lg shadow-md max-w-3xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-6">

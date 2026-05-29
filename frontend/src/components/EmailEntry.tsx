@@ -98,7 +98,16 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
       onSuccess(response.user, accessToken);
     } catch (err: any) {
       console.error("Login failed:", err);
-      setError(err.message || "Login failed. Please try again.");
+      const msg = err.message || "";
+      if (msg.includes("429") || msg.includes("cooldown") || msg.includes("rate limit")) {
+        setError("Too many login attempts. Please wait a moment before trying again.");
+      } else if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid")) {
+        setError("Invalid email. Please check and try again.");
+      } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("ERR_CONNECTION")) {
+        setError("Network error. Please check your connection and try again.");
+      } else {
+        setError("Login failed. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -130,7 +139,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
         {/* Logo */}
         <div className="relative w-24 h-24 mx-auto flex items-center justify-center" style={{ background: "linear-gradient(135deg, #0B1D33 0%, #163350 100%)", border: "1px solid rgba(46,134,171,0.3)", borderRadius: "1rem" }}>
           {/* Glow halo */}
-          <div className="absolute inset-0 blur-2xl rounded-2xl scale-90" style={{ background: "radial-gradient(circle, rgba(46,134,171,0.35) 0%, transparent 70%)" }} />
+          <div className="absolute inset-0 blur-2xl rounded-md scale-90" style={{ background: "radial-gradient(circle, rgba(46,134,171,0.35) 0%, transparent 70%)" }} />
           <img
             src="/images/sentinel-logo.png"
             alt="SENTINEL"
@@ -159,7 +168,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
 
       {/* Email Input Form */}
       <div
-        className="w-full max-w-md p-6 rounded-xl"
+        className="w-full max-w-md p-6 rounded-md"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",
