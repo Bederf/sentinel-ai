@@ -159,6 +159,16 @@ export interface CockpitSeverityInterpretation {
   criticality: CockpitCriticality | null
 }
 
+export interface BuildingGeometryData {
+  floor_count: number
+  shape: string
+  setbacks: { floor: number; ratio: number }[]
+  facade: string
+  footprint_width_depth_ratio: number
+  roof_equipment: boolean
+  source: string
+}
+
 export interface CockpitState {
   site: {
     id: string
@@ -171,6 +181,7 @@ export interface CockpitState {
     mode: CockpitGuidanceMode
     renderState: 'waiting' | 'live'
     dataFreshnessLabel: string
+    buildingGeometry?: BuildingGeometryData | null
   }
   sitePulse: CockpitSitePulse
   primaryMetric: CockpitPrimaryMetric

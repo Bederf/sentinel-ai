@@ -60,6 +60,7 @@ export interface CockpitSiteSummary {
   equipmentCount: number
   dataFreshnessLabel: string
   siteFloors?: string[] | null // floors from building config (settings page)
+  buildingGeometry?: Record<string, unknown> | null // geometry from photo extraction
 }
 
 export interface EnergyCentreTelemetry {
@@ -84,14 +85,31 @@ export interface RemoteSiteTelemetry {
 
 const DEFAULT_FLOOR_ORDER = ['R', 'L2', 'L1', 'L0', 'G', 'B1']
 
-const SITE_TOWER_PROFILES: Record<string, { towerFloors: string[]; managedFloors: string[] }> = {
+type TowerProfile = {
+  towerFloors: string[];
+  managedFloors: string[];
+  /** Slab width multiplier relative to BASE_WIDTH (1.0 = office default). */
+  widthScale?: number;
+  /** Slab depth multiplier relative to BASE_DEPTH (1.0 = office default). */
+  depthScale?: number;
+};
+
+const SITE_TOWER_PROFILES: Record<string, TowerProfile> = {
   'site-002': {
-    // Site-002 profile: 10 floors (basement + ground + 8 levels + roof).
+    // Sandton City Office Tower: slender high-rise.
     towerFloors: ['R', 'L7', 'L6', 'L5', 'L4', 'L3', 'L2', 'L1', 'L0', 'B1'],
-    // Sentinel scope: L0, L1, L2 only (three occupied floors).
     managedFloors: ['L0', 'L1', 'L2'],
+    widthScale: 1.0,
+    depthScale: 1.0,
   },
-}
+  'site-003': {
+    // Busamed Gateway Private Hospital: wider, lower hospital profile.
+    towerFloors: ['L9', 'L8', 'L7', 'L6', 'L5', 'L4', 'L3', 'L2', 'L1', 'G'],
+    managedFloors: ['G', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'],
+    widthScale: 1.6,  // Hospital is wider
+    depthScale: 1.4,  // Hospital is deeper
+  },
+};
 
 function titleCase(value: string): string {
   return value
@@ -188,11 +206,15 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
     site: {
       id: summary.siteId,
       name: summary.siteName,
+      latitude: summary.gpsLat ?? null,
+      longitude: summary.gpsLon ?? null,
+      orientationDegrees: summary.orientationDegrees ?? null,
       onboardingPhase: summary.onboardingPhase ?? 'shadow',
       posture: 'Waiting',
       mode: 'waiting',
       renderState: 'waiting',
       dataFreshnessLabel: summary.dataFreshnessLabel,
+      buildingGeometry: summary.buildingGeometry ?? null,
     },
     sitePulse: {
       tone: 'normal',
@@ -698,6 +720,7 @@ export function mapCockpitState(
       mode: isShadowPhase ? 'watch' : payload.operator_guidance.mode,
       renderState: 'live',
       dataFreshnessLabel: summary.dataFreshnessLabel,
+      buildingGeometry: summary.buildingGeometry ?? null,
     },
     sitePulse: {
       tone,

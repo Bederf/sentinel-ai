@@ -34,13 +34,17 @@ interface Message {
 // Voice mode state machine for interruptible real-time voice
 type VoiceState = "idle" | "user_speaking" | "ai_speaking" | "interrupted";
 
-export function Chat() {
+interface ChatProps {
+  defaultSiteId?: string;
+}
+
+export function Chat({ defaultSiteId }: ChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [streamingContent, setStreamingContent] = useState("");
   const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+  const [selectedSiteId, setSelectedSiteId] = useState<string>(defaultSiteId || "");
   const [includeSystemDocs, setIncludeSystemDocs] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false); // Auto-summarised voice playback
   const [voiceState, setVoiceState] = useState<VoiceState>("idle"); // Voice mode state machine
@@ -117,11 +121,13 @@ export function Chat() {
       if (cachedSites) {
         try {
           const parsedSites = JSON.parse(cachedSites) as Site[];
-          if (parsedSites.length > 0) {
-            const sorted = parsedSites.sort((a, b) => a.name.localeCompare(b.name));
+          const activeFromCache = parsedSites.filter((site) => site.sentinel_processing_enabled !== false);
+          if (activeFromCache.length > 0) {
+            const sorted = activeFromCache.sort((a, b) => a.name.localeCompare(b.name));
             setSites(sorted);
             const defaultSite =
-              sorted.find((site) => site.id === "site-002")
+              (defaultSiteId ? sorted.find((site) => site.id === defaultSiteId) : null)
+              ?? sorted.find((site) => site.id === "site-002")
               ?? sorted.find((site) => /sandton city office tower/i.test(site.name))
               ?? sorted[0];
             if (defaultSite) {
@@ -136,12 +142,14 @@ export function Chat() {
 
       try {
         const sitesData = await api.getSites();
-        setSites(sitesData.sort((a, b) => a.name.localeCompare(b.name)));
-        // Default to Sandton City Office Tower (site-002) when available.
+        const activeSites = sitesData.filter((site) => site.sentinel_processing_enabled !== false);
+        setSites(activeSites.sort((a, b) => a.name.localeCompare(b.name)));
+        // Default to first active site.
         const defaultSite =
-          sitesData.find((site) => site.id === "site-002")
-          ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))
-          ?? sitesData[0];
+          (defaultSiteId ? activeSites.find((site) => site.id === defaultSiteId) : null)
+          ?? activeSites.find((site) => site.id === "site-002")
+          ?? activeSites.find((site) => /sandton city office tower/i.test(site.name))
+          ?? activeSites[0];
         if (defaultSite) {
           setSelectedSiteId(defaultSite.id);
         }
@@ -152,7 +160,7 @@ export function Chat() {
       }
     };
     loadSites();
-  }, []);
+  }, [defaultSiteId]);
 
   // Check TTS availability on mount
   useEffect(() => {

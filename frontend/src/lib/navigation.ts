@@ -8,7 +8,6 @@
 import { TrendingUp } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
-  MessageSquare,
   LayoutDashboard,
   Shield,
   Settings as SettingsIcon,
@@ -31,7 +30,6 @@ import type { ModuleType } from "./moduleRegistry";
 
 export type View =
   | "dashboard"
-  | "ai-chat"
   | "integrations"
   | "logs"
   | "maintenance"
@@ -62,7 +60,6 @@ export const VIEW_TITLES: Record<View, string> = {
   "ai-chat": "AI Chat",
   integrations: "System Health",
   logs: "Logs",
-  maintenance: "Maintenance",
   simbiot: "SIMBIOT",
   settings: "Settings",
   financial: "Financial",
@@ -73,14 +70,12 @@ export const VIEW_TITLES: Record<View, string> = {
 };
 
 /**
- * Base sidebar items — always visible (4 items).
+ * Base sidebar items — always visible.
  */
 export const BASE_NAV_ITEMS: NavItem[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, description: "Overview and AI recommendations", category: "base" },
-  { id: "ai-chat", label: "AI Chat", icon: MessageSquare, description: "SENTINEL AI Assistant", category: "base" },
   { id: "integrations", label: "System Health", icon: Activity, description: "Integration monitoring", category: "base" },
   { id: "logs", label: "Logs", icon: FileText, description: "Audit trail and event logs", category: "base" },
-  { id: "maintenance", label: "Maintenance", icon: Wrench, description: "Equipment, work orders & tech chat", category: "base", requiredModule: "maintenance" },
 ];
 
 /**
@@ -92,15 +87,12 @@ export const ADMIN_NAV_ITEMS: NavItem[] = [
 ];
 
 /**
- * Conditional add-on sidebar items (4 items).
+ * Conditional add-on sidebar items.
  * Only visible when the respective add-on module is active.
  */
 export const ADDON_NAV_ITEMS: NavItem[] = [
-  { id: "digital-twin", label: "Digital Twin", icon: Activity, description: "3D building visualization", category: "addon", requiredModule: "digital_twin" },
-  { id: "optimization", label: "AI Optimization", icon: TrendingUp, description: "Recommendations and setpoint adjustments", category: "addon" },
-  { id: "financial",   label: "Financial",   icon: DollarSign,      description: "Contracts and billing",            category: "addon", requiredModule: "financial" },
-  { id: "fleet-ml",   label: "Fleet ML",    icon: Brain,           description: "Cross-site analytics",             category: "addon", requiredModule: "fleet_ml" },
-  { id: "compliance", label: "Compliance",  icon: ClipboardCheck,  description: "OHS, Fire, Electrical, Lift safety", category: "addon", requiredModule: "compliance" },
+  { id: "financial",   label: "Financial",   icon: DollarSign,      description: "Contracts and billing",  category: "addon", requiredModule: "financial" },
+  { id: "fleet-ml",   label: "Fleet ML",    icon: Brain,           description: "Cross-site analytics",   category: "addon", requiredModule: "fleet_ml" },
 ];
 
 /** All nav items combined (for lookup) */
@@ -125,7 +117,9 @@ export type BuildingTabId =
   | "controls"
   | "space"
   | "fuel"
-  | "esg";
+  | "esg"
+  | "maintenance"
+  | "compliance";
 
 export interface BuildingTabItem {
   id: BuildingTabId;
@@ -152,10 +146,14 @@ export const BUILDING_TAB_ITEMS: BuildingTabItem[] = [
   { id: "water", label: "Water", icon: Droplets, controlModule: "water_control", requiredModule: "water" },
   { id: "fire", label: "Fire", icon: Activity, requiredModule: "fire" },
   { id: "security", label: "Security", icon: Shield, controlModule: "security_control", requiredModule: "security" },
+  { id: "digital-twin", label: "Digital Twin", icon: Activity, requiredModule: "digital_twin" },
   { id: "controls", label: "Controls", icon: Sliders },
   { id: "space", label: "Space", icon: LayoutGrid, requiredModule: "space_optimization" },
   { id: "fuel", label: "Fuel", icon: Fuel, requiredModule: "fuel" },
   { id: "esg", label: "ESG", icon: Leaf, requiredModule: "compliance" },
+
+  { id: "maintenance", label: "Maintenance", icon: Wrench, requiredModule: "maintenance" },
+  { id: "compliance", label: "Compliance", icon: ClipboardCheck, requiredModule: "compliance" },
 ];
 
 // ─── Helpers ──

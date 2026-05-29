@@ -256,7 +256,7 @@ function SafetyRulesPanel({
       iconColor="var(--color-sentinel-red)"
       title="Safety Rules"
     >
-      <SafetyRulesEditor onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} />
+      <SafetyRulesEditor onError={onError} onSuccess={controller.handleSuccess} readOnly={controller.readOnly} siteId={controller.selectedSiteId ?? undefined} />
     </SettingsPanelFrame>
   );
 }

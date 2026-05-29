@@ -208,14 +208,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
     }
   }, [hiddenSiteIds, HIDDEN_SITE_IDS_STORAGE_KEY]);
 
-  // Initialize energy filter from selected site context when available.
-  useEffect(() => {
-    if (energyFilterSiteId) return;
-    const preferredSiteId = getStoredSelectedSite() || autoSelectSiteId || null;
-    if (!preferredSiteId) return;
-    if (!buildingsList.some((site) => site.id === preferredSiteId)) return;
-    setEnergyFilterSiteId(preferredSiteId);
-  }, [energyFilterSiteId, autoSelectSiteId, buildingsList]);
+  // Default to All Sites — no auto-selection.
 
   useEffect(() => {
     const loadDashboardData = async () => {

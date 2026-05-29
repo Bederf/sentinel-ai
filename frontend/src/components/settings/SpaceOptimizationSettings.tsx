@@ -138,8 +138,8 @@ export function SpaceOptimizationSettings({
     for (const f of GRACE_FIELDS) {
       (defaults as unknown as Record<string, number>)[f.key] = f.default;
     }
-    defaults.ghost_booking_notifications_enabled = true;
-    defaults.focus_room_notifications_enabled = true;
+    defaults.ghost_booking_notifications_enabled = false;
+    defaults.focus_room_notifications_enabled = false;
     return defaults;
   });
   const [graceSaving, setGraceSaving] = useState(false);
@@ -181,6 +181,10 @@ export function SpaceOptimizationSettings({
         (gp as unknown as Record<string, number>)[f.key] =
           (settings as unknown as Record<string, number>)[f.key] ?? f.default;
       }
+      gp.ghost_booking_notifications_enabled =
+        (settings as unknown as Record<string, boolean>).ghost_booking_notifications_enabled ?? false;
+      gp.focus_room_notifications_enabled =
+        (settings as unknown as Record<string, boolean>).focus_room_notifications_enabled ?? false;
       setGraceValues(gp);
       setConcierges(settings.concierges || []);
       setSites(sitesData);

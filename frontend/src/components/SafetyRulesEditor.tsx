@@ -7,6 +7,7 @@ interface SafetyRulesEditorProps {
   onError?: (error: string) => void;
   onSuccess?: (message: string) => void;
   readOnly?: boolean; // If true, hide edit/create/delete controls
+  siteId?: string; // Site code for per-site rule filtering
 }
 
 const RULE_TYPES = [
@@ -32,7 +33,7 @@ const DEVICE_TYPES = [
   { value: "fire_safety", label: "Fire Safety" },
 ];
 
-export function SafetyRulesEditor({ onError, onSuccess, readOnly = false }: SafetyRulesEditorProps) {
+export function SafetyRulesEditor({ onError, onSuccess, readOnly = false, siteId }: SafetyRulesEditorProps) {
   const [rules, setRules] = useState<SafetyRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
@@ -56,12 +57,12 @@ export function SafetyRulesEditor({ onError, onSuccess, readOnly = false }: Safe
   useEffect(() => {
     loadRules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [siteId]);
 
   const loadRules = async () => {
     try {
       setLoading(true);
-      const response = await api.getSafetyRules();
+      const response = await api.getSafetyRules(undefined, undefined, siteId);
       setRules(response.rules);
     } catch (err) {
       onError?.("Failed to load safety rules");

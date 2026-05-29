@@ -67,6 +67,7 @@ import { WaterIntelligenceCard } from "./intelligence/WaterIntelligenceCard";
 import { FireIntelligenceCard } from "./intelligence/FireIntelligenceCard";
 import { SecurityIntelligenceCard } from "./intelligence/SecurityIntelligenceCard";
 import CardLibrary from "./CardLibrary";
+import { ChatWidget } from "./ChatWidget";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 import { ArcadeView } from "./arcade/ArcadeView";
 import { OverviewCockpitHost } from "./cockpit/OverviewCockpitHost";
@@ -104,6 +105,9 @@ const SpaceOptimizationPage = lazy(() => import("./SpaceOptimizationPage").then(
 const FuelDashboard = lazy(() => import("./fuel/FuelDashboard").then(m => ({ default: m.FuelDashboard })));
 // ESG & Sustainability
 const SustainabilityDashboard = lazy(() => import("./sustainability/SustainabilityDashboard").then(m => ({ default: m.SustainabilityDashboard })));
+const AssetWorkflowDashboard = lazy(() => import("./AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
+const DigitalTwin = lazy(() => import("./digital-twin").then(m => ({ default: m.DigitalTwin })));
+const CompliancePage = lazy(() => import("../pages/CompliancePage").then(m => ({ default: m.CompliancePage })));
 
 // ─── Sub-tab types for discipline tabs ────────────────────────────
 type LightingSub = "Lighting" | "Occupancy" | "Analytics" | "Correlation";
@@ -1901,6 +1905,21 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           {activeMainTab === "esg" && isModuleActive('compliance') && (
             <SustainabilityDashboard siteId={siteId} />
           )}
+
+          {/* Maintenance — work orders, equipment lifecycle */}
+          {activeMainTab === "maintenance" && isModuleActive('maintenance') && (
+            <AssetWorkflowDashboard />
+          )}
+
+          {/* Digital Twin — 3D building visualization */}
+          {activeMainTab === "digital-twin" && isModuleActive('digital_twin') && (
+            <div className="h-full"><DigitalTwin siteId={siteId} /></div>
+          )}
+
+          {/* Compliance — OHS, Fire, Electrical, Lift safety */}
+          {activeMainTab === "compliance" && isModuleActive('compliance') && (
+            <CompliancePage />
+          )}
         </div>
       </Suspense>
       )}
@@ -2092,7 +2111,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                       </span>
                     </div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-canvas)" }}>
-                      <div className="h-full rounded-full transition-all" style={{ width: selectedEquipment.health_score != null ? `${selectedEquipment.health_score}%` : '0%', background: getStatusColor(selectedEquipment.status) }} />
+                      <div className="h-full w-full origin-left rounded-full transition-transform will-change-transform" style={{ transform: `scaleX(${(selectedEquipment.health_score ?? 0) / 100})`, background: getStatusColor(selectedEquipment.status) }} />
                     </div>
                   </div>
 
@@ -2669,6 +2688,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           </div>
         </div>
       )}
+
+      <ChatWidget siteId={siteId} />
     </div>
   );
 }

@@ -91,7 +91,7 @@ export function SimbiotPage() {
         {activeTab === "wizard" && (
           <BMSConnectionWizard
             key={wizardKey}
-            siteId={selectedSiteId}
+            siteId=""
             sites={sites}
             onClose={() => setWizardKey((k) => k + 1)}
             onComplete={() => setWizardKey((k) => k + 1)}

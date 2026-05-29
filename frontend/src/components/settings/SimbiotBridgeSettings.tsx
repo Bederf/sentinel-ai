@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Radio, Shield } from "lucide-react";
-import api from "../../lib/api";
+import api, { niagaraApi } from "../../lib/api";
 
 interface SimbiotBridgeSettingsProps {
   siteId?: string;
@@ -19,11 +19,22 @@ export function SimbiotBridgeSettings({
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
 
+  // Read bridge adapter's enabled field (not sentinel_processing_enabled)
+  // Cache the existing config so toggling doesn't overwrite it
+  const [existingConfig, setExistingConfig] = useState<Record<string, any>>({});
+
   const fetchBridgeState = useCallback(async () => {
     if (!siteId) { setLoading(false); return; }
     try {
-      const data = await api.getSiteProcessing(siteId);
-      setBridgeEnabled(data.sentinel_processing_enabled);
+      const res = await fetch(`/api/simbiot/sites/${siteId}/adapters`);
+      if (res.ok) {
+        const data = await res.json();
+        const bridgeCfg = data?.adapters?.find((a: any) => a.protocol === "bridge");
+        setBridgeEnabled(bridgeCfg?.enabled === true);
+        setExistingConfig(bridgeCfg?.connection_config || {});
+      } else {
+        setBridgeEnabled(null);
+      }
     } catch {
       setBridgeEnabled(null);
     } finally {
@@ -38,7 +49,14 @@ export function SimbiotBridgeSettings({
     const next = !bridgeEnabled;
     setToggling(true);
     try {
-      await api.toggleSiteProcessing(siteId!, next);
+      // Toggle the bridge adapter's enabled flag, preserving existing config
+      await niagaraApi.saveSimbiotAdapterConfig({
+        site_id: siteId!,
+        protocol: "bridge",
+        config: existingConfig,
+        enabled: next,
+        poll_interval_seconds: 300,
+      });
       setBridgeEnabled(next);
       onSuccess?.();
     } catch (err) {
@@ -46,7 +64,7 @@ export function SimbiotBridgeSettings({
     } finally {
       setToggling(false);
     }
-  }, [bridgeEnabled, toggling, readOnly, siteId, onError, onSuccess]);
+  }, [bridgeEnabled, toggling, readOnly, siteId, onError, onSuccess, existingConfig]);
 
   const isActive = bridgeEnabled === true;
   const isDisabled = loading || bridgeEnabled === null || toggling || readOnly;

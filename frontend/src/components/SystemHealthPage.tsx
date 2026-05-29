@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useServerEvents } from '@/hooks/useServerEvents';
 
 import {
@@ -10,9 +10,10 @@ import {
   Server,
   TrendingUp,
   TrendingDown,
+  Building2,
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import type { IntegrationHealthSummary } from '@/lib/api';
+import type { IntegrationHealthSummary, Site } from '@/lib/api';
 import type { CommissioningSnapshot, QualityGateStatus } from '@/lib/api/system';
 import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
@@ -21,6 +22,7 @@ import { PageLoading } from './PageLoading';
 import { AdapterHealthCard } from './system/AdapterHealthCard';
 import { CriticalPathCard } from './system/CriticalPathCard';
 import { CommissioningGatePanel } from './system/CommissioningGatePanel';
+import { PhaseProgressCard } from './system/PhaseProgressCard';
 import { TabBar } from './TabBar';
 import type { TabDef } from './TabBar';
 
@@ -71,23 +73,45 @@ export default function SystemHealthPage() {
   const [dataFreshness, setDataFreshness] = useState<DataFreshnessResponse | null>(null);
   const [commissioning, setCommissioning] = useState<CommissioningSnapshot | null>(null);
   const [qualityGate, setQualityGate] = useState<QualityGateStatus | null>(null);
+  const [sites, setSites] = useState<Site[]>([]);
+  const [selectedSiteId, setSelectedSiteId] = useState<string>('site-002');
 
+  // Load sites list
   useEffect(() => {
+    fetch('/api/buildings')
+      .then(r => r.json())
+      .then(d => {
+        const all = [...(d.active || []), ...(d.inactive || [])];
+        setSites(all);
+        // Restore last selected site from localStorage
+        const stored = localStorage.getItem('sentinel_selected_site');
+        if (stored && all.some((s: any) => s.id === stored)) {
+          setSelectedSiteId(stored);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const loadAllData = useCallback(() => {
     loadHealthData();
     loadDataFreshness();
     loadUptimeData();
     loadGateData();
-    const healthInterval = setInterval(loadHealthData, 30000);
+  }, [selectedSiteId]);
+
+  useEffect(() => {
+    loadAllData();
+    const healthInterval = setInterval(loadHealthData, 60000);
     const freshnessInterval = setInterval(loadDataFreshness, 300000);
     const uptimeInterval = setInterval(loadUptimeData, 600000);
-    const gateInterval = setInterval(loadGateData, 30000);
+    const gateInterval = setInterval(loadGateData, 60000);
     return () => {
       clearInterval(healthInterval);
       clearInterval(freshnessInterval);
       clearInterval(uptimeInterval);
       clearInterval(gateInterval);
     };
-  }, []);
+  }, [loadAllData]);
 
   const loadHealthData = async () => {
     try {
@@ -118,8 +142,7 @@ export default function SystemHealthPage() {
 
   const loadDataFreshness = async () => {
     try {
-      const siteId = 'site-002';
-      const res = await authorizedFetch(`/api/system/sites/${siteId}/data-freshness`);
+      const res = await authorizedFetch(`/api/system/sites/${selectedSiteId}/data-freshness`);
       if (res.ok) {
         const data = await res.json();
         setDataFreshness(data);
@@ -155,10 +178,9 @@ export default function SystemHealthPage() {
 
   const loadGateData = async () => {
     try {
-      const siteId = 'site-002';
       const [scorecardRes, qgRes] = await Promise.all([
-        authorizedFetch(`/api/integration/buildings/${siteId}/commissioning-scorecard`),
-        authorizedFetch(`/api/optimization/quality-gate/${siteId}`),
+        authorizedFetch(`/api/integration/buildings/${selectedSiteId}/commissioning-scorecard`),
+        authorizedFetch(`/api/optimization/quality-gate/${selectedSiteId}`),
       ]);
       if (scorecardRes.ok) {
         const data = await scorecardRes.json();
@@ -245,7 +267,7 @@ export default function SystemHealthPage() {
     const barColor = color === 'green' ? 'var(--color-sentinel-green)' : color === 'yellow' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-red)';
     return (
       <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(148, 163, 184, 0.2)' }}>
-        <div className="h-2 rounded-full transition-all duration-500" style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: barColor }} />
+        <div className="h-2 w-full origin-left transition-transform duration-500 will-change-transform rounded-full" style={{ transform: `scaleX(${Math.min(100, Math.max(0, value)) / 100})`, background: barColor }} />
       </div>
     );
   };
@@ -306,6 +328,29 @@ export default function SystemHealthPage() {
               </p>
             </div>
           </div>
+          {/* Site selector */}
+          {sites.length > 0 && (
+            <div className="relative">
+              <Building2 className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2" style={{ color: 'var(--color-sentinel-text-secondary)' }} />
+              <select
+                value={selectedSiteId}
+                onChange={(e) => {
+                  setSelectedSiteId(e.target.value);
+                  localStorage.setItem('sentinel_selected_site', e.target.value);
+                }}
+                className="rounded-md pl-9 pr-4 py-2 text-sm appearance-none cursor-pointer"
+                style={{
+                  background: 'var(--color-sentinel-bg-secondary)',
+                  border: '1px solid var(--color-sentinel-border)',
+                  color: 'var(--color-sentinel-text-primary)',
+                }}
+              >
+                {sites.map((s) => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 
@@ -405,12 +450,16 @@ export default function SystemHealthPage() {
                 </div>
               </div>
 
+              <PhaseProgressCard
+                currentPhase={selectedSiteId === 'site-003' ? 'commissioning' : selectedSiteId === 'site-002' ? 'advisory' : 'commissioning'}
+                isLoading={loading}
+              />
               <CommissioningGatePanel
                 commissioning={commissioning}
                 qualityGate={qualityGate}
               />
 
-              <AdapterHealthCard siteId="site-002" />
+              <AdapterHealthCard siteId={selectedSiteId} key={selectedSiteId} />
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(currentHealth.components || {}).map(
@@ -686,7 +735,7 @@ export default function SystemHealthPage() {
                 </div>
               )}
 
-              <CriticalPathCard siteId="site-002" />
+              <CriticalPathCard siteId={selectedSiteId} key={`cp-${selectedSiteId}`} />
             </>
           )}
         </div>

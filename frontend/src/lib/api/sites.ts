@@ -118,7 +118,7 @@ export const sitesApi = {
       inactive: Site[]
       total: number
     }>("/api/buildings")
-    return { sites: [...res.active, ...res.inactive], total: res.total }
+    return { sites: res.active, total: res.active.length }
   },
 
   /**

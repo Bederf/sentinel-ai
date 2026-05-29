@@ -7,7 +7,7 @@ export interface HealthThresholds {
   critical: number;
 }
 
-export function useHealthThresholds() {
+export function useHealthThresholds(siteId?: string) {
   const [thresholds, setThresholds] = useState<HealthThresholds>({
     healthy: 90,
     warning: 70,
@@ -19,7 +19,7 @@ export function useHealthThresholds() {
   useEffect(() => {
     const fetchThresholds = async () => {
       try {
-        const data = await api.getHealthThresholds();
+        const data = await api.getHealthThresholds(siteId);
         setThresholds(data);
         setError(null);
       } catch (err) {
@@ -30,12 +30,13 @@ export function useHealthThresholds() {
       }
     };
 
+    setLoading(true);
     fetchThresholds();
-  }, []);
+  }, [siteId]);
 
   const updateThresholds = async (newThresholds: HealthThresholds) => {
     try {
-      const updated = await api.updateHealthThresholds(newThresholds);
+      const updated = await api.updateHealthThresholds(newThresholds, siteId);
       setThresholds(updated);
       setError(null);
       return true;

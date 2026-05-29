@@ -23,19 +23,14 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import { type View, VIEW_TITLES, ALL_NAV_ITEMS } from "./lib/navigation";
 import { canAccessView, getDefaultView } from "./lib/access-control";
 
-const Chat = lazy(() => import("./components/Chat").then(m => ({ default: m.Chat })));
 const Dashboard = lazy(() => import("./components/Dashboard").then(m => ({ default: m.Dashboard })));
 const ControlAuditTrail = lazy(() => import("./components/ControlAuditTrail").then(m => ({ default: m.ControlAuditTrail })));
 const Settings = lazy(() => import("./components/Settings").then(m => ({ default: m.Settings })));
 const SystemHealthPage = lazy(() => import("./components/SystemHealthPage"));
 const InviteAcceptPage = lazy(() => import("./components/auth/InviteAcceptPage").then(m => ({ default: m.InviteAcceptPage })));
-const AssetWorkflowDashboard = lazy(() => import("./components/AssetWorkflowDashboard").then(m => ({ default: m.AssetWorkflowDashboard })));
 const SimbiotPage = lazy(() => import("./components/SimbiotPage").then(m => ({ default: m.SimbiotPage })));
 const FleetInsights = lazy(() => import("./components/FleetInsights").then(m => ({ default: m.FleetInsights })));
-const DigitalTwin = lazy(() => import("./components/digital-twin").then(m => ({ default: m.DigitalTwin })));
-const OptimizationPage = lazy(() => import("./pages/OptimizationPage").then(m => ({ default: m.OptimizationPage })));
 const ContractManagementPage = lazy(() => import("./pages/ContractManagementPage").then(m => ({ default: m.ContractManagementPage })));
-const CompliancePage = lazy(() => import("./pages/CompliancePage").then(m => ({ default: m.CompliancePage })));
 const SiteDetail = lazy(() => import("./components/SiteDetail").then(m => ({ default: m.SiteDetail })));
 
 interface HealthStatus {
@@ -188,7 +183,7 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [currentView, setCurrentView] = useState<View>("dashboard");
   const [viewRefreshKey, setViewRefreshKey] = useState(0);
-  const [chatKey, setChatKey] = useState(0);
+
   // Card library removed — dashboard now shows only portfolio-level sections
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showAlertsPanel, setShowAlertsPanel] = useState(false);
@@ -480,7 +475,6 @@ function App() {
       setViewRefreshKey(k => k + 1);
     } else {
       setCurrentView(view);
-      if (view === "ai-chat") setChatKey(k => k + 1);
     }
   }, [currentView, currentUser?.email]);
 
@@ -849,10 +843,6 @@ function App() {
               autoSelectSiteId={autoSelectSiteId}
               defaultBuildingTab={defaultBuildingTab}
             />
-          ) : currentView === "ai-chat" ? (
-            <div className="h-full">
-              <Chat key={chatKey} />
-            </div>
           ) : currentView === "integrations" ? (
             <div className="h-full overflow-y-auto">
               <SystemHealthPage />
@@ -870,20 +860,10 @@ function App() {
             <SimbiotPage />
           ) : currentView === "settings" ? (
             <Settings siteId={effectiveSiteId || undefined} onError={setError} onNavigate={handleViewChange} />
-          ) : currentView === "maintenance" ? (
-            <div className="h-full overflow-y-auto">
-              <AssetWorkflowDashboard />
-            </div>
           ) : currentView === "financial" ? (
             <ContractManagementPage />
           ) : currentView === "fleet-ml" ? (
             <FleetInsights />
-          ) : currentView === "digital-twin" ? (
-            <div className="h-full"><DigitalTwin siteId={selectedSite?.id || siteId} /></div>
-          ) : currentView === "optimization" ? (
-            <OptimizationPage />
-          ) : currentView === "compliance" ? (
-            <CompliancePage />
           ) : (
             <div className="h-full flex items-center justify-center">
               <div className="text-center">

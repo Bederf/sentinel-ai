@@ -12,7 +12,7 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return error instanceof Error && error.message ? error.message : fallback;
 }
 
-export function useRiskThresholds() {
+export function useRiskThresholds(siteId?: string) {
   const [thresholds, setThresholds] = useState<RiskThresholds>(DEFAULT_RISK_THRESHOLDS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export function useRiskThresholds() {
   useEffect(() => {
     const fetchThresholds = async () => {
       try {
-        const data = await api.getRiskThresholds();
+        const data = await api.getRiskThresholds(siteId);
         setThresholds(data);
         setError(null);
       } catch (err) {
@@ -31,12 +31,13 @@ export function useRiskThresholds() {
       }
     };
 
+    setLoading(true);
     fetchThresholds();
-  }, []);
+  }, [siteId]);
 
   const updateThresholds = async (newThresholds: RiskThresholds) => {
     try {
-      const updated = await api.updateRiskThresholds(newThresholds);
+      const updated = await api.updateRiskThresholds(newThresholds, siteId);
       setThresholds(updated);
       setError(null);
       return true;

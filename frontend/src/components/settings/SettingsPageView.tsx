@@ -82,7 +82,15 @@ function SettingsSections({
 }: SettingsPageViewProps) {
   return (
     <div className="space-y-6 max-w-4xl">
+      <SimbiotBridgeSettings
+        key={`bridge-${controller.selectedSiteId}`}
+        siteId={controller.selectedSiteId ?? undefined}
+        readOnly={controller.readOnly}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+      />
       <OnboardingPhaseSettings
+        key={`phase-${controller.selectedSiteId}`}
         selectedSiteId={controller.selectedSiteId ?? undefined}
         sites={controller.buildings}
         currentUserRole={controller.currentUserRole}
@@ -91,54 +99,55 @@ function SettingsSections({
         onSuccess={controller.handleSuccess}
       />
       <SystemHealthDashboard onError={onError} onNavigate={onNavigate} />
-      <AiCostTracker onError={onError} siteId={controller.selectedSiteId ?? undefined} />
+      <AiCostTracker key={`ai-${controller.selectedSiteId}`} onError={onError} siteId={controller.selectedSiteId ?? undefined} />
       <AiRuntimePolicySettings
+        key={`policy-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         currentUserRole={controller.currentUserRole}
         readOnly={controller.readOnly}
         onError={onError}
         onSuccess={controller.handleSuccess}
       />
-      <ThresholdSettingsSection controller={controller} onError={onError} />
+      <ThresholdSettingsSection key={`thresh-${controller.selectedSiteId}`} controller={controller} onError={onError} />
       <NotificationSettingsPanel
+        key={`notif-${controller.selectedSiteId}`}
         currentUserEmail={controller.currentUserEmail}
         hasAuthenticatedSession={controller.hasSessionToken}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
       />
-      <ChannelStatusDashboard onError={onError} siteId={controller.selectedSiteId ?? undefined} />
+      <ChannelStatusDashboard key={`channel-${controller.selectedSiteId}`} onError={onError} siteId={controller.selectedSiteId ?? undefined} />
       <AlertRoutingRules
+        key={`routing-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
       <AlertMuting
+        key={`muting-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
       <TechnicianRegistry
+        key={`tech-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
       <ManagerRegistry
+        key={`mgr-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
-      />
-      <SimbiotBridgeSettings
-        siteId={controller.selectedSiteId ?? undefined}
-        readOnly={controller.readOnly}
-        onError={onError}
-        onSuccess={controller.handleSuccess}
       />
       <AegisSettings
+        key={`aegis-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         currentUserRole={controller.currentUserRole}
         readOnly={controller.readOnly}
@@ -147,6 +156,7 @@ function SettingsSections({
       />
       {controller.isModuleActive("space_optimization") ? (
         <SpaceOptimizationSettings
+          key={`space-${controller.selectedSiteId}`}
           siteId={controller.selectedSiteId ?? undefined}
           onError={onError}
           onSuccess={controller.handleSuccess}
@@ -154,30 +164,34 @@ function SettingsSections({
         />
       ) : null}
       <BuildingConfigEditor
+        key={`bldg-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
       <BuildingHandbookSettings
+        key={`handbook-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
       <OperatingScheduleEditor
+        key={`ops-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
       <HolidayCalendar
+        key={`holiday-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
-      <TariffManager siteId={controller.selectedSiteId ?? undefined} onError={onError} readOnly={controller.readOnly} />
+      <TariffManager key={`tariff-${controller.selectedSiteId}`} siteId={controller.selectedSiteId ?? undefined} onError={onError} readOnly={controller.readOnly} />
       <ModuleAccessSections controller={controller} onError={onError} />
       <DisplaySettingsSection controller={controller} onError={onError} />
     </div>

@@ -170,18 +170,19 @@ function useFeatureToggleActions({
 }
 
 export function useSettingsController({ siteId, onError }: UseSettingsControllerParams) {
+  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
   const {
     thresholds: healthThresholds,
     loading: healthThresholdLoading,
     error: healthThresholdError,
     updateThresholds: updateHealthThresholds,
-  } = useHealthThresholds();
+  } = useHealthThresholds(selectedSiteId ?? undefined);
   const {
     thresholds: riskThresholds,
     loading: riskThresholdLoading,
     error: riskThresholdError,
     updateThresholds: updateRiskThresholds,
-  } = useRiskThresholds();
+  } = useRiskThresholds(selectedSiteId ?? undefined);
   const { data: buildings = [] } = useBuildingsList();
   const { availableModules, isModuleActive, isMandatory, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
 
@@ -190,7 +191,6 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
   const currentUserEmail = currentUser.email || "";
   const hasSessionToken = !!getAccessToken();
 
-  const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
   const [settingsPageUnlocked, setSettingsPageUnlocked] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const { saveSuccess, showSaveSuccess } = useSaveSuccessState();

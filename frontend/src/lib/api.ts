@@ -1642,8 +1642,9 @@ export const api = {
   async getSites(): Promise<Site[]> {
     try {
       const response = await fetchApi<{ total: number; sites: Site[] }>("/api/sites");
-      localStorage.setItem(SITES_CACHE_KEY, JSON.stringify(response.sites));
-      return response.sites;
+      const activeSites = response.sites.filter((s) => s.sentinel_processing_enabled !== false);
+      localStorage.setItem(SITES_CACHE_KEY, JSON.stringify(activeSites));
+      return activeSites;
     } catch (error) {
       const maybeApiError = error as { status?: number };
       if (maybeApiError?.status === 429) {
@@ -2777,16 +2778,19 @@ export const api = {
   /**
    * Get health score thresholds
    */
-  async getHealthThresholds(): Promise<HealthThresholds> {
-    return fetchApi<HealthThresholds>("/api/settings/health-thresholds");
+  async getHealthThresholds(siteId?: string): Promise<HealthThresholds> {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    return fetchApi<HealthThresholds>(`/api/settings/health-thresholds${qs}`);
   },
 
   /**
    * Update health score thresholds
    * @param thresholds - Threshold values to update
+   * @param siteId - Optional site code for per-site thresholds
    */
-  async updateHealthThresholds(thresholds: HealthThresholds): Promise<HealthThresholds> {
-    return fetchApi<HealthThresholds>("/api/settings/health-thresholds", {
+  async updateHealthThresholds(thresholds: HealthThresholds, siteId?: string): Promise<HealthThresholds> {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    return fetchApi<HealthThresholds>(`/api/settings/health-thresholds${qs}`, {
       method: "PUT",
       body: JSON.stringify(thresholds),
     });
@@ -2794,17 +2798,21 @@ export const api = {
 
   /**
    * Get risk score thresholds
+   * @param siteId - Optional site code for per-site thresholds
    */
-  async getRiskThresholds(): Promise<RiskThresholds> {
-    return fetchApi<RiskThresholds>("/api/settings/risk-thresholds");
+  async getRiskThresholds(siteId?: string): Promise<RiskThresholds> {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    return fetchApi<RiskThresholds>(`/api/settings/risk-thresholds${qs}`);
   },
 
   /**
    * Update risk score thresholds
    * @param thresholds - Threshold values to update
+   * @param siteId - Optional site code for per-site thresholds
    */
-  async updateRiskThresholds(thresholds: RiskThresholds): Promise<RiskThresholds> {
-    return fetchApi<RiskThresholds>("/api/settings/risk-thresholds", {
+  async updateRiskThresholds(thresholds: RiskThresholds, siteId?: string): Promise<RiskThresholds> {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    return fetchApi<RiskThresholds>(`/api/settings/risk-thresholds${qs}`, {
       method: "PUT",
       body: JSON.stringify(thresholds),
     });
@@ -2829,11 +2837,13 @@ export const api = {
    * Get all safety rules
    * @param deviceType - Optional filter by device type
    * @param enabled - Optional filter by enabled status
+   * @param siteId - Optional site code to filter rules by site
    */
-  async getSafetyRules(deviceType?: string, enabled?: boolean): Promise<SafetyRulesResponse> {
+  async getSafetyRules(deviceType?: string, enabled?: boolean, siteId?: string): Promise<SafetyRulesResponse> {
     const params = new URLSearchParams();
     if (deviceType) params.append("device_type", deviceType);
     if (enabled !== undefined) params.append("enabled", String(enabled));
+    if (siteId) params.append("site_id", siteId);
     const queryString = params.toString();
     return fetchApi<SafetyRulesResponse>(`/api/safety/rules${queryString ? `?${queryString}` : ""}`);
   },

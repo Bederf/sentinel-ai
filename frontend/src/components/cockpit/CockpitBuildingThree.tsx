@@ -23,6 +23,47 @@ const SLAB_HEIGHT = 0.28
 const BASE_WIDTH  = 1.35
 const BASE_DEPTH  = 1.05
 
+/** Building-type slab proportions — hospital is wider/deeper than office. */
+const BUILDING_TYPE_SCALE: Record<string, { w: number; d: number }> = {
+  hospital: { w: BASE_WIDTH * 1.6, d: BASE_DEPTH * 1.4 },
+  private_hospital: { w: BASE_WIDTH * 1.6, d: BASE_DEPTH * 1.4 },
+  retail: { w: BASE_WIDTH * 1.3, d: BASE_DEPTH * 1.1 },
+  industrial: { w: BASE_WIDTH * 1.8, d: BASE_DEPTH * 1.6 },
+  warehouse: { w: BASE_WIDTH * 2.0, d: BASE_DEPTH * 1.8 },
+  data_centre: { w: BASE_WIDTH * 1.2, d: BASE_DEPTH * 1.2 },
+}
+
+/** Per-site override takes priority, then falls back to building-type scale. */
+const SITE_SLAB_SCALE: Record<string, { w: number; d: number }> = {
+  'site-002': { w: BASE_WIDTH, d: BASE_DEPTH },
+}
+
+function siteSlabScale(siteId: string, buildingType?: string, geometry?: import('./types').BuildingGeometryData | null): { w: number; d: number } {
+  // Geometry from photo extraction takes highest priority
+  if (geometry) {
+    const ratio = geometry.footprint_width_depth_ratio || 1.0
+    return {
+      w: BASE_WIDTH * (ratio >= 1.0 ? ratio : 1.0),
+      d: BASE_DEPTH * (ratio < 1.0 ? 1.0 / ratio : 1.0),
+    }
+  }
+  if (SITE_SLAB_SCALE[siteId]) return SITE_SLAB_SCALE[siteId]
+  const typeScale = BUILDING_TYPE_SCALE[buildingType ?? '']
+  if (typeScale) return typeScale
+  return { w: BASE_WIDTH, d: BASE_DEPTH }
+}
+function siteWidth(siteId: string, buildingType?: string, geometry?: import('./types').BuildingGeometryData | null): number {
+  return siteSlabScale(siteId, buildingType, geometry).w
+}
+function siteDepth(siteId: string, buildingType?: string, geometry?: import('./types').BuildingGeometryData | null): number {
+  return siteSlabScale(siteId, buildingType, geometry).d
+}
+
+function geometryFloorCount(geometry?: import('./types').BuildingGeometryData | null): number | null {
+  if (geometry?.floor_count && geometry.floor_count > 0) return geometry.floor_count
+  return null
+}
+
 /** Tracer orbit speed per active system (units: cycles per second roughly) */
 const TRACER_SPEEDS: Record<string, number> = {
   hvac: 0.42,
@@ -39,11 +80,9 @@ const TRACER_SPEEDS: Record<string, number> = {
 // 10 floors covers any realistic FNB REMS site.
 const MAX_FLOORS = 10
 
-// Occupied floor IDs for Sandton City Office Tower.
-// ONLY these floors receive the amber intelligence glow (isManaged = true).
-// B1 has equipment (chillers/pumps) and R has equipment (cooling towers)
-// but neither is an occupied tenant space — they render as neutral host mass.
-const OCCUPIED_FLOOR_IDS = new Set(['L0', 'L1', 'L2'])
+// Managed floors tracked by Sentinel — derived from floor.isManaged on each floor object.
+// For Sandton: L0, L1, L2 only. For Busamed: all 10 floors (full hospital).
+// The floor data comes from the site's tower profile in mapCockpitState.
 
 /** Orb colour per active system tab — matches the tone palette used elsewhere */
 const SYSTEM_ORB_COLORS: Record<string, { color: string; emissive: string }> = {
@@ -61,13 +100,43 @@ function GridHelperMemo() {
   return <primitive object={grid} position={[0, 0, 0]} />
 }
 
-function GroundPlane() {
-  const map = useTexture('/images/sandton-map.png')
+const SITE_MAP_TEXTURES: Record<string, string> = {
+  'site-002': '/images/sandton-map.png',
+  'site-003': '/images/busamed-map.png',
+}
+
+function GroundPlane({ siteId, lat, lng }: { siteId?: string; lat?: number | null; lng?: number | null }) {
+  const texPath = (siteId && SITE_MAP_TEXTURES[siteId]) || '/images/sandton-map.png'
+  const mapTexture = useTexture(texPath)
+
+  // For sites without a pre-downloaded map, overlay a GPS pin on a canvas
+  const overlayTexture = useMemo(() => {
+    if (siteId && SITE_MAP_TEXTURES[siteId]) return undefined
+    if (!lat || !lng) return undefined
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 512
+    const ctx = canvas.getContext('2d')!
+    ctx.fillStyle = '#0f172a'
+    ctx.fillRect(0, 0, 512, 512)
+    ctx.strokeStyle = '#1e293b'
+    ctx.lineWidth = 1
+    for (let x = 0; x <= 512; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke() }
+    for (let y = 0; y <= 512; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke() }
+    ctx.beginPath(); ctx.arc(256, 256, 12, 0, Math.PI * 2)
+    ctx.fillStyle = '#22c55e'; ctx.fill()
+    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke()
+    ctx.fillStyle = '#94a3b8'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'
+    ctx.fillText(siteId || '', 256, 440)
+    ctx.fillText(`${lat?.toFixed(4)}, ${lng?.toFixed(4)}`, 256, 480)
+    return new THREE.CanvasTexture(canvas)
+  }, [lat, lng, siteId])
+
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
       <planeGeometry args={[32, 32]} />
       <meshStandardMaterial
-        map={map}
+        map={mapTexture}
         color="#ffffff"
         metalness={0.05}
         roughness={0.95}
@@ -94,9 +163,9 @@ function managedLocalYRange(floors: CockpitState['visualTwin']['floors']): { min
     const h = SLAB_HEIGHT
     const cy = yCursor + h / 2
     yCursor += h
-    // Gate on OCCUPIED_FLOOR_IDS — same source of truth as BuildingStack.
+    // Gate on isManaged flag from the floor data — per-site managed floors.
     // Prevents the tracer from floating above the occupied stack.
-    if (OCCUPIED_FLOOR_IDS.has(f.id)) {
+    if (f.isManaged) {
       minY = Math.min(minY, cy - h / 2)
       maxY = Math.max(maxY, cy + h / 2)
     }
@@ -228,6 +297,11 @@ function BuildingStack({
   state: CockpitState
   tone: ReturnType<typeof cockpitToneKey>
 }) {
+  const siteId = state.site.id
+  const geometry = state.site.buildingGeometry
+  const slabW = siteWidth(siteId, undefined, geometry)
+  const slabD = siteDepth(siteId, undefined, geometry)
+  const geomFloorCount = geometryFloorCount(geometry)
   const floors = state.visualTwin.floors
   const waiting = state.site.renderState === 'waiting'
   const calm = !waiting && state.primaryMetric.value === 'Stable'
@@ -341,7 +415,7 @@ function BuildingStack({
     <group position={[0, 0, 0]}>
       {/* Full host-tower cage so overall mass stays readable on dark scenes */}
       <mesh position={[0, totalHeight / 2, 0]} receiveShadow>
-        <boxGeometry args={[BASE_WIDTH * 1.04, totalHeight, BASE_DEPTH * 1.04]} />
+        <boxGeometry args={[slabW * 1.04, totalHeight, slabD * 1.04]} />
         <meshStandardMaterial
           color="#94a3b8"
           transparent
@@ -359,8 +433,8 @@ function BuildingStack({
         const h = SLAB_HEIGHT
         const y = yPositions[index] + h / 2
         const setback = 1 - index * 0.0045
-        const w = BASE_WIDTH * setback
-        const d = BASE_DEPTH * setback
+        const w = slabW * setback
+        const d = slabD * setback
 
         if (floor.isManaged) {
           return (
@@ -574,11 +648,15 @@ function ZoneMarkers({
   buildingHeight: _buildingHeight,
   onboardingPhase,
   onZoneSelect,
+  slabW: zoneSlabW,
+  slabD: zoneSlabD,
 }: {
   state: CockpitState
   buildingHeight: number
   onboardingPhase: string | null
   onZoneSelect?: (sig: import('./types').CockpitTwinZoneSignal) => void
+  slabW: number
+  slabD: number
 }) {
   // Shadow mode has no active conditions — no orbs
   if (onboardingPhase === 'shadow') return null
@@ -595,7 +673,7 @@ function ZoneMarkers({
         const fi = floors.findIndex((f) => f.id === sig.floorId)
         const targetFloor = fi >= 0 ? floors[fi] : null
         // Skip orbs whose floorId doesn't match any floor (would render outside the building)
-        if (fi < 0 || !targetFloor || !OCCUPIED_FLOOR_IDS.has(targetFloor.id)) return null
+        if (fi < 0 || !targetFloor || !targetFloor.isManaged) return null
         // reversedIndex: 0 = bottom floor (L0), increases upward — matches BuildingStack slab Y math
         const reversedIndex = totalFloors - 1 - fi
         const y = reversedIndex * SLAB_HEIGHT + SLAB_HEIGHT / 2
@@ -605,8 +683,8 @@ function ZoneMarkers({
         const seedB = hashString(sig.meshId || sig.zoneId + '-b')
         const xNorm = ((seedA % 1000) / 1000) * 2 - 1 // -1 to 1
         const zNorm = ((seedB % 1000) / 1000) * 2 - 1 // -1 to 1
-        const x = xNorm * (BASE_WIDTH * 0.35)
-        const z = zNorm * (BASE_DEPTH * 0.35)
+        const x = xNorm * (zoneSlabW * 0.35)
+        const z = zNorm * (zoneSlabD * 0.35)
 
         // Primary signal gets larger, brighter orb
         const isPrimary = sig.isPrimary === true
@@ -689,6 +767,10 @@ function SceneR3F({
 
   const worldHalf = buildingHeight * modelScale * 0.5
   const fogFar = Math.max(18, worldHalf * 4.5)
+  const siteId = state.siteId
+  const buildingGeometry = state.site.buildingGeometry
+  const mainSlabW = siteWidth(siteId, undefined, buildingGeometry)
+  const mainSlabD = siteDepth(siteId, undefined, buildingGeometry)
 
   return (
     <>
@@ -701,7 +783,7 @@ function SceneR3F({
       <directionalLight position={[0, 4, -9]} intensity={0.44} color="#e2e8f0" />
       <hemisphereLight args={['#0ea5e9', '#0b1120', 0.3]} />
 
-      <GroundPlane />
+      <GroundPlane siteId={state.siteId} lat={state.site.latitude} lng={state.site.longitude} />
 
       <GridHelperMemo />
 
@@ -715,6 +797,8 @@ function SceneR3F({
           buildingHeight={buildingHeight}
           onboardingPhase={state.site.onboardingPhase ?? null}
           onZoneSelect={onZoneSelect}
+          slabW={mainSlabW}
+          slabD={mainSlabD}
         />
       </group>
 
