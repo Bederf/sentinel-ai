@@ -76,7 +76,7 @@ export function ModuleDependencyWarning({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div
-        className="rounded-lg shadow-2xl max-w-sm w-full p-6 space-y-4"
+        className="rounded-lg shadow-md max-w-sm w-full p-6 space-y-4"
         style={{
           background: 'var(--color-sentinel-bg-secondary)',
           border: '1px solid var(--color-sentinel-border)',

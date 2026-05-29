@@ -159,7 +159,7 @@ export default function CardLibrary({
       {/* Floating overlay panel */}
       {expanded && (
         <div
-          className="absolute top-full left-0 mt-2 w-80 rounded-lg shadow-xl z-50 max-h-[70vh] overflow-y-auto"
+          className="absolute top-full left-0 mt-2 w-80 rounded-lg shadow-md z-50 max-h-[70vh] overflow-y-auto"
           style={{
             background: 'var(--color-sentinel-bg-panel)',
             border: '1px solid var(--color-sentinel-border)',

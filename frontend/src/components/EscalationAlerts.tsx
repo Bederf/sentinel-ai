@@ -234,7 +234,7 @@ export const EscalationAlerts: React.FC<EscalationAlertsProps> = ({
       {/* Urgent Alert Modal */}
       {showUrgentModal && urgentAlert && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-96 p-6 rounded-lg shadow-2xl border-2 border-red-500">
+          <Card className="w-96 p-6 rounded-lg shadow-md border-2 border-red-500">
             <div className="flex items-center space-x-3 mb-4">
               <AlertTriangle className="h-8 w-8 text-red-600 animate-pulse" />
               <h2 className="text-2xl font-bold text-red-600">URGENT ALERT</h2>

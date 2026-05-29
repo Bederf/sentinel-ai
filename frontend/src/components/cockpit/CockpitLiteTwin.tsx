@@ -88,7 +88,7 @@ export function CockpitLiteTwin({ state }: CockpitLiteTwinProps) {
 
   return (
     <div
-      className="relative overflow-hidden rounded-2xl border border-slate-800/80 bg-[radial-gradient(circle_at_top,rgba(14,116,144,0.18),rgba(2,6,23,0.96)_52%)]"
+      className="relative overflow-hidden rounded-md border border-slate-800/80 bg-[radial-gradient(circle_at_top,rgba(14,116,144,0.18),rgba(2,6,23,0.96)_52%)]"
       role="img"
       aria-label={`Lightweight intelligence twin for ${state.site.name}`}
     >
@@ -123,7 +123,7 @@ export function CockpitLiteTwin({ state }: CockpitLiteTwinProps) {
             return (
               <section
                 key={floor.meshId}
-                className="rounded-2xl border p-4 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.25)]"
+                className="rounded-md border p-4 shadow-[inset_0_0_0_1px_rgba(15,23,42,0.25)]"
                 style={{
                   borderColor: palette.border,
                   background: `linear-gradient(135deg, ${palette.glow}, rgba(2,6,23,0.88) 72%)`,
@@ -181,7 +181,7 @@ export function CockpitLiteTwin({ state }: CockpitLiteTwinProps) {
                       return (
                         <div
                           key={signal.meshId}
-                          className={`min-w-[10rem] rounded-xl border px-3 py-2 ${animClass}`}
+                          className={`min-w-[10rem] rounded-md border px-3 py-2 ${animClass}`}
                           style={{
                             borderColor: badge ? badge.border : signalPalette.border,
                             background: signal.isPrimary ? signalPalette.glow : 'rgba(15,23,42,0.45)',

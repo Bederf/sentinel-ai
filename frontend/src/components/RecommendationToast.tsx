@@ -179,7 +179,7 @@ export function RecommendationCard({
 
   return (
     <div
-      className="fixed right-4 top-4 z-50 w-96 rounded-lg shadow-2xl overflow-hidden"
+      className="fixed right-4 top-4 z-50 w-96 rounded-lg shadow-md overflow-hidden"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}

@@ -345,7 +345,7 @@ function severityClass(severity: QueueItem['severity']) {
 
 function ForecastPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+    <div className="rounded-md border border-white/8 bg-black/20 px-4 py-3">
       <div className="text-[10px] uppercase tracking-[0.2em] text-slate-500">{label}</div>
       <div className="mt-2 text-sm leading-6 text-slate-200">{value}</div>
     </div>
@@ -358,7 +358,7 @@ function InsightCard({ item }: { item: QueueItem }) {
       initial={{ opacity: 0, y: 18 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, ease: FRAMER_EASE }}
-      className="rounded-2xl border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm transition hover:bg-white/[0.05]"
+      className="rounded-md border border-white/8 bg-white/[0.03] p-4 backdrop-blur-sm transition hover:bg-white/[0.05]"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.2em] ${severityClass(item.severity)}`}>
@@ -447,7 +447,7 @@ function RailAction({ state, onApprove }: { state: CockpitState; onApprove?: () 
 
   return (
     <div className="border-t border-white/8 px-5 py-4">
-      <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-4">
+      <div className="rounded-md border border-white/8 bg-black/20 px-4 py-4">
         <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
           <PlayIcon />
           <span>Operator path</span>
@@ -495,7 +495,7 @@ function ZoneEquipmentPanel({
   return (
     <div
       ref={panelRef}
-      className="rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(8,12,22,0.97),rgba(3,7,16,0.98))] p-5"
+      className="rounded-md border border-white/8 bg-[linear-gradient(180deg,rgba(8,12,22,0.97),rgba(3,7,16,0.98))] p-5"
     >
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-start gap-3">
@@ -523,15 +523,15 @@ function ZoneEquipmentPanel({
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+        <div className="rounded-md border border-white/8 bg-black/20 px-3 py-3">
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Weight</div>
           <div className="mt-2 text-base font-medium text-white">{Math.round(zone.weight * 100)}%</div>
         </div>
-        <div className="rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+        <div className="rounded-md border border-white/8 bg-black/20 px-3 py-3">
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Floor</div>
           <div className="mt-2 text-base font-medium text-white">{zone.level}</div>
         </div>
-        <div className="rounded-xl border border-white/8 bg-black/20 px-3 py-3">
+        <div className="rounded-md border border-white/8 bg-black/20 px-3 py-3">
           <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Slot</div>
           <div className="mt-2 text-base font-medium text-white">{zone.slot ?? '—'}</div>
         </div>
@@ -864,7 +864,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
 
           {state.site.onboardingPhase === 'shadow' && modelReadiness?.ready && (
             <div className="border-t border-white/8 px-5 py-4">
-              <div className="rounded-xl border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-center">
+              <div className="rounded-md border border-cyan-400/20 bg-cyan-400/5 px-4 py-3 text-center">
                 <div className="text-[10px] uppercase tracking-[0.2em] text-cyan-400 mb-2">ML Training complete — site ready for advisory</div>
                 <div className="text-xs text-slate-400 mb-3">
                   {modelReadiness.activeModelCount} model(s) covering {modelReadiness.equipmentTypesCovered.join(', ')}
@@ -924,7 +924,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
           )}
 
           <div className="grid grid-cols-2 gap-3 border-t border-white/8 px-5 py-4">
-            <div className={`rounded-2xl border ${palette.border} ${palette.soft} px-4 py-3`}>
+            <div className={`rounded-md border ${palette.border} ${palette.soft} px-4 py-3`}>
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
                 <Shield className="h-3.5 w-3.5" />
                 <span>Evidence</span>
@@ -932,7 +932,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
               <div className="mt-3 text-sm text-slate-100">{evidenceLabel(state)}</div>
             </div>
 
-            <div className="rounded-2xl border border-white/8 bg-black/20 px-4 py-3">
+            <div className="rounded-md border border-white/8 bg-black/20 px-4 py-3">
               <div className="flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] text-slate-500">
                 <TimerReset className="h-3.5 w-3.5" />
                 <span>{freshnessLabel(state)}</span>

@@ -258,7 +258,7 @@ export const SafetyBoundaryConfig: React.FC<SafetyBoundaryConfigProps> = ({
       {/* Boundary Editor Dialog */}
       {showEditor && selectedBoundary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-96 p-6 rounded-lg shadow-2xl">
+          <Card className="w-96 p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
               Edit Boundary Configuration
             </h3>
@@ -376,7 +376,7 @@ export const SafetyBoundaryConfig: React.FC<SafetyBoundaryConfigProps> = ({
       {/* Temporary Relaxation Dialog */}
       {showRelaxDialog && selectedBoundary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-96 p-6 rounded-lg shadow-2xl border-l-4 border-l-yellow-500">
+          <Card className="w-96 p-6 rounded-lg shadow-md border-l-4 border-l-yellow-500">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
               Temporary Boundary Relaxation
             </h3>

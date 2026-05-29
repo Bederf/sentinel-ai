@@ -4,12 +4,17 @@ import path from 'path'
 import { resolve } from 'path'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
     },
+  },
+  esbuild: {
+    pure: mode === 'production'
+      ? ['console.log', 'console.debug', 'console.info', 'console.trace']
+      : [],
   },
   server: {
     port: 9096,
@@ -65,4 +70,4 @@ export default defineConfig({
     include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'lucide-react'],
     exclude: ['@react-three/fiber', '@react-three/drei', 'three'],
   },
-})
+}))

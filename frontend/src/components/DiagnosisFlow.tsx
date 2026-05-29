@@ -437,7 +437,7 @@ export default function DiagnosisFlow({
   // Loading state
   if (isLoading && !session) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 p-6">
         <div className="flex items-center justify-center gap-3">
           <RefreshCw className="w-5 h-5 text-blue-500 animate-spin" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
@@ -451,7 +451,7 @@ export default function DiagnosisFlow({
   // Error state
   if (error && !session) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-xl border border-red-200 dark:border-red-800 p-6">
+      <div className="bg-white dark:bg-gray-800 rounded-md border border-red-200 dark:border-red-800 p-6">
         <div className="flex items-center gap-3 text-red-600 dark:text-red-400">
           <AlertTriangle className="w-5 h-5" />
           <span className="text-sm">{error}</span>
@@ -467,7 +467,7 @@ export default function DiagnosisFlow({
   }
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center gap-2">

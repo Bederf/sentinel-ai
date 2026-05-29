@@ -181,7 +181,7 @@ export function RiskDetailModal({
       tabIndex={-1}
     >
       <div
-        className="relative w-full max-w-2xl my-4 glass-panel shadow-2xl flex flex-col"
+        className="relative w-full max-w-2xl my-4 glass-panel shadow-md flex flex-col"
         style={{
           maxHeight: "calc(100vh - 2rem)",
         }}

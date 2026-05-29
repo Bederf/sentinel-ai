@@ -98,7 +98,7 @@ export function SupervisedConfirmBar({ onConfirm, mode = 'advisory' }: Supervise
 
   return (
     <div
-      className={`mt-4 cursor-pointer select-none rounded-2xl border ${borderColor} ${bgColor} px-4 py-4`}
+      className={`mt-4 cursor-pointer select-none rounded-md border ${borderColor} ${bgColor} px-4 py-4`}
       onPointerDown={onPressStart}
       onPointerUp={onPressEnd}
       onPointerLeave={onPressEnd}

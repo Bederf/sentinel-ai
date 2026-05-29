@@ -29,7 +29,7 @@ export function UrgencyBar({ score }: UrgencyBarProps) {
         </span>
       </div>
       <div className="w-full rounded-full h-2" style={{ background: 'var(--color-sentinel-bg-secondary)' }}>
-        <div className="h-2 rounded-full transition-all" style={{ width: `${percentage}%`, background: score >= 0.8 ? 'var(--color-sentinel-red)' : score >= 0.6 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-blue)' }} />
+        <div className="h-2 w-full origin-left rounded-full transition-transform will-change-transform" style={{ transform: `scaleX(${percentage / 100})`, background: score >= 0.8 ? 'var(--color-sentinel-red)' : score >= 0.6 ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-blue)' }} />
       </div>
     </div>
   );

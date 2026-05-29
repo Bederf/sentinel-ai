@@ -914,7 +914,7 @@ export function SolarConfigWizard({ onComplete }: SolarConfigWizardProps = {}) {
         </div>
 
         {/* Step Content */}
-        <div className="p-6 rounded-xl bg-gray-900/50 border border-gray-700 mb-6">
+        <div className="p-6 rounded-md bg-gray-900/50 border border-gray-700 mb-6">
           {state.step === 1 && renderStep1()}
           {state.step === 2 && renderStep2()}
           {state.step === 3 && renderStep3()}

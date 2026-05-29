@@ -229,7 +229,7 @@ export default function PhotoCapture({
   if (preview) {
     return (
       <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
-        <div className="bg-white dark:bg-gray-800 rounded-xl max-w-md w-full overflow-hidden">
+        <div className="bg-white dark:bg-gray-800 rounded-md max-w-md w-full overflow-hidden">
           {/* Preview image */}
           <div className="relative aspect-[4/3] bg-gray-900">
             <img

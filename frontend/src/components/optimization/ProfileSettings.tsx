@@ -58,7 +58,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ siteId }) => {
   if (loading) {
     return (
       <div
-        className="rounded-2xl border p-6"
+        className="rounded-md border p-6"
         style={{
           background: 'var(--color-sentinel-bg-panel)',
           borderColor: 'var(--color-sentinel-border)',
@@ -80,7 +80,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ siteId }) => {
 
   return (
     <div
-      className="rounded-2xl border p-6"
+      className="rounded-md border p-6"
       style={{
         background: 'var(--color-sentinel-bg-panel)',
         borderColor: 'var(--color-sentinel-border)',
@@ -120,7 +120,7 @@ export const ProfileSettings: React.FC<ProfileSettingsProps> = ({ siteId }) => {
             return (
               <div
                 key={p.value}
-                className="flex flex-col items-start text-left rounded-xl border-2 p-4 min-h-[90px]"
+                className="flex flex-col items-start text-left rounded-md border-2 p-4 min-h-[90px]"
                 style={{
                   borderColor: active ? 'var(--color-sentinel-blue)' : 'var(--color-sentinel-border)',
                   background: active ? 'rgba(59,130,246,0.08)' : 'var(--color-sentinel-bg-canvas)',

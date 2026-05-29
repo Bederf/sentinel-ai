@@ -878,7 +878,7 @@ export function DigitalTwin({ siteId: propSiteId }: DigitalTwinProps = {}) {
             {/* Equipment Detail Panel */}
             {!isEquipmentPanelMinimized && (
               <div
-                className="absolute right-0 top-2 bottom-2 w-96 max-h-[calc(100%-1rem)] shadow-2xl overflow-y-auto z-50 rounded-l-lg"
+                className="absolute right-0 top-2 bottom-2 w-96 max-h-[calc(100%-1rem)] shadow-md overflow-y-auto z-50 rounded-l-lg"
                 style={{
                   borderLeft: '2px solid var(--color-sentinel-accent)',
                   borderColor: 'var(--color-sentinel-border)',

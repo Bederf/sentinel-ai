@@ -116,7 +116,7 @@ export function InviteAcceptPage() {
         style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
         <div
-          className="w-full max-w-md p-6 rounded-xl"
+          className="w-full max-w-md p-6 rounded-md"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid var(--color-sentinel-border)",
@@ -151,7 +151,7 @@ export function InviteAcceptPage() {
         style={{ background: "var(--color-sentinel-bg-canvas)" }}
       >
         <div
-          className="w-full max-w-md p-6 rounded-xl"
+          className="w-full max-w-md p-6 rounded-md"
           style={{
             background: "var(--color-sentinel-bg-panel)",
             border: "1px solid rgba(34, 197, 94, 0.3)",
@@ -201,7 +201,7 @@ export function InviteAcceptPage() {
           }}
         >
           <div
-            className="absolute inset-0 blur-2xl rounded-2xl scale-90"
+            className="absolute inset-0 blur-2xl rounded-md scale-90"
             style={{ background: "radial-gradient(circle, rgba(46,134,171,0.35) 0%, transparent 70%)" }}
           />
           <img
@@ -239,7 +239,7 @@ export function InviteAcceptPage() {
 
       {/* Password Form */}
       <div
-        className="w-full max-w-md p-6 rounded-xl"
+        className="w-full max-w-md p-6 rounded-md"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",

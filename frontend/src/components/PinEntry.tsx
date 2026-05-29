@@ -94,7 +94,7 @@ export function PinEntry({ onSuccess }: PinEntryProps) {
       {/* Logo and Title */}
       <div className="flex flex-col items-center mb-8">
         <div
-          className="w-16 h-16 rounded-xl flex items-center justify-center mb-4"
+          className="w-16 h-16 rounded-md flex items-center justify-center mb-4"
           style={{
             background: "linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(59, 130, 246, 0.1))",
             border: "1px solid rgba(59, 130, 246, 0.3)",
@@ -168,7 +168,7 @@ export function PinEntry({ onSuccess }: PinEntryProps) {
 
       {/* Keypad */}
       <div
-        className="grid grid-cols-3 gap-3 p-4 rounded-xl"
+        className="grid grid-cols-3 gap-3 p-4 rounded-md"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",

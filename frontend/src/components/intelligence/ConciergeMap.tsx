@@ -538,7 +538,7 @@ function EmptyConciergeMindMap() {
       <div className="absolute left-1/2 top-1/2 h-[58%] w-px -translate-x-1/2 -translate-y-1/2" style={{ background: "var(--color-sentinel-border)" }} />
 
       <div
-        className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-xl text-center"
+        className="absolute left-1/2 top-1/2 flex h-24 w-24 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-md text-center"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",

@@ -200,7 +200,7 @@ export const OverrideControls: React.FC<OverrideControlsProps> = ({
       {/* Mode Warning Dialog */}
       {showModeWarning && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-96 p-6 rounded-lg shadow-2xl border-l-4 border-l-yellow-500">
+          <Card className="w-96 p-6 rounded-lg shadow-md border-l-4 border-l-yellow-500">
             <div className="flex items-center space-x-3 mb-4">
               <AlertCircle className="h-6 w-6 text-yellow-600" />
               <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100">
@@ -238,7 +238,7 @@ export const OverrideControls: React.FC<OverrideControlsProps> = ({
       {/* Device Override Dialog */}
       {showDeviceOverrideDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <Card className="w-96 p-6 rounded-lg shadow-2xl">
+          <Card className="w-96 p-6 rounded-lg shadow-md">
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
               Temporary Device Override
             </h3>

@@ -205,7 +205,7 @@ export const ApprovalDialog: React.FC<ApprovalDialogProps> = ({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-      <div className="w-full max-w-2xl rounded-lg bg-gray-900 shadow-2xl border border-gray-700">
+      <div className="w-full max-w-2xl rounded-lg bg-gray-900 shadow-md border border-gray-700">
         {/* Header */}
         <div className="border-b border-gray-700 px-6 py-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-white flex items-center gap-2">

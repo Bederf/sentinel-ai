@@ -249,7 +249,7 @@ export function OptimizationRecommendationModal({
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
       <div
-        className="relative w-full max-w-3xl my-4 glass-panel shadow-2xl flex flex-col"
+        className="relative w-full max-w-3xl my-4 glass-panel shadow-md flex flex-col"
         style={{
           maxHeight: "calc(100vh - 2rem)",
         }}

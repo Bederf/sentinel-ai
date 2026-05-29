@@ -124,7 +124,7 @@ export default function AuditLogDetail({
         aria-hidden="true"
       ></div>
 
-      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 border border-gray-800 rounded-lg shadow-2xl">
+      <div className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 border border-gray-800 rounded-lg shadow-md">
         {/* Header */}
         <div className="sticky top-0 z-10 flex items-center justify-between p-6 bg-gray-900 border-b border-gray-800">
           <div className="flex items-center gap-3">

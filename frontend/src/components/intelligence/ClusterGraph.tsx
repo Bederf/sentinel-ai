@@ -598,7 +598,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 function ConfidenceBar({ value, color }: { value: number; color?: string }) {
   return (
     <div className="h-[3px] rounded-full overflow-hidden mt-1" style={{ background: "var(--color-sentinel-border)" }}>
-      <div className="h-full rounded-full transition-all" style={{ width: `${value * 100}%`, background: color || "#3B82F6" }} />
+      <div className="h-full w-full origin-left rounded-full transition-transform will-change-transform" style={{ transform: `scaleX(${value})`, background: color || "var(--color-sentinel-blue)" }} />
     </div>
   );
 }

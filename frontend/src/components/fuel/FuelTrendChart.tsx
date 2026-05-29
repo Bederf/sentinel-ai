@@ -98,12 +98,12 @@ export function FuelTrendChart({ tanks }: FuelTrendChartProps) {
           {chartData.map((d, i) => (
             <div key={i} className="flex-1 flex flex-col items-center justify-end" title={`${d.time}: ${d['Level %']}%`}>
               <div
-                className="w-full rounded-t"
+                className="w-full rounded-t origin-bottom will-change-transform"
                 style={{
-                  height: `${d['Level %']}%`,
+                  height: '100%',
                   background: "var(--sentinel-blue)",
-                  minHeight: '1px',
-                  transition: 'height 0.2s ease',
+                  transform: `scaleY(${Math.max(d['Level %'], 0.4) / 100})`,
+                  transition: 'transform 0.2s ease',
                 }}
               />
             </div>

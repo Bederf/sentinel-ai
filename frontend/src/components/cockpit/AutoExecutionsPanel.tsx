@@ -91,7 +91,7 @@ export function AutoExecutionsPanel({ state }: AutoExecutionsPanelProps) {
   return (
     <div
       ref={panelRef}
-      className="overflow-hidden rounded-xl border border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.85),rgba(2,6,23,0.95))]"
+      className="overflow-hidden rounded-md border border-white/10 bg-[linear-gradient(180deg,rgba(2,6,23,0.85),rgba(2,6,23,0.95))]"
     >
       {/* Header */}
       <button

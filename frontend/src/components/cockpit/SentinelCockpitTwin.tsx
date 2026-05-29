@@ -83,7 +83,7 @@ interface StatusPillProps {
 
 function StatusPill({ label, value, toneClass = 'border-white/20 text-slate-200 bg-white/5' }: StatusPillProps) {
   return (
-    <div className={`flex flex-col rounded-2xl border px-4 py-2 text-[11px] uppercase tracking-[0.2em] shadow-[0_0_24px_rgba(2,6,23,0.65)] ${toneClass}`}>
+    <div className={`flex flex-col rounded-md border px-4 py-2 text-[11px] uppercase tracking-[0.2em] shadow-[0_0_24px_rgba(2,6,23,0.65)] ${toneClass}`}>
       <span className="text-[8px] opacity-70">{label}</span>
       <span className="mt-1 font-semibold tracking-[0.1em] text-sm uppercase leading-none">{value}</span>
     </div>
@@ -337,9 +337,9 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
       <div
         ref={heroRef}
         style={{ opacity: 0 }}
-        className="relative rounded-3xl border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.9),rgba(2,6,23,0.95))] p-5 shadow-[0_40px_90px_rgba(2,6,23,0.6)]"
+        className="relative rounded-md border border-white/10 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.9),rgba(2,6,23,0.95))] p-5 shadow-[0_40px_90px_rgba(2,6,23,0.6)]"
       >
-        <div ref={heroGlowRef} className="pointer-events-none absolute inset-0 rounded-3xl bg-gradient-to-br from-sky-500/10 to-transparent opacity-20 blur-3xl" />
+        <div ref={heroGlowRef} className="pointer-events-none absolute inset-0 rounded-md bg-gradient-to-br from-sky-500/10 to-transparent opacity-20 blur-3xl" />
         <div className="relative">
           <div className="flex flex-wrap items-center gap-4 text-[10px] uppercase tracking-[0.3em] text-slate-400">
             <span className="text-white/80">{state.status.toUpperCase()}</span>
@@ -400,7 +400,7 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
         <span ref={underlineRef} className="absolute inset-x-0 bottom-0 mx-auto h-0.5 max-w-[180px] rounded-full bg-amber-500" />
       </div>
 
-      <div className="mt-4 flex flex-col gap-3 rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(6,10,24,0.8),rgba(3,5,14,0.92))] p-5 shadow-[0_30px_60px_rgba(2,6,23,0.6)]">
+      <div className="mt-4 flex flex-col gap-3 rounded-md border border-white/10 bg-[linear-gradient(180deg,rgba(6,10,24,0.8),rgba(3,5,14,0.92))] p-5 shadow-[0_30px_60px_rgba(2,6,23,0.6)]">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Live signal strip</div>
@@ -421,18 +421,18 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
-        <section className="rounded-3xl border border-white/10 bg-black/40 p-5">
+        <section className="rounded-md border border-white/10 bg-black/40 p-5">
           <div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Reasoning</div>
           <ul className="mt-3 space-y-3 text-sm text-slate-300">
             {state.reasoning.map((fact, index) => (
-              <li key={`${fact}-${index}`} className="rounded-2xl border border-white/5 bg-white/5 p-3 text-xs leading-5 text-slate-100">
+              <li key={`${fact}-${index}`} className="rounded-md border border-white/5 bg-white/5 p-3 text-xs leading-5 text-slate-100">
                 {fact}
               </li>
             ))}
           </ul>
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-gradient-to-b from-slate-900/60 to-slate-900/20 p-5">
+        <section className="rounded-md border border-white/10 bg-gradient-to-b from-slate-900/60 to-slate-900/20 p-5">
           <div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Prediction</div>
           <p className="mt-3 text-lg font-semibold text-slate-100">{finalPrediction}</p>
           {typeof state.timeToConstraintMin === 'number' && (
@@ -440,7 +440,7 @@ export const SentinelCockpitTwin = ({ state }: SentinelCockpitTwinProps) => {
           )}
         </section>
 
-        <section className="rounded-3xl border border-white/10 bg-[radial-gradient(circle,rgba(24,58,115,0.25),rgba(2,6,23,0.9))] p-5">
+        <section className="rounded-md border border-white/10 bg-[radial-gradient(circle,rgba(24,58,115,0.25),rgba(2,6,23,0.9))] p-5">
           <div className="text-[10px] uppercase tracking-[0.3em] text-slate-500">Recommended action</div>
           <p className="mt-3 text-lg font-semibold text-slate-100">{action}</p>
           <p className="mt-2 text-sm text-slate-400">Calm, confident, and operator-ready.</p>

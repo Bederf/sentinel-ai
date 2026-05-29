@@ -115,7 +115,7 @@ export function MfaApprovalWaiting({ email, onCancel, onApproved }: MfaApprovalW
       </div>
 
       <div
-        className="w-full max-w-md p-6 rounded-xl text-center"
+        className="w-full max-w-md p-6 rounded-md text-center"
         style={{
           background: "var(--color-sentinel-bg-panel)",
           border: "1px solid var(--color-sentinel-border)",

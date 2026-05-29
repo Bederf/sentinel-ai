@@ -220,11 +220,11 @@ export function OnboardingPhaseSettings({
                       </span>
                       {holdProgress > 0 && (
                         <span
-                          className="absolute inset-0"
+                          className="absolute inset-0 origin-left will-change-transform"
                           style={{
                             background: "rgba(220, 38, 38, 0.2)",
-                            width: `${holdProgress * 100}%`,
-                            transition: "width 50ms linear",
+                            transform: `scaleX(${holdProgress})`,
+                            transition: "transform 50ms linear",
                           }}
                         />
                       )}

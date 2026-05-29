@@ -428,7 +428,7 @@ export function ReviewQueueDashboard({
       {/* Approve Modal */}
       {approveModal.open && (
         <ModalPortal>
-          <div className="glass-panel w-full max-w-md shadow-2xl" style={{ maxHeight: "calc(100vh - 2rem)" }}>
+          <div className="glass-panel w-full max-w-md shadow-md" style={{ maxHeight: "calc(100vh - 2rem)" }}>
             <div className="flex items-center justify-between px-5 py-4 border-b" style={borderStyle}>
               <h3 className="font-semibold" style={textPrimary}>Approve Classification</h3>
               <button
@@ -482,7 +482,7 @@ export function ReviewQueueDashboard({
       {/* Reject Modal */}
       {rejectModal.open && (
         <ModalPortal>
-          <div className="glass-panel w-full max-w-md shadow-2xl" style={{ maxHeight: "calc(100vh - 2rem)" }}>
+          <div className="glass-panel w-full max-w-md shadow-md" style={{ maxHeight: "calc(100vh - 2rem)" }}>
             <div className="flex items-center justify-between px-5 py-4 border-b" style={borderStyle}>
               <h3 className="font-semibold" style={textPrimary}>Reject Classification</h3>
               <button
@@ -549,7 +549,7 @@ export function ReviewQueueDashboard({
       {/* Bulk Approve Confirmation Modal */}
       {bulkModal.open && (
         <ModalPortal>
-          <div className="glass-panel w-full max-w-sm shadow-2xl">
+          <div className="glass-panel w-full max-w-sm shadow-md">
             <div className="flex items-center justify-between px-5 py-4 border-b" style={borderStyle}>
               <h3 className="font-semibold" style={textPrimary}>Confirm Bulk Approval</h3>
               <button

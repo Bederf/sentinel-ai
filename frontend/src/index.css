@@ -1432,3 +1432,19 @@
     animation-duration: 3s !important;
   }
 }
+
+/* ─── Glass aesthetic — theme-gated ────────────────────────── */
+/* Backdrop-filter is expensive (compositor cost) and should be opt-in via
+ * the glass theme. Outside `.glass-theme`, neutralize blur on glass utilities
+ * and Tailwind backdrop-blur-* so the aesthetic doesn't leak into the
+ * ops/matrix/teal/sentinel themes. Backgrounds remain visible (we don't drop
+ * --glass-bg) so layouts don't break; only the GPU-heavy blur is suppressed.
+ */
+html:not(.glass-theme):not([data-theme="glass"]) .glass,
+html:not(.glass-theme):not([data-theme="glass"]) .glass-panel,
+html:not(.glass-theme):not([data-theme="glass"]) .glass-card,
+html:not(.glass-theme):not([data-theme="glass"]) .glass-subtle,
+html:not(.glass-theme):not([data-theme="glass"]) [class*="backdrop-blur"] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}

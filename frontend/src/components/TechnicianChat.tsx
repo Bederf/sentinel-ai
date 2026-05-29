@@ -947,7 +947,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             )}
 
             {conceptSearch.status === 'loading' && (
-              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-5 text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
+              <div className="rounded-md border border-gray-200 bg-white px-4 py-5 text-sm text-gray-500 shadow-sm dark:border-gray-700 dark:bg-gray-800 dark:text-gray-400">
                 Searching equipment document repository...
               </div>
             )}
@@ -971,12 +971,12 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
                   {conceptSearch.totalResults} matching document{conceptSearch.totalResults === 1 ? '' : 's'} found
                 </div>
                 {conceptSearch.weakResults && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
                     We found related documents, but no strong exact matches.
                   </div>
                 )}
                 {conceptSearch.message && (
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/20 dark:text-amber-200">
                     {conceptSearch.message}
                   </div>
                 )}
@@ -994,7 +994,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             )}
 
             {conceptSearch.status === 'empty' && (
-              <div className="rounded-2xl border border-gray-200 bg-white px-4 py-5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800">
+              <div className="rounded-md border border-gray-200 bg-white px-4 py-5 text-sm shadow-sm dark:border-gray-700 dark:bg-gray-800">
                 <p className="font-medium text-gray-900 dark:text-white">
                   {isConceptSite
                     ? 'No matching documents found in Concept for this site.'
@@ -1007,7 +1007,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             )}
 
             {conceptSearch.status === 'unavailable' && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm shadow-sm dark:border-red-900/60 dark:bg-red-950/20">
+              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-5 text-sm shadow-sm dark:border-red-900/60 dark:bg-red-950/20">
                 <p className="font-medium text-red-900 dark:text-red-200">
                   {isConceptSite
                     ? 'Concept document search is currently unavailable.'
@@ -1022,7 +1022,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
             )}
 
             {conceptSearch.status === 'error' && conceptSearch.message && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-800 shadow-sm dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200">
+              <div className="rounded-md border border-red-200 bg-red-50 px-4 py-5 text-sm text-red-800 shadow-sm dark:border-red-900/60 dark:bg-red-950/20 dark:text-red-200">
                 {conceptSearch.message}
               </div>
             )}
@@ -1101,7 +1101,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
 
             {isTyping && (
               <div className="flex justify-start">
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl px-4 py-3 shadow-sm">
+                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-4 py-3 shadow-sm">
                   <div className="flex items-center gap-2">
                     <div className="flex gap-1">
                       <span className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -1174,7 +1174,7 @@ export default function TechnicianChat({ siteId, siteLabel }: TechnicianChatProp
           </button>
         </div>
           {!conceptSearchEnabled && showDocumentUpload && (
-            <div className="mt-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-2">
+            <div className="mt-2 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 p-3 space-y-2">
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                 Technician document upload
               </p>
@@ -1277,7 +1277,7 @@ function MessageBubble({ message, onStartGuided }: { message: Message; onStartGu
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div
-        className={`max-w-[85%] md:max-w-[75%] rounded-2xl px-4 py-3 shadow-sm ${
+        className={`max-w-[85%] md:max-w-[75%] rounded-md px-4 py-3 shadow-sm ${
           isUser
             ? 'bg-blue-600 text-white'
             : message.type === 'error'
@@ -1321,11 +1321,11 @@ function ConceptDocumentCard({
   const canDownloadFile = isBrowserOpenableConceptLink(result.download_url);
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
+    <div className="rounded-md border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+            <div className="mt-0.5 flex h-10 w-10 flex-none items-center justify-center rounded-md bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0 flex-1">

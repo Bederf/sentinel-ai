@@ -404,7 +404,7 @@ export function SecurityDashboard({ siteId: propSiteId }: SecurityDashboardProps
                     </div>
                     {/* Progress bar */}
                     <div className="w-full rounded-full h-2 mt-2" style={{ background: "var(--color-sentinel-bg-panel)" }}>
-                      <div className="h-2 rounded-full transition-all" style={{ width: `${Math.min(100, pct)}%`, background: barColor }} />
+                      <div className="h-2 w-full origin-left rounded-full transition-transform will-change-transform" style={{ transform: `scaleX(${Math.min(100, pct) / 100})`, background: barColor }} />
                     </div>
                     <div className="flex justify-between mt-1">
                       <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>

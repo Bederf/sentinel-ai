@@ -507,11 +507,13 @@ export function SustainabilityDashboard({
                   <div
                     style={{
                       height: '100%',
-                      width: `${pct}%`,
-                      minWidth: 2,
+                      width: '100%',
                       borderRadius: 4,
                       background: barColor,
-                      transition: 'width 0.6s ease',
+                      transform: `scaleX(${Math.max(pct, 0.5) / 100})`,
+                      transformOrigin: 'left',
+                      willChange: 'transform',
+                      transition: 'transform 0.6s ease',
                     }}
                   />
                   {targetPct > 0 && (
