@@ -131,26 +131,48 @@ curl http://10.99.0.1:8080/api/sites/site-002/health \
 ```
 Bridge is reachable but cannot reach BMS — site-side issue.
 
+## Ingestion Quality Gate
+
+The bridge polling rate is automatically controlled by the site's onboarding phase:
+
+| Phase | Poll Sampling | Purpose |
+|-------|:------------:|---------|
+| `commissioning` | 10% | New sites start here — protects baselines from startup noise |
+| `shadow_live` | 50% | Building baselines, monitoring data quality |
+| `advisory+` | 100% | Full trust, all data flows |
+
+The gate is enforced in `ShadowModePollingService.poll()` by reading the site's `onboarding_phase` from Supabase and skipping poll cycles proportionally. See the policy gate system docs for promotion criteria.
+
 ## Multi-Site Pattern
 
 Each site can use a different bridge or protocol, configured entirely in DB:
 
 ```json
 S002 (bridge):  { "base_url": "http://10.99.0.1:8080", "token": "..." }
-S005 (bridge):  { "base_url": "http://10.99.0.5:8080", "token": "..." }
+S003 (bridge):  { "base_url": "http://10.99.0.1:8080", "token": "..." }
 S00X (direct):  { "host": "192.168.10.50", "device_instance": 1234, "port": 47808 }
 ```
 
-No code changes needed — `MultiSitePollingCoordinator` selects the adapter dynamically based on protocol and config.
+Per-site adapter configs are saved via the SIMBIOT Connection Wizard into `site_adapter_config` with the correct protocol and connection details. No code changes needed — the coordinator selects the adapter dynamically.
 
 ## Connection Configs in Database
 
-Configured sites as of 2026-05-03:
+Configured sites as of 2026-05-28:
 
 | Site | Protocol | Bridge URL | Status |
 |------|----------|------------|--------|
 | site-001 | bridge | http://10.99.0.1:8080 | Disabled (future) |
 | site-002 | bridge | http://10.99.0.1:8080 | Active, telemetry flowing |
-| site-005 | bridge | (configured on bridge) | Not tracked in SENTINEL DB yet |
+| site-003 | bridge | http://10.99.0.1:8080 | Active, commissioning phase (10% sampling) |
+
+### New site onboarding flow
+
+1. SIMBIOT Connection Wizard creates the site (Supabase + disk)
+2. Wizard discovers 1006+ points via bridge API
+3. Bridge adapter config saved with `enabled: false` (disabled by default)
+4. User toggles bridge ON in Settings → SIMBIOT Bridge
+5. Site starts at `commissioning` phase → 10% poll sampling
+6. Phase auto-promotes to `shadow_live` when quality gates pass (≥24h, ≥50 polls, quality ≥ 0.7)
+7. User can optionally generate a **building twin** via Step 5 of the wizard
 
 Site-005 (Example Hospital Private Hospital, Umhlanga) is configured on the bridge (Niagara/Tridium, oBIX protocol) but not yet in `site_adapter_config`.

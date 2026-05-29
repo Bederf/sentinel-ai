@@ -2,9 +2,9 @@
 title: "SIMBIOT BMS Integration Onboarding Checklist"
 type: "spec"
 status: "draft"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-05-28"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -24,6 +24,91 @@ estimated_read_time: 10
 SENTINEL's SIMBIOT device abstraction layer autodetects **~60% of BMS integration requirements** via BACnet/Modbus discovery. The remaining 40% requires one-time consultant inputs—no ongoing exports needed.
 
 **The Pitch:** "Your BMS consultant provides network access + a couple of seed CSVs, and SIMBIOT handles the rest."
+
+---
+
+## Multi-site onboarding flow
+
+Each new site is onboarded via the **SIMBIOT Connection Wizard**. The wizard steps are:
+
+1. **Connect** — enter BMS connection details, test bridge/BACnet connection
+2. **Discover** — discover BACnet points, classify equipment groups
+3. **Review** — review AI-classified mappings
+4. **Approve** — enable processing, save adapter config
+5. **Configure** — set site contacts, generate building twin (optional)
+
+### Connection types supported
+
+The wizard supports three connection types:
+
+| Type | Protocol | Use Case |
+|------|----------|----------|
+| **SIMBIOT Bridge (HTTP)** | REST API via bridge | Sites behind the WireGuard bridge — no BACnet/UDP needed |
+| **Tridium Niagara (oBIX)** | oBIX + BACnet/IP | Niagara JACE/Supervisor with oBIX auth |
+| **Generic BACnet/IP** | BACnet/IP (UDP 47808) | Direct BACnet/IP to BMS controllers |
+
+### Bridge adapter (default for new sites)
+
+The SIMBIOT Bridge vendor uses HTTP REST through the WireGuard tunnel. This avoids BACnet/UDP routing issues. The bridge adapter:
+
+- Connects via `base_url` (e.g. `http://10.99.0.1:8080`) and API `token`
+- Discovers 1 logical bridge device per site with all points classified
+- Saves per-site adapter config to `site_adapter_config` table
+- Is **disabled by default** for new sites — toggle on in Settings when ready
+
+### Building profile data captured
+
+The wizard captures and persists to Supabase:
+
+| Field | Stored in |
+|-------|-----------|
+| Site name, address, region | `sites` table (code, name, address, region) |
+| Building type, sqm | `sites` table (type, sqm) |
+| Floors | `building.json` (disk) + `sites` table (floor_labels) |
+| GPS coordinates | `sites` table (latitude, longitude) via geocode |
+| Operating schedule | `site_profiles` table |
+| Building contacts | `sites` table (contact_email, contact_phone) + `metadata` JSONB |
+| BMS connection config | `site_adapter_config` table |
+| Base modules (15) | `site_modules` table (auto-seeded) |
+
+### Building twin generation
+
+After onboarding, a **"Generate Building Twin"** button in Step 5 triggers:
+
+1. Web scrape for a building photo
+2. Claude Vision extracts geometry (floor count, shape, setbacks, facade)
+3. Geometry stored in `sites.building_geometry` JSONB column
+4. Cockpit 3D view renders the building using extracted proportions
+
+A satellite map tile (OpenStreetMap) is also downloaded for the cockpit ground plane.
+
+---
+
+## Ingestion quality gate (phase-based)
+
+Data ingestion rate is automatically controlled by the site's onboarding phase:
+
+| Phase | Sampling Rate | Ingestion |
+|-------|:------------:|-----------|
+| `commissioning` | **10%** | Minimum — protects baselines from startup noise |
+| `shadow_live` | **50%** | Moderate — building baselines, monitoring quality |
+| `advisory` | **100%** | Full — policies passed, data verified |
+| `supervised` | **100%** | Full |
+| `automatic` | **100%** | Full |
+
+The polling service (`ShadowModePollingService`) reads the site's `onboarding_phase` from Supabase before each poll cycle and skips polls proportionally.
+
+### Promotion gates (commissioning → shadow_live)
+
+Commissioning auto-promotes to shadow_live when all gates pass:
+
+| Gate | Threshold | Check |
+|------|-----------|-------|
+| hours_since_created | ≥ 24h | Site has existed for at least 24 hours |
+| bridge_polls_successful | ≥ 50 | Bridge has successfully polled at least 50 times |
+| data_quality_score | ≥ 0.7 | Fault-to-normal ratio in sensor readings |
+
+The `PhasePromotionEvaluator` runs hourly and auto-promotes commissioning sites (higher phases require manual approval).
 
 ---
 
