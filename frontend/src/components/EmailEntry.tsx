@@ -98,12 +98,17 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
       onSuccess(response.user, accessToken);
     } catch (err: any) {
       console.error("Login failed:", err);
-      const msg = err.message || "";
-      if (msg.includes("429") || msg.includes("cooldown") || msg.includes("rate limit")) {
+      const status: number | undefined = err?.status;
+      const msg = (err?.message || "").toLowerCase();
+      if (status === 429 || msg.includes("429") || msg.includes("cooldown") || msg.includes("rate limit")) {
         setError("Too many login attempts. Please wait a moment before trying again.");
-      } else if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("invalid")) {
+      } else if (status === 403 || msg.includes("user not registered") || msg.includes("not registered") || msg.includes("inactive")) {
+        setError("Email not recognized or inactive. Contact your administrator if you need access.");
+      } else if (status === 401 || msg.includes("unauthorized") || msg.includes("invalid")) {
         setError("Invalid email. Please check and try again.");
-      } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("ERR_CONNECTION")) {
+      } else if (status === 500 || msg.includes("login failed")) {
+        setError("Server error during login. Please try again shortly.");
+      } else if (msg.includes("network") || msg.includes("fetch") || msg.includes("err_connection")) {
         setError("Network error. Please check your connection and try again.");
       } else {
         setError("Login failed. Please try again.");

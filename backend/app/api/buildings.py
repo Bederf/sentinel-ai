@@ -21,11 +21,11 @@ import shutil
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.site_resolver import get_registered_sites
-from app.middleware.auth_middleware import require_role, require_site_access
+from app.middleware.auth_middleware import optional_auth, require_role, require_site_access
 from app.models.auth import AuthContext, SentinelRole
 from app.services.device_abstraction import device_manager
 from app.services.site_loader import get_site_loader
@@ -288,7 +288,7 @@ def _is_device_controllable(device_id: str, equipment_points: dict) -> bool:
 router = APIRouter(prefix="/api/buildings", tags=["Building Management"])
 
 # Data path
-DATA_PATH = Path(__file__).parent.parent / "data" / "buildings"
+DATA_PATH = Path(__file__).parent.parent / "data" / "sites"
 
 
 def _next_site_id() -> str:
@@ -372,7 +372,7 @@ class BuildingConfigUpdate(BaseModel):
 
 
 @router.get("")
-async def list_sites(current_user: dict | None = None) -> dict:
+async def list_sites(request: Request) -> dict:
     """
     List buildings accessible to the current user.
 
@@ -382,6 +382,15 @@ async def list_sites(current_user: dict | None = None) -> dict:
         - default_building: The default building ID
     """
     from app.database.supabase_client import Supabase
+    from app.middleware.auth_middleware import _authenticate_request_sync
+
+    auth_ctx = _authenticate_request_sync(request)
+    # Enforce authentication for site listing so results are always gated
+    if not auth_ctx or not auth_ctx.email:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    is_admin = getattr(auth_ctx, "role", None) and getattr(auth_ctx.role, "value", "") == "admin"
+    current_user = {"email": auth_ctx.email, "role": getattr(auth_ctx.role, "value", "")}
 
     loader = get_site_loader()
     loader.load(force=True)  # Refresh
@@ -391,8 +400,11 @@ async def list_sites(current_user: dict | None = None) -> dict:
 
     # Get user's accessible sites from database
     # user_site_access stores site UUIDs; resolve to site codes for comparison
+    # ADMIN users see all sites (no filtering)
     accessible_codes: set[str] | None = set()
-    if current_user and current_user.get("email"):
+    if is_admin:
+        accessible_codes = None  # None means do not filter (show all)
+    elif current_user and current_user.get("email"):
         try:
             supabase = Supabase.instance()
 
@@ -435,9 +447,13 @@ async def list_sites(current_user: dict | None = None) -> dict:
                 from app.database.supabase_client import get_supabase_client
 
                 client = get_supabase_client()
-                site_row = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+                site_row = client.table("sites").select("id,onboarding_phase").eq("code", site_id).limit(1).execute()
                 if site_row.data:
                     site_uuid = site_row.data[0]["id"]
+                    # Include current onboarding phase so UI reflects up-to-date mode
+                    phase_val = site_row.data[0].get("onboarding_phase")
+                    if phase_val:
+                        info["onboarding_phase"] = phase_val
                     alerts = (
                         client.table("alerts")
                         .select("severity")
@@ -1118,7 +1134,22 @@ async def get_equipment_summary(site_id: str, auth: AuthContext = Depends(requir
     except Exception as e:
         logger.debug(f"Supabase asset summary failed: {e}")
 
-    # Fall back to JSON file counting
+    # Fall back to JSON file counting (debug/development only if Supabase has no summary)
+    from app.config.settings import settings
+    if not settings.debug:
+        # No JSON fallback in production: surface empty summary if Supabase has none
+        return {
+            "site_id": site_id,
+            "site_name": site_id,
+            "total_assets": 0,
+            "categories": {k: 0 for k in [
+                "equipment","hvac_zones","generators","generator_groups","diesel_tanks",
+                "energy_centres","mv_incomers","transformers","lv_switchboards","ats_units",
+                "power_meters","pfc_banks","ups_systems","feeders","dali_controllers"
+            ]},
+            "supplementary": {"desks": 0, "luminaires": 0, "dali_sensors": 0},
+            "source": "supabase",
+        }
     # Map site_id to site code for JSON lookup
     site_code = _building_to_site(site_id)
 
@@ -1149,12 +1180,17 @@ async def get_equipment_summary(site_id: str, auth: AuthContext = Depends(requir
         "dali_controllers": 0,
     }
 
-    # HVAC zones
+    # HVAC zones (support both list and {"zones": [...]} shapes)
     zones_file = site_path / "zones.json"
     if zones_file.exists():
         with open(zones_file) as f:
-            zones = json.load(f)
-            counts["hvac_zones"] = len(zones)
+            zones_payload = json.load(f)
+            if isinstance(zones_payload, dict) and isinstance(zones_payload.get("zones"), list):
+                counts["hvac_zones"] = len(zones_payload["zones"])
+            elif isinstance(zones_payload, list):
+                counts["hvac_zones"] = len(zones_payload)
+            else:
+                counts["hvac_zones"] = 0
 
     # Generators
     gen_file = site_path / "generators.json"
@@ -1251,207 +1287,260 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
             # Not a UUID, use as-is
             pass
 
-    # Try Supabase first
+    # Try Supabase first (direct query to avoid repository/cache issues)
     try:
-        from app.database.repositories.equipment_repository import EquipmentRepository
+        from app.database.supabase_client import get_supabase_client
+        client = get_supabase_client()
+        if not site_uuid:
+            site_row = client.table("sites").select("id, name").eq("code", site_code).limit(1).execute()
+            if not site_row.data:
+                raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
+            site_uuid = site_row.data[0]["id"]
+            site_name = site_row.data[0]["name"]
+        else:
+            site_name = site_id
 
-        repo = EquipmentRepository()
-        equipment_data = repo.get_by_site_code(site_code)
+        # Primary: use repository with retry + caching
+        try:
+            from app.database.repositories.equipment_repository import EquipmentRepository
 
-        if equipment_data:
-            # Get building info from Supabase (needed in the loop)
-            from app.database.supabase_client import get_supabase_client
+            repo = EquipmentRepository()
+            equipment_data = repo.get_by_site_code(site_code) or []
+        except Exception:
+            equipment_data = []
 
-            client = get_supabase_client()
-
-            # Only query if we don't already have site_uuid
-            if not site_uuid:
-                site_result = client.table("sites").select("id, name").eq("code", site_code).execute()
-                site_name = site_result.data[0]["name"] if site_result.data else site_id
-                site_uuid = site_result.data[0]["id"] if site_result.data else None
-            else:
-                site_result = client.table("sites").select("id, name").eq("id", site_uuid).execute()
-                site_name = site_result.data[0]["name"] if site_result.data else site_id
-
-            # Cross-reference active alerts to derive equipment risk status
-            alert_severity_map: dict[str, str] = {}  # equipment_uuid -> highest severity
-            if site_uuid:
-                try:
-                    from app.database.repositories.alert_repository import AlertRepository
-
-                    alert_repo = AlertRepository()
-                    active_alerts = alert_repo.get_active_by_site(site_uuid)
-                    for alert in active_alerts:
-                        eq_uuid = alert.get("equipment_id")
-                        if eq_uuid:
-                            severity = alert.get("severity", "warning")
-                            existing = alert_severity_map.get(eq_uuid)
-                            if existing != "critical":
-                                if severity == "critical" or existing is None:
-                                    alert_severity_map[eq_uuid] = severity
-                except Exception as e:
-                    logger.warning(f"Failed to fetch alerts for equipment status: {e}")
-
-            # Ensure device_manager is populated so _is_device_controllable can check it
+        # Fallback: direct queries with de-duplication if repository returns too few
+        if len(equipment_data) < 50:
+            eq_resp_uuid = (
+                client.table("equipment")
+                .select("id, code, name, status, health_score, type, location, site_id")
+                .eq("site_id", site_uuid)
+                .execute()
+            )
+            raw_rows = eq_resp_uuid.data or []
             try:
-                from app.services.ai_optimizer import ensure_device_manager_initialized
-
-                await ensure_device_manager_initialized()
-            except Exception as e:
-                logger.debug(f"Device manager init skipped: {e}")
-
-            equipment_list = []
-            categories = {}
-
-            for eq in equipment_data:
-                # Determine category from type - normalize if type is unknown
-                eq_code = eq.get("code", "")
-                eq_type_raw = eq.get("type", "unknown")
-                eq_type = _normalize_equipment_type(eq_code, eq_type_raw)
-                type_to_category = {
-                    "sensor": "Sensors",
-                    "daylight_sensor": "Sensors",
-                    "occupancy_sensor": "Sensors",
-                    "zone_sensor": "Sensors",
-                    "outdoor_air_sensor": "Sensors",
-                    "vav": "HVAC",
-                    "VAV": "HVAC",
-                    "ahu": "HVAC",
-                    "fcu": "HVAC",
-                    "FCU": "HVAC",
-                    "chiller": "HVAC",
-                    "split_unit": "HVAC",
-                    "cooling_tower": "HVAC",
-                    "hvac_zone": "HVAC",
-                    "pump": "HVAC",
-                    "zone": "HVAC",
-                    "generator": "Generator Plant",
-                    "diesel_tank": "Generator Plant",
-                    "generator_group": "Generator Plant",
-                    "transformer": "Energy Centre",
-                    "mv_incomer": "Energy Centre",
-                    "lv_switchboard": "Energy Centre",
-                    "ats": "Energy Centre",
-                    "ups": "Energy Centre",
-                    "power_meter": "Energy Centre",
-                    "pfc_bank": "Energy Centre",
-                    "feeder": "Energy Centre",
-                    "bess": "Energy Centre",
-                    "inverter": "Energy Centre",
-                    "meter": "Energy Centre",
-                    "dali_controller": "Lighting",
-                    "dali": "Lighting",
-                    "dali_zone": "Lighting",
-                    "luminaire": "Lighting",
-                    "lighting_zone": "Lighting",
-                    "bms_controller": "Building Systems",
-                    "bms_scada": "Building Systems",
-                    "lift-passenger": "Lifts",
-                }
-                category = type_to_category.get(eq_type, "Other")
-                status = eq.get("status", "normal")
-                health = eq.get("health_score", 85)
-
-                # Override status if equipment has active alerts
-                eq_uuid = eq.get("id")
-                if eq_uuid and eq_uuid in alert_severity_map:
-                    alert_sev = alert_severity_map[eq_uuid]
-                    if alert_sev == "critical" and status != "critical":
-                        status = "critical"
-                        health = min(health, 30)
-                    elif alert_sev == "warning" and status not in ("critical", "warning"):
-                        status = "warning"
-                        health = min(health, 60)
-
-                # Derive status from health score to align with SafetySummary thresholds
-                # (sites_aggregation.py: <57 = alarm, 57-80 = warning, >=80 = safe)
-                if status == "normal" and isinstance(health, (int, float)):
-                    if health < 57:
-                        status = "critical"
-                    elif health < 80:
-                        status = "warning"
-
-                operating_data = eq.get("operating_data", {}) or {}
-                capability_sync = operating_data.get("capability_sync", {}) if isinstance(operating_data, dict) else {}
-                synced_controllable = capability_sync.get("controllable")
-                inferred_controllable = _is_device_controllable(eq.get("code", eq.get("id", "")), eq.get("points", {}))
-                is_simulated_sync = (
-                    capability_sync.get("vendor") == "simulation"
-                    and capability_sync.get("writable_point_count", 0) == 0
+                eq_resp_code = (
+                    client.table("equipment")
+                    .select("id, code, name, status, health_score, type, location, site_id")
+                    .eq("site_id", site_code)
+                    .execute()
                 )
-                controllable_by_type = eq_type in (
-                    "fcu",
-                    "vav",
-                    "ahu",
-                    "chiller",
-                    "pump",
-                    "split",
-                    "ct",
-                    "dali",
-                    "lum",
-                    "gen",
-                    "ups",
-                    "bess",
-                    "inv",
-                )
-                # Determine effective controllable status:
-                # - Simulation sync (no real BMS): use type-based override when device_manager has no writable points
-                # - Shadow mode (capability_sync empty): also use type-based override for known controllable types
-                # - Real BMS sync: trust synced_controllable if available, else fall back to device_manager
-                if is_simulated_sync or (not synced_controllable and controllable_by_type):
-                    if not inferred_controllable and controllable_by_type:
-                        # No real writable points found — fall back to type-based assumption.
-                        # Real BMS sync should override this when connectivity is available.
-                        inferred_controllable = True
-                    effective_controllable = inferred_controllable
+                raw_rows += eq_resp_code.data or []
+            except Exception:
+                pass
+
+            equipment_by_code: dict[str, dict] = {}
+            for row in raw_rows:
+                code = row.get("code") or row.get("id")
+                if not code:
+                    continue
+                prev = equipment_by_code.get(code)
+                if not prev:
+                    equipment_by_code[code] = row
                 else:
-                    effective_controllable = (
-                        bool(synced_controllable) if isinstance(synced_controllable, bool) else inferred_controllable
+                    prev_uuid = isinstance(prev.get("site_id"), str) and len(prev["site_id"]) == 36
+                    curr_uuid = isinstance(row.get("site_id"), str) and len(row["site_id"]) == 36
+                    if curr_uuid and not prev_uuid:
+                        equipment_by_code[code] = row
+
+            equipment_data = list(equipment_by_code.values())
+
+            if len(equipment_data) < 50:
+                try:
+                    site_num = site_code.split("-")[1]
+                    site_prefix = f"S{site_num.zfill(3)}-"
+                    eq_by_code_prefix = (
+                        client.table("equipment")
+                        .select("id, code, name, status, health_score, type, location, site_id")
+                        .like("code", f"{site_prefix}%")
+                        .execute()
                     )
+                    for row in eq_by_code_prefix.data or []:
+                        code = row.get("code") or row.get("id")
+                        if not code:
+                            continue
+                        if code not in equipment_by_code:
+                            equipment_by_code[code] = row
+                    equipment_data = list(equipment_by_code.values())
+                except Exception:
+                    pass
 
-                # Extract location from equipment code
-                eq_code = eq.get("code", "")
-                extracted_location = _extract_location_from_code(eq_code)
-                # Use extracted location if DB location is empty
-                location = eq.get("location", "") or extracted_location
+        # Cross-reference active alerts to derive equipment risk status
+        alert_severity_map: dict[str, str] = {}
+        try:
+            from app.database.repositories.alert_repository import AlertRepository
 
-                equipment_list.append(
-                    {
-                        "id": eq.get("code", eq.get("id")),
-                        "code": eq.get("code"),
-                        "name": _normalize_equipment_name(eq),
-                        "equipment_type": eq_type,  # Frontend expects equipment_type, not type
-                        "type": eq_type,  # Keep for backward compatibility
-                        "category": category,
-                        "status": status,
-                        "health_score": health,
-                        "location": location,
-                        "site_id": site_code,
-                        "site_name": site_name,
-                        "details": {
-                            "manufacturer": eq.get("manufacturer"),
-                            "model": eq.get("model"),
-                            "metadata": eq.get("metadata", {}),
-                        },
-                        "controllable": effective_controllable,
-                        "control_state": (
-                            "synced_capability"
-                            if isinstance(synced_controllable, bool)
-                            else ("inferred_writable" if inferred_controllable else "read_only")
-                        ),
-                    }
+            alert_repo = AlertRepository()
+            active_alerts = alert_repo.get_active_by_site(site_uuid)
+            for alert in active_alerts:
+                eq_uuid = alert.get("equipment_id")
+                if eq_uuid:
+                    severity = alert.get("severity", "warning")
+                    existing = alert_severity_map.get(eq_uuid)
+                    if existing != "critical":
+                        if severity == "critical" or existing is None:
+                            alert_severity_map[eq_uuid] = severity
+        except Exception as e:
+            logger.debug(f"Alert cross-reference skipped: {e}")
+
+        # Ensure device_manager is populated so _is_device_controllable can check it
+        try:
+            from app.services.ai_optimizer import ensure_device_manager_initialized
+
+            await ensure_device_manager_initialized()
+        except Exception:
+            pass
+
+        equipment_list = []
+        categories = {}
+
+        for eq in equipment_data:
+            # Determine category from type - normalize if type is unknown
+            eq_code = eq.get("code", "")
+            eq_type_raw = eq.get("type", "unknown")
+            eq_type = _normalize_equipment_type(eq_code, eq_type_raw)
+            type_to_category = {
+                "sensor": "Sensors",
+                "daylight_sensor": "Sensors",
+                "occupancy_sensor": "Sensors",
+                "zone_sensor": "Sensors",
+                "outdoor_air_sensor": "Sensors",
+                "vav": "HVAC",
+                "VAV": "HVAC",
+                "ahu": "HVAC",
+                "fcu": "HVAC",
+                "FCU": "HVAC",
+                "chiller": "HVAC",
+                "split_unit": "HVAC",
+                "cooling_tower": "HVAC",
+                "hvac_zone": "HVAC",
+                "pump": "HVAC",
+                "zone": "HVAC",
+                "generator": "Generator Plant",
+                "diesel_tank": "Generator Plant",
+                "generator_group": "Generator Plant",
+                "transformer": "Energy Centre",
+                "mv_incomer": "Energy Centre",
+                "lv_switchboard": "Energy Centre",
+                "ats": "Energy Centre",
+                "ups": "Energy Centre",
+                "power_meter": "Energy Centre",
+                "pfc_bank": "Energy Centre",
+                "feeder": "Energy Centre",
+                "bess": "Energy Centre",
+                "inverter": "Energy Centre",
+                "meter": "Energy Centre",
+                "dali_controller": "Lighting",
+                "dali": "Lighting",
+                "dali_zone": "Lighting",
+                "luminaire": "Lighting",
+                "lighting_zone": "Lighting",
+                "bms_controller": "Building Systems",
+                "bms_scada": "Building Systems",
+                "lift-passenger": "Lifts",
+            }
+            category = type_to_category.get(eq_type, "Other")
+            status = eq.get("status", "normal")
+            health = eq.get("health_score", 85)
+
+            # Override status if equipment has active alerts
+            eq_uuid = eq.get("id")
+            if eq_uuid and eq_uuid in alert_severity_map:
+                alert_sev = alert_severity_map[eq_uuid]
+                if alert_sev == "critical" and status != "critical":
+                    status = "critical"
+                    # Guard against None health values
+                    health = min((health if isinstance(health, (int, float)) else 85), 30)
+                elif alert_sev == "warning" and status not in ("critical", "warning"):
+                    status = "warning"
+                    health = min((health if isinstance(health, (int, float)) else 85), 60)
+
+            # Derive status from health score to align with SafetySummary thresholds
+            # (sites_aggregation.py: <57 = alarm, 57-80 = warning, >=80 = safe)
+            if status == "normal" and isinstance(health, (int, float)):
+                if health < 57:
+                    status = "critical"
+                elif health < 80:
+                    status = "warning"
+
+            operating_data = {}
+            capability_sync = {}
+            synced_controllable = None
+            inferred_controllable = _is_device_controllable(eq.get("code", eq.get("id", "")), {})
+            is_simulated_sync = False
+            controllable_by_type = eq_type in (
+                "fcu",
+                "vav",
+                "ahu",
+                "chiller",
+                "pump",
+                "split",
+                "ct",
+                "dali",
+                "lum",
+                "gen",
+                "ups",
+                "bess",
+                "inv",
+            )
+            # Determine effective controllable status:
+            # - Simulation sync (no real BMS): use type-based override when device_manager has no writable points
+            # - Shadow mode (capability_sync empty): also use type-based override for known controllable types
+            # - Real BMS sync: trust synced_controllable if available, else fall back to device_manager
+            if is_simulated_sync or (not synced_controllable and controllable_by_type):
+                if not inferred_controllable and controllable_by_type:
+                    # No real writable points found — fall back to type-based assumption.
+                    # Real BMS sync should override this when connectivity is available.
+                    inferred_controllable = True
+                effective_controllable = inferred_controllable
+            else:
+                effective_controllable = (
+                    bool(synced_controllable) if isinstance(synced_controllable, bool) else inferred_controllable
                 )
 
-                # Update category stats
-                if category not in categories:
-                    categories[category] = {"total": 0, "normal": 0, "warning": 0, "critical": 0}
-                categories[category]["total"] += 1
-                if status == "normal":
-                    categories[category]["normal"] += 1
-                elif status == "warning":
-                    categories[category]["warning"] += 1
-                elif status == "critical":
-                    categories[category]["critical"] += 1
+            # Extract location from equipment code
+            eq_code = eq.get("code", "")
+            extracted_location = _extract_location_from_code(eq_code)
+            # Use extracted location if DB location is empty
+            location = eq.get("location", "") or extracted_location
+
+            equipment_list.append(
+                {
+                    "id": eq.get("code", eq.get("id")),
+                    "code": eq.get("code"),
+                    "name": _normalize_equipment_name(eq),
+                    "equipment_type": eq_type,  # Frontend expects equipment_type, not type
+                    "type": eq_type,  # Keep for backward compatibility
+                    "category": category,
+                    "status": status,
+                    "health_score": health,
+                    "location": location,
+                    "site_id": site_code,
+                    "site_name": site_name,
+                    "details": {
+                        "manufacturer": eq.get("manufacturer"),
+                        "model": eq.get("model"),
+                        "metadata": eq.get("metadata", {}),
+                    },
+                    "controllable": effective_controllable,
+                    "control_state": (
+                        "synced_capability"
+                        if isinstance(synced_controllable, bool)
+                        else ("inferred_writable" if inferred_controllable else "read_only")
+                    ),
+                }
+            )
+
+            # Update category stats
+            if category not in categories:
+                categories[category] = {"total": 0, "normal": 0, "warning": 0, "critical": 0}
+            categories[category]["total"] += 1
+            if status == "normal":
+                categories[category]["normal"] += 1
+            elif status == "warning":
+                categories[category]["warning"] += 1
+            elif status == "critical":
+                categories[category]["critical"] += 1
 
             # Merge controllable status from building equipment directory (Niagara discovery)
             # The directory files have points with writable=true that Supabase doesn't have
@@ -1476,18 +1565,28 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     if eq_item["id"] in dir_controllable:
                         eq_item["controllable"] = True
 
-            return {
-                "site_id": site_id,
-                "site_name": site_name,
-                "total_equipment": len(equipment_list),
-                "categories": categories,
-                "equipment": equipment_list,
-                "source": "supabase",
-            }
+        return {
+            "site_id": site_id,
+            "site_name": site_name,
+            "total_equipment": len(equipment_list),
+            "categories": categories,
+            "equipment": equipment_list,
+            "source": "supabase",
+        }
     except Exception as e:
         logger.warning(f"Supabase equipment fetch failed for {site_id}: {e}")
 
-    # Fall back to JSON files
+    # Fall back to JSON files only in debug; in production return empty if Supabase has none
+    from app.config.settings import settings
+    if not settings.debug:
+        return {
+            "site_id": site_id,
+            "site_name": site_id,
+            "total_equipment": 0,
+            "categories": {},
+            "equipment": [],
+            "source": "supabase",
+        }
     loader = get_site_loader()
     building = loader.get_site(site_code)
 
@@ -1522,12 +1621,17 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
         }
         return status_map.get(status.lower() if status else "unknown", ("unknown", 50))
 
-    # 1. HVAC Zones
+    # 1. HVAC Zones (support both list and {"zones": [...]} shapes)
     zones_file = site_path / "zones.json"
     if zones_file.exists():
         with open(zones_file) as f:
-            zones = json.load(f)
-            for zone in zones:
+            zones_payload = json.load(f)
+            zones_list = (
+                zones_payload.get("zones", []) if isinstance(zones_payload, dict) else zones_payload
+            )
+            if not isinstance(zones_list, list):
+                zones_list = []
+            for zone in zones_list:
                 status, health = get_status_health(zone.get("status", "idle"))
                 equipment_list.append(
                     {

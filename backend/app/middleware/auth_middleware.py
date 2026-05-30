@@ -765,8 +765,12 @@ def _authenticate_request_sync(request: Request) -> AuthContext | None:
     """Sync helper that extracts auth context from request state.
 
     Checks both the middleware-injected state (from agent_security) and
-    the auth module's state for flexibility.
+    the auth module's state for flexibility. Falls back to direct token
+    extraction for public paths where middleware skips auth.
     """
+    source_ip = _extract_ip_address(request)
+
+    # 1) Check middleware-injected auth state
     state = getattr(request, "state", None)
     if state:
         auth = getattr(state, "auth", None)
@@ -775,7 +779,33 @@ def _authenticate_request_sync(request: Request) -> AuthContext | None:
         auth_ctx = getattr(state, "auth_ctx", None)
         if auth_ctx:
             return auth_ctx
-    return None
+
+    # 2) Fallback: directly extract and validate Bearer token
+    # This handles public-path endpoints that use optional_auth
+    # but where the middleware skipped auth injection
+    from app.config.settings import settings
+
+    token = _extract_bearer_token(request)
+    if not token:
+        return None
+
+    payload = validate_jwt_token(token, required_token_type="access")
+    if not payload:
+        return None
+
+    role = _extract_role_from_token(payload)
+    auth_ctx = AuthContext(
+        user_id=payload.get("sub", "unknown"),
+        role=role,
+        auth_method="bearer_token",
+        source_ip=source_ip,
+        email=payload.get("email"),
+        scopes=payload.get("scopes", []),
+        metadata={"token_iss": payload.get("iss", "")},
+    )
+    if state is not None:
+        state.auth = auth_ctx
+    return auth_ctx
 
 
 # =============================================================================

@@ -1,84 +1,116 @@
 """
-Cockpit Decision API (Phase 207 — v2).
+Cockpit Decision API — Issue-based contract (Phase 209 V2).
 
-GET /api/cockpit/decision/{site_id}
-  Real intelligence integration — replaces v1 stubs.
-  Sources active recommendations, equipment health, and site profile.
-  Phase-gated: calm building, advisory read-only, supervised approve decision.
+GET  /api/cockpit/decision/{site_id}
+     Sources live issues via CockpitIssueFusionService; returns CockpitDecisionPayload.
+     Merges any in-session status mutations from _ISSUE_STORE before responding.
 
 POST /api/cockpit/decision/approve/{site_id}
-  Wired through ApprovalService — real execution, not stub.
+     Supervised-mode approval (Phase 207 path, unchanged).
+
+POST /api/cockpit/issues/{site_id}/{issue_id}/action
+     Issue lifecycle mutations: acknowledge, assign, create_work_order, escalate.
 """
 
 from __future__ import annotations
 
 import logging
+import uuid
 from datetime import UTC, datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from app.services.cockpit_policy_resolution import resolve_cockpit_contract
-from app.services.site_operating_mode_service import resolve_site_operating_mode
+from app.schemas.cockpit import (
+    AuditOutcome,
+    CockpitActionAudit,
+    CockpitActionType,
+    CockpitIssue,
+    CockpitIssueEvidenceRef,
+    CockpitIssueLocation,
+    CockpitSourceStatus,
+    IssueStatus,
+)
+from app.services.cockpit_issue_fusion import CockpitIssueFusionService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cockpit", tags=["cockpit"])
 
+# ---------------------------------------------------------------------------
+# Module-level stores (in-memory, cleared between test runs via fixture)
+# ---------------------------------------------------------------------------
+
+_ISSUE_STORE: dict[str, list[CockpitIssue]] = {}
+_AUDIT_LOG_STORE: dict[str, list[CockpitActionAudit]] = {}
+_ISSUE_SITE_LOOKUP: dict[str, str] = {}  # issue_id → site_id
+
+# Module-level service instance (monkeypatched in tests)
+cockpit_issue_service = CockpitIssueFusionService()
 
 # ---------------------------------------------------------------------------
-# CockpitDecisionPayload — Final contract (locked between v1 and v2)
+# Re-export schema types used in tests (imported from app.api.cockpit)
 # ---------------------------------------------------------------------------
+
+__all__ = [
+    "CockpitActionRequest",
+    "CockpitIssue",
+    "CockpitIssueEvidenceRef",
+    "CockpitIssueLocation",
+    "CockpitSourceStatus",
+    "CockpitDecisionPayload",
+    "cockpit_issue_service",
+    "_ISSUE_STORE",
+    "_AUDIT_LOG_STORE",
+    "_ISSUE_SITE_LOOKUP",
+    "_cache_site_issues",
+    "_apply_action",
+    "_record_audit",
+    "_available_actions",
+    "_build_cockpit_payload",
+    "_fetch_site_phase",
+    "_fetch_control_enabled",
+]
+
+
+# ---------------------------------------------------------------------------
+# Request / payload models
+# ---------------------------------------------------------------------------
+
+
+class CockpitActionRequest(BaseModel):
+    action: CockpitActionType
+    actor_id: str
+    actor_label: str
+    assign_to: str | None = None
+    assign_team: str | None = None
+    work_order_title: str | None = None
+    notes: str | None = None
+    evidence_refs: list[str] = []
 
 
 class CockpitRiskResolution(BaseModel):
     """Backend-resolved risk semantics for cockpit rendering."""
 
     score: float
-    """0-1 resolved risk score."""
-
     band: Literal["low", "medium", "high", "critical"]
-    """Resolved risk band from threshold policy."""
-
     reason: str
-    """Explainable reason for the current risk interpretation."""
-
     policy_source: str
-    """Threshold policy source used for this interpretation."""
-
     policy_level: Literal["site_asset_criticality", "site_asset", "site", "posture", "system"]
-    """Resolution layer that produced the active policy."""
-
     constraint_type: Literal["comfort", "asset", "cost", "compliance"]
-    """Primary operational constraint driving risk interpretation."""
-
     time_to_constraint_breach_min: int | None = None
-    """Minutes until the active constraint is expected to breach."""
-
     affected_scope: dict[str, Any]
-    """Resolved impact scope for zones, assets, and estimated occupants."""
 
 
 class CockpitHealthResolution(BaseModel):
     """Backend-resolved health semantics for cockpit rendering."""
 
     score: float
-    """0-1 health score."""
-
     state: Literal["healthy", "stable", "watch", "degraded", "critical"]
-    """Simple health state for the current contract slice."""
-
     trend: Literal["improving", "flat", "declining", "volatile"]
-    """Simple health trend for the current contract slice."""
-
     reason: str
-    """Explainable reason for the current health interpretation."""
-
     asset_class: str
-    """Resolved asset class for the health interpretation."""
-
     criticality: Literal["low", "medium", "high", "mission_critical"]
-    """Resolved asset criticality used for health interpretation."""
 
 
 class CockpitDecisionPayload(BaseModel):
@@ -87,249 +119,168 @@ class CockpitDecisionPayload(BaseModel):
 
     All fields support null (for calm buildings, missing context, etc).
     Frontend mapCockpitState will use these nulls to trigger fallback states.
-
-    This shape does NOT change between v1 (stub) and v2 (real intelligence).
     """
 
     building_id: str
-    """Site ID (e.g., S002)."""
+    issues: list[CockpitIssue] = []
+    selected_issue_id: str | None = None
+    source_health: list[CockpitSourceStatus] = []
 
     alert_text: str | None = None
-    """Plain-language alert summary (null = no active alert)."""
-
     reasoning_summary: str | None = None
-    """Why SENTINEL made this decision (diagnostic context for operator)."""
-
     active_posture: str | None = None
-    """Deployment posture: 'advisory', 'supervised', 'autonomous', 'ghost'."""
-
     time_to_discomfort: int | None = None
-    """Minutes until comfort threshold breached (null = not computed)."""
-
     time_confidence: str | int | None = None
-    """Confidence label: 'stable', 'declining', 'critical' or score 0-1."""
-
     estimated_impact: Any | None = None
-    """Projected impact of inaction (cost, energy, comfort, compliance)."""
-
     recommended_action: str | None = None
-    """Operator-facing action prompt (null = monitor only)."""
-
     urgency_score: float | None = None
-    """0-1 urgency score interpreted by frontend threshold policy."""
-
     urgency_components: dict[str, float] | None = None
-    """Decomposed urgency: {'comfort': 0.1, 'asset_risk': 0.2, 'cost': 0.3}, etc."""
-
     affected_zone_ids: list[str] | None = None
-    """Zone IDs with active conditions (null = site-wide, [] = no zones)."""
-
     primary_asset_id: str | None = None
-    """Equipment ID if decision is equipment-centric (null = site-level)."""
-
     building_metadata: dict[str, Any] | None = None
-    """Site config: {'deployment_mode': 'advisory', ...}."""
-
     risk: CockpitRiskResolution | None = None
-    """Backend-resolved cockpit risk interpretation."""
-
     health: CockpitHealthResolution | None = None
-    """Backend-resolved cockpit health summary."""
-
-
-def _attach_resolved_contract(payload: CockpitDecisionPayload) -> CockpitDecisionPayload:
-    """
-    Attach backend-resolved risk and health semantics to the cockpit payload.
-
-    This keeps stub sourcing in place while moving richer policy and health meaning
-    into the backend contract.
-    """
-
-    resolved = resolve_cockpit_contract(
-        site_id=payload.building_id,
-        primary_asset_id=payload.primary_asset_id,
-        affected_zone_ids=payload.affected_zone_ids,
-        active_posture=payload.active_posture,
-        urgency_score=payload.urgency_score or 0.0,
-        time_to_constraint_breach_min=payload.time_to_discomfort,
-        time_confidence=payload.time_confidence,
-        reasoning_summary=payload.reasoning_summary,
-        urgency_components=payload.urgency_components,
-    )
-
-    payload.risk = CockpitRiskResolution(
-        score=resolved.risk.score,
-        band=resolved.risk.band,
-        reason=resolved.risk.reason,
-        policy_source=resolved.risk.policy_source,
-        policy_level=resolved.risk.policy_level,
-        constraint_type=resolved.risk.constraint_type,
-        time_to_constraint_breach_min=resolved.risk.time_to_constraint_breach_min,
-        affected_scope={
-            "zones": resolved.risk.affected_scope.zones,
-            "assets": resolved.risk.affected_scope.assets,
-            "occupants_estimate": resolved.risk.affected_scope.occupants_estimate,
-        },
-    )
-    payload.health = CockpitHealthResolution(
-        score=resolved.health.score,
-        state=resolved.health.state,
-        trend=resolved.health.trend,
-        reason=resolved.health.reason,
-        asset_class=resolved.health.asset_class,
-        criticality=resolved.health.criticality,
-    )
-    return payload
 
 
 # ---------------------------------------------------------------------------
-# v2: Real data sourcing
+# In-memory helpers
 # ---------------------------------------------------------------------------
 
 
-async def _fetch_site_phase(site_id: str) -> str:
-    """Fetch onboarding phase from Supabase."""
-    try:
-        from app.database.supabase_client import get_supabase_client
-        client = get_supabase_client()
-        row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
-        if row.data:
-            return row.data[0].get("onboarding_phase") or "commissioning"
-    except Exception as exc:
-        logger.debug("Could not fetch onboarding_phase for %s: %s", site_id, exc)
-    return "commissioning"
+def _cache_site_issues(site_id: str, issues: list[CockpitIssue]) -> None:
+    """Cache a list of issues for a site and populate the reverse lookup."""
+    _ISSUE_STORE[site_id] = issues
+    for issue in issues:
+        _ISSUE_SITE_LOOKUP[issue.id] = site_id
 
 
-async def _fetch_active_recommendation(site_id: str) -> dict | None:
-    """Fetch the highest-priority pending recommendation for a site."""
-    try:
-        from app.database.repositories.recommendation_repository import RecommendationRepository
-        repo = RecommendationRepository()
-        recs = await repo.get_by_status(site_id, status="pending", limit=1)
-        if recs:
-            return recs[0].to_dict()
-    except Exception as exc:
-        logger.debug("Could not fetch recommendations for %s: %s", site_id, exc)
-    return None
+# ---------------------------------------------------------------------------
+# Action helpers
+# ---------------------------------------------------------------------------
 
 
-async def _fetch_recent_health_snapshots(site_id: str, limit: int = 5) -> list[dict]:
-    """Fetch recent health snapshots for urgency computation."""
-    try:
-        from app.database.supabase_client import get_supabase_client
-        client = get_supabase_client()
-        rows = client.table("asset_health_snapshots").select("*").eq("site_id", site_id).order("created_at", desc=True).limit(limit).execute()
-        return rows.data or []
-    except Exception as exc:
-        logger.debug("Could not fetch health snapshots for %s: %s", site_id, exc)
+def _available_actions(
+    status: IssueStatus, posture: str = "supervised"
+) -> list[CockpitActionType]:
+    """Return valid next actions for an issue in the given status and posture."""
+    if posture == "advisory":
+        # Read-only: only acknowledge allowed for new issues
+        return ["acknowledge"] if status == "new" else []
+    if status == "new":
+        return ["acknowledge", "assign"]
+    if status == "triaged":
+        return ["assign", "create_work_order", "escalate"]
+    if status == "in_progress":
+        return ["create_work_order", "escalate"]
     return []
 
 
-def _compute_urgency(recommendation: dict | None, health_snapshots: list[dict], profile: str) -> dict:
-    """Compute urgency score from recommendation risk, health data, and profile."""
-    urgency_score = 0.0
-    components: dict[str, float] = {"comfort": 0.0, "asset_risk": 0.0, "cost": 0.0}
+def _apply_action(
+    issue: CockpitIssue,
+    request: CockpitActionRequest,
+) -> tuple[Literal["accepted", "rejected"], IssueStatus, str]:
+    """Apply an action to an issue in-place. Returns (result, status_after, message)."""
+    action = request.action
 
-    if not recommendation:
-        return {"score": urgency_score, "components": components}
+    if action == "acknowledge":
+        if issue.status != "new":
+            return "rejected", issue.status, "acknowledge requires new status"
+        issue.status = "triaged"
+        return "accepted", issue.status, "Issue acknowledged"
 
-    # Risk level contributes base urgency
-    risk_map = {"low": 0.2, "medium": 0.5, "high": 0.75, "critical": 0.95}
-    base = risk_map.get(recommendation.get("risk_level", "medium"), 0.5)
-    urgency_score = base
+    if action == "assign":
+        if not request.assign_to and not request.assign_team:
+            return "rejected", issue.status, "assign_to or assign_team required"
+        if issue.status not in ("new", "triaged"):
+            return "rejected", issue.status, "assign requires new or triaged status"
+        issue.owner = request.assign_to
+        issue.owner_team = request.assign_team
+        if issue.status == "new":
+            issue.status = "triaged"
+        return "accepted", issue.status, "Issue assigned"
 
-    # Profile weights shift urgency components
-    if profile == "comfort":
-        components["comfort"] = base * 0.5
-        components["asset_risk"] = base * 0.25
-        components["cost"] = base * 0.25
-    elif profile == "cost_saving":
-        components["comfort"] = base * 0.15
-        components["asset_risk"] = base * 0.25
-        components["cost"] = base * 0.6
-    elif profile == "asset_preservation":
-        components["comfort"] = base * 0.1
-        components["asset_risk"] = base * 0.6
-        components["cost"] = base * 0.3
-    else:  # balanced
-        components = {"comfort": base * 0.33, "asset_risk": base * 0.33, "cost": base * 0.34}
+    if action == "create_work_order":
+        if issue.status not in ("triaged", "in_progress"):
+            return "rejected", issue.status, "create_work_order requires triaged or in_progress status"
+        issue.status = "in_progress"
+        return "accepted", issue.status, "Work order created"
 
-    # Health data boosts asset_risk if equipment health is declining
-    if health_snapshots:
-        low_health_count = sum(1 for h in health_snapshots if (h.get("health_score") or 100) < 60)
-        if low_health_count > 0:
-            boost = min(low_health_count * 0.05, 0.2)
-            components["asset_risk"] = min(components["asset_risk"] + boost, 1.0)
-            urgency_score = min(urgency_score + boost * 0.5, 1.0)
+    if action == "escalate":
+        return "accepted", issue.status, "Issue escalated"
 
-    return {"score": round(urgency_score, 2), "components": {k: round(v, 2) for k, v in components.items()}}
+    return "rejected", issue.status, f"Unknown action: {action}"
 
 
-async def _build_v2_payload_for_site(site_id: str) -> CockpitDecisionPayload | None:
-    """
-    v2: Build cockpit payload from real data sources.
+def _record_audit(
+    issue: CockpitIssue,
+    request: CockpitActionRequest,
+    result: str,
+    status_before: IssueStatus,
+    status_after: IssueStatus,
+    message: str | None = None,
+    *,
+    site_id: str | None = None,
+) -> CockpitActionAudit:
+    """Record an action audit entry and persist to _AUDIT_LOG_STORE."""
+    outcome_map: dict[str, AuditOutcome] = {
+        "accepted": "success",
+        "rejected": "rejected",
+        "failed": "failed",
+    }
+    outcome: AuditOutcome = outcome_map.get(result, "failed")  # type: ignore[assignment]
 
-    Phase-gating:
-      - commissioning/shadow_live → null (calm building)
-      - advisory → read-only recommendation
-      - supervised → approve-able recommendation
-    """
+    audit = CockpitActionAudit(
+        id=str(uuid.uuid4()),
+        issue_id=issue.id,
+        action=request.action,
+        actor_type="user",
+        actor_id=request.actor_id,
+        actor_label=request.actor_label,
+        occurred_at=datetime.now(UTC),
+        outcome=outcome,
+        status_before=status_before,
+        status_after=status_after,
+        notes=message or request.notes,
+        evidence_refs=request.evidence_refs,
+    )
+
+    resolved_site = site_id or _ISSUE_SITE_LOOKUP.get(issue.id, "unknown")
+    _AUDIT_LOG_STORE.setdefault(resolved_site, []).append(audit)
+    return audit
+
+
+# ---------------------------------------------------------------------------
+# Payload builder
+# ---------------------------------------------------------------------------
+
+
+async def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
+    """Build a CockpitDecisionPayload for a site, merging cached issue state."""
     phase = await _fetch_site_phase(site_id)
 
-    # Phase gate: calm building for early phases
+    # Commissioning / shadow_live: no cockpit payload
     if phase in ("commissioning", "shadow_live"):
         return None
 
-    # Fetch real recommendation + health context
-    recommendation = await _fetch_active_recommendation(site_id)
-    health_snapshots = await _fetch_recent_health_snapshots(site_id)
-    profile = resolve_site_operating_mode(site_id)
-
-    if not recommendation:
+    issues, source_statuses, _tensions, selected_id = cockpit_issue_service.aggregate(site_id)
+    if not issues:
         return None
 
-    # Build urgency from recommendation + health + profile
-    urgency = _compute_urgency(recommendation, health_snapshots, profile)
+    # Merge in-session status mutations from _ISSUE_STORE (e.g., after actions)
+    cached = {i.id: i for i in _ISSUE_STORE.get(site_id, [])}
+    merged = [cached.get(issue.id, issue) for issue in issues]
 
-    # Map deployment posture from phase
-    posture_map = {
-        "advisory": "advisory",
-        "supervised": "supervised",
-        "automatic": "autonomous",
-    }
-    deployment_mode = posture_map.get(phase, "advisory")
+    # Derive posture from phase
+    posture_map = {"advisory": "advisory", "supervised": "supervised", "automatic": "autonomous"}
+    posture = posture_map.get(phase, "advisory")
 
-    # Determine confidence label
-    confidence = recommendation.get("confidence", "medium")
-    confidence_map = {"high": "stable", "medium": "stable", "low": "declining"}
-    time_confidence = confidence_map.get(confidence, "stable")
-
-    # Extract impacted zones + equipment
-    target = recommendation.get("target_equipment", "")
-    meta = recommendation.get("metadata", {})
-    affected_zone_ids = meta.get("affected_zones", []) if isinstance(meta, dict) else []
-
-    payload = CockpitDecisionPayload(
+    return CockpitDecisionPayload(
         building_id=site_id,
-        alert_text=recommendation.get("reason", ""),
-        reasoning_summary=recommendation.get("reason", ""),
-        active_posture=deployment_mode,
-        time_to_discomfort=None,
-        time_confidence=time_confidence,
-        estimated_impact=recommendation.get("expected_impact"),
-        recommended_action=f"Apply recommendation: {recommendation.get('action_type', '')} on {target}",
-        urgency_score=urgency["score"],
-        urgency_components=urgency["components"],
-        affected_zone_ids=affected_zone_ids or None,
-        primary_asset_id=target or None,
-        building_metadata={
-            "deployment_mode": deployment_mode,
-            "profile": profile,
-            "recommendation_id": recommendation.get("id", ""),
-        },
+        active_posture=posture,
+        issues=merged,
+        selected_issue_id=selected_id,
+        source_health=source_statuses,
     )
-
-    return _attach_resolved_contract(payload)
 
 
 # ---------------------------------------------------------------------------
@@ -340,18 +291,11 @@ async def _build_v2_payload_for_site(site_id: str) -> CockpitDecisionPayload | N
 @router.get("/decision/{site_id}")
 async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
     """
-    Get cockpit decision payload for a site (v2).
+    Get cockpit decision payload for a site (V2 issue-based).
 
-    Sources real recommendations, phase-gates output, and computes
-    urgency from health data + profile settings.
-
-    Phase gating:
-      - commissioning/shadow_live → null payload (calm building)
-      - advisory → decision payload with read-only recommendations
-      - supervised → decision payload with approve-able action
-      - automatic → decision payload showing auto-applied state
+    Returns null payload when no active issues exist or phase is pre-advisory.
     """
-    payload = await _build_v2_payload_for_site(site_id)
+    payload = await _build_cockpit_payload(site_id)
     return {
         "payload": payload,
         "site_id": site_id,
@@ -359,10 +303,60 @@ async def get_cockpit_decision(site_id: str) -> dict[str, Any]:
     }
 
 
+@router.post("/issues/{site_id}/{issue_id}/action")
+async def cockpit_issue_action(
+    site_id: str,
+    issue_id: str,
+    request: CockpitActionRequest,
+) -> dict[str, Any]:
+    """
+    Apply a lifecycle action to a cockpit issue.
+
+    Actions: acknowledge, assign, create_work_order, escalate.
+    Issue must be present in the in-session _ISSUE_STORE for the site.
+    """
+    phase = await _fetch_site_phase(site_id)
+    posture_map = {"advisory": "advisory", "supervised": "supervised", "automatic": "autonomous"}
+    posture = posture_map.get(phase, "advisory")
+
+    issues = _ISSUE_STORE.get(site_id, [])
+    issue = next((i for i in issues if i.id == issue_id), None)
+    if not issue:
+        raise HTTPException(status_code=404, detail=f"Issue {issue_id} not found")
+
+    # Advisory gate: only acknowledge allowed
+    if posture == "advisory" and request.action not in ("acknowledge",):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Action '{request.action}' not available in advisory posture",
+        )
+
+    # Control-enabled gate: create_work_order and escalate require control_enabled
+    control_enabled = await _fetch_control_enabled(site_id)
+    if not control_enabled and request.action in ("create_work_order", "escalate"):
+        raise HTTPException(
+            status_code=403,
+            detail=f"Control not enabled for site {site_id}. Enable via site settings.",
+        )
+
+    status_before = issue.status
+    result, status_after, message = _apply_action(issue, request)
+    audit = _record_audit(issue, request, result, status_before, status_after, message, site_id=site_id)
+
+    return {
+        "result": result,
+        "status_before": status_before,
+        "status_after": status_after,
+        "message": message,
+        "audit_id": audit.id,
+        "available_actions": _available_actions(status_after, posture),
+    }
+
+
 @router.post("/decision/approve/{site_id}", status_code=202)
 async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
     """
-    Operator approval for supervised-mode cockpit action (v2).
+    Operator approval for supervised-mode cockpit action (Phase 207 path, unchanged).
 
     Validates phase ≥ supervised, fetches active recommendation, routes
     through ApprovalService, persists parasite_decision, returns execution_id.
@@ -371,7 +365,6 @@ async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
     """
     accepted_at = datetime.now(UTC).isoformat()
 
-    # Phase gate: require supervised+
     phase = await _fetch_site_phase(site_id)
     if phase not in ("supervised", "automatic"):
         logger.warning("Cockpit approve rejected: phase %s < supervised for %s", phase, site_id)
@@ -380,7 +373,6 @@ async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
             detail=f"Cannot approve: site is in '{phase}' phase. Supervised or automatic required.",
         )
 
-    # Fetch active recommendation
     recommendation = await _fetch_active_recommendation(site_id)
     if not recommendation:
         logger.warning("Cockpit approve rejected: no pending recommendation for %s", site_id)
@@ -414,3 +406,50 @@ async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
         "execution_status": result.status if hasattr(result, "status") else "executed",
         "correlation_id": recommendation.get("correlation_id", ""),
     }
+
+
+# ---------------------------------------------------------------------------
+# Data fetch helpers (used by approve endpoint)
+# ---------------------------------------------------------------------------
+
+
+async def _fetch_site_phase(site_id: str) -> str:
+    """Fetch onboarding phase from Supabase."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+        if row.data:
+            return row.data[0].get("onboarding_phase") or "commissioning"
+    except Exception as exc:
+        logger.debug("Could not fetch onboarding_phase for %s: %s", site_id, exc)
+    return "commissioning"
+
+
+async def _fetch_control_enabled(site_id: str) -> bool:
+    """Fetch control_enabled flag from Supabase for the given site."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        row = client.table("sites").select("control_enabled").eq("code", site_id).limit(1).execute()
+        if row.data:
+            return bool(row.data[0].get("control_enabled", False))
+    except Exception as exc:
+        logger.debug("Could not fetch control_enabled for %s: %s", site_id, exc)
+    return False
+
+
+async def _fetch_active_recommendation(site_id: str) -> dict | None:
+    """Fetch the highest-priority pending recommendation for a site."""
+    try:
+        from app.database.repositories.recommendation_repository import RecommendationRepository
+
+        repo = RecommendationRepository()
+        recs = await repo.get_by_status(site_id, status="pending", limit=1)
+        if recs:
+            return recs[0].to_dict()
+    except Exception as exc:
+        logger.debug("Could not fetch recommendations for %s: %s", site_id, exc)
+    return None

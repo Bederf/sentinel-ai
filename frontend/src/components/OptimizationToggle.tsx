@@ -70,7 +70,7 @@ export function OptimizationToggle({
         className="text-xs whitespace-nowrap"
         style={{ color: "var(--color-sentinel-text-secondary)" }}
       >
-        {currentEnabled ? "Auto" : "Supervised"}
+        {currentEnabled ? "Optimization On" : "Optimization Off"}
       </span>
 
       <button
@@ -89,8 +89,8 @@ export function OptimizationToggle({
             : disabled
             ? "Cannot modify optimization settings"
             : currentEnabled
-            ? "Switch to supervised mode (requires human approval)"
-            : "Switch to automatic mode (AI auto-applies changes)"
+            ? "Turn optimization off"
+            : "Turn optimization on"
         }
         role="switch"
         aria-checked={currentEnabled}

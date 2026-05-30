@@ -21,9 +21,13 @@ import logging
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client
+from app.services.bridge_disconnect_notifier import check_and_alert, record_poll_result
 from app.services.shadow_mode_polling import ShadowModePollingService
 
 logger = logging.getLogger("sentinel.multi_site_polling")
+
+# site_id → human-readable name (populated from sites table on first fetch)
+_site_names: dict[str, str] = {}
 
 
 class MultiSitePollingCoordinator:
@@ -62,6 +66,10 @@ class MultiSitePollingCoordinator:
                     result = loop.run_until_complete(svc.poll())
                     results[site_id] = result
                     errors = result.get("errors", [])
+                    all_failed = bool(errors) and result.get("equipment_states", 0) == 0
+                    site_name = _site_names.get(site_id)
+                    record_poll_result(site_id, has_errors=all_failed, site_name=site_name)
+                    check_and_alert(site_id, site_name=site_name)
                     if errors:
                         logger.warning("[COORDINATOR] %s poll errors: %s", site_id, errors)
                     else:
@@ -76,6 +84,8 @@ class MultiSitePollingCoordinator:
             except Exception as exc:
                 logger.error("[COORDINATOR] %s poll failed: %s", site_id, exc, exc_info=True)
                 results[site_id] = {"errors": [str(exc)]}
+                record_poll_result(site_id, has_errors=True, site_name=_site_names.get(site_id))
+                check_and_alert(site_id, site_name=_site_names.get(site_id))
 
         return results
 
@@ -121,12 +131,26 @@ class MultiSitePollingCoordinator:
                 .eq("enabled", True)
                 .execute()
             )
-            return {
+            configs = {
                 row["site_id"]: row["connection_config"]
                 for row in (rows.data or [])
                 if row.get("connection_config", {}).get("base_url")
                 and row.get("connection_config", {}).get("token")
             }
+            # Cache human-readable site names for alert messages
+            if configs:
+                try:
+                    site_rows = (
+                        client.table("sites")
+                        .select("code, name")
+                        .in_("code", list(configs.keys()))
+                        .execute()
+                    )
+                    for s in (site_rows.data or []):
+                        _site_names[s["code"]] = s.get("name") or s["code"]
+                except Exception:
+                    pass
+            return configs
         except Exception as exc:
             logger.error("[COORDINATOR] Failed to fetch bridge configs: %s", exc)
             return {}

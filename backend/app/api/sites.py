@@ -1644,9 +1644,11 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
         except Exception as opt_err:
             logger.warning(f"Failed to sync optimization settings for {site_id}: {opt_err}")
 
+    except HTTPException as e:  # Propagate intended HTTP errors (400/422)
+        raise e
     except Exception as e:
         logger.error(f"Phase update failed for {site_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        raise HTTPException(status_code=500, detail="Internal error during phase update") from e
 
     # JSON fallback — best-effort persistence for offline/HTTP-only scenarios
     # NOTE: This is rarely reached now since Supabase failures raise 500.

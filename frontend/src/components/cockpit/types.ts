@@ -208,3 +208,53 @@ export interface ModelReadiness {
   lastTrainingAt: string | null
   message: string
 }
+
+// ─── Phase 209 — Issue-based cockpit types ────────────────────────────────────
+
+export type CockpitIssueSeverity = 'critical' | 'high' | 'medium' | 'low'
+export type CockpitIssueSource = 'bms' | 'intake' | 'tech'
+export type CockpitIssueStatus = 'new' | 'triaged' | 'in_progress' | 'resolved'
+export type CockpitIssueActionType = 'acknowledge' | 'assign' | 'create_work_order' | 'escalate'
+export type CockpitSourceHealthState = 'healthy' | 'stale' | 'degraded' | 'unavailable'
+
+export interface CockpitIssueLocation {
+  zone_ids: string[]
+  asset_ids: string[]
+  floor_id: string | null
+}
+
+export interface CockpitIssueItem {
+  id: string
+  title: string
+  summary: string
+  severity: CockpitIssueSeverity
+  source: CockpitIssueSource
+  status: CockpitIssueStatus
+  owner: string | null
+  owner_team: string | null
+  opened_at: string
+  updated_at: string
+  sla_due_at: string | null
+  stale: boolean
+  impact_summary: string | null
+  recommended_action: string | null
+  confidence: number | null
+  confidence_label: string | null
+  subsystem: string | null
+  location: CockpitIssueLocation
+}
+
+export interface CockpitIssueSourceHealth {
+  source: CockpitIssueSource
+  label: string
+  state: CockpitSourceHealthState
+  badge_tone: 'normal' | 'warning' | 'critical'
+  message: string
+}
+
+export interface CockpitIssuesPayload {
+  issues: CockpitIssueItem[]
+  selectedIssueId: string | null
+  sourceHealth: CockpitIssueSourceHealth[]
+  posture: string | null
+}

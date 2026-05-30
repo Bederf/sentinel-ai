@@ -271,7 +271,7 @@ async def get_optimization_status(
     site_id: str,
     auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ) -> dict[str, Any]:
-    """Return optimization status for a site. Used by the frontend OptimizationInfoCard."""
+    """Return optimization status for a site (derived, production behavior)."""
     try:
         from app.database.supabase_client import get_supabase_client as _get_supabase
 
@@ -280,19 +280,63 @@ async def get_optimization_status(
         if not row.data:
             raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
         site = row.data[0]
+
+        onboarding_phase = site.get("onboarding_phase", "commissioning")
+        raw_settings = site.get("optimization_settings") or {}
+        optimization_enabled = site.get("optimization_enabled") or False
+        history = site.get("optimization_history") or []
+
+        # Monthly savings summary
+        savings_summary = calculate_monthly_savings(history)
+
+        # Normalize settings
+        control_tier_value = raw_settings.get("control_tier") or raw_settings.get("mode", "advisory")
+        normalized_settings = {
+            "mode": control_tier_value,
+            "control_tier": control_tier_value,
+            "last_analysis": raw_settings.get("last_analysis"),
+            "analysis_interval_minutes": raw_settings.get("analysis_interval_minutes", 15),
+        }
+
+        # Derive status
+        last_recommendation = site.get("last_recommendation")
+        last_optimization = site.get("last_optimization")
+        if not optimization_enabled:
+            derived_status = "disabled"
+        elif last_recommendation and last_recommendation.get("status") == "pending":
+            derived_status = "recommendation_pending"
+        elif last_optimization:
+            derived_status = "optimized"
+        elif site.get("error_message"):
+            derived_status = "error"
+        elif onboarding_phase in ("commissioning", "shadow_live"):
+            derived_status = "learning"
+        else:
+            derived_status = "active"
+
+        routing_summary = last_recommendation.get("routing_summary") if last_recommendation else None
+        control_tier = last_recommendation.get("control_tier") if last_recommendation else None
+
         return {
-            "optimization_status": site.get("optimization_status") or "unknown",
-            "optimization_enabled": site.get("optimization_enabled", False),
-            "optimization_settings": site.get("optimization_settings") or {},
-            "onboarding_phase": site.get("onboarding_phase") or "commissioning",
-            "last_optimization": None,
-            "last_recommendation": None,
-            "monthly_savings": None,
-            "active_profile": (site.get("optimization_settings") or {}).get("active_profile") or "balanced",
+            "site_id": site.get("code"),
+            "site_name": site.get("name"),
+            "onboarding_phase": onboarding_phase,
+            "optimization_enabled": optimization_enabled,
+            "optimization_status": derived_status,
+            "active_profile": raw_settings.get("active_profile", "balanced"),
+            "optimization_settings": normalized_settings,
+            "last_recommendation": last_recommendation,
+            "last_optimization": last_optimization,
+            "optimization_history": history,
+            "error_message": site.get("error_message"),
+            "monthly_savings": savings_summary,
+            "routing_summary": routing_summary,
+            "control_tier": control_tier,
         }
     except HTTPException:
         raise
     except Exception as e:
+        logger.error(f"Error getting optimization status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

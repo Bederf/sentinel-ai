@@ -16,6 +16,7 @@ from app.api import (
     niagara,
     niagara_bacnet,
     niagara_discovery,
+    residential_onboarding,
     simbiot,
     solar,
     water,
@@ -45,6 +46,9 @@ def register_integrations_routers(app: FastAPI) -> None:
 
     # SIMBIOT site & adapter configuration (Phase 206)
     app.include_router(simbiot.router, tags=["simbiot"])
+
+    # Residential / solar energy onboarding (Phase 210)
+    app.include_router(residential_onboarding.router)
 
     # BMS/CAFM integrations
     app.include_router(integration.router)

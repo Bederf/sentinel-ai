@@ -20,7 +20,7 @@ import {
   Shield,
   Sliders,
 } from "lucide-react";
-import { OptimizationToggle } from "./OptimizationToggle";
+import { OptimizationToggleGated } from "./OptimizationToggleGated";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
 import { formatRelativeTime } from "../lib/timeFormat";
 import api, { type ROISummaryResponse } from '@/lib/api';
@@ -283,9 +283,19 @@ export function OptimizationInfoCard({
               <Lightbulb className="h-4 w-4" style={{ color: "var(--color-sentinel-amber)" }} />
             </button>
           )}
-          {isAutoMode && (
-            <OptimizationToggle siteId={siteId} enabled={optimizationEnabled} />
-          )}
+          {/* Always show enable/disable toggle in hero */}
+          <OptimizationToggleGated
+            siteId={siteId}
+            enabled={optimizationEnabled}
+            gated={false}
+            onToggle={async () => {
+              try {
+                const status = await api.getOptimizationStatus(siteId);
+                setOptimizationStatus(status.optimization_status);
+                if (status.optimization_settings?.mode) setMode(status.optimization_settings.mode);
+              } catch (_) {}
+            }}
+          />
         </div>
       </div>
 

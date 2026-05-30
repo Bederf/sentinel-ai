@@ -191,6 +191,8 @@ class Settings(BaseSettings):
     simbiot_api_url: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_URL", "BRIDGE_BASE_URL"))
     simbiot_username: str = ""
     simbiot_password: str = ""
+    solarman_app_id: str = Field(default="", validation_alias="SOLARMAN_APP_ID")
+    solarman_app_secret: str = Field(default="", validation_alias="SOLARMAN_APP_SECRET")
 
     # Notification service settings (email, Slack)
     notification_smtp_host: str = Field(
@@ -470,6 +472,12 @@ class Settings(BaseSettings):
         default="", validation_alias=AliasChoices("SENTRY_FM_CHAT_ID", "TELEGRAM_ALERT_CHAT_ID")
     )
     telegram_secret_token: str = Field(default="", validation_alias="TELEGRAM_SECRET_TOKEN")
+
+    # Residential Cloud-to-MQTT Bridge (Phase 210)
+    residential_mqtt_broker: str = Field(default="127.0.0.1", validation_alias="RESIDENTIAL_MQTT_BROKER")
+    residential_mqtt_port: int = Field(default=1883, validation_alias="RESIDENTIAL_MQTT_PORT")
+    residential_mqtt_username: str = Field(default="", validation_alias="RESIDENTIAL_MQTT_USERNAME")
+    residential_mqtt_password: str = Field(default="", validation_alias="RESIDENTIAL_MQTT_PASSWORD")
 
     # Fuel Tank MQTT Ingestion (Phase 148)
     fuel_mqtt_enabled: bool = False

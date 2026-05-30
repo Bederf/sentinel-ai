@@ -68,7 +68,7 @@ _PUBLIC_PREFIXES = (
     "/api/webhooks/google/calendar",  # Google Calendar Pub/Sub push notifications (public — validated by channel ID)
     "/api/webhooks/graph/events",  # Microsoft Graph webhook notifications (public — validated by clientState)
     "/api/debug/",  # Debug endpoints for non-production inspection (guarded by environment=production check)
-    "/api/buildings",  # Building/site data — used by SIMBIOT wizard and frontend during onboarding
+    # "/api/buildings",  # REMOVED: Building listing now requires auth to enforce per-user gating
     "/api/work-orders",  # Work order creation from optimization page (user-initiated, no JWT)
     "/api/chat",  # Chat endpoint — uses internal rate limiting and prompt guards
     "/api/modules/",  # Module site recommendations and config

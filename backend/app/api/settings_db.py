@@ -18,6 +18,7 @@ class HealthThresholdsUpdate(BaseModel):
     healthy: int
     warning: int
     critical: int
+    site_id: str | None = None
 
 
 class RiskThresholdsUpdate(BaseModel):
@@ -26,6 +27,7 @@ class RiskThresholdsUpdate(BaseModel):
     medium: int
     high: int
     critical: int
+    site_id: str | None = None
 
 
 class SettingUpdate(BaseModel):
@@ -34,6 +36,7 @@ class SettingUpdate(BaseModel):
     value: dict[str, Any]
     category: str | None = None
     description: str | None = None
+    site_id: str | None = None
 
 
 @router.get("/settings")
@@ -89,15 +92,31 @@ async def get_public_settings() -> dict[str, Any]:
 
 
 @router.get("/settings/health-thresholds")
-async def get_health_thresholds() -> dict[str, int]:
+async def get_health_thresholds(site_id: str | None = None) -> dict[str, int]:
     """Get health score thresholds from database.
+
+    Args:
+        site_id: Optional site identifier for per-site thresholds.
+                 Falls back to global settings if no site-specific entry exists.
 
     Returns: {healthy: 90, warning: 70, critical: 50}
     """
     try:
         supabase = get_supabase_client()
 
-        # Try to get from database first
+        # Try site-specific first, then fall back to global
+        if site_id:
+            result = (
+                supabase.table("system_settings")
+                .select("value")
+                .eq("key", "health_thresholds")
+                .eq("site_id", site_id)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]["value"]
+
+        # Fall back to global
         result = supabase.table("system_settings").select("value").eq("key", "health_thresholds").execute()
 
         if result.data:
@@ -120,6 +139,7 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> dict[s
     Validates:
     - All values between 0-100
     - healthy > warning > critical
+    - site_id for per-site settings
     """
     # Validate threshold ranges (0-100)
     for field in ["healthy", "warning", "critical"]:
@@ -149,28 +169,29 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> dict[s
     try:
         supabase = get_supabase_client()
 
-        # Update in database
+        # Build upsert payload
+        payload = {
+            "key": "health_thresholds",
+            "value": {
+                "healthy": thresholds.healthy,
+                "warning": thresholds.warning,
+                "critical": thresholds.critical,
+            },
+            "category": "health",
+            "description": "Health score thresholds for equipment classification (0-100 scale)",
+            "data_type": "object",
+            "is_public": True,
+            "site_id": thresholds.site_id,
+        }
+
+        # Update in database with composite key (key, site_id)
         (
             supabase.table("system_settings")
-            .upsert(
-                {
-                    "key": "health_thresholds",
-                    "value": {
-                        "healthy": thresholds.healthy,
-                        "warning": thresholds.warning,
-                        "critical": thresholds.critical,
-                    },
-                    "category": "health",
-                    "description": "Health score thresholds for equipment classification (0-100 scale)",
-                    "data_type": "object",
-                    "is_public": True,
-                },
-                on_conflict="key",
-            )
+            .upsert(payload, on_conflict="key,site_id")
             .execute()
         )
 
-        logger.info(f"Updated health thresholds: {thresholds.dict()}")
+        logger.info(f"Updated health thresholds: site_id={thresholds.site_id}, values={thresholds.dict()}")
 
         return {"healthy": thresholds.healthy, "warning": thresholds.warning, "critical": thresholds.critical}
 
@@ -180,13 +201,28 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> dict[s
 
 
 @router.get("/settings/risk-thresholds")
-async def get_risk_thresholds() -> dict[str, int]:
+async def get_risk_thresholds(site_id: str | None = None) -> dict[str, int]:
     """Get risk score thresholds from database.
+
+    Args:
+        site_id: Optional site identifier for per-site thresholds.
 
     Returns: {medium: 31, high: 61, critical: 81}
     """
     try:
         supabase = get_supabase_client()
+
+        if site_id:
+            result = (
+                supabase.table("system_settings")
+                .select("value")
+                .eq("key", "risk_thresholds")
+                .eq("site_id", site_id)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]["value"]
+
         result = supabase.table("system_settings").select("value").eq("key", "risk_thresholds").execute()
 
         if result.data:
@@ -202,7 +238,13 @@ async def get_risk_thresholds() -> dict[str, int]:
 
 @router.put("/settings/risk-thresholds")
 async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> dict[str, int]:
-    """Update risk score thresholds in database."""
+    """Update risk score thresholds in database.
+
+    Validates:
+    - All values between 0-100
+    - medium < high < critical
+    - site_id for per-site settings
+    """
     for field in ["medium", "high", "critical"]:
         value = getattr(thresholds, field)
         if not (0 <= value <= 100):
@@ -239,13 +281,14 @@ async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> dict[str, 
                     "description": "Risk score thresholds for cockpit severity interpretation (0-100 scale)",
                     "data_type": "object",
                     "is_public": True,
+                    "site_id": thresholds.site_id,
                 },
-                on_conflict="key",
+                on_conflict="key,site_id",
             )
             .execute()
         )
 
-        logger.info(f"Updated risk thresholds: {thresholds.dict()}")
+        logger.info(f"Updated risk thresholds: site_id={thresholds.site_id}, values={thresholds.dict()}")
         return {"medium": thresholds.medium, "high": thresholds.high, "critical": thresholds.critical}
 
     except Exception as e:
@@ -254,14 +297,28 @@ async def update_risk_thresholds(thresholds: RiskThresholdsUpdate) -> dict[str, 
 
 
 @router.get("/settings/alert-intervals")
-async def get_alert_intervals() -> dict[str, int]:
+async def get_alert_intervals(site_id: str | None = None) -> dict[str, int]:
     """Get alert throttling intervals from database.
+
+    Args:
+        site_id: Optional site identifier for per-site thresholds.
 
     Returns: {critical: 30, warning: 60, info: 1440}
     Values are in minutes (how often to repeat alerts).
     """
     try:
         supabase = get_supabase_client()
+
+        if site_id:
+            result = (
+                supabase.table("system_settings")
+                .select("value")
+                .eq("key", "alert_intervals")
+                .eq("site_id", site_id)
+                .execute()
+            )
+            if result.data:
+                return result.data[0]["value"]
 
         result = supabase.table("system_settings").select("value").eq("key", "alert_intervals").execute()
 
@@ -277,11 +334,12 @@ async def get_alert_intervals() -> dict[str, int]:
 
 
 @router.put("/settings/alert-intervals")
-async def update_alert_intervals(intervals: dict[str, int]) -> dict[str, int]:
+async def update_alert_intervals(intervals: dict[str, int], site_id: str | None = None) -> dict[str, int]:
     """Update alert throttling intervals in database.
 
     Args:
         intervals: {critical: minutes, warning: minutes, info: minutes}
+        site_id: Optional site identifier for per-site settings.
 
     Example:
         {"critical": 15, "warning": 30, "info": 60}
@@ -306,13 +364,14 @@ async def update_alert_intervals(intervals: dict[str, int]) -> dict[str, int]:
                     "description": "Alert throttling intervals in minutes",
                     "data_type": "object",
                     "is_public": False,
+                    "site_id": site_id,
                 },
-                on_conflict="key",
+                on_conflict="key,site_id",
             )
             .execute()
         )
 
-        logger.info(f"Updated alert intervals: {intervals}")
+        logger.info(f"Updated alert intervals: site_id={site_id}, intervals={intervals}")
 
         return intervals
 
@@ -322,14 +381,37 @@ async def update_alert_intervals(intervals: dict[str, int]) -> dict[str, int]:
 
 
 @router.get("/settings/{key}")
-async def get_setting(key: str) -> dict[str, Any]:
+async def get_setting(key: str, site_id: str | None = None) -> dict[str, Any]:
     """Get a specific setting by key.
 
     Args:
         key: Setting key (e.g., "health_thresholds", "alert_intervals")
+        site_id: Optional site identifier for per-site settings
     """
     try:
         supabase = get_supabase_client()
+
+        # Try site-specific first
+        if site_id:
+            result = (
+                supabase.table("system_settings")
+                .select("*")
+                .eq("key", key)
+                .eq("site_id", site_id)
+                .execute()
+            )
+            if result.data:
+                setting = result.data[0]
+                return {
+                    "key": setting["key"],
+                    "value": setting["value"],
+                    "category": setting.get("category"),
+                    "description": setting.get("description"),
+                    "dataType": setting.get("data_type"),
+                    "isEditable": setting.get("is_editable", True),
+                    "updatedAt": setting.get("updated_at"),
+                    "site_id": setting.get("site_id"),
+                }
 
         result = supabase.table("system_settings").select("*").eq("key", key).execute()
 
@@ -337,9 +419,6 @@ async def get_setting(key: str) -> dict[str, Any]:
             raise HTTPException(status_code=404, detail=f"Setting '{key}' not found")
 
         setting = result.data[0]
-
-        # Check if user has access (for non-public settings)
-        # TODO: Add proper authentication check here
 
         return {
             "key": setting["key"],
@@ -349,6 +428,7 @@ async def get_setting(key: str) -> dict[str, Any]:
             "dataType": setting.get("data_type"),
             "isEditable": setting.get("is_editable", True),
             "updatedAt": setting.get("updated_at"),
+            "site_id": setting.get("site_id"),
         }
 
     except HTTPException:
@@ -359,27 +439,23 @@ async def get_setting(key: str) -> dict[str, Any]:
 
 
 @router.put("/settings/{key}")
-async def update_setting(key: str, update: SettingUpdate) -> dict[str, Any]:
+async def update_setting(key: str, update: SettingUpdate, site_id: str | None = None) -> dict[str, Any]:
     """Update a specific setting by key.
 
     Args:
         key: Setting key to update
         update: {value: ..., category: ..., description: ...}
+        site_id: Optional site identifier for per-site settings
     """
     try:
         supabase = get_supabase_client()
-
-        # Check if setting exists and is editable
-        existing = supabase.table("system_settings").select("is_editable").eq("key", key).execute()
-
-        if existing.data and not existing.data[0].get("is_editable", True):
-            raise HTTPException(status_code=403, detail=f"Setting '{key}' is not editable")
 
         # Build update data
         update_data = {
             "key": key,
             "value": update.value,
             "data_type": "object" if isinstance(update.value, dict) else "string",
+            "site_id": site_id,
         }
 
         if update.category:
@@ -387,16 +463,23 @@ async def update_setting(key: str, update: SettingUpdate) -> dict[str, Any]:
         if update.description:
             update_data["description"] = update.description
 
-        # Update in database
-        supabase.table("system_settings").upsert(update_data, on_conflict="key").execute()
+        # Check if setting exists and is editable
+        existing = supabase.table("system_settings").select("is_editable").eq("key", key).execute()
 
-        logger.info(f"Updated setting '{key}': {update.value}")
+        if existing.data and not existing.data[0].get("is_editable", True):
+            raise HTTPException(status_code=403, detail=f"Setting '{key}' is not editable")
+
+        # Update in database with composite key (key, site_id)
+        supabase.table("system_settings").upsert(update_data, on_conflict="key,site_id").execute()
+
+        logger.info(f"Updated setting '{key}': site_id={site_id}, value={update.value}")
 
         return {
             "key": key,
             "value": update.value,
-            "category": update.get("category"),
-            "description": update.get("description"),
+            "category": update.category,
+            "description": update.description,
+            "site_id": site_id,
         }
 
     except HTTPException:

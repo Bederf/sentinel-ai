@@ -14,7 +14,8 @@ import {
   Sparkles,
   TimerReset,
 } from 'lucide-react'
-import type { CockpitRenderMode, CockpitRiskItem, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
+import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitRenderMode, CockpitRiskItem, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
+import { CockpitIssuePanel } from './CockpitIssuePanel'
 import { phaseAllows } from '@/lib/onboardingPhase'
 import { BUILDING_TAB_ITEMS, type BuildingTabId } from '@/lib/navigation'
 import { SupervisedConfirmBar } from './useHoldToConfirm'
@@ -34,6 +35,9 @@ interface CockpitViewProps {
   activeMainTab: BuildingTabId
   onMainTabChange: (tab: BuildingTabId) => void
   isModuleActive: (module: string) => boolean
+  /** Phase 209 — issue-based triage panel */
+  issuesPayload?: CockpitIssuesPayload | null
+  onIssueAction?: (issueId: string, action: CockpitIssueActionType) => Promise<void>
 }
 
 const FRAMER_EASE: [number, number, number, number] = [0.4, 0, 0.2, 1]
@@ -540,7 +544,7 @@ function ZoneEquipmentPanel({
   )
 }
 
-export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selectedZone, onZoneClose, modelReadiness, onAdvancePhase, onZoneSelect, activeMainTab, onMainTabChange, isModuleActive }: CockpitViewProps) {
+export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selectedZone, onZoneClose, modelReadiness, onAdvancePhase, onZoneSelect, activeMainTab, onMainTabChange, isModuleActive, issuesPayload, onIssueAction }: CockpitViewProps) {
   const shellRef = useRef<HTMLElement | null>(null)
   const headerRef = useRef<HTMLDivElement | null>(null)
   const railRef = useRef<HTMLDivElement | null>(null)
@@ -558,6 +562,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
 
   const [zoomLevel, setZoomLevel] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
 
   const clampZoom = (value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value))
 
@@ -880,7 +885,15 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             </div>
           )}
 
-          {state.site.onboardingPhase === 'shadow' ? (
+          {issuesPayload !== undefined ? (
+            /* Phase 209 — issue triage inbox replaces decision rows when wired */
+            <CockpitIssuePanel
+              payload={issuesPayload ?? null}
+              onAction={onIssueAction ?? (async () => {})}
+              selectedIssueId={selectedIssueId}
+              onSelectIssue={setSelectedIssueId}
+            />
+          ) : state.site.onboardingPhase === 'shadow' ? (
             <>
               {/* Shadow mode: replace decision fields with telemetry observation fields */}
               <DetailRow

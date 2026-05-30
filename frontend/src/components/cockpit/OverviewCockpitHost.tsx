@@ -5,7 +5,7 @@ import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
 import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry, type EquipmentWarningInput } from './mapCockpitState'
-import type { CockpitTwinZoneSignal, ModelReadiness } from './types'
+import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitTwinZoneSignal, ModelReadiness } from './types'
 
 import type { BuildingTabId } from '@/lib/navigation'
 
@@ -30,11 +30,12 @@ interface OverviewCockpitHostProps {
 
 const POLL_INTERVAL_MS = 30_000
 
-function formatFreshness(lastUpdatedAt: number | null): string {
-  if (!lastUpdatedAt) return 'Freshness unavailable'
+function formatFreshness(lastUpdatedAt: number | null, loading: boolean): string {
+  if (!lastUpdatedAt) return loading ? 'Fetching data…' : 'No data received yet'
   const ageSeconds = Math.max(0, Math.floor((Date.now() - lastUpdatedAt) / 1000))
   if (ageSeconds < 60) return `Updated ${ageSeconds}s ago`
-  return `Updated ${Math.floor(ageSeconds / 60)}m ago`
+  if (ageSeconds < 3600) return `Updated ${Math.floor(ageSeconds / 60)}m ago`
+  return `Updated ${Math.floor(ageSeconds / 3600)}h ago`
 }
 
 function useBuildingStatePayload(siteId: string) {
@@ -43,6 +44,7 @@ function useBuildingStatePayload(siteId: string) {
   const [energyTelemetry, setEnergyTelemetry] = useState<EnergyCentreTelemetry | null>(null)
   const [equipment, setEquipment] = useState<Equipment[] | null>(null)
   const [lastUpdatedAt, setLastUpdatedAt] = useState<number | null>(null)
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
     let mounted = true
@@ -50,6 +52,7 @@ function useBuildingStatePayload(siteId: string) {
     let controller: AbortController | null = null
 
     async function load() {
+      setLoading(true)
       try {
         controller?.abort()
         controller = new AbortController()
@@ -106,6 +109,7 @@ function useBuildingStatePayload(siteId: string) {
           )
           setEquipment(equipmentJson?.equipment ?? null)
           setLastUpdatedAt(Date.now())
+          setLoading(false)
         }
       } catch (error) {
         if (error instanceof Error && error.name === 'AbortError') {
@@ -124,7 +128,120 @@ function useBuildingStatePayload(siteId: string) {
     }
   }, [siteId])
 
-  return { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt }
+  return { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading }
+}
+
+// ─── Phase 209 — issue-based decision hook ────────────────────────────────────
+
+interface RawIssueItem {
+  id: string
+  title: string
+  summary: string
+  severity: string
+  source: string
+  status: string
+  owner: string | null
+  owner_team: string | null
+  opened_at?: string
+  updated_at?: string
+  sla_due_at: string | null
+  stale?: boolean
+  impact_summary: string | null
+  recommended_action: string | null
+  confidence: number | null
+  confidence_label: string | null
+  subsystem: string | null
+  location: { zone_ids: string[]; asset_ids: string[]; floor_id: string | null }
+}
+
+interface RawSourceHealth {
+  source: string
+  label: string
+  state: string
+  badge_tone: string
+  message: string
+}
+
+interface RawDecisionResponse {
+  payload: {
+    building_id: string
+    issues: RawIssueItem[]
+    selected_issue_id: string | null
+    source_health: RawSourceHealth[]
+    active_posture: string | null
+  } | null
+  site_id: string
+  fetched_at: string
+}
+
+function mapIssuesPayload(raw: RawDecisionResponse): CockpitIssuesPayload | null {
+  if (!raw.payload) return null
+  return {
+    issues: raw.payload.issues.map((i) => ({
+      id: i.id,
+      title: i.title,
+      summary: i.summary,
+      severity: i.severity as CockpitIssuesPayload['issues'][number]['severity'],
+      source: i.source as CockpitIssuesPayload['issues'][number]['source'],
+      status: i.status as CockpitIssuesPayload['issues'][number]['status'],
+      owner: i.owner,
+      owner_team: i.owner_team,
+      opened_at: i.opened_at ?? new Date().toISOString(),
+      updated_at: i.updated_at ?? new Date().toISOString(),
+      sla_due_at: i.sla_due_at,
+      stale: i.stale ?? false,
+      impact_summary: i.impact_summary,
+      recommended_action: i.recommended_action,
+      confidence: i.confidence,
+      confidence_label: i.confidence_label,
+      subsystem: i.subsystem,
+      location: {
+        zone_ids: i.location?.zone_ids ?? [],
+        asset_ids: i.location?.asset_ids ?? [],
+        floor_id: i.location?.floor_id ?? null,
+      },
+    })),
+    selectedIssueId: raw.payload.selected_issue_id,
+    sourceHealth: raw.payload.source_health.map((s) => ({
+      source: s.source as CockpitIssuesPayload['sourceHealth'][number]['source'],
+      label: s.label,
+      state: s.state as CockpitIssuesPayload['sourceHealth'][number]['state'],
+      badge_tone: s.badge_tone as CockpitIssuesPayload['sourceHealth'][number]['badge_tone'],
+      message: s.message,
+    })),
+    posture: raw.payload.active_posture,
+  }
+}
+
+function useCockpitIssues(siteId: string) {
+  const [issuesPayload, setIssuesPayload] = useState<CockpitIssuesPayload | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    async function load() {
+      try {
+        const res = await authorizedFetch(`/api/cockpit/decision/${encodeURIComponent(siteId)}`)
+        if (res.ok && mounted) {
+          const data = await res.json() as RawDecisionResponse
+          setIssuesPayload(mapIssuesPayload(data))
+        }
+      } catch {
+        // Issues failures are silent — cockpit continues with existing state
+      }
+    }
+
+    load()
+    timer = setInterval(load, POLL_INTERVAL_MS)
+
+    return () => {
+      mounted = false
+      if (timer) clearInterval(timer)
+    }
+  }, [siteId])
+
+  return issuesPayload
 }
 
 function buildCockpitSummary(
@@ -142,7 +259,7 @@ function buildCockpitSummary(
     activeAlerts: props.activeAlerts,
     predictionsCount: props.predictionsCount,
     equipmentCount: props.equipmentCount,
-    dataFreshnessLabel: formatFreshness(lastUpdatedAt),
+    dataFreshnessLabel: formatFreshness(lastUpdatedAt, loading),
     siteFloors: props.siteFloors ?? null,
   }
 }
@@ -165,7 +282,8 @@ export function OverviewCockpitHost({
   onMainTabChange,
   isModuleActive,
 }: OverviewCockpitHostProps) {
-  const { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt } = useBuildingStatePayload(siteId)
+  const { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading } = useBuildingStatePayload(siteId)
+  const issuesPayload = useCockpitIssues(siteId)
   const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
   const [modelReadiness, setModelReadiness] = useState<ModelReadiness | null>(null)
 
@@ -226,6 +344,26 @@ export function OverviewCockpitHost({
     }
   }, [siteId, onboardingPhase])
 
+  const handleIssueAction = useCallback(async (issueId: string, action: CockpitIssueActionType) => {
+    try {
+      await authorizedFetch(
+        `/api/cockpit/issues/${encodeURIComponent(siteId)}/${encodeURIComponent(issueId)}/action`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action,
+            actor_id: 'operator',
+            actor_label: 'Operator',
+            evidence_refs: [],
+          }),
+        },
+      )
+    } catch {
+      // Action failures are silent — operator sees no state change; backend logs it
+    }
+  }, [siteId])
+
   const state = useMemo(() => {
     const summary = buildCockpitSummary(
       { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, siteFloors },
@@ -272,6 +410,8 @@ export function OverviewCockpitHost({
       activeMainTab={activeMainTab}
       onMainTabChange={onMainTabChange}
       isModuleActive={isModuleActive}
+      issuesPayload={issuesPayload}
+      onIssueAction={handleIssueAction}
     />
   )
 }

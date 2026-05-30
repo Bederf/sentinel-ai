@@ -86,10 +86,10 @@ async def init_default_devices(
         HTTPException: 403 if user lacks access to the default site
     """
     try:
+        site_access_repo = get_user_site_access_repository()
         site_id = get_primary_site_code() or "unknown"
 
-        # Verify user has access to the primary registered site (Security: Authorization check)
-        site_access_repo = get_user_site_access_repository()
+        # If user lacks access to the primary site, fall back to their first accessible site
         has_access = site_access_repo.has_access_to_site_code(
             user_email=auth.email,
             user_role=auth.role,
@@ -97,12 +97,19 @@ async def init_default_devices(
         )
 
         if not has_access:
-            logger.warning(f"User {auth.email} attempted to initialize devices for unauthorized primary site")
-            # Return consistent 403 for all unauthorized access (prevents enumeration)
-            raise HTTPException(
-                status_code=403,
-                detail="Access denied to this site",
+            accessible = site_access_repo.get_accessible_site_codes(
+                user_email=auth.email,
+                user_role=auth.role,
             )
+            if accessible:
+                site_id = accessible[0]
+                logger.info(f"Fell back to user's first accessible site: {site_id}")
+            else:
+                logger.warning(f"User {auth.email} has no accessible sites for device init")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Access denied — no accessible sites",
+                )
 
         result = await initialize_connected_site_devices(site_id)
         return {
