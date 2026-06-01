@@ -251,26 +251,47 @@ async def deactivate_residential_site(site_id: str) -> dict:
     supabase = get_supabase_client()
 
     # Check current state
-    existing = supabase.table("residential_sites").select("id,is_active").eq("site_id", site_id).execute()
+    existing = supabase.table("residential_sites").select("id,is_active,platform,ha_deployment_type").eq("site_id", site_id).execute()
     if not existing.data:
         raise HTTPException(status_code=404, detail=f"Residential site not found: {site_id}")
 
     if not existing.data[0]["is_active"]:
         return {"status": "already_inactive", "site_id": site_id}
 
-    # 1. Stop APScheduler polling job
+    # 1. Mark inactive in DB first
+    import datetime as _dt
+
+    deactivated_at = _dt.datetime.utcnow().isoformat()
+    supabase.table("residential_sites").update({"is_active": False}).eq("site_id", site_id).execute()
+
+    # 2. Stop APScheduler jobs (poll + morning) — idempotent
     try:
         remove_residential_polling_job(site_id)
     except Exception as exc:
         logger.warning("Could not remove polling job for %s: %s", site_id, exc)
+    try:
+        from app.services.residential.bridge_scheduler import cancel_morning_summary
 
-    # 2. Revoke Mosquitto ACL
+        cancel_morning_summary(site_id)
+    except Exception as exc:
+        logger.warning("Could not cancel morning job for %s: %s", site_id, exc)
+
+    # 3. Revoke VPS MQTT credentials if applicable
+    try:
+        platform = existing.data[0].get("platform")
+        deploy = existing.data[0].get("ha_deployment_type")
+        if platform == "home_assistant" and deploy == "vps":
+            get_mqtt_provisioner().revoke_vps_client(site_id)
+    except Exception as exc:
+        logger.warning("VPS credential revoke failed for %s: %s", site_id, exc)
+
+    # 4. Revoke Mosquitto ACL (idempotent)
     try:
         get_mqtt_provisioner().revoke_site(site_id)
     except Exception as exc:
         logger.error("MQTT ACL revocation failed for %s (continuing): %s", site_id, exc)
 
-    # 3. Clear all retained MQTT topics
+    # 5. Clear all retained MQTT topics
     topics_cleared = 0
     try:
         from app.config.settings import settings as _settings
@@ -290,20 +311,6 @@ async def deactivate_residential_site(site_id: str) -> dict:
             client.disconnect()
     except Exception as exc:
         logger.warning("Failed to clear retained MQTT topics for %s: %s", site_id, exc)
-
-    # 4. Mark inactive in DB
-    import datetime as _dt
-
-    deactivated_at = _dt.datetime.utcnow().isoformat()
-    supabase.table("residential_sites").update({"is_active": False}).eq("site_id", site_id).execute()
-
-    # Remove morning summary job (idempotent)
-    try:
-        from app.services.residential.bridge_scheduler import cancel_morning_summary
-
-        cancel_morning_summary(site_id)
-    except Exception as exc:
-        logger.warning("Could not cancel morning job for %s: %s", site_id, exc)
 
     logger.info("Residential site deactivated: %s (topics_cleared=%d)", site_id, topics_cleared)
 

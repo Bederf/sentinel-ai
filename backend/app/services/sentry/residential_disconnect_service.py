@@ -100,29 +100,21 @@ class ResidentialDisconnectService:
         except Exception as exc:
             logger.warning("state clear failed for chat_id=%s: %s", chat_id, exc)
 
-        # Check if HA site — stop gateway first
+        # Lookup platform/deployment for post-deactivation cleanup
         try:
             supabase = get_supabase_client()
-            row = supabase.table("residential_sites").select("platform").eq("site_id", site_id).maybe_execute()
+            row = (
+                supabase.table("residential_sites")
+                .select("platform,ha_deployment_type")
+                .eq("site_id", site_id)
+                .maybe_execute()
+            )
             is_ha = row.data and row.data[0].get("platform") == "home_assistant" if row.data else False
+            ha_deploy = row.data[0].get("ha_deployment_type") if (row and row.data) else None
         except Exception as exc:
             logger.warning("Could not check platform for site_id=%s: %s", site_id, exc)
             is_ha = False
-
-        if is_ha:
-            try:
-                from app.services.residential.bridge_scheduler import stop_ha_gateway
-
-                stop_ha_gateway(site_id)
-            except Exception as exc:
-                logger.warning("HA gateway stop failed for %s: %s", site_id, exc)
-
-            try:
-                from app.services.residential.wireguard_peer_manager import WireGuardPeerManager
-
-                WireGuardPeerManager().revoke_peer(site_id)
-            except Exception as exc:
-                logger.warning("WireGuard peer revoke failed for %s: %s", site_id, exc)
+            ha_deploy = None
 
         # Call deactivate endpoint
         try:
@@ -132,7 +124,14 @@ class ResidentialDisconnectService:
                 timeout=15,
             )
             if r.status_code in (200, 404):
-                if is_ha:
+                # Post-deactivation: for local HA, revoke WireGuard peer now (manual operator cleanup)
+                if is_ha and ha_deploy == "local":
+                    try:
+                        from app.services.residential.wireguard_peer_manager import WireGuardPeerManager
+
+                        WireGuardPeerManager().revoke_peer(site_id)
+                    except Exception as exc:
+                        logger.warning("WireGuard peer revoke failed for %s: %s", site_id, exc)
                     return (
                         "✅ Disconnected. SENTINEL will no longer monitor your system.\n\n"
                         "Also remove the SENTINEL peer from your\n"
