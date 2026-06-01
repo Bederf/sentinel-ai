@@ -7,7 +7,6 @@ local fine-tuning, benchmarking, and cross-site insights.
 Phase 45-02: Fleet Learning and Cross-Site Insights.
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.config.settings import settings

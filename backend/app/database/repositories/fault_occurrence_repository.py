@@ -57,7 +57,7 @@ class FaultOccurrenceRepository:
         try:
             with open(self.json_backup_path) as f:
                 return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
+        except (OSError, json.JSONDecodeError) as e:
             logger.warning("Failed to read JSON backup, resetting: %s", e)
             return {"occurrences": []}
 
@@ -66,7 +66,7 @@ class FaultOccurrenceRepository:
         try:
             with open(self.json_backup_path, "w") as f:
                 json.dump(data, f, indent=2, default=str)
-        except IOError as e:
+        except OSError as e:
             logger.error("Failed to save JSON backup: %s", e)
 
     # -------------------------------------------------------------------------

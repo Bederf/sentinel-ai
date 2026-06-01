@@ -107,8 +107,7 @@ class BridgeBmsAdapter(BmsAdapter):
                 message = ""
             elif resp.status_code == 401:
                 message = (
-                    f"Bridge authentication failed for site {self._site_id} — "
-                    f"check that your API token is correct"
+                    f"Bridge authentication failed for site {self._site_id} — check that your API token is correct"
                 )
             else:
                 message = f"Bridge returned HTTP {resp.status_code} — check the bridge URL and port"

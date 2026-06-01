@@ -59,14 +59,17 @@ async def test_approval_returns_401_without_jwt(client):
 @pytest.mark.asyncio
 async def test_approval_returns_403_for_viewer(client, auth_headers_auditor, mock_decision):
     """VIEWER/AUDITOR cannot approve → 403 Forbidden."""
-    with patch(
-        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-        new_callable=AsyncMock,
-        return_value=mock_decision,
-    ), patch(
-        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-        new_callable=AsyncMock,
-    ) as mock_execute:
+    with (
+        patch(
+            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+            new_callable=AsyncMock,
+            return_value=mock_decision,
+        ),
+        patch(
+            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+            new_callable=AsyncMock,
+        ) as mock_execute,
+    ):
         # Endpoint should reject before calling service
         resp = await client.post(
             "/api/v1/approval/execute/site-002",
@@ -92,14 +95,17 @@ async def test_approval_returns_accepted_immediately(client, auth_headers_operat
         "estimated_verification_time_seconds": 30,
     }
 
-    with patch(
-        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-        new_callable=AsyncMock,
-        return_value=mock_response,
-    ), patch(
-        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-        new_callable=AsyncMock,
-        return_value=mock_decision,
+    with (
+        patch(
+            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ),
+        patch(
+            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+            new_callable=AsyncMock,
+            return_value=mock_decision,
+        ),
     ):
         start = time.time()
         resp = await client.post(
@@ -164,14 +170,17 @@ async def test_approval_engineer_can_approve_critical(client, auth_headers_engin
         "estimated_verification_time_seconds": 30,
     }
 
-    with patch(
-        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-        new_callable=AsyncMock,
-        return_value=mock_response,
-    ), patch(
-        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-        new_callable=AsyncMock,
-        return_value=mock_decision_critical,
+    with (
+        patch(
+            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ),
+        patch(
+            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+            new_callable=AsyncMock,
+            return_value=mock_decision_critical,
+        ),
     ):
         resp = await client.post(
             "/api/v1/approval/execute/site-002",
@@ -193,14 +202,17 @@ async def test_approval_admin_can_approve_any_tier(client, auth_headers_admin, m
         "estimated_verification_time_seconds": 30,
     }
 
-    with patch(
-        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-        new_callable=AsyncMock,
-        return_value=mock_response,
-    ), patch(
-        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-        new_callable=AsyncMock,
-        return_value=mock_decision_critical,
+    with (
+        patch(
+            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+            new_callable=AsyncMock,
+            return_value=mock_response,
+        ),
+        patch(
+            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+            new_callable=AsyncMock,
+            return_value=mock_decision_critical,
+        ),
     ):
         resp = await client.post(
             "/api/v1/approval/execute/site-002",
@@ -214,20 +226,23 @@ async def test_approval_admin_can_approve_any_tier(client, auth_headers_admin, m
 @pytest.mark.asyncio
 async def test_approval_endpoint_route_exists(client, auth_headers_operator):
     """Endpoint route is registered and reachable."""
-    with patch(
-        "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
-        new_callable=AsyncMock,
-        return_value={"id": "dec-1", "site_id": "site-002", "tier": 1},
-    ), patch(
-        "app.services.approval_service.ApprovalService.execute_decision_with_audit",
-        new_callable=AsyncMock,
-        return_value={
-            "status": "ACCEPTED",
-            "decision_id": "dec-1",
-            "correlation_id": "corr-xyz",
-            "message": "OK",
-            "estimated_verification_time_seconds": 30,
-        },
+    with (
+        patch(
+            "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository.get_decision_by_id",
+            new_callable=AsyncMock,
+            return_value={"id": "dec-1", "site_id": "site-002", "tier": 1},
+        ),
+        patch(
+            "app.services.approval_service.ApprovalService.execute_decision_with_audit",
+            new_callable=AsyncMock,
+            return_value={
+                "status": "ACCEPTED",
+                "decision_id": "dec-1",
+                "correlation_id": "corr-xyz",
+                "message": "OK",
+                "estimated_verification_time_seconds": 30,
+            },
+        ),
     ):
         # Should not raise 404 route not found
         resp = await client.post(

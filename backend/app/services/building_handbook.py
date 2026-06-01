@@ -58,12 +58,14 @@ def parse_handbook_rooms(markdown: str) -> tuple[list[dict[str, Any]], str]:
                 # AV: ✅ or Yes/True
                 av = bool(re.search(r"(yes|true|✅|av)", av_raw, re.IGNORECASE))
 
-                rooms.append({
-                    "name": room_name,
-                    "capacity": capacity,
-                    "floor": floor,
-                    "av": av,
-                    "notes": notes,
-                })
+                rooms.append(
+                    {
+                        "name": room_name,
+                        "capacity": capacity,
+                        "floor": floor,
+                        "av": av,
+                        "notes": notes,
+                    }
+                )
 
     return rooms, "handbook"

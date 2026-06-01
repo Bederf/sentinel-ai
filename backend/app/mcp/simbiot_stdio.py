@@ -129,9 +129,7 @@ class MCPServerStdio:
 
         except Exception as e:
             logger.error(f"Error handling request: {e}", exc_info=True)
-            await self.send_response(
-                error={"code": -32603, "message": f"Internal error: {e!s}"}, request_id=request_id
-            )
+            await self.send_response(error={"code": -32603, "message": f"Internal error: {e!s}"}, request_id=request_id)
 
     async def run(self):
         """Main server loop reading from stdin."""

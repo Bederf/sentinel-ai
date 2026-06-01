@@ -18,9 +18,7 @@ class OrganizationRepository:
     def __init__(self):
         self.client = get_supabase_client()
 
-    def get_all(
-        self, tier: str | None = None, status: str | None = None, limit: int = 50
-    ) -> list[dict[str, Any]]:
+    def get_all(self, tier: str | None = None, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
         """
         List organizations with optional filters.
 

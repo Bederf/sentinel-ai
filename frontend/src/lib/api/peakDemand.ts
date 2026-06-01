@@ -93,7 +93,7 @@ export interface DemandSummary {
 export const peakDemandApi = {
   /**
    * Get 24-hour demand forecast with ML predictions and confidence intervals
-   * @param siteId Site identifier (e.g., 'S002', 'site-003')
+   * @param siteId Site identifier (e.g., 'S002', 'site-005')
    * @returns DemandForecastResponse with hourly predictions and peak analysis
    */
   async getDemandForecast(siteId: string): Promise<DemandForecastResponse> {

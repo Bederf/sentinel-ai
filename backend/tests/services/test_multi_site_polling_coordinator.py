@@ -4,10 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from app.services.multi_site_polling_coordinator import MultiSitePollingCoordinator
-
 
 BRIDGE_CONFIG_S002 = {
     "base_url": "http://10.99.0.1:8080",
@@ -116,7 +113,6 @@ class TestPollAll:
             mock_svc.poll = MagicMock(return_value=_mock_poll_result("site-002"))
             mock_svc_cls.return_value = mock_svc
 
-            import asyncio
 
             async def _async_result(*a, **kw):
                 return _mock_poll_result("site-002")
@@ -176,17 +172,16 @@ class TestPollAll:
             coordinator,
             "_fetch_enabled_bridge_configs",
             return_value={"site-002": BRIDGE_CONFIG_S002},
-        ):
-            with patch("app.services.multi_site_polling_coordinator.ShadowModePollingService") as mock_svc_cls:
-                mock_svc = MagicMock()
+        ), patch("app.services.multi_site_polling_coordinator.ShadowModePollingService") as mock_svc_cls:
+            mock_svc = MagicMock()
 
-                async def _poll():
-                    return _mock_poll_result("site-002")
+            async def _poll():
+                return _mock_poll_result("site-002")
 
-                mock_svc.poll = _poll
-                mock_svc_cls.return_value = mock_svc
+            mock_svc.poll = _poll
+            mock_svc_cls.return_value = mock_svc
 
-                results = coordinator.poll_all()
+            results = coordinator.poll_all()
 
         assert "site-001" not in results
         assert "site-002" in results

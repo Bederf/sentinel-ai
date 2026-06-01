@@ -4,14 +4,14 @@ Tests for Equipment Baselines API (Phase 206-01)
 Phase: 206-asset-onboarding
 """
 
-import pytest
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.api.equipment_baselines import router
-from app.models.baseline import BaselineSource, BaselineType, BaselineStatus, EquipmentBaseline
+from app.models.baseline import BaselineSource, BaselineStatus, BaselineType, EquipmentBaseline
 
 
 class TestEquipmentBaselinesAPI:
@@ -23,7 +23,7 @@ class TestEquipmentBaselinesAPI:
         return EquipmentBaseline(
             id="test-baseline-1",
             equipment_id="S002-CHILLER-B1-001",
-            baseline_date=datetime.now(timezone.utc),
+            baseline_date=datetime.now(UTC),
             captured_by="automated",
             baseline_type=BaselineType.INITIAL,
             status=BaselineStatus.ACTIVE,
@@ -32,8 +32,8 @@ class TestEquipmentBaselinesAPI:
             source_type=BaselineSource.BMS_AVERAGE,
             notes=None,
             attachment_urls=[],
-            created_at=datetime.now(timezone.utc),
-            updated_at=datetime.now(timezone.utc),
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
 
     @pytest.fixture

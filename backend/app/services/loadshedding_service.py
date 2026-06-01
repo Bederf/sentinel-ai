@@ -91,11 +91,7 @@ class LoadsheddingService:
             # Return cached value if available, else -1
             return self._cache.get("current_stage", -1)
 
-    async def get_upcoming_outages(
-        self,
-        hours_ahead: int = 72,
-        use_cache: bool = True
-    ) -> list[dict[str, Any]]:
+    async def get_upcoming_outages(self, hours_ahead: int = 72, use_cache: bool = True) -> list[dict[str, Any]]:
         """Returns list of upcoming outages for Sandton area.
 
         Args:
@@ -221,14 +217,16 @@ class LoadsheddingService:
 
                     duration = end - start
 
-                    schedule.append({
-                        "area_name": area_name,
-                        "start": start,
-                        "end": end,
-                        "stage": int(row.get("stage", 0)),
-                        "duration_minutes": int(duration.total_seconds() / 60),
-                        "source": row.get("source", ""),
-                    })
+                    schedule.append(
+                        {
+                            "area_name": area_name,
+                            "start": start,
+                            "end": end,
+                            "stage": int(row.get("stage", 0)),
+                            "duration_minutes": int(duration.total_seconds() / 60),
+                            "source": row.get("source", ""),
+                        }
+                    )
 
                 except (ValueError, TypeError) as e:
                     logger.debug(f"[LOADSHEDDING] Failed to parse date: {e}")
@@ -241,11 +239,7 @@ class LoadsheddingService:
             logger.error(f"[LOADSHEDDING] Failed to fetch schedule: {e}")
             raise
 
-    def _filter_outages(
-        self,
-        schedule: list[dict[str, Any]],
-        hours_ahead: int
-    ) -> list[dict[str, Any]]:
+    def _filter_outages(self, schedule: list[dict[str, Any]], hours_ahead: int) -> list[dict[str, Any]]:
         """Filter schedule to only future outages within hours_ahead.
 
         Args:
@@ -263,14 +257,16 @@ class LoadsheddingService:
             # Include if outage ends in the future AND starts before cutoff
             if outage["end"] > now and outage["start"] <= cutoff:
                 # Convert datetime to ISO strings for JSON serialization
-                filtered.append({
-                    "area_name": outage["area_name"],
-                    "start": outage["start"].isoformat(),
-                    "end": outage["end"].isoformat(),
-                    "stage": outage["stage"],
-                    "duration_minutes": outage["duration_minutes"],
-                    "source": outage["source"],
-                })
+                filtered.append(
+                    {
+                        "area_name": outage["area_name"],
+                        "start": outage["start"].isoformat(),
+                        "end": outage["end"].isoformat(),
+                        "stage": outage["stage"],
+                        "duration_minutes": outage["duration_minutes"],
+                        "source": outage["source"],
+                    }
+                )
 
         # Sort by start time
         filtered.sort(key=lambda x: x["start"])

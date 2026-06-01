@@ -160,43 +160,43 @@ When preparing the DoE energy balance, use these Supabase queries to extract dat
 
 ```sql
 -- Grid energy import (monthly)
-SELECT 
+SELECT
   date_trunc('month', date) AS month,
   ROUND(SUM(total_kwh)::numeric, 0) AS grid_import_kwh
-FROM energy_consumption_history 
+FROM energy_consumption_history
 WHERE site_id = 'site-002'
   AND date >= '2025-06-01' AND date <= '2026-05-31'
 GROUP BY date_trunc('month', date)
 ORDER BY month;
 
 -- Solar generation (monthly)
-SELECT 
+SELECT
   date_trunc('month', reading_time) AS month,
   ROUND(SUM(solar_yield_kwh)::numeric, 0) AS solar_kwh
-FROM solar_bess 
+FROM solar_bess
 WHERE site_id = 'site-002'
   AND reading_time >= '2025-06-01' AND reading_time <= '2026-05-31'
 GROUP BY date_trunc('month', reading_time)
 ORDER BY month;
 
 -- BESS charge/discharge (monthly)
-SELECT 
+SELECT
   date_trunc('month', reading_time) AS month,
   ROUND(SUM(charge_kwh)::numeric, 0) AS bess_charge_kwh,
   ROUND(SUM(discharge_kwh)::numeric, 0) AS bess_discharge_kwh
-FROM solar_bess 
+FROM solar_bess
 WHERE site_id = 'site-002'
   AND reading_time >= '2025-06-01' AND reading_time <= '2026-05-31'
 GROUP BY date_trunc('month', reading_time)
 ORDER BY month;
 
 -- HVAC breakdown (monthly)
-SELECT 
+SELECT
   date_trunc('month', date) AS month,
   ROUND(SUM(hvac_kwh)::numeric, 0) AS hvac_kwh,
   ROUND(SUM(lighting_kwh)::numeric, 0) AS lighting_kwh,
   ROUND(SUM(other_kwh)::numeric, 0) AS other_kwh
-FROM energy_consumption_history 
+FROM energy_consumption_history
 WHERE site_id = 'site-002'
   AND date >= '2025-06-01' AND date <= '2026-05-31'
 GROUP BY date_trunc('month', date)

@@ -12,9 +12,11 @@ from app.api.residential_onboarding import OnboardRequest
 
 # ── HTTP client fixture (GET /platforms only — no async-patch issues) ─────────
 
+
 @pytest.fixture()
 def http_client():
     from fastapi import APIRouter, FastAPI
+
     app = FastAPI()
     r = APIRouter(prefix="/api/residential")
 
@@ -27,6 +29,7 @@ def http_client():
 
 
 # ── Direct-call helper (avoids TestClient async-patch boundary issue) ─────────
+
 
 def _req(**overrides) -> OnboardRequest:
     base = {
@@ -43,6 +46,7 @@ def _req(**overrides) -> OnboardRequest:
 
 
 # ── GET /api/residential/platforms ───────────────────────────────────────────
+
 
 def test_get_platforms_returns_list(http_client):
     resp = http_client.get("/api/residential/platforms")
@@ -66,9 +70,11 @@ def test_get_platforms_includes_auth_fields(http_client):
 
 # ── POST /api/residential/onboard — happy path ────────────────────────────────
 
+
 @pytest.fixture()
 def mock_solarman_adapter():
     from app.adapters.residential.schemas import DeviceManifest
+
     adapter = MagicMock()
     adapter.authenticate = AsyncMock(return_value=True)
     adapter.discover_devices = AsyncMock(
@@ -88,9 +94,7 @@ def mock_solarman_adapter():
 @pytest.mark.asyncio
 async def test_onboard_happy_path(mock_solarman_adapter):
     mock_supabase = MagicMock()
-    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [
-        {"id": "res-site-uuid-001"}
-    ]
+    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [{"id": "res-site-uuid-001"}]
 
     with (
         patch("app.api.residential_onboarding.build_adapter", return_value=mock_solarman_adapter),
@@ -133,6 +137,7 @@ async def test_onboard_creates_device_records(mock_solarman_adapter):
 
 
 # ── POST /api/residential/onboard — error paths ───────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_onboard_unsupported_platform_returns_400():
@@ -196,9 +201,11 @@ async def test_onboard_discovery_timeout_returns_504(mock_solarman_adapter):
 
 # ── Victron onboarding happy path ─────────────────────────────────────────────
 
+
 @pytest.fixture()
 def mock_victron_adapter():
     from app.adapters.residential.schemas import DeviceManifest
+
     adapter = MagicMock()
     adapter.authenticate = AsyncMock(return_value=True)
     adapter.discover_devices = AsyncMock(
@@ -218,9 +225,7 @@ def mock_victron_adapter():
 @pytest.mark.asyncio
 async def test_onboard_victron_happy_path(mock_victron_adapter):
     mock_supabase = MagicMock()
-    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [
-        {"id": "res-site-uuid-002"}
-    ]
+    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [{"id": "res-site-uuid-002"}]
 
     victron_req = _req(
         platform="victron",
@@ -253,9 +258,11 @@ async def test_onboard_victron_credentials_encrypted(mock_victron_adapter):
     def _table_side_effect(name: str):
         tbl = MagicMock()
         if name == "residential_sites":
+
             def _store_config(row, **kwargs):
                 stored_config.append(row.get("site_config", ""))
                 return original_insert
+
             tbl.insert = _store_config
             tbl.upsert = _store_config  # Phase 213: changed insert→upsert
         else:
@@ -283,6 +290,7 @@ async def test_onboard_victron_credentials_encrypted(mock_victron_adapter):
 
 # ── GET /platforms — victron entry ────────────────────────────────────────────
 
+
 def test_get_platforms_includes_victron(http_client):
     resp = http_client.get("/api/residential/platforms")
     platforms = {p["id"]: p for p in resp.json()["platforms"]}
@@ -295,12 +303,11 @@ def test_get_platforms_includes_victron(http_client):
 
 # ── Credential safety ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_onboard_credentials_not_in_logs(mock_solarman_adapter, caplog):
     mock_supabase = MagicMock()
-    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [
-        {"id": "uuid-001"}
-    ]
+    mock_supabase.table.return_value.insert.return_value.execute.return_value.data = [{"id": "uuid-001"}]
 
     with (
         patch("app.api.residential_onboarding.build_adapter", return_value=mock_solarman_adapter),
@@ -316,6 +323,7 @@ async def test_onboard_credentials_not_in_logs(mock_solarman_adapter, caplog):
 
 
 # ── chat_id field ──────────────────────────────────────────────────────────────
+
 
 def test_onboard_request_chat_id_optional():
     # Without chat_id

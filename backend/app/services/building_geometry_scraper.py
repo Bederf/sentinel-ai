@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
 
 import httpx
 
@@ -43,7 +42,6 @@ async def _scrape_building_photo(
     address: str,
 ) -> bytes | None:
     """Scrape a building photo from the web using Google Custom Search or Bing."""
-    import base64
 
     query = f"{site_name} {address} building"
     logger.info("Searching for building photo: %s", query)
@@ -104,17 +102,11 @@ def _guess_photo_urls(site_name: str, address: str) -> list[str]:
 
     # Busamed hospitals follow a pattern
     if "busamed" in clean_name:
-        urls.append(
-            f"https://busamed.co.za/wp-content/uploads/2025/03/{name_slug}.webp"
-        )
-        urls.append(
-            f"https://busamed.co.za/wp-content/uploads/2024/08/{name_slug}.webp"
-        )
+        urls.append(f"https://busamed.co.za/wp-content/uploads/2025/03/{name_slug}.webp")
+        urls.append(f"https://busamed.co.za/wp-content/uploads/2024/08/{name_slug}.webp")
 
     # Generic Wikimedia Commons
-    urls.append(
-        f"https://commons.wikimedia.org/wiki/Special:FilePath/{name_slug}.jpg"
-    )
+    urls.append(f"https://commons.wikimedia.org/wiki/Special:FilePath/{name_slug}.jpg")
 
     return urls
 
@@ -203,9 +195,7 @@ async def _persist_geometry(site_id: str, geometry: BuildingGeometry) -> None:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        client.table("sites").update(
-            {"building_geometry": geometry.to_dict()}
-        ).eq("code", site_id).execute()
+        client.table("sites").update({"building_geometry": geometry.to_dict()}).eq("code", site_id).execute()
         logger.info("Persisted building geometry for %s", site_id)
     except Exception as e:
         logger.warning("Failed to persist geometry for %s: %s", site_id, e)
@@ -217,13 +207,7 @@ async def get_site_geometry(site_id: str) -> BuildingGeometry | None:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        result = (
-            client.table("sites")
-            .select("building_geometry")
-            .eq("code", site_id)
-            .limit(1)
-            .execute()
-        )
+        result = client.table("sites").select("building_geometry").eq("code", site_id).limit(1).execute()
         if result.data and result.data[0].get("building_geometry"):
             return BuildingGeometry.from_dict(result.data[0]["building_geometry"])
     except Exception as e:

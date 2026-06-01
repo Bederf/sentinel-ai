@@ -1,6 +1,6 @@
-from enum import Enum
-from typing import Any, Optional
 from datetime import datetime
+from enum import Enum
+from typing import Any
 
 from pydantic import BaseModel
 
@@ -14,18 +14,18 @@ class PreferenceType(str, Enum):
 
 
 class UserPreference(BaseModel):
-    id: Optional[str] = None
+    id: str | None = None
     site_id: str
     user_id: str
     preference_type: PreferenceType
     preference_value: dict[str, Any]
     source: str = "chat_explicit"
     confidence: float
-    created_at: Optional[datetime] = None
+    created_at: datetime | None = None
 
 
 class PreferenceExtractionResult(BaseModel):
     preference_type: PreferenceType
     preference_value: dict[str, Any]
     confidence: float
-    reasoning: Optional[str] = None
+    reasoning: str | None = None

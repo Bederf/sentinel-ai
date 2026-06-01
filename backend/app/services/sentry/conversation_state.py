@@ -24,9 +24,9 @@ class ConversationStateManager:
 
     @dataclass
     class ConversationState:
-        flow: str          # e.g. "residential_onboarding"
-        step: str          # e.g. "awaiting_email"
-        data: dict         # Accumulated data (credentials cleared after auth)
+        flow: str  # e.g. "residential_onboarding"
+        step: str  # e.g. "awaiting_email"
+        data: dict  # Accumulated data (credentials cleared after auth)
         created_at: str
         updated_at: str
 

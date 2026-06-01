@@ -16,7 +16,11 @@ class EnergySnapshot:
     load_power_w: float | None
     grid_voltage_v: float | None
     battery_soh_pct: float | None = None  # Victron only; None for other platforms
-    source_system: str = ""  # "solarman"|"victron"|"growatt"|"fronius"
+    source_system: str = ""  # "solarman"|"victron"|"growatt"|"fronius"|"home_assistant"
+    # Home Assistant extended fields (None for non-HA platforms)
+    geyser_power_w: float | None = None
+    geyser_state: str | None = None  # "on" | "off" | None
+    ev_charger_power_w: float | None = None
 
 
 @dataclass

@@ -429,9 +429,7 @@ class StringAnalyzer:
             if string_id not in self._persistent_anomalies:
                 self._persistent_anomalies[string_id] = datetime.now(UTC)
             else:
-                elapsed_hours = (
-                    datetime.now(UTC) - self._persistent_anomalies[string_id]
-                ).total_seconds() / 3600
+                elapsed_hours = (datetime.now(UTC) - self._persistent_anomalies[string_id]).total_seconds() / 3600
                 if elapsed_hours > ANOMALY_PERSISTENCE_HOURS:
                     logger.warning(
                         f"String {string_id} has persistent anomaly ({health_score_obj.failure_type}) "

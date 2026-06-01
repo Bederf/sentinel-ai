@@ -21,9 +21,7 @@ def _safe_float(value) -> float | None:
         return None
 
 
-def _derive_load(
-    pv: float | None, grid: float | None, battery: float | None
-) -> float | None:
+def _derive_load(pv: float | None, grid: float | None, battery: float | None) -> float | None:
     """Derive load from generation triangle. Returns None only if all inputs are None."""
     if pv is None and grid is None and battery is None:
         return None
@@ -153,23 +151,17 @@ class VictronVRMAdapter(ResidentialEnergyAdapter):
         id_site = device_id
         battery_data, solar_data, grid_data = {}, {}, {}
         try:
-            battery_data = await self._request(
-                "GET", f"/installations/{id_site}/widgets/BatteryMonitor"
-            )
+            battery_data = await self._request("GET", f"/installations/{id_site}/widgets/BatteryMonitor")
         except Exception as exc:
             logger.debug("BatteryMonitor widget unavailable for %s: %s", id_site, exc)
 
         try:
-            solar_data = await self._request(
-                "GET", f"/installations/{id_site}/widgets/SolarChargerSummary"
-            )
+            solar_data = await self._request("GET", f"/installations/{id_site}/widgets/SolarChargerSummary")
         except Exception as exc:
             logger.debug("SolarChargerSummary widget unavailable for %s: %s", id_site, exc)
 
         try:
-            grid_data = await self._request(
-                "GET", f"/installations/{id_site}/widgets/GridMeter"
-            )
+            grid_data = await self._request("GET", f"/installations/{id_site}/widgets/GridMeter")
         except Exception as exc:
             logger.debug("GridMeter widget unavailable for %s: %s", id_site, exc)
 
@@ -196,9 +188,7 @@ class VictronVRMAdapter(ResidentialEnergyAdapter):
             source_system="victron",
         )
 
-    async def get_historical(
-        self, device_id: str, start: datetime, end: datetime
-    ) -> list[EnergySnapshot]:
+    async def get_historical(self, device_id: str, start: datetime, end: datetime) -> list[EnergySnapshot]:
         data = await self._request(
             "GET",
             f"/installations/{device_id}/stats",

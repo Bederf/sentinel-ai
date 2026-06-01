@@ -318,9 +318,12 @@ class TestCheckSiteAccessJsonFallback:
         clear_site_access_cache()
 
         # Patch the module-level path and force Supabase to fail
-        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file), patch(
-            "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
-            side_effect=Exception("No DB"),
+        with (
+            patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file),
+            patch(
+                "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
+                side_effect=Exception("No DB"),
+            ),
         ):
             ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="operator@example.com")
             assert _check_site_access(ctx, "site-002") is True
@@ -340,9 +343,12 @@ class TestCheckSiteAccessJsonFallback:
 
         clear_site_access_cache()
 
-        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file), patch(
-            "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
-            side_effect=Exception("No DB"),
+        with (
+            patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file),
+            patch(
+                "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
+                side_effect=Exception("No DB"),
+            ),
         ):
             ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="operator@example.com")
             assert _check_site_access(ctx, "site-999") is False
@@ -362,9 +368,12 @@ class TestCheckSiteAccessJsonFallback:
 
         clear_site_access_cache()
 
-        with patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file), patch(
-            "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
-            side_effect=Exception("No DB"),
+        with (
+            patch("app.security.pipeline._SITE_ACCESS_CONFIG_PATH", config_file),
+            patch(
+                "app.database.repositories.user_site_access_repository.get_user_site_access_repository",
+                side_effect=Exception("No DB"),
+            ),
         ):
             ctx = _make_auth_ctx(SentinelRole.OPERATOR, email="unknown@example.com")
             assert _check_site_access(ctx, "site-002") is False

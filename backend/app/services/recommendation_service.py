@@ -67,8 +67,9 @@ class RecommendationService:
 
         # Phase gate: check onboarding_phase before creating recommendation
         try:
-            from app.models.onboarding_phase import phase_allows as _rec_phase_allows
             from app.database.supabase_client import get_supabase_client
+            from app.models.onboarding_phase import phase_allows as _rec_phase_allows
+
             _sb = get_supabase_client()
             _row = _sb.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
             _phase = (_row.data[0].get("onboarding_phase") or "commissioning") if _row.data else "commissioning"

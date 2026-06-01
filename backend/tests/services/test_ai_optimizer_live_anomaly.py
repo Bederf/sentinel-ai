@@ -11,35 +11,49 @@ class TestPullLiveAnomalyScores:
         """Returns equipment that has at least one of anomaly_score or lstm_anomaly_score."""
         from unittest.mock import patch
 
-
         svc = AIOptimizerService()
 
-        fake_sb_resp = type("_FakeSBResp", (), {
-            "data": [
-                {
-                    "code": "S002-CHILLER-B1-001",
-                    "operating_data": {"anomaly_score": 0.72, "lstm_anomaly_score": 0.31},
-                    "updated_at": "2026-04-05T10:30:00Z",
-                }
-            ]
-        })()
+        fake_sb_resp = type(
+            "_FakeSBResp",
+            (),
+            {
+                "data": [
+                    {
+                        "code": "S002-CHILLER-B1-001",
+                        "operating_data": {"anomaly_score": 0.72, "lstm_anomaly_score": 0.31},
+                        "updated_at": "2026-04-05T10:30:00Z",
+                    }
+                ]
+            },
+        )()
 
         fake_site_resp = type("_FakeSiteResp", (), {"data": [{"id": "site-uuid-002"}]})()
 
         class FakeTable:
             def __init__(self, side_effect):
                 self._side_effect = side_effect
-            def select(self, *args): return self
-            def eq(self, *args): return self
-            def in_(self, *args): return self
+
+            def select(self, *args):
+                return self
+
+            def eq(self, *args):
+                return self
+
+            def in_(self, *args):
+                return self
+
             def execute(self):
                 if self._side_effect == "site":
                     return fake_site_resp
                 return fake_sb_resp
 
-        fake_sb = type("_FakeSB", (), {
-            "table": lambda self, name: FakeTable("equip" if name == "equipment" else "site"),
-        })()
+        fake_sb = type(
+            "_FakeSB",
+            (),
+            {
+                "table": lambda self, name: FakeTable("equip" if name == "equipment" else "site"),
+            },
+        )()
 
         with patch("app.database.supabase_client.get_supabase_client", return_value=fake_sb):
             result = await svc._pull_live_anomaly_scores("site-002", ["S002-CHILLER-B1-001"])
@@ -55,35 +69,51 @@ class TestPullLiveAnomalyScores:
         """Equipment with both scores None is excluded from results."""
         from unittest.mock import patch
 
-
         svc = AIOptimizerService()
 
-        fake_sb_resp = type("_FakeSBResp", (), {
-            "data": [
-                {"code": "S002-FCU-001", "operating_data": {}, "updated_at": "2026-04-05T10:30:00Z"},
-                {"code": "S002-FCU-002", "operating_data": {"room_temp": 22.1}, "updated_at": "2026-04-05T10:30:00Z"},
-            ]
-        })()
+        fake_sb_resp = type(
+            "_FakeSBResp",
+            (),
+            {
+                "data": [
+                    {"code": "S002-FCU-001", "operating_data": {}, "updated_at": "2026-04-05T10:30:00Z"},
+                    {
+                        "code": "S002-FCU-002",
+                        "operating_data": {"room_temp": 22.1},
+                        "updated_at": "2026-04-05T10:30:00Z",
+                    },
+                ]
+            },
+        )()
 
         fake_site_resp = type("_FakeSiteResp", (), {"data": [{"id": "site-uuid-002"}]})()
 
         class FakeTable:
             def __init__(self, side):
                 self._side = side
-            def select(self, *args): return self
-            def eq(self, *args): return self
-            def in_(self, *args): return self
+
+            def select(self, *args):
+                return self
+
+            def eq(self, *args):
+                return self
+
+            def in_(self, *args):
+                return self
+
             def execute(self):
                 return fake_site_resp if self._side == "site" else fake_sb_resp
 
-        fake_sb = type("_FakeSB", (), {
-            "table": lambda self, name: FakeTable("site" if name == "sites" else "equip"),
-        })()
+        fake_sb = type(
+            "_FakeSB",
+            (),
+            {
+                "table": lambda self, name: FakeTable("site" if name == "sites" else "equip"),
+            },
+        )()
 
         with patch("app.database.supabase_client.get_supabase_client", return_value=fake_sb):
-            result = await svc._pull_live_anomaly_scores(
-                "site-002", ["S002-FCU-001", "S002-FCU-002"]
-            )
+            result = await svc._pull_live_anomaly_scores("site-002", ["S002-FCU-001", "S002-FCU-002"])
 
         # Both rows have neither anomaly_score nor lstm_anomaly_score → excluded
         assert len(result) == 0

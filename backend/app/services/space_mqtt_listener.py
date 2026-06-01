@@ -249,7 +249,9 @@ class SpaceMqttListener:
                             settings.space_mqtt_topic,
                         )
                 else:
-                    logger.warning("Space MQTT listener connect failed: reason_code=%s (%s)", reason_code, type(reason_code))
+                    logger.warning(
+                        "Space MQTT listener connect failed: reason_code=%s (%s)", reason_code, type(reason_code)
+                    )
 
             def _on_message(_client, _userdata, message):
                 logger.warning("Space MQTT _on_message fired: topic=%s", message.topic)
@@ -275,7 +277,9 @@ class SpaceMqttListener:
             client.on_message = _on_message
             client.connect_async(settings.space_mqtt_broker, settings.space_mqtt_port, keepalive=30)
             client.loop_start()
-            logger.info("Space MQTT client started — connecting to %s:%d", settings.space_mqtt_broker, settings.space_mqtt_port)
+            logger.info(
+                "Space MQTT client started — connecting to %s:%d", settings.space_mqtt_broker, settings.space_mqtt_port
+            )
             self._client = client
 
     async def stop(self) -> None:

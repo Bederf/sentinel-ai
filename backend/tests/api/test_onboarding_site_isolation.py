@@ -3,19 +3,19 @@ Onboarding API site isolation tests (BOLA).
 
 Validates that /api/onboarding/* endpoints enforce site-level authorization.
 """
+
 import os
-import pytest
 from unittest.mock import patch
+
+import pytest
 from httpx import ASGITransport, AsyncClient
 
 os.environ.setdefault("DEMO_MODE", "true")
 os.environ.setdefault("TESTING", "true")
 os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-for-bola-testing-32chars")
 
-from app.config.demo_configs import USER_DEMO_CONFIGS
 from app.main import app
 from app.models.auth import AuthContext, SentinelRole
-
 
 OWNER_EMAIL = "onboarding-owner@sentinel.bms"
 OWNER_USER_ID = "onboarding-owner-001"
@@ -41,6 +41,7 @@ ATTACKER_AUTH = _make_auth_context(ATTACKER_EMAIL, SentinelRole.OPERATOR, ATTACK
 def _fake_auth_for(auth_ctx: AuthContext | None):
     async def _fake(request):
         return auth_ctx
+
     return _fake
 
 
@@ -116,6 +117,7 @@ async def attacker_client():
 # BOLA: baseline-eligibility
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_baseline_eligibility_site_002_blocked(attacker_client: AsyncClient):
     """Attacker on site-003 cannot query baseline-eligibility for site-002."""
@@ -131,14 +133,14 @@ async def test_baseline_eligibility_site_002_allowed(owner_client: AsyncClient):
     """Owner on site-002 can query their own baseline-eligibility."""
     response = await owner_client.get("/api/onboarding/baseline-eligibility?site_id=site-002")
     assert response.status_code in (200, 404), (
-        f"Owner got {response.status_code} for own site; expected 200/404. "
-        f"Body: {response.text[:200]}"
+        f"Owner got {response.status_code} for own site; expected 200/404. Body: {response.text[:200]}"
     )
 
 
 # ---------------------------------------------------------------------------
 # BOLA: seed-baselines
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_seed_baselines_site_002_blocked(attacker_client: AsyncClient):
@@ -161,14 +163,14 @@ async def test_seed_baselines_site_002_allowed(owner_client: AsyncClient):
         json={"equipment_ids": []},
     )
     assert response.status_code in (200, 404, 422), (
-        f"Owner got {response.status_code} for own site; expected 200/404/422. "
-        f"Body: {response.text[:200]}"
+        f"Owner got {response.status_code} for own site; expected 200/404/422. Body: {response.text[:200]}"
     )
 
 
 # ---------------------------------------------------------------------------
 # Authorization: owner still gets their own site
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_own_site_still_accessible(owner_client: AsyncClient):
@@ -180,6 +182,7 @@ async def test_own_site_still_accessible(owner_client: AsyncClient):
 # ---------------------------------------------------------------------------
 # Filter tampering: ensure no cross-site data leakage
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_seed_baselines_rejects_foreign_site_id(owner_client: AsyncClient):

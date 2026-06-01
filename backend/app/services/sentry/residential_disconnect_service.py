@@ -1,57 +1,64 @@
 from __future__ import annotations
 
-import json
 import logging
-import os
 
-import requests as http_requests
+import httpx
+
+from app.config.settings import settings
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
-def _bot_token() -> str:
-    with open(os.path.expanduser("~/.sentry/gateway/sentry.json")) as f:
-        return json.load(f)["channels"]["telegram"]["accounts"]["client"]["botToken"]
+# ── Telegram sender (home bot — never commercial) ─────────────────────────────
+
+from app.services.residential.residential_telegram_sender import ResidentialTelegramSender  # noqa: E402
+
+_sender = ResidentialTelegramSender()
+
+
+# ── API headers for backend auth ─────────────────────────────────────────────
+
 
 def _api_headers() -> dict:
-    from app.config.settings import settings as _settings
     return {
-        "X-Sentry-API-Key": _settings.sentry_bot_api_key,
-        "X-Sentry-Secret": _settings.sentry_webhook_secret,
+        "X-Sentry-API-Key": settings.sentry_bot_api_key,
+        "X-Sentry-Secret": settings.sentry_webhook_secret,
         "Content-Type": "application/json",
     }
 
-def _send(chat_id: int, text: str, reply_markup=None) -> dict | None:
-    payload = {"chat_id": chat_id, "text": text}
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
+
+def _send(chat_id: int, text: str, reply_markup: dict | None = None) -> dict | None:
+    """Send text via ResidentialTelegramSender. Returns result dict on success."""
     try:
-        r = http_requests.post(
-            f"https://api.telegram.org/bot{_bot_token()}/sendMessage",
-            json=payload, timeout=10,
-        )
-        r.raise_for_status()
-        return r.json().get("result")
+        import asyncio
+
+        result = asyncio.get_event_loop().run_until_complete(_sender.send_text(chat_id, text, reply_markup))
+        return {"message_id": 0} if result else None
     except Exception as exc:
         logger.error("send failed: %s", exc)
         return None
 
+
 def _answer_callback(callback_query_id: str) -> None:
+    """Must be called FIRST on callback receipt to dismiss spinner."""
     try:
-        http_requests.post(
-            f"https://api.telegram.org/bot{_bot_token()}/answerCallbackQuery",
-            json={"callback_query_id": callback_query_id},
-            timeout=5,
-        )
+        import asyncio
+
+        asyncio.get_event_loop().run_until_complete(_sender.answer_callback_query(callback_query_id))
     except Exception as exc:
         logger.warning("answerCallbackQuery failed: %s", exc)
 
+
 def _confirmation_keyboard(yes_data: str = "disconnect:confirm") -> dict:
     return {
-        "inline_keyboard": [[
-            {"text": "✅ Yes, disconnect", "callback_data": yes_data},
-            {"text": "Cancel", "callback_data": "confirm:cancel"},
-        ]]
+        "inline_keyboard": [
+            [
+                {"text": "✅ Yes, disconnect", "callback_data": yes_data},
+                {"text": "Cancel", "callback_data": "confirm:cancel"},
+            ]
+        ]
     }
+
 
 class ResidentialDisconnectService:
     def handle_disconnect(self, chat_id: int) -> str:
@@ -59,7 +66,6 @@ class ResidentialDisconnectService:
         site_id = f"res-{chat_id}"
 
         # Check if site exists and is active
-        import httpx
         try:
             r = httpx.get(
                 f"http://localhost:9095/api/residential/deactivate/{site_id}",
@@ -73,10 +79,11 @@ class ResidentialDisconnectService:
             logger.error("pre-check failed for chat_id=%s: %s", chat_id, exc)
 
         # Site exists — ask for confirmation
-        _send(chat_id,
-              "Are you sure you want to disconnect?\n"
-              "This will stop all monitoring and alerts.",
-              reply_markup=_confirmation_keyboard())
+        _send(
+            chat_id,
+            "Are you sure you want to disconnect?\nThis will stop all monitoring and alerts.",
+            reply_markup=_confirmation_keyboard(),
+        )
         return None  # message sent via _send
 
     def handle_disconnect_confirm(self, chat_id: int, callback_query_id: str) -> str:
@@ -88,12 +95,36 @@ class ResidentialDisconnectService:
         # Clear conversation state first
         try:
             from app.services.sentry.conversation_state import ConversationStateManager
+
             ConversationStateManager().clear(chat_id)
         except Exception as exc:
             logger.warning("state clear failed for chat_id=%s: %s", chat_id, exc)
 
+        # Check if HA site — stop gateway first
+        try:
+            supabase = get_supabase_client()
+            row = supabase.table("residential_sites").select("platform").eq("site_id", site_id).maybe_execute()
+            is_ha = row.data and row.data[0].get("platform") == "home_assistant" if row.data else False
+        except Exception as exc:
+            logger.warning("Could not check platform for site_id=%s: %s", site_id, exc)
+            is_ha = False
+
+        if is_ha:
+            try:
+                from app.services.residential.bridge_scheduler import stop_ha_gateway
+
+                stop_ha_gateway(site_id)
+            except Exception as exc:
+                logger.warning("HA gateway stop failed for %s: %s", site_id, exc)
+
+            try:
+                from app.services.residential.wireguard_peer_manager import WireGuardPeerManager
+
+                WireGuardPeerManager().revoke_peer(site_id)
+            except Exception as exc:
+                logger.warning("WireGuard peer revoke failed for %s: %s", site_id, exc)
+
         # Call deactivate endpoint
-        import httpx
         try:
             r = httpx.post(
                 f"http://localhost:9095/api/residential/deactivate/{site_id}",
@@ -101,8 +132,17 @@ class ResidentialDisconnectService:
                 timeout=15,
             )
             if r.status_code in (200, 404):
-                return ("✅ Disconnected. SENTINEL will no longer monitor your system.\n"
-                        "Send /connect to reconnect at any time.")
+                if is_ha:
+                    return (
+                        "✅ Disconnected. SENTINEL will no longer monitor your system.\n\n"
+                        "Also remove the SENTINEL peer from your\n"
+                        "Home Assistant WireGuard Add-on to\n"
+                        "complete the disconnection."
+                    )
+                return (
+                    "✅ Disconnected. SENTINEL will no longer monitor your system.\n"
+                    "Send /connect to reconnect at any time."
+                )
             else:
                 logger.error("deactivate failed for chat_id=%s: status=%s", chat_id, r.status_code)
                 return "Failed to disconnect. Please try again or contact support."

@@ -91,7 +91,12 @@ class EmailClusterRepository:
     def increment_cluster(self, cluster_id: str) -> dict[str, Any]:
         now = datetime.utcnow().isoformat()
         updates = {
-            "email_count": self.client.table("email_clusters").select("email_count").eq("id", cluster_id).execute().data[0]["email_count"] + 1,
+            "email_count": self.client.table("email_clusters")
+            .select("email_count")
+            .eq("id", cluster_id)
+            .execute()
+            .data[0]["email_count"]
+            + 1,
             "last_seen": now,
             "updated_at": now,
         }
@@ -131,10 +136,12 @@ class EmailClusterRepository:
     def link_intake_to_cluster(self, intake_id: str, cluster_id: str) -> None:
         if self.client:
             try:
-                self.client.table("email_intake_clusters").insert({
-                    "intake_id": intake_id,
-                    "cluster_id": cluster_id,
-                }).execute()
+                self.client.table("email_intake_clusters").insert(
+                    {
+                        "intake_id": intake_id,
+                        "cluster_id": cluster_id,
+                    }
+                ).execute()
             except Exception as exc:
                 # Ignore duplicate key — idempotent
                 if "duplicate key" not in str(exc).lower():

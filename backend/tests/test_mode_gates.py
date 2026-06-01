@@ -12,8 +12,8 @@ Stage names match site-002-mode-policy.json stage_order:
 Execution requires supervised or automatic.
 """
 
+
 import pytest
-from unittest.mock import MagicMock
 
 
 class TestModeGateGeneration:
@@ -21,13 +21,16 @@ class TestModeGateGeneration:
 
     GENERATION_ALLOWED = {"shadow_live", "advisory", "supervised", "automatic"}
 
-    @pytest.mark.parametrize("mode,expected_generation", [
-        ("shadow_live", True),
-        ("advisory", True),
-        ("supervised", True),
-        ("automatic", True),
-        ("commissioning", False),
-    ])
+    @pytest.mark.parametrize(
+        "mode,expected_generation",
+        [
+            ("shadow_live", True),
+            ("advisory", True),
+            ("supervised", True),
+            ("automatic", True),
+            ("commissioning", False),
+        ],
+    )
     def test_generation_gate_logic(self, mode, expected_generation):
         """Commissioning is the only mode that blocks generation."""
         should_run = mode in self.GENERATION_ALLOWED
@@ -98,13 +101,16 @@ class TestModeGateExecution:
 
     EXECUTION_ALLOWED = {"supervised", "automatic"}
 
-    @pytest.mark.parametrize("mode,expected_execution", [
-        ("shadow_live", False),
-        ("advisory", False),
-        ("supervised", True),
-        ("automatic", True),
-        ("commissioning", False),
-    ])
+    @pytest.mark.parametrize(
+        "mode,expected_execution",
+        [
+            ("shadow_live", False),
+            ("advisory", False),
+            ("supervised", True),
+            ("automatic", True),
+            ("commissioning", False),
+        ],
+    )
     def test_execution_gate_logic(self, mode, expected_execution):
         """Only supervised and automatic allow execution."""
         should_allow = mode in self.EXECUTION_ALLOWED

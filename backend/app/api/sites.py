@@ -932,7 +932,7 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
 
             shutil.copy2(policy_src, policy_dst)
             # Patch site_id in the copied policy
-            with open(policy_dst, "r") as f:
+            with open(policy_dst) as f:
                 policy_data = json.load(f)
             policy_data["site_id"] = site_id
             policy_data["default_stage"] = "commissioning"

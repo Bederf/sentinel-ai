@@ -353,8 +353,6 @@ def format_response_node(state: ComplaintState) -> dict:
 
 def _send_escalation_email(state: ComplaintState) -> None:
     """Send escalation email to helpdesk in a fire-and-forget thread."""
-    import json
-    import os
     import threading
     from datetime import UTC, datetime
 
@@ -379,22 +377,23 @@ def _send_escalation_email(state: ComplaintState) -> None:
 
     body = f"""Unclassified Facilities Complaint
 
-User: {escalation_record['reporter_name']}
-Telegram ID: {escalation_record['reporter_telegram_id']}
-Timestamp: {escalation_record['timestamp']}
+User: {escalation_record["reporter_name"]}
+Telegram ID: {escalation_record["reporter_telegram_id"]}
+Timestamp: {escalation_record["timestamp"]}
 
 Complaint:
-{escalation_record['original_message']}
+{escalation_record["original_message"]}
 
 ---
 Action Required:
 Review the complaint and create a work order if applicable.
 
-Status: {escalation_record['status']}
+Status: {escalation_record["status"]}
 """
 
     def _send():
         import asyncio
+
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -432,7 +431,7 @@ def _append_escalation_record(record: dict) -> None:
 
     try:
         if os.path.exists(escalations_path):
-            with open(escalations_path, "r") as f:
+            with open(escalations_path) as f:
                 data = json.load(f)
         else:
             data = []

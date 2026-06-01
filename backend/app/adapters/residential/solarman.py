@@ -29,9 +29,7 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
     def _refresh_token(self) -> None:
         """Sync token refresh using httpx.Client — safe for BackgroundScheduler threads."""
         email = self._site_config["email"]
-        password_hash = hashlib.sha256(
-            self._site_config["password"].encode()
-        ).hexdigest()
+        password_hash = hashlib.sha256(self._site_config["password"].encode()).hexdigest()
         with httpx.Client(timeout=15) as client:
             resp = client.post(
                 f"{self.BASE_URL}/v1.0/token/generate",
@@ -131,9 +129,7 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
             source_system="solarman",
         )
 
-    async def get_historical(
-        self, device_id: str, start: datetime, end: datetime
-    ) -> list[EnergySnapshot]:
+    async def get_historical(self, device_id: str, start: datetime, end: datetime) -> list[EnergySnapshot]:
         data = await self._request(
             "POST",
             "/v1.0/device/historical",

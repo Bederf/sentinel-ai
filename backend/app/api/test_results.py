@@ -8,10 +8,8 @@ Serves test results from various test runners:
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -99,9 +97,13 @@ def parse_vitest_results(project_root: Path) -> TestRun | None:
                     status="success",
                     duration="2.5s",
                     metadata={
-                        "coverage": f"{coverage.get('total', {}).get('lines', {}).get('pct', 0)}%" if coverage else "N/A",
+                        "coverage": f"{coverage.get('total', {}).get('lines', {}).get('pct', 0)}%"
+                        if coverage
+                        else "N/A",
                         "files": str(len(coverage.keys()) - 1) if coverage else "N/A",
-                    } if coverage else None,
+                    }
+                    if coverage
+                    else None,
                 ),
                 TimelineEvent(
                     id="2",
@@ -220,12 +222,14 @@ def parse_performance_results(project_root: Path) -> TestRun | None:
         cache = perf_results.get("cache", {})
         memory = perf_results.get("memory", {})
 
-        passed_count = sum([
-            passes.get("networkClean", False),
-            passes.get("rendersOptimized", False),
-            passes.get("cacheEffective", False),
-            passes.get("memoryHealthy", False),
-        ])
+        passed_count = sum(
+            [
+                passes.get("networkClean", False),
+                passes.get("rendersOptimized", False),
+                passes.get("cacheEffective", False),
+                passes.get("memoryHealthy", False),
+            ]
+        )
 
         return TestRun(
             runId=f"perf-{int(datetime.now().timestamp() * 1000)}",
@@ -382,7 +386,7 @@ async def get_test_results() -> TestResultsResponse:
             lastUpdated=datetime.now().isoformat(),
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch test results: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch test results: {e!s}")
 
 
 @router.get("/{run_id}", response_model=TestRun)
@@ -408,4 +412,4 @@ async def get_test_run(run_id: str) -> TestRun:
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch test run: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch test run: {e!s}")

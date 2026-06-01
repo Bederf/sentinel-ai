@@ -173,9 +173,7 @@ class InspectionRepository:
             return InspectionTask(**result.data[0])
         return None
 
-    async def update_task_assignment(
-        self, task_id: str, assigned_to: str, assigned_by: str
-    ) -> InspectionTask | None:
+    async def update_task_assignment(self, task_id: str, assigned_to: str, assigned_by: str) -> InspectionTask | None:
         """Update task assignment."""
         update_data = {"assigned_to": assigned_to, "assigned_by": assigned_by, "updated_at": datetime.now().isoformat()}
 
@@ -416,9 +414,7 @@ class InspectionRepository:
 
         return stats
 
-    async def get_deficiency_statistics(
-        self, equipment_id: str | None = None, days_back: int = 30
-    ) -> dict[str, Any]:
+    async def get_deficiency_statistics(self, equipment_id: str | None = None, days_back: int = 30) -> dict[str, Any]:
         """Get deficiency statistics."""
         start_date = datetime.now() - timedelta(days=days_back)
 

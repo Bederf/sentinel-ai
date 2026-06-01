@@ -6,7 +6,6 @@ manufacturer + model. Falls back gracefully if Firecrawl isn't configured.
 """
 
 import asyncio
-import json
 import logging
 import os
 import subprocess
@@ -97,7 +96,9 @@ async def scrape_oem_parts(
         if all_parts:
             logger.info(
                 "[OEM SCRAPE] Found %d parts for %s %s",
-                len(all_parts), manufacturer, model,
+                len(all_parts),
+                manufacturer,
+                model,
             )
         else:
             logger.info("[OEM SCRAPE] No parts found for %s %s", manufacturer, model)
@@ -112,8 +113,12 @@ async def _run_firecrawl_search(query: str, api_key: str) -> str | None:
     """Run Firecrawl search for parts query."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "npx", "firecrawl-cli@latest", "search", query,
-            "--limit", "5",
+            "npx",
+            "firecrawl-cli@latest",
+            "search",
+            query,
+            "--limit",
+            "5",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env={**os.environ, "FIRECRAWL_API_KEY": api_key},
@@ -123,7 +128,7 @@ async def _run_firecrawl_search(query: str, api_key: str) -> str | None:
             logger.debug("[OEM SCRAPE] Search failed: %s", stderr.decode()[:200])
             return None
         return stdout.decode()
-    except (asyncio.TimeoutError, FileNotFoundError) as e:
+    except (TimeoutError, FileNotFoundError) as e:
         logger.debug("[OEM SCRAPE] Search error: %s", e)
         return None
 
@@ -132,9 +137,14 @@ async def _run_firecrawl_scrape(url: str, api_key: str) -> str | None:
     """Run Firecrawl scrape on a URL."""
     try:
         proc = await asyncio.create_subprocess_exec(
-            "npx", "firecrawl-cli@latest", "scrape", url,
-            "--format", "markdown",
-            "--wait-for", "3000",
+            "npx",
+            "firecrawl-cli@latest",
+            "scrape",
+            url,
+            "--format",
+            "markdown",
+            "--wait-for",
+            "3000",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             env={**os.environ, "FIRECRAWL_API_KEY": api_key},
@@ -144,7 +154,7 @@ async def _run_firecrawl_scrape(url: str, api_key: str) -> str | None:
             logger.debug("[OEM SCRAPE] Scrape failed: %s", stderr.decode()[:200])
             return None
         return stdout.decode()
-    except (asyncio.TimeoutError, FileNotFoundError) as e:
+    except (TimeoutError, FileNotFoundError) as e:
         logger.debug("[OEM SCRAPE] Scrape error: %s", e)
         return None
 
@@ -197,11 +207,31 @@ def _extract_parts_from_content(
         re.compile(r"\b([A-Z]{2,}[-][A-Z0-9]+[-][A-Z0-9]+)\b"),
     ]
     price_zar_pattern = re.compile(r"(?:R|ZAR|USD)\s*([\d,]+(?:\.\d{2})?)")
-    parts_keywords = {"filter", "belt", "seal", "bearing", "valve", "sensor",
-                      "actuator", "motor", "pump", "capacitor", "board",
-                      "gasket", "impeller", "relay", "thermostat", "coil",
-                      "drier", "strainer", "oil", "refrigerant", "spare",
-                      "replacement", "part"}
+    parts_keywords = {
+        "filter",
+        "belt",
+        "seal",
+        "bearing",
+        "valve",
+        "sensor",
+        "actuator",
+        "motor",
+        "pump",
+        "capacitor",
+        "board",
+        "gasket",
+        "impeller",
+        "relay",
+        "thermostat",
+        "coil",
+        "drier",
+        "strainer",
+        "oil",
+        "refrigerant",
+        "spare",
+        "replacement",
+        "part",
+    }
 
     lines = content.split("\n")
     for i, line in enumerate(lines):
@@ -241,9 +271,7 @@ def _extract_parts_from_content(
             price_match = price_zar_pattern.search(line)
             if price_match:
                 try:
-                    part_entry["unit_cost_zar"] = round(
-                        float(price_match.group(1).replace(",", "")), 2
-                    )
+                    part_entry["unit_cost_zar"] = round(float(price_match.group(1).replace(",", "")), 2)
                 except ValueError:
                     pass
 

@@ -14,9 +14,7 @@ class TestFreshnessGateFailClosed:
         """Exception in data quality check → freshness_hours=9999 → ingest skipped."""
         from app.services.sentinel_data_sync import SentinelDataSync
 
-        with patch(
-            "app.database.repositories.integration_repository.IntegrationRepository"
-        ) as mock_repo_class:
+        with patch("app.database.repositories.integration_repository.IntegrationRepository") as mock_repo_class:
             mock_repo = MagicMock()
             mock_repo.get_data_quality_metrics.side_effect = RuntimeError("DB unreachable")
             mock_repo_class.return_value = mock_repo
@@ -43,9 +41,7 @@ class TestMlHoursPersistence:
 
         mock_sites = {"id": "site-002", "ml_hours_ingested": None}
 
-        with patch(
-            "app.database.repositories.integration_repository.IntegrationRepository"
-        ) as mock_repo_class:
+        with patch("app.database.repositories.integration_repository.IntegrationRepository") as mock_repo_class:
             mock_repo = MagicMock()
             mock_repo.get_data_quality_metrics.return_value = {
                 "data_freshness_hours": 1.0,

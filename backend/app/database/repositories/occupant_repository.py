@@ -49,12 +49,7 @@ class SiteOccupantRepository:
             return None
         try:
             result = (
-                self.client.table("site_occupants")
-                .select("*")
-                .eq("phone", phone)
-                .eq("active", True)
-                .limit(1)
-                .execute()
+                self.client.table("site_occupants").select("*").eq("phone", phone).eq("active", True).limit(1).execute()
             )
             return result.data[0] if result.data else None
         except Exception as e:
@@ -74,7 +69,6 @@ class SiteOccupantRepository:
             logger.warning("Supabase client not available")
             return None
         try:
-            import uuid
 
             resolved = self._resolve_site_uuid(site_id)
             data = {

@@ -110,7 +110,7 @@ async def discover_device(request: DiscoverDeviceRequest) -> dict:
     try:
         ip = _get_gateway_ip(request.gateway_ip)
     except HTTPException:
-            return await _simulated_discovery(
+        return await _simulated_discovery(
             request.equipment_code,
             "led_panel",
             request.dali_address or 1,

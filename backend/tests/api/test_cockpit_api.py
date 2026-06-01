@@ -3,7 +3,6 @@ from __future__ import annotations
 import os
 import uuid
 from datetime import UTC, datetime, timedelta
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -15,7 +14,6 @@ from app.api.cockpit import (
     CockpitIssueLocation,
     CockpitSourceStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # Shared helpers for API-level tests
@@ -264,9 +262,8 @@ async def test_api_get_decision_with_issues(monkeypatch):
     """API-level: GET /cockpit/decision/S002 returns issue payload."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
-
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     issue = _make_issue()
     now = datetime.now(UTC)
@@ -315,8 +312,8 @@ async def test_api_get_decision_null_in_commissioning(monkeypatch):
     """Phase gate: commissioning phase returns null payload."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     async def _mock_phase(site_id: str) -> str:
         return "commissioning"
@@ -341,8 +338,8 @@ async def test_api_get_decision_null_in_shadow_live(monkeypatch):
     """Phase gate: shadow_live phase returns null payload."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     async def _mock_phase(site_id: str) -> str:
         return "shadow_live"
@@ -367,8 +364,8 @@ async def test_api_action_acknowledge(monkeypatch):
     """POST /cockpit/issues/.../action — acknowledge transitions new→triaged."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     issue = _seed_issue(_make_issue())
 
@@ -408,8 +405,8 @@ async def test_api_action_blocked_in_advisory(monkeypatch):
     """Advisory posture blocks create_work_order (403)."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     issue = _seed_issue(_make_issue())
     issue.status = "triaged"
@@ -447,8 +444,8 @@ async def test_api_action_blocked_when_control_disabled(monkeypatch):
     """control_enabled=False blocks create_work_order even in supervised phase (403)."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     issue = _seed_issue(_make_issue())
     issue.status = "triaged"
@@ -487,8 +484,8 @@ async def test_api_approve_rejected_in_advisory(monkeypatch):
     """POST /cockpit/decision/approve/{site_id} blocked in advisory phase (400)."""
     from httpx import ASGITransport, AsyncClient
 
-    from app.main import app as fastapi_app
     from app.api import cockpit as c
+    from app.main import app as fastapi_app
 
     async def _mock_phase(site_id: str) -> str:
         return "advisory"

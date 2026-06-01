@@ -324,8 +324,9 @@ async def close_focus_session(
     session_id: str,
 ) -> dict[str, Any]:
     """Manually close an active focus room session (admin override)."""
-    from app.services import occupancy_store
     from datetime import datetime, timedelta, timezone
+
+    from app.services import occupancy_store
 
     # SAST is UTC+2
     SAST = timezone(timedelta(hours=2))
@@ -397,9 +398,12 @@ async def get_room_occupancy(
         )
     else:
         # Get all rooms with their latest event
-        resp = client.table("space_occupancy_events").select(
-            "room_code, sensor_id, occupied, timestamp"
-        ).eq("site_id", site_id).execute()
+        resp = (
+            client.table("space_occupancy_events")
+            .select("room_code, sensor_id, occupied, timestamp")
+            .eq("site_id", site_id)
+            .execute()
+        )
 
     # Deduplicate to latest per room
     seen: dict[str, dict] = {}

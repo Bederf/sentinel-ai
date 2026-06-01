@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 from datetime import UTC, datetime, timezone
 from typing import Any
 
@@ -11,7 +10,6 @@ from app.models.booking_record import BlockBookingConfig
 from app.models.space_occupancy import GhostBookingFinding
 from app.services import occupancy_store
 from app.services.ghost_booking_detector import concierge_confirm_empty, concierge_confirm_occupied
-from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
 logger = logging.getLogger(__name__)
 
@@ -310,6 +308,7 @@ async def send_ghost_booking_alert(
     # Check if ghost booking notifications are enabled in space settings
     try:
         from app.api.space_settings import _load_space_settings
+
         space_settings = _load_space_settings()
         if not space_settings.get("ghost_booking_notifications_enabled", False):
             logger.info("Ghost booking alerts disabled by space_settings toggle — skipping")

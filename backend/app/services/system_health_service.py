@@ -1062,11 +1062,7 @@ class SystemHealthService:
 
         try:
             freshness_rows = (
-                self.client.table("data_freshness")
-                .select("*")
-                .eq("site_id", site_id)
-                .order("data_source")
-                .execute()
+                self.client.table("data_freshness").select("*").eq("site_id", site_id).order("data_source").execute()
             )
 
             sources = []

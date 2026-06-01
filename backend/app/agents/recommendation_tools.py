@@ -8,7 +8,7 @@ LLM usage: Zero. All functions are pure Python service calls.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -516,8 +516,8 @@ def check_recommendation_freshness(recommendation: dict[str, Any], max_age_minut
         rec_time = datetime.fromisoformat(timestamp_str) if isinstance(timestamp_str, str) else timestamp_str
         # Ensure rec_time is timezone-aware (UTC); normalize naive datetimes to UTC
         if rec_time.tzinfo is None:
-            rec_time = rec_time.replace(tzinfo=timezone.utc)
-        now_utc = datetime.now(timezone.utc)
+            rec_time = rec_time.replace(tzinfo=UTC)
+        now_utc = datetime.now(UTC)
         age = now_utc - rec_time
         age_minutes = age.total_seconds() / 60
 

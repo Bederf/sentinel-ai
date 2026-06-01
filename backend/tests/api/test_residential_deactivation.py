@@ -19,6 +19,7 @@ def _supabase_with_active_site(site_id: str = "site-test") -> MagicMock:
 
 # ── Happy path ────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_deactivate_happy_path():
     sb = _supabase_with_active_site()
@@ -60,6 +61,7 @@ async def test_deactivate_raises_404_for_unknown_site():
 
 
 # ── Teardown sequence ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_deactivate_calls_remove_polling_job():
@@ -104,13 +106,11 @@ async def test_deactivate_marks_db_inactive():
 
     # Verify update was called with is_active=False
     update_calls = sb.table.return_value.update.call_args_list
-    assert any(
-        call.args and call.args[0].get("is_active") is False
-        for call in update_calls
-    )
+    assert any(call.args and call.args[0].get("is_active") is False for call in update_calls)
 
 
 # ── Resilience ────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_deactivate_continues_if_polling_job_missing():
@@ -143,7 +143,4 @@ async def test_deactivate_continues_if_acl_revocation_fails():
 
     assert result["status"] == "deactivated"
     update_calls = sb.table.return_value.update.call_args_list
-    assert any(
-        call.args and call.args[0].get("is_active") is False
-        for call in update_calls
-    )
+    assert any(call.args and call.args[0].get("is_active") is False for call in update_calls)

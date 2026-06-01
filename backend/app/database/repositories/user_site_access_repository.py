@@ -88,10 +88,7 @@ class UserSiteAccessRepository:
         try:
             email = user_email.lower().strip()
             result = (
-                self.client.table("user_site_access")
-                .select("site_id, sites(code)")
-                .eq("user_email", email)
-                .execute()
+                self.client.table("user_site_access").select("site_id, sites(code)").eq("user_email", email).execute()
             )
 
             codes = []

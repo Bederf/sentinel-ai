@@ -3,6 +3,7 @@
 import contextlib
 import logging
 from collections.abc import AsyncGenerator
+from datetime import UTC
 from typing import Any
 
 import httpx
@@ -473,13 +474,14 @@ async def generate_sse_stream(
     # Inject FM preferences from previous sessions as context
     if site_id and user_email:
         try:
+            from datetime import datetime
+
             from app.repositories.preference_repository import preference_repo
-            from datetime import datetime, timezone
 
             prefs = await preference_repo.fetch_active_by_user(site_id, user_email)
             if prefs:
                 pref_lines = ["## FM Preferences (from previous sessions):"]
-                now = datetime.now(tz=timezone.utc)
+                now = datetime.now(tz=UTC)
                 for p in prefs:
                     days_ago = (now - p.created_at).days if p.created_at else 0
                     summary = _format_preference_summary(p)
@@ -1006,28 +1008,27 @@ async def chat_tts_stream(
 
     async def stream_audio():
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
-                    headers={
-                        "xi-api-key": settings.elevenlabs_api_key,
-                        "Content-Type": "application/json",
-                        "Accept": "audio/mpeg",
+            async with httpx.AsyncClient(timeout=120.0) as client, client.stream(
+                "POST",
+                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
+                headers={
+                    "xi-api-key": settings.elevenlabs_api_key,
+                    "Content-Type": "application/json",
+                    "Accept": "audio/mpeg",
+                },
+                json={
+                    "text": text,
+                    "model_id": stt_request.model,
+                    "voice_settings": {
+                        "stability": 0.5,
+                        "similarity_boost": 0.75,
                     },
-                    json={
-                        "text": text,
-                        "model_id": stt_request.model,
-                        "voice_settings": {
-                            "stability": 0.5,
-                            "similarity_boost": 0.75,
-                        },
-                    },
-                ) as response:
-                    response.raise_for_status()
-                    async for chunk in response.aiter_bytes(chunk_size=8192):
-                        if chunk:
-                            yield chunk
+                },
+            ) as response:
+                response.raise_for_status()
+                async for chunk in response.aiter_bytes(chunk_size=8192):
+                    if chunk:
+                        yield chunk
         except httpx.HTTPStatusError as e:
             logger.error(f"ElevenLabs streaming TTS error {e.response.status_code}: {e.response.text[:200]}")
         except Exception as e:

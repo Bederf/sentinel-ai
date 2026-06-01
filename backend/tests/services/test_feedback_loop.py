@@ -279,14 +279,17 @@ class TestRejectionLearning:
                     previous_rejection3,
                 ]
 
-                with patch.object(
-                    learning_service,
-                    "_add_action_constraint",
-                    new_callable=AsyncMock,
-                ) as mock_add_constraint, patch.object(
-                    learning_service.profile_service,
-                    "load_site_profile_config",
-                    return_value=None,
+                with (
+                    patch.object(
+                        learning_service,
+                        "_add_action_constraint",
+                        new_callable=AsyncMock,
+                    ) as mock_add_constraint,
+                    patch.object(
+                        learning_service.profile_service,
+                        "load_site_profile_config",
+                        return_value=None,
+                    ),
                 ):
                     await learning_service.process_rejection(rec, "Too cold")
 
@@ -456,14 +459,17 @@ class TestFeedbackLoopIntegration:
                 # Return all 3 rejections to trigger pattern (>= 3)
                 mock_get_recent.return_value = rejection_records
 
-                with patch.object(
-                    learning_service,
-                    "_add_action_constraint",
-                    new_callable=AsyncMock,
-                ) as mock_constraint, patch.object(
-                    learning_service.profile_service,
-                    "load_site_profile_config",
-                    return_value=None,
+                with (
+                    patch.object(
+                        learning_service,
+                        "_add_action_constraint",
+                        new_callable=AsyncMock,
+                    ) as mock_constraint,
+                    patch.object(
+                        learning_service.profile_service,
+                        "load_site_profile_config",
+                        return_value=None,
+                    ),
                 ):
                     await learning_service.process_rejection(rec, "Too cold")
                     # Should call add_action_constraint with 3+ rejections

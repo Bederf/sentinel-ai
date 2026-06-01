@@ -244,9 +244,9 @@ Run these Supabase queries monthly and log results to `energy/monthly-enpi-<YYYY
 
 ```sql
 -- Energy intensity (kWh/m²)
-SELECT 
+SELECT
   ROUND(SUM(total_kwh) / NULLIF(4850, 0), 2) AS energy_intensity_kwh_m2
-FROM energy_consumption_history 
+FROM energy_consumption_history
 WHERE site_id = 'site-002'
   AND date >= '2026-01-01' AND date < '2026-02-01';
 
@@ -256,16 +256,16 @@ WHERE site_id = 'site-002'
 -- Calculate: chiller_power_kw / chiller_cooling_tons
 
 -- Solar self-consumption rate
-SELECT 
+SELECT
   ROUND(SUM(discharge_kwh) / NULLIF(SUM(solar_yield_kwh), 0) * 100, 1) AS solar_self_consumption_pct
-FROM solar_bess 
+FROM solar_bess
 WHERE site_id = 'site-002'
   AND reading_time >= '2026-01-01' AND reading_time < '2026-02-01';
 
 -- BESS round-trip efficiency
-SELECT 
+SELECT
   ROUND(SUM(discharge_kwh) / NULLIF(SUM(charge_kwh), 0) * 100, 1) AS bess_rte_pct
-FROM solar_bess 
+FROM solar_bess
 WHERE site_id = 'site-002'
   AND reading_time >= '2026-01-01' AND reading_time < '2026-02-01';
 ```

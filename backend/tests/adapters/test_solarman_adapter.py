@@ -32,6 +32,7 @@ def _mock_sync_client(token_resp: MagicMock):
 
 # ── Token management ─────────────────────────────────────────────────────────
 
+
 def test_get_token_calls_refresh_once():
     adapter = _make_adapter()
     token_resp = _mock_token_response()
@@ -57,6 +58,7 @@ def test_refresh_token_uses_sha256_password():
     call_kwargs = sync_client.post.call_args
     body = call_kwargs.kwargs["json"] if call_kwargs.kwargs else call_kwargs[1]["json"]
     import hashlib
+
     expected_hash = hashlib.sha256(b"secret").hexdigest()
     assert body["password"] == expected_hash
     assert "secret" not in body["password"]
@@ -86,6 +88,7 @@ def test_token_refresh_on_401():
 
 # ── authenticate ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_authenticate_success():
     adapter = _make_adapter()
@@ -114,6 +117,7 @@ async def test_authenticate_failure_returns_false():
 
 
 # ── discover_devices ──────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_discover_devices_returns_manifests():
@@ -146,6 +150,7 @@ async def test_discover_devices_returns_manifests():
 
 
 # ── get_realtime ──────────────────────────────────────────────────────────────
+
 
 def _patch_async_client(resp: MagicMock):
     """Helper: patch httpx.AsyncClient to return a mock response."""

@@ -6,7 +6,6 @@ stages, frequency/voltage trending, and compliance reports.
 Pattern follows solar.py and devices.py routers.
 """
 
-
 from datetime import UTC
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request

@@ -513,16 +513,20 @@ class NotificationService:
 
             try:
                 from app.database.supabase_client import get_supabase_client
-                from app.models.onboarding_phase import phase_allows
                 from app.models.module_registry import ModuleType
+                from app.models.onboarding_phase import phase_allows
                 from app.services.module_registry_service import module_registry
 
                 try:
                     sb = get_supabase_client()
-                    phase_result = sb.table("sites").select("onboarding_phase").eq("code", rec.site_id).limit(1).execute()
+                    phase_result = (
+                        sb.table("sites").select("onboarding_phase").eq("code", rec.site_id).limit(1).execute()
+                    )
                     site_phase = (
-                        phase_result.data[0].get("onboarding_phase") or "commissioning"
-                    ) if phase_result.data else "commissioning"
+                        (phase_result.data[0].get("onboarding_phase") or "commissioning")
+                        if phase_result.data
+                        else "commissioning"
+                    )
                 except Exception:
                     site_phase = "commissioning"
 
@@ -596,11 +600,7 @@ class NotificationService:
             unit = impact.get("unit", "")
             current_value = impact.get("current_value")
             recommended_value = impact.get("recommended_value", action_value)
-            current_line = (
-                f"Current value: {current_value}{unit}\n"
-                if current_value is not None
-                else ""
-            )
+            current_line = f"Current value: {current_value}{unit}\n" if current_value is not None else ""
 
             description = (
                 f"Created from SENTINEL AI advisory recommendation {recommendation_id}.\n\n"
@@ -620,6 +620,7 @@ class NotificationService:
             assigned_team = None
             try:
                 from app.database.repositories.technician_repository import TechnicianRepository
+
                 tech_repo = TechnicianRepository()
                 technician = await tech_repo.get_technician_for_equipment_code(equipment_code)
                 if technician:
@@ -715,7 +716,6 @@ class NotificationService:
         Uses the workflow trigger engine (on_prediction_critical) to create
         the work order, which handles dedup against existing open work orders.
         """
-        from uuid import UUID as _UUID
 
         try:
             from app.database.repositories.prediction_repository import get_prediction_repository
@@ -749,14 +749,18 @@ class NotificationService:
             # Gate check: maintenance module must be active
             try:
                 from app.database.supabase_client import get_supabase_client
-                from app.models.onboarding_phase import phase_allows
                 from app.models.module_registry import ModuleType
+                from app.models.onboarding_phase import phase_allows
                 from app.services.module_registry_service import module_registry
 
                 try:
                     sb = get_supabase_client()
                     phase_result = sb.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
-                    site_phase = (phase_result.data[0].get("onboarding_phase") or "commissioning") if phase_result.data else "commissioning"
+                    site_phase = (
+                        (phase_result.data[0].get("onboarding_phase") or "commissioning")
+                        if phase_result.data
+                        else "commissioning"
+                    )
                 except Exception:
                     site_phase = "commissioning"
 
@@ -815,6 +819,7 @@ class NotificationService:
                     wo_code = result.details.get("work_order_code")
                     if wo_id:
                         from app.database.repositories.work_order_repository import get_work_order_repository
+
                         wo_repo = get_work_order_repository()
                         created_wo = wo_repo.get_by_id(wo_id)
                     if not created_wo and wo_code:
@@ -1000,11 +1005,7 @@ class NotificationService:
 
             sender = get_telegram_sender()
             assigned = tech_name or "Pending"
-            msg = (
-                f"Work Order Created #{wo_code}\n"
-                f"Assigned: {assigned}\n"
-                f"Priority: {priority.upper()}"
-            )
+            msg = f"Work Order Created #{wo_code}\nAssigned: {assigned}\nPriority: {priority.upper()}"
             try:
                 await sender.send_text(chat_id=str(tech_telegram_id), text=msg)
                 logger.info("Telegram sent to %s for %s", tech_telegram_id, wo_code)

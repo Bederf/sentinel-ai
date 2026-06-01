@@ -36,8 +36,8 @@ from app.api import (
     occupancy_analytics,
     occupancy_energy_correlation,
     sensors,
-    site_profiles,
     simbiot_capabilities,
+    site_profiles,
     sites_3d,
     zone_ingestion,
 )

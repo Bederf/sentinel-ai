@@ -16,10 +16,11 @@ def _provisioner_with_tmpfiles() -> tuple[MQTTProvisioner, Path, Path]:
     conf_path.write_text("listener 1883 0.0.0.0\nallow_anonymous false\npassword_file /etc/mosquitto/passwd\n")
 
     p = MQTTProvisioner()
-    p._acl_file = acl_path   # type: ignore[attr-defined]
+    p._acl_file = acl_path  # type: ignore[attr-defined]
     p._conf_file = conf_path  # type: ignore[attr-defined]
     # Monkeypatch the module-level constants used inside the class methods
     import app.services.residential.mqtt_provisioner as mod
+
     mod._ACL_FILE = acl_path
     mod._CONF_FILE = conf_path
     mod._PID_FILE = Path(tmp) / "mosquitto.pid"
@@ -27,6 +28,7 @@ def _provisioner_with_tmpfiles() -> tuple[MQTTProvisioner, Path, Path]:
 
 
 # ── provision_site ────────────────────────────────────────────────────────────
+
 
 def test_provision_site_writes_acl_entry():
     p, acl_path, conf_path = _provisioner_with_tmpfiles()
@@ -84,6 +86,7 @@ def test_provision_site_calls_reload():
 
 # ── revoke_site ───────────────────────────────────────────────────────────────
 
+
 def test_revoke_site_removes_acl_entry():
     p, acl_path, _ = _provisioner_with_tmpfiles()
 
@@ -117,6 +120,7 @@ def test_revoke_site_preserves_other_sites():
 
 
 # ── _reload_mosquitto ─────────────────────────────────────────────────────────
+
 
 def test_reload_sends_sighup_via_pid_file():
     p, _, _ = _provisioner_with_tmpfiles()

@@ -134,19 +134,13 @@ class MultiSitePollingCoordinator:
             configs = {
                 row["site_id"]: row["connection_config"]
                 for row in (rows.data or [])
-                if row.get("connection_config", {}).get("base_url")
-                and row.get("connection_config", {}).get("token")
+                if row.get("connection_config", {}).get("base_url") and row.get("connection_config", {}).get("token")
             }
             # Cache human-readable site names for alert messages
             if configs:
                 try:
-                    site_rows = (
-                        client.table("sites")
-                        .select("code, name")
-                        .in_("code", list(configs.keys()))
-                        .execute()
-                    )
-                    for s in (site_rows.data or []):
+                    site_rows = client.table("sites").select("code, name").in_("code", list(configs.keys())).execute()
+                    for s in site_rows.data or []:
                         _site_names[s["code"]] = s.get("name") or s["code"]
                 except Exception:
                     pass

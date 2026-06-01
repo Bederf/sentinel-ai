@@ -195,22 +195,31 @@ class HealthSnapshotService:
                     eq_name = eq_code
 
                     # Check if there's already an active alert for this equipment
-                    existing = self._supabase.table("alerts").select("id").eq(
-                        "equipment_id", eq_uuid
-                    ).neq("status", "resolved").limit(1).execute()
+                    existing = (
+                        self._supabase.table("alerts")
+                        .select("id")
+                        .eq("equipment_id", eq_uuid)
+                        .neq("status", "resolved")
+                        .limit(1)
+                        .execute()
+                    )
 
                     if not existing.data:
                         alert_severity = "critical" if health_status == "critical" else "warning"
-                        self._supabase.table("alerts").insert({
-                            "site_id": site_id,
-                            "equipment_id": eq_uuid,
-                            "type": "health",
-                            "title": f"{eq_name} health is {health_status}",
-                            "message": f"Equipment health score {int(rating.health_score)} is in '{health_status}' range.",
-                            "severity": alert_severity,
-                            "status": "active",
-                        }).execute()
-                        logger.info("Alert created: %s health=%d status=%s", eq_code, int(rating.health_score), health_status)
+                        self._supabase.table("alerts").insert(
+                            {
+                                "site_id": site_id,
+                                "equipment_id": eq_uuid,
+                                "type": "health",
+                                "title": f"{eq_name} health is {health_status}",
+                                "message": f"Equipment health score {int(rating.health_score)} is in '{health_status}' range.",
+                                "severity": alert_severity,
+                                "status": "active",
+                            }
+                        ).execute()
+                        logger.info(
+                            "Alert created: %s health=%d status=%s", eq_code, int(rating.health_score), health_status
+                        )
 
             except Exception as e:
                 logger.warning(f"Could not update equipment health_score for {eq_uuid}: {e}")
@@ -485,9 +494,12 @@ class HealthSnapshotService:
 
             # Gate: check if equipment type is scoreable
             from app.config.health_config import get_scoreability
+
             score_cfg = get_scoreability(eq_type)
             if not score_cfg.get("scoreable", False):
-                logger.debug(f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): {score_cfg.get('reason', 'not scoreable')}")
+                logger.debug(
+                    f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): {score_cfg.get('reason', 'not scoreable')}"
+                )
                 continue
 
             # Skip synthetic fallback types (VAV/FCU) — static placeholder until real service data

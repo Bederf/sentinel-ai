@@ -89,9 +89,9 @@ class HybridAIService:
             try:
                 # Ensure venv site-packages is on the import path
                 import site
+
                 venv_site = next(
-                    (p for p in site.getsitepackages()
-                     if "venv" in p or "site-packages" in p),
+                    (p for p in site.getsitepackages() if "venv" in p or "site-packages" in p),
                     None,
                 )
                 if venv_site and venv_site not in sys.path:

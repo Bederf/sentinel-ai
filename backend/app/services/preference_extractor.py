@@ -6,9 +6,8 @@ Runs as async background task after chat response is streamed to client.
 
 import json
 import logging
-from typing import Optional
 
-from app.models.preference import UserPreference, PreferenceType
+from app.models.preference import PreferenceType, UserPreference
 from app.repositories.preference_repository import preference_repo
 from app.services.model_gateway import model_gateway
 
@@ -45,7 +44,7 @@ async def extract_preference_from_chat(
     assistant_response: str,
     site_id: str,
     user_id: str,
-) -> Optional[UserPreference]:
+) -> UserPreference | None:
     """Extract FM preferences from a chat exchange using Claude Haiku.
 
     Routes through model_gateway with task_class="extraction".
@@ -72,7 +71,7 @@ async def extract_preference_from_chat(
 
     try:
         result = json.loads(response)
-    except (json.JSONDecodeError, TypeError) as e:
+    except (json.JSONDecodeError, TypeError):
         logger.warning(
             "haiku_response_malformed",
             extra={"site_id": site_id, "response": response[:200] if isinstance(response, str) else str(response)},

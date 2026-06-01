@@ -3,7 +3,7 @@
 Provides unified system health monitoring and SIMBIOT-powered diagnostics.
 """
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -414,11 +414,7 @@ async def get_adapter_health(site_id: str):
 
     # Get configured adapters for this site
     config_result = (
-        supabase.table("site_adapter_config")
-        .select("protocol")
-        .eq("site_id", site_id)
-        .eq("enabled", True)
-        .execute()
+        supabase.table("site_adapter_config").select("protocol").eq("site_id", site_id).eq("enabled", True).execute()
     )
 
     if not config_result.data:
@@ -691,7 +687,7 @@ async def get_critical_path(site_id: str):
     from app.database.supabase_client import get_supabase_client
 
     supabase = get_supabase_client()
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     hour_start = now.replace(minute=0, second=0, microsecond=0) - timedelta(hours=1)
 
     result = (

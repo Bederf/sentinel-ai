@@ -18,11 +18,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from app.database.repositories.workflow_event_repository import (
-    get_workflow_event_repository,
-)
 from app.database.repositories.work_order_repository import (
     get_work_order_repository,
+)
+from app.database.repositories.workflow_event_repository import (
+    get_workflow_event_repository,
 )
 from app.services.feedback_collection_service import (
     get_feedback_collection_service,
@@ -660,8 +660,7 @@ class WorkflowTriggerEngine:
         Deduplicates against existing open work orders for the same equipment.
         """
         logger.info(
-            f"Prediction critical trigger: equipment={equipment_id} "
-            f"health={health_score} prob={probability_percent}%"
+            f"Prediction critical trigger: equipment={equipment_id} health={health_score} prob={probability_percent}%"
         )
 
         try:

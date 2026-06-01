@@ -31,7 +31,6 @@ class GeocodingService:
         Returns:
             Dict with lat, lon, display_name, type or None if not found
         """
-        import urllib.request
 
         params = f"q={urllib.parse.quote(query)}&format=json&limit=1&addressdetails=1"
         url = f"{self.BASE_URL}/search?{params}"
@@ -77,7 +76,6 @@ class GeocodingService:
         Returns:
             List of [lon, lat] polygon coordinates or None if nothing found
         """
-        import json as json_mod
         import urllib.request
 
         overpass_url = "https://overpass-api.de/api/interpreter"

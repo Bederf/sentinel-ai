@@ -11,6 +11,7 @@ from app.services.residential.cloud_mqtt_bridge import CloudToMQTTBridge
 
 def _make_snapshot(site_id: str = "site-test", device_id: str = "dev-001") -> EnergySnapshot:
     from datetime import datetime
+
     return EnergySnapshot(
         site_id=site_id,
         device_id=device_id,
@@ -45,6 +46,7 @@ def _make_adapter(snapshot: EnergySnapshot | None = None) -> MagicMock:
 
 # ── register / unregister ─────────────────────────────────────────────────────
 
+
 def test_register_and_unregister_site():
     bridge = CloudToMQTTBridge()
     adapter = _make_adapter()
@@ -60,6 +62,7 @@ def test_unregister_nonexistent_site_is_idempotent():
 
 
 # ── poll_site ─────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_poll_site_publishes_all_energy_fields():
@@ -102,9 +105,7 @@ async def test_poll_site_publishes_with_retain_true():
     mock_info = MagicMock()
     mock_info.wait_for_publish = MagicMock()
     mock_client = MagicMock()
-    mock_client.publish.side_effect = lambda topic, payload, qos, retain: (
-        retain_flags.append(retain) or mock_info
-    )
+    mock_client.publish.side_effect = lambda topic, payload, qos, retain: retain_flags.append(retain) or mock_info
     mock_client.connect = MagicMock()
     mock_client.disconnect = MagicMock()
 
@@ -127,9 +128,7 @@ async def test_poll_site_publishes_none_as_json_null():
     mock_info = MagicMock()
     mock_info.wait_for_publish = MagicMock()
     mock_client = MagicMock()
-    mock_client.publish.side_effect = lambda topic, payload, qos, retain: (
-        payloads.update({topic: payload}) or mock_info
-    )
+    mock_client.publish.side_effect = lambda topic, payload, qos, retain: payloads.update({topic: payload}) or mock_info
     mock_client.connect = MagicMock()
     mock_client.disconnect = MagicMock()
 

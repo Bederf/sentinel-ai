@@ -582,7 +582,14 @@ class PredictionGeneratorService:
             List of mechanical equipment records with health below threshold
         """
         MECHANICAL_TYPES = {
-            "ahu", "chiller", "cooling_tower", "fcu", "pump", "vav", "boiler", "generator",
+            "ahu",
+            "chiller",
+            "cooling_tower",
+            "fcu",
+            "pump",
+            "vav",
+            "boiler",
+            "generator",
         }
         try:
             response = (

@@ -7,7 +7,7 @@ and multi-turn Tier 2 approval flow.
 
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -32,7 +32,7 @@ def make_recommendation(
     status="pending",
 ):
     """Create a test recommendation dict."""
-    ts = (datetime.now(timezone.utc) - timedelta(minutes=age_minutes)).isoformat()
+    ts = (datetime.now(UTC) - timedelta(minutes=age_minutes)).isoformat()
     return {
         "id": rec_id,
         "site_id": "S002",

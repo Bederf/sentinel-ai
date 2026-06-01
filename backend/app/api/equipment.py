@@ -325,7 +325,11 @@ def get_safety_limits_for_point(device_type: str, point_name: str, safety_rules:
         point_match = False
         if rule_point_name:
             # Direct match
-            if rule_point_name.lower() == point_name.lower() or ("setpoint" in point_name.lower() and "setpoint" in rule_point_name.lower()) or ("temp" in point_name.lower() and "temp" in rule_point_name.lower()):
+            if (
+                rule_point_name.lower() == point_name.lower()
+                or ("setpoint" in point_name.lower() and "setpoint" in rule_point_name.lower())
+                or ("temp" in point_name.lower() and "temp" in rule_point_name.lower())
+            ):
                 point_match = True
         elif rule.get("rule_type") == "temperature_range" and "temp" in point_name.lower():
             # Generic temperature rule without specific point applies to temp setpoints

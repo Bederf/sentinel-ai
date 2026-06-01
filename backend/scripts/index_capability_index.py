@@ -236,51 +236,139 @@ async def main():
         doc_id = existing.data[0]["id"]
         print(f"Updating existing capability index: {doc_id}")
         client.table("document_chunks").delete().eq("document_id", doc_id).execute()
-        client.table("documents").update({
-            "title": DOC_TITLE,
-            "full_text": CAPABILITY_INDEX_TEXT,
-            "summary": "SENTINEL platform capability reference: FSR risk questionnaire, ISO 42001, NIST AI RMF, EU AI Act, POPIA, security, features, onboarding, troubleshooting.",
-            "keywords": [
-                "standards", "ISO 42001", "NIST AI RMF", "EU AI Act", "POPIA", "FSR",
-                "FirstRand", "supplier risk", "gap analysis", "FSR questionnaire",
-                "gap analysis score", "control mapping", "compliance", "security",
-                "hack", "breach", "vulnerability", "penetration test", "cryptography",
-                "capability", "feature", "integration", "BMS", "SIMBIOT", "call logging",
-                "predictive maintenance", "energy", "zone health", "onboarding",
-                "configuration", "setup", "AI", "work order", "incident",
-                "authentication", "encryption", "data protection", "GDPR",
-                "King IV", "automation", "DALI", "BACnet", "human oversight",
-                "human in the loop", "AI governance", "quality gate", "safety interlocks",
-                "incident response", "business continuity", "third party", "HR security",
-            ],
-            "indexing_status": "pending",
-        }).eq("id", doc_id).execute()
+        client.table("documents").update(
+            {
+                "title": DOC_TITLE,
+                "full_text": CAPABILITY_INDEX_TEXT,
+                "summary": "SENTINEL platform capability reference: FSR risk questionnaire, ISO 42001, NIST AI RMF, EU AI Act, POPIA, security, features, onboarding, troubleshooting.",
+                "keywords": [
+                    "standards",
+                    "ISO 42001",
+                    "NIST AI RMF",
+                    "EU AI Act",
+                    "POPIA",
+                    "FSR",
+                    "FirstRand",
+                    "supplier risk",
+                    "gap analysis",
+                    "FSR questionnaire",
+                    "gap analysis score",
+                    "control mapping",
+                    "compliance",
+                    "security",
+                    "hack",
+                    "breach",
+                    "vulnerability",
+                    "penetration test",
+                    "cryptography",
+                    "capability",
+                    "feature",
+                    "integration",
+                    "BMS",
+                    "SIMBIOT",
+                    "call logging",
+                    "predictive maintenance",
+                    "energy",
+                    "zone health",
+                    "onboarding",
+                    "configuration",
+                    "setup",
+                    "AI",
+                    "work order",
+                    "incident",
+                    "authentication",
+                    "encryption",
+                    "data protection",
+                    "GDPR",
+                    "King IV",
+                    "automation",
+                    "DALI",
+                    "BACnet",
+                    "human oversight",
+                    "human in the loop",
+                    "AI governance",
+                    "quality gate",
+                    "safety interlocks",
+                    "incident response",
+                    "business continuity",
+                    "third party",
+                    "HR security",
+                ],
+                "indexing_status": "pending",
+            }
+        ).eq("id", doc_id).execute()
         print(f"  Updated document {doc_id}")
     else:
         print("Creating new capability index document...")
-        result = client.table("documents").insert({
-            "code": DOC_CODE,
-            "title": DOC_TITLE,
-            "document_type": DOC_TYPE,
-            "equipment_type": EQUIP_TYPE,
-            "full_text": CAPABILITY_INDEX_TEXT,
-            "source": SOURCE,
-            "summary": "SENTINEL platform capability reference: FSR risk questionnaire, ISO 42001, NIST AI RMF, EU AI Act, POPIA, security, features, onboarding, troubleshooting.",
-            "keywords": [
-                "standards", "ISO 42001", "NIST AI RMF", "EU AI Act", "POPIA", "FSR",
-                "FirstRand", "supplier risk", "gap analysis", "FSR questionnaire",
-                "gap analysis score", "control mapping", "compliance", "security",
-                "hack", "breach", "vulnerability", "penetration test", "cryptography",
-                "capability", "feature", "integration", "BMS", "SIMBIOT", "call logging",
-                "predictive maintenance", "energy", "zone health", "onboarding",
-                "configuration", "setup", "AI", "work order", "incident",
-                "authentication", "encryption", "data protection", "GDPR",
-                "King IV", "automation", "DALI", "BACnet", "human oversight",
-                "human in the loop", "AI governance", "quality gate", "safety interlocks",
-                "incident response", "business continuity", "third party", "HR security",
-            ],
-            "indexing_status": "pending",
-        }).execute()
+        result = (
+            client.table("documents")
+            .insert(
+                {
+                    "code": DOC_CODE,
+                    "title": DOC_TITLE,
+                    "document_type": DOC_TYPE,
+                    "equipment_type": EQUIP_TYPE,
+                    "full_text": CAPABILITY_INDEX_TEXT,
+                    "source": SOURCE,
+                    "summary": "SENTINEL platform capability reference: FSR risk questionnaire, ISO 42001, NIST AI RMF, EU AI Act, POPIA, security, features, onboarding, troubleshooting.",
+                    "keywords": [
+                        "standards",
+                        "ISO 42001",
+                        "NIST AI RMF",
+                        "EU AI Act",
+                        "POPIA",
+                        "FSR",
+                        "FirstRand",
+                        "supplier risk",
+                        "gap analysis",
+                        "FSR questionnaire",
+                        "gap analysis score",
+                        "control mapping",
+                        "compliance",
+                        "security",
+                        "hack",
+                        "breach",
+                        "vulnerability",
+                        "penetration test",
+                        "cryptography",
+                        "capability",
+                        "feature",
+                        "integration",
+                        "BMS",
+                        "SIMBIOT",
+                        "call logging",
+                        "predictive maintenance",
+                        "energy",
+                        "zone health",
+                        "onboarding",
+                        "configuration",
+                        "setup",
+                        "AI",
+                        "work order",
+                        "incident",
+                        "authentication",
+                        "encryption",
+                        "data protection",
+                        "GDPR",
+                        "King IV",
+                        "automation",
+                        "DALI",
+                        "BACnet",
+                        "human oversight",
+                        "human in the loop",
+                        "AI governance",
+                        "quality gate",
+                        "safety interlocks",
+                        "incident response",
+                        "business continuity",
+                        "third party",
+                        "HR security",
+                    ],
+                    "indexing_status": "pending",
+                }
+            )
+            .execute()
+        )
 
         if not result.data:
             print("ERROR: Failed to insert document")
@@ -310,14 +398,12 @@ async def main():
         ("EU AI Act compliance sentinel", "FSR/standards"),
         ("how does SENTINEL map to the FirstRand risk questionnaire", "FSR"),
         ("what is SENTINEL's FSR score", "FSR"),
-
         # Security concerns
         ("we're worried SENTINEL can be hacked", "security"),
         ("can SENTINEL be breached what are the vulnerabilities", "security"),
         ("what is the password and authentication policy", "security/auth"),
         ("how does POPIA data protection work in SENTINEL", "privacy"),
         ("security vulnerabilities of SENTINEL", "security"),
-
         # Capabilities and features
         ("what can SENTINEL do what are its features", "capability"),
         ("how does SENTINEL solve call logging issues", "capability"),
@@ -325,16 +411,13 @@ async def main():
         ("predictive maintenance how does it work", "capability"),
         ("energy management and optimisation", "capability"),
         ("zone health assessment how does it work", "capability"),
-
         # Integration
         ("how does SENTINEL integrate with our existing BMS", "integration"),
         ("SIMBIOT universal adapter BACnet DALI", "integration"),
-
         # Onboarding
         ("how do I upload a building into SENTINEL", "onboarding"),
         ("how does the onboarding process work", "onboarding"),
         ("building upload procedure", "onboarding"),
-
         # FSR specific questionnaire areas
         ("how does SENTINEL handle information security governance AI governance", "FSR/governance"),
         ("how does SENTINEL manage third party security third party AI risk", "FSR/third-party"),
@@ -342,7 +425,6 @@ async def main():
         ("how does SENTINEL handle business continuity BCP disaster recovery", "FSR/bcp"),
         ("how does SENTINEL handle human resource security AI literacy training", "FSR/hr"),
         ("how does SENTINEL handle application security AI safety quality gates", "FSR/app-sec"),
-
         # Troubleshooting
         ("AI chat is giving wrong answers fabricated information", "troubleshooting"),
         ("zone health shows no data", "troubleshooting"),
@@ -381,4 +463,5 @@ async def main():
 
 if __name__ == "__main__":
     import asyncio
+
     asyncio.run(main())

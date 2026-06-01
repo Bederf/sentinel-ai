@@ -4,7 +4,6 @@ SCADA-style monitoring for complete electrical infrastructure:
 MV/LV switchgear, ATS, transformers, power metering, PFC, UPS.
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.middleware.auth_middleware import require_auth, require_site_access

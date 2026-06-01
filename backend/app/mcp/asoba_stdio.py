@@ -141,7 +141,7 @@ async def main():
 
         except Exception as e:
             logger.exception("Unexpected error in main loop")
-            _send_error(None, -32603, f"Internal error: {str(e)}")
+            _send_error(None, -32603, f"Internal error: {e!s}")
 
 
 def _send_response(response: dict):

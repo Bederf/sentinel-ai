@@ -10,12 +10,9 @@ Covers:
 6. Redis unavailable — memory fallback, no exception
 """
 
-import asyncio
 import unittest
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
-
 from zoneinfo import ZoneInfo
 
 
@@ -34,7 +31,7 @@ class TestAiUsageTrackerBudget(unittest.IsolatedAsyncioTestCase):
     # ---- test_budget_not_exceeded ----
     def test_budget_not_exceeded(self):
         """record() with 50k tokens, 200k budget — no exception, no alert."""
-        from app.services.ai_usage_tracker import AiUsageTracker, TokenBudgetExceeded
+        from app.services.ai_usage_tracker import AiUsageTracker
 
         tracker = AiUsageTracker.__new__(AiUsageTracker)
         tracker._initialized = True
@@ -150,6 +147,7 @@ class TestAiUsageTrackerBudget(unittest.IsolatedAsyncioTestCase):
             with patch.object(tracker, "_check_alert_sent", new_callable=AsyncMock) as mock_check:
                 mock_check.return_value = False
                 import asyncio
+
                 with self.assertRaises(TokenBudgetExceeded) as ctx:
                     asyncio.run(tracker._check_and_enforce_budget("site-002", 10_000, "heavy"))
 
@@ -160,7 +158,7 @@ class TestAiUsageTrackerBudget(unittest.IsolatedAsyncioTestCase):
     # ---- test_interactive_excluded ----
     def test_interactive_excluded(self):
         """task_class='chat_ai' over budget — no exception raised."""
-        from app.services.ai_usage_tracker import AiUsageTracker, TokenBudgetExceeded
+        from app.services.ai_usage_tracker import AiUsageTracker
 
         tracker = AiUsageTracker.__new__(AiUsageTracker)
         tracker._initialized = True

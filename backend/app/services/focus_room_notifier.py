@@ -10,8 +10,6 @@ import logging
 import os
 from typing import Any
 
-from app.config.settings import settings
-
 logger = logging.getLogger(__name__)
 
 # In-memory mapping of WhatsApp message IDs to focus room codes
@@ -43,6 +41,7 @@ async def send_focus_overstay_alert(
     # Check if focus room notifications are enabled
     try:
         from app.api.space_settings import _load_space_settings
+
         space_settings = _load_space_settings()
         if not space_settings.get("focus_room_notifications_enabled", False):
             logger.info("Focus room alerts disabled by space_settings toggle — skipping")
@@ -56,8 +55,8 @@ async def send_focus_overstay_alert(
         whatsapp_ok = False
         whatsapp_result: dict = {}
         try:
-            from app.services.space_booking_simulator import get_block_booking_config
             from app.services.concierge_store import find_all_concierges_for_room
+            from app.services.space_booking_simulator import get_block_booking_config
 
             config = get_block_booking_config(site_id)
             concierges = find_all_concierges_for_room(site_id, room_code.split("-")[0] if "-" in room_code else site_id)
@@ -85,6 +84,7 @@ async def send_focus_overstay_alert(
                 )
                 sent_any = False
                 import shutil
+
                 cli = shutil.which("openclaw") or "/home/bederf/.local/bin/openclaw"
                 for target in whatsapp_targets:
                     try:
@@ -92,12 +92,16 @@ async def send_focus_overstay_alert(
                         env["SENTRY_CONFIG_DIR"] = "/home/bederf/.sentry/gateway"
                         result = subprocess.run(
                             [cli, "message", "send", "--channel", "whatsapp", "--target", target, "--message", body],
-                            capture_output=True, text=True, timeout=90, env=env,
+                            capture_output=True,
+                            text=True,
+                            timeout=90,
+                            env=env,
                         )
                         if result.returncode == 0:
                             sent_any = True
                             if result.stdout:
                                 import json
+
                                 try:
                                     msg_data = json.loads(result.stdout)
                                     msg_id = msg_data.get("message_id") or msg_data.get("id") or ""
@@ -155,6 +159,7 @@ async def process_focus_room_whatsapp_reply(
         all_sessions = []
         try:
             from app.database.supabase_client import get_supabase_client
+
             sb = get_supabase_client()
             if sb:
                 result = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).execute()
@@ -169,7 +174,7 @@ async def process_focus_room_whatsapp_reply(
             rooms = [s.get("room_code", "?") for s in all_sessions]
             return {
                 "handled": True,
-                "response_message": f"Multiple active focus rooms: {', '.join(rooms)}. Please reply with the room code."
+                "response_message": f"Multiple active focus rooms: {', '.join(rooms)}. Please reply with the room code.",
             }
 
         room_code = all_sessions[0].get("room_code", "")
@@ -186,6 +191,7 @@ async def process_focus_room_whatsapp_reply(
     if reply == "yes":
         occupancy_store.extend_overstay_grace(session_id, 10)
         from app.services.focus_room_relay_service import sync_focus_room_relay
+
         sync_focus_room_relay(site_id=site_id, room_code=room_code)
         logger.info("Focus overstay confirmed occupied — grace +10min via WhatsApp: room=%s", room_code)
         return {
@@ -195,6 +201,7 @@ async def process_focus_room_whatsapp_reply(
     else:
         occupancy_store.close_session(session_id, datetime.utcnow())
         from app.services.focus_room_relay_service import sync_focus_room_relay
+
         sync_focus_room_relay(site_id=site_id, room_code=room_code)
         logger.info("Focus session reset via WhatsApp (room vacant): room=%s", room_code)
         return {

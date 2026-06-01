@@ -10,27 +10,105 @@ logger = logging.getLogger(__name__)
 
 CURATED_MANUFACTURER_PARTS: dict[str, list[dict[str, Any]]] = {
     "carrier_chiller": [
-        {"part_name": "Compressor oil filter", "part_number": "30GX-502012-XX", "unit_cost_zar": 950.00, "typical_replacement_interval_days": 365, "criticality": "critical"},
-        {"part_name": "Refrigerant filter drier", "part_number": "30GX-503214-XX", "unit_cost_zar": 1350.00, "typical_replacement_interval_days": 730, "criticality": "critical"},
-        {"part_name": "Oil pressure sensor", "part_number": "HH79NZ005", "unit_cost_zar": 720.00, "typical_replacement_interval_days": 1095, "criticality": "essential"},
-        {"part_name": "Chilled water temp sensor", "part_number": "CEA-2002-10K", "unit_cost_zar": 480.00, "typical_replacement_interval_days": 1460, "criticality": "essential"},
+        {
+            "part_name": "Compressor oil filter",
+            "part_number": "30GX-502012-XX",
+            "unit_cost_zar": 950.00,
+            "typical_replacement_interval_days": 365,
+            "criticality": "critical",
+        },
+        {
+            "part_name": "Refrigerant filter drier",
+            "part_number": "30GX-503214-XX",
+            "unit_cost_zar": 1350.00,
+            "typical_replacement_interval_days": 730,
+            "criticality": "critical",
+        },
+        {
+            "part_name": "Oil pressure sensor",
+            "part_number": "HH79NZ005",
+            "unit_cost_zar": 720.00,
+            "typical_replacement_interval_days": 1095,
+            "criticality": "essential",
+        },
+        {
+            "part_name": "Chilled water temp sensor",
+            "part_number": "CEA-2002-10K",
+            "unit_cost_zar": 480.00,
+            "typical_replacement_interval_days": 1460,
+            "criticality": "essential",
+        },
     ],
     "trane_chiller": [
-        {"part_name": "Compressor oil filter", "part_number": "CHH-123-456", "unit_cost_zar": 890.00, "typical_replacement_interval_days": 365, "criticality": "critical"},
-        {"part_name": "Refrigerant filter", "part_number": "CHH-789-012", "unit_cost_zar": 1200.00, "typical_replacement_interval_days": 730, "criticality": "critical"},
-        {"part_name": "Oil pressure transducer", "part_number": "SEN-OP-101", "unit_cost_zar": 680.00, "typical_replacement_interval_days": 1095, "criticality": "essential"},
+        {
+            "part_name": "Compressor oil filter",
+            "part_number": "CHH-123-456",
+            "unit_cost_zar": 890.00,
+            "typical_replacement_interval_days": 365,
+            "criticality": "critical",
+        },
+        {
+            "part_name": "Refrigerant filter",
+            "part_number": "CHH-789-012",
+            "unit_cost_zar": 1200.00,
+            "typical_replacement_interval_days": 730,
+            "criticality": "critical",
+        },
+        {
+            "part_name": "Oil pressure transducer",
+            "part_number": "SEN-OP-101",
+            "unit_cost_zar": 680.00,
+            "typical_replacement_interval_days": 1095,
+            "criticality": "essential",
+        },
     ],
     "york_chiller": [
-        {"part_name": "Compressor oil filter", "part_number": "YF-502-001", "unit_cost_zar": 920.00, "typical_replacement_interval_days": 365, "criticality": "critical"},
-        {"part_name": "Filter drier", "part_number": "YF-503-002", "unit_cost_zar": 1100.00, "typical_replacement_interval_days": 730, "criticality": "critical"},
+        {
+            "part_name": "Compressor oil filter",
+            "part_number": "YF-502-001",
+            "unit_cost_zar": 920.00,
+            "typical_replacement_interval_days": 365,
+            "criticality": "critical",
+        },
+        {
+            "part_name": "Filter drier",
+            "part_number": "YF-503-002",
+            "unit_cost_zar": 1100.00,
+            "typical_replacement_interval_days": 730,
+            "criticality": "critical",
+        },
     ],
     "daikin_chiller": [
-        {"part_name": "Oil filter element", "part_number": "DK-OF-100", "unit_cost_zar": 780.00, "typical_replacement_interval_days": 365, "criticality": "critical"},
-        {"part_name": "Strainer set", "part_number": "DK-ST-200", "unit_cost_zar": 450.00, "typical_replacement_interval_days": 730, "criticality": "essential"},
+        {
+            "part_name": "Oil filter element",
+            "part_number": "DK-OF-100",
+            "unit_cost_zar": 780.00,
+            "typical_replacement_interval_days": 365,
+            "criticality": "critical",
+        },
+        {
+            "part_name": "Strainer set",
+            "part_number": "DK-ST-200",
+            "unit_cost_zar": 450.00,
+            "typical_replacement_interval_days": 730,
+            "criticality": "essential",
+        },
     ],
     "grundfos_pump": [
-        {"part_name": "Mechanical seal", "part_number": "GR-SEAL-CR45", "unit_cost_zar": 520.00, "typical_replacement_interval_days": 730, "criticality": "essential"},
-        {"part_name": "Bearing set", "part_number": "GR-BRG-CR45", "unit_cost_zar": 750.00, "typical_replacement_interval_days": 1095, "criticality": "essential"},
+        {
+            "part_name": "Mechanical seal",
+            "part_number": "GR-SEAL-CR45",
+            "unit_cost_zar": 520.00,
+            "typical_replacement_interval_days": 730,
+            "criticality": "essential",
+        },
+        {
+            "part_name": "Bearing set",
+            "part_number": "GR-BRG-CR45",
+            "unit_cost_zar": 750.00,
+            "typical_replacement_interval_days": 1095,
+            "criticality": "essential",
+        },
     ],
 }
 

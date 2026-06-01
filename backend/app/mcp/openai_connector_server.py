@@ -164,13 +164,7 @@ class SupabaseDataLoader:
     def load_work_orders(self) -> list[dict[str, Any]]:
         """Load work orders from Supabase."""
         try:
-            response = (
-                self.client.table("work_orders")
-                .select("*")
-                .order("created_at", desc=True)
-                .limit(100)
-                .execute()
-            )
+            response = self.client.table("work_orders").select("*").order("created_at", desc=True).limit(100).execute()
             return response.data or []
         except Exception as e:
             logger.error(f"Failed to load work orders from Supabase: {e}")
@@ -908,7 +902,11 @@ class OpenAIConnectorMCPServer:
                     "type": "object",
                     "properties": {
                         "site_id": {"type": "string", "description": "Site identifier (e.g., S002)"},
-                        "status": {"type": "string", "description": "Filter by status", "enum": ["scheduled", "in_progress", "resolved", "verified", "all"]},
+                        "status": {
+                            "type": "string",
+                            "description": "Filter by status",
+                            "enum": ["scheduled", "in_progress", "resolved", "verified", "all"],
+                        },
                         "limit": {"type": "integer", "description": "Max results to return", "default": 10},
                     },
                     "required": ["site_id"],
@@ -952,6 +950,7 @@ class OpenAIConnectorMCPServer:
         self._ensure_index()
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             client.table("sites").select("code").limit(1).execute()
             supabase_ok = True
@@ -1027,7 +1026,13 @@ class OpenAIConnectorMCPServer:
             }
         """
         if not id:
-            return {"id": "", "title": "Invalid ID", "text": "No ID provided", "url": "", "metadata": {"error": "bad_input"}}
+            return {
+                "id": "",
+                "title": "Invalid ID",
+                "text": "No ID provided",
+                "url": "",
+                "metadata": {"error": "bad_input"},
+            }
 
         # Try in-memory index first (fast path for tech docs indexed at startup)
         self._ensure_index()
@@ -1065,7 +1070,9 @@ class OpenAIConnectorMCPServer:
             # Try fetching from documents table by id (UUID)
             result = (
                 client.table("documents")
-                .select("id, code, title, document_type, equipment_type, manufacturer, model, summary, keywords, source, full_text")
+                .select(
+                    "id, code, title, document_type, equipment_type, manufacturer, model, summary, keywords, source, full_text"
+                )
                 .eq("id", doc_uuid)
                 .limit(1)
                 .execute()
@@ -1080,7 +1087,9 @@ class OpenAIConnectorMCPServer:
         try:
             result = (
                 client.table("documents")
-                .select("id, code, title, document_type, equipment_type, manufacturer, model, summary, keywords, source, full_text")
+                .select(
+                    "id, code, title, document_type, equipment_type, manufacturer, model, summary, keywords, source, full_text"
+                )
                 .eq("code", doc_uuid)
                 .limit(1)
                 .execute()
@@ -1099,6 +1108,7 @@ class OpenAIConnectorMCPServer:
             client = _get_supabase_client()
             if client:
                 from app.services.vector_db import get_vector_db_service
+
                 return get_vector_db_service(client)
         except Exception as e:
             logger.warning(f"VectorDB service unavailable: {e}")
@@ -1196,14 +1206,16 @@ class OpenAIConnectorMCPServer:
             equipment_at_risk = []
             if equip_result.data:
                 for eq in equip_result.data:
-                    equipment_at_risk.append({
-                        "id": eq.get("code") or eq.get("id"),
-                        "name": eq.get("name"),
-                        "risk_level": "high" if eq.get("status") == "critical" else "medium",
-                        "health_score": eq.get("health_score"),
-                        "health_confidence": eq.get("health_confidence", "unknown"),
-                        "health_trend": eq.get("health_trend", "unknown"),
-                    })
+                    equipment_at_risk.append(
+                        {
+                            "id": eq.get("code") or eq.get("id"),
+                            "name": eq.get("name"),
+                            "risk_level": "high" if eq.get("status") == "critical" else "medium",
+                            "health_score": eq.get("health_score"),
+                            "health_confidence": eq.get("health_confidence", "unknown"),
+                            "health_trend": eq.get("health_trend", "unknown"),
+                        }
+                    )
 
             # Determine overall status
             overall_status = "green"
@@ -1274,7 +1286,9 @@ class OpenAIConnectorMCPServer:
                 for rec in result.data:
                     ei = rec.get("expected_impact") or {}
                     risk_level = rec.get("risk_level", "medium")
-                    priority = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}.get(risk_level, "medium")
+                    priority = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}.get(
+                        risk_level, "medium"
+                    )
                     confidence = rec.get("confidence_score") or rec.get("confidence") or 0.5
                     # Extract projected saving from expected_impact
                     projected_saving_zar = None
@@ -1293,7 +1307,11 @@ class OpenAIConnectorMCPServer:
                             else:
                                 action_text = f"Set {point} to {value}{unit}"
                         else:
-                            action_text = action_obj.get("type", "") or rec.get("reason", "") or f"Take action: {rec.get('action_type')}"
+                            action_text = (
+                                action_obj.get("type", "")
+                                or rec.get("reason", "")
+                                or f"Take action: {rec.get('action_type')}"
+                            )
                     else:
                         action_text = str(action_obj) if action_obj else f"Take action: {rec.get('action_type')}"
                     # The full SENTRY advisory text is in the reason field
@@ -1302,19 +1320,21 @@ class OpenAIConnectorMCPServer:
                     equipment = rec.get("target_equipment") or ""
                     # Optimisation goal (cost/comfort/profile)
                     goal = rec.get("profile") or rec.get("action_type", "") or None
-                    recommendations.append({
-                        "id": rec.get("id"),
-                        "equipment": equipment,
-                        "action_type": rec.get("action_type", "unknown"),
-                        "status": rec.get("status"),
-                        "priority": priority,
-                        "confidence": confidence,
-                        "recommended_action": action_text,
-                        "full_advisory": full_advisory,
-                        "goal": goal,
-                        "projected_saving_zar": projected_saving_zar,
-                        "created_at": rec.get("timestamp"),
-                    })
+                    recommendations.append(
+                        {
+                            "id": rec.get("id"),
+                            "equipment": equipment,
+                            "action_type": rec.get("action_type", "unknown"),
+                            "status": rec.get("status"),
+                            "priority": priority,
+                            "confidence": confidence,
+                            "recommended_action": action_text,
+                            "full_advisory": full_advisory,
+                            "goal": goal,
+                            "projected_saving_zar": projected_saving_zar,
+                            "created_at": rec.get("timestamp"),
+                        }
+                    )
 
             return {
                 "site_id": site_code,
@@ -1354,7 +1374,9 @@ class OpenAIConnectorMCPServer:
                 "zone_breakdown": [
                     {"zone_id": z.zone_id, "zone_name": z.zone_name, "curtailable_kw": z.curtailable_kw}
                     for z in (result.zone_breakdown or [])
-                ] if include_zones else [],
+                ]
+                if include_zones
+                else [],
                 "data_freshness": "live",
             }
         except Exception as e:
@@ -1405,8 +1427,7 @@ class OpenAIConnectorMCPServer:
                 "record_count": result.record_count,
                 "exported_at": result.exported_at,
                 "first_records": [
-                    {"timestamp": r.timestamp, "kWh": r.kWh, "direction": r.direction}
-                    for r in result.records[:3]
+                    {"timestamp": r.timestamp, "kWh": r.kWh, "direction": r.direction} for r in result.records[:3]
                 ],
             }
         except Exception as e:
@@ -1421,13 +1442,7 @@ class OpenAIConnectorMCPServer:
 
         try:
             # Get recommendation
-            rec_result = (
-                client.table("recommendations")
-                .select("*")
-                .eq("id", recommendation_id)
-                .limit(1)
-                .execute()
-            )
+            rec_result = client.table("recommendations").select("*").eq("id", recommendation_id).limit(1).execute()
             if not rec_result.data:
                 return {"error": f"Recommendation not found: {recommendation_id}"}
 
@@ -1498,13 +1513,7 @@ class OpenAIConnectorMCPServer:
 
         try:
             # Get equipment by code (globally unique, no site_id join needed)
-            equip_result = (
-                client.table("equipment")
-                .select("*")
-                .eq("code", equipment_id)
-                .limit(1)
-                .execute()
-            )
+            equip_result = client.table("equipment").select("*").eq("code", equipment_id).limit(1).execute()
             if not equip_result.data:
                 return {"error": f"Equipment not found: {equipment_id}"}
 
@@ -1517,6 +1526,7 @@ class OpenAIConnectorMCPServer:
             if install_date:
                 try:
                     from datetime import datetime
+
                     if isinstance(install_date, str):
                         install = datetime.fromisoformat(install_date.replace("Z", "+00:00"))
                         age_years = round((datetime.now() - install).days / 365, 1)
@@ -1525,11 +1535,7 @@ class OpenAIConnectorMCPServer:
 
             # Get open alerts count (alerts use equipment UUID)
             alerts_result = (
-                client.table("alerts")
-                .select("id")
-                .eq("equipment_id", equip_uuid)
-                .eq("status", "active")
-                .execute()
+                client.table("alerts").select("id").eq("equipment_id", equip_uuid).eq("status", "active").execute()
             )
             open_alerts = len(alerts_result.data) if alerts_result.data else 0
 
@@ -1546,11 +1552,13 @@ class OpenAIConnectorMCPServer:
             active_predictions = []
             if preds_result.data:
                 for p in preds_result.data:
-                    active_predictions.append({
-                        "probability": p.get("probability_percent"),
-                        "severity": p.get("severity"),
-                        "timeframe_days": p.get("timeframe_days"),
-                    })
+                    active_predictions.append(
+                        {
+                            "probability": p.get("probability_percent"),
+                            "severity": p.get("severity"),
+                            "timeframe_days": p.get("timeframe_days"),
+                        }
+                    )
 
             # Calculate failure risk — use all signals, not just >70 threshold
             failure_risk = {"score": 0.0, "reason": "No risk factors detected", "timeline_hours": None}
@@ -1685,9 +1693,13 @@ class OpenAIConnectorMCPServer:
                 current_readings["data_source"] = current_readings.get("data_source", "unavailable")
 
             # Legacy InfluxDB fallback (token_present=False in production)
-            if current_readings.get("data_source") == "unavailable" or current_readings.get("data_source") == "influxdb_unavailable":
+            if (
+                current_readings.get("data_source") == "unavailable"
+                or current_readings.get("data_source") == "influxdb_unavailable"
+            ):
                 try:
                     from app.services.influxdb_service import get_influxdb_service
+
                     influx = get_influxdb_service()
                     if influx._available and influx._client and influx._token_present:
                         eq_uuid = equip.get("id")
@@ -1784,7 +1796,8 @@ class OpenAIConnectorMCPServer:
             time_period = "Last 30 days"
             if recs_result.data:
                 try:
-                    from datetime import datetime, timedelta
+                    from datetime import datetime
+
                     timestamps = [r.get("executed_at") for r in recs_result.data if r.get("executed_at")]
                     if timestamps:
                         oldest = min(datetime.fromisoformat(t.replace("Z", "+00:00")) for t in timestamps if t)
@@ -1829,13 +1842,7 @@ class OpenAIConnectorMCPServer:
 
         try:
             # Get recommendation
-            rec_result = (
-                client.table("recommendations")
-                .select("*")
-                .eq("id", recommendation_id)
-                .limit(1)
-                .execute()
-            )
+            rec_result = client.table("recommendations").select("*").eq("id", recommendation_id).limit(1).execute()
             if not rec_result.data:
                 return {"error": f"Recommendation not found: {recommendation_id}"}
 
@@ -1862,10 +1869,12 @@ class OpenAIConnectorMCPServer:
             risk_trajectory = []
             if predictions:
                 for i, p in enumerate(predictions[:24]):  # 24-hour trajectory
-                    risk_trajectory.append({
-                        "hour": i,
-                        "risk_level": p.get("severity", "medium"),
-                    })
+                    risk_trajectory.append(
+                        {
+                            "hour": i,
+                            "risk_level": p.get("severity", "medium"),
+                        }
+                    )
 
             # Get side effects from execution_result
             side_effects = []
@@ -1932,23 +1941,27 @@ class OpenAIConnectorMCPServer:
                     elif warnings > 0:
                         status = "amber"
 
-                    sites_comparison.append({
-                        "site_id": site_code,
-                        "site_name": site.get("name"),
-                        "value": None,
-                        "status": status,
-                        "trend": "stable",
-                    })
+                    sites_comparison.append(
+                        {
+                            "site_id": site_code,
+                            "site_name": site.get("name"),
+                            "value": None,
+                            "status": status,
+                            "trend": "stable",
+                        }
+                    )
             else:
                 # Default: just list sites with basic info
                 for site in sites_data:
-                    sites_comparison.append({
-                        "site_id": site.get("code"),
-                        "site_name": site.get("name"),
-                        "value": None,
-                        "status": "unknown",
-                        "trend": "unknown",
-                    })
+                    sites_comparison.append(
+                        {
+                            "site_id": site.get("code"),
+                            "site_name": site.get("name"),
+                            "value": None,
+                            "status": "unknown",
+                            "trend": "unknown",
+                        }
+                    )
 
             # Determine best/worst performers
             best = sites_comparison[0] if sites_comparison else {}
@@ -1981,13 +1994,15 @@ class OpenAIConnectorMCPServer:
 
             formatted_results = []
             for r in results:
-                formatted_results.append({
-                    "title": r.get("title", "Untitled"),
-                    "content": r.get("description", r.get("content", ""))[:500],
-                    "source": r.get("source", "knowledge_base"),
-                    "relevance_score": round(r.get("similarity", 0.0) * 100, 1),
-                    "doc_type": r.get("knowledge_type", "unknown"),
-                })
+                formatted_results.append(
+                    {
+                        "title": r.get("title", "Untitled"),
+                        "content": r.get("description", r.get("content", ""))[:500],
+                        "source": r.get("source", "knowledge_base"),
+                        "relevance_score": round(r.get("similarity", 0.0) * 100, 1),
+                        "doc_type": r.get("knowledge_type", "unknown"),
+                    }
+                )
 
             return {
                 "results": formatted_results,
@@ -2060,6 +2075,7 @@ class OpenAIConnectorMCPServer:
         """Get ComfortComplaintHandler instance."""
         try:
             from app.services.complaint_handler import get_complaint_handler
+
             return get_complaint_handler()
         except Exception as e:
             logger.warning(f"ComplaintHandler unavailable: {e}")
@@ -2069,6 +2085,7 @@ class OpenAIConnectorMCPServer:
         """Get WorkOrderRepository instance."""
         try:
             from app.database.repositories.work_order_repository import WorkOrderRepository
+
             return WorkOrderRepository()
         except Exception as e:
             logger.warning(f"WorkOrderRepository unavailable: {e}")
@@ -2115,7 +2132,9 @@ class OpenAIConnectorMCPServer:
                 zone_result = client.table("zones").select("site_id").eq("zone_id", equipment_id).limit(1).execute()
                 if zone_result.data:
                     site_uuid = zone_result.data[0].get("site_id")
-                    site_result = client.table("sites").select("code, control_enabled").eq("id", site_uuid).limit(1).execute()
+                    site_result = (
+                        client.table("sites").select("code, control_enabled").eq("id", site_uuid).limit(1).execute()
+                    )
                     if site_result.data:
                         site_code = site_result.data[0]["code"]
                         control_enabled = site_result.data[0].get("control_enabled", False)
@@ -2135,7 +2154,9 @@ class OpenAIConnectorMCPServer:
 
             # Final site lookup if not already resolved
             if not control_enabled:
-                site_result = client.table("sites").select("code, control_enabled").eq("code", site_code).limit(1).execute()
+                site_result = (
+                    client.table("sites").select("code, control_enabled").eq("code", site_code).limit(1).execute()
+                )
                 if not site_result.data:
                     return {"error": f"Site not found: {site_code}"}
                 control_enabled = site_result.data[0].get("control_enabled", False)
@@ -2161,6 +2182,7 @@ class OpenAIConnectorMCPServer:
 
             # Use ApprovalService for safe write with COV verification
             from app.services.approval_service import get_approval_service
+
             approval_svc = get_approval_service()
 
             result = await approval_svc._execute_device_write(equipment_id, point, value)
@@ -2209,16 +2231,18 @@ class OpenAIConnectorMCPServer:
             result = query.order("created_at", desc=True).limit(limit).execute()
 
             work_orders = []
-            for wo in (result.data or []):
-                work_orders.append({
-                    "id": wo.get("id"),
-                    "code": wo.get("code"),
-                    "title": wo.get("title"),
-                    "priority": wo.get("priority"),
-                    "status": wo.get("status"),
-                    "assigned_to": wo.get("assigned_to"),
-                    "created_at": wo.get("created_at"),
-                })
+            for wo in result.data or []:
+                work_orders.append(
+                    {
+                        "id": wo.get("id"),
+                        "code": wo.get("code"),
+                        "title": wo.get("title"),
+                        "priority": wo.get("priority"),
+                        "status": wo.get("status"),
+                        "assigned_to": wo.get("assigned_to"),
+                        "created_at": wo.get("created_at"),
+                    }
+                )
 
             return {
                 "site_id": site_id,

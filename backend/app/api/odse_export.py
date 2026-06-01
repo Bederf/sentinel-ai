@@ -12,7 +12,7 @@ from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import PlainTextResponse
 
 from app.models.odse_models import ODSEAssetExport, ODSETimeseriesExport
 from app.services.odse_service import odse_service
@@ -39,10 +39,7 @@ async def export_timeseries(
 
     Returns energy consumption/generation records with ODS-E v0.4.0 schema compliance.
     """
-    logger.info(
-        f"ODS-E timeseries export request: site={site_id}, start={start}, end={end}, "
-        f"format={format}"
-    )
+    logger.info(f"ODS-E timeseries export request: site={site_id}, start={start}, end={end}, format={format}")
 
     try:
         result = await odse_service.export_timeseries(
@@ -62,7 +59,7 @@ async def export_timeseries(
 
     except Exception as e:
         logger.error(f"ODS-E timeseries export failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {e!s}")
 
 
 @router.get("/asset-metadata", response_model=ODSEAssetExport)
@@ -77,8 +74,7 @@ async def export_asset_metadata(
     Returns asset records with ODS-E v0.4.0 schema and Sentinel extensions.
     """
     logger.info(
-        f"ODS-E asset metadata export request: site={site_id}, "
-        f"type={equipment_type}, include_health={include_health}"
+        f"ODS-E asset metadata export request: site={site_id}, type={equipment_type}, include_health={include_health}"
     )
 
     try:
@@ -91,7 +87,7 @@ async def export_asset_metadata(
 
     except Exception as e:
         logger.error(f"ODS-E asset metadata export failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {e!s}")
 
 
 @router.get("/health")
@@ -119,28 +115,40 @@ def _export_timeseries_csv(export: ODSETimeseriesExport) -> PlainTextResponse:
     writer.writerow([])
 
     # Write column headers
-    writer.writerow([
-        "timestamp", "kWh", "error_type", "direction", "fuel_type",
-        "end_use", "kVA", "PF", "tariff_currency", "tariff_period"
-    ])
+    writer.writerow(
+        [
+            "timestamp",
+            "kWh",
+            "error_type",
+            "direction",
+            "fuel_type",
+            "end_use",
+            "kVA",
+            "PF",
+            "tariff_currency",
+            "tariff_period",
+        ]
+    )
 
     # Write records
     for record in export.records:
-        writer.writerow([
-            record.timestamp,
-            record.kWh,
-            record.error_type,
-            record.direction,
-            record.fuel_type,
-            record.end_use or "",
-            record.kVA or "",
-            record.PF or "",
-            record.tariff_currency or "",
-            record.tariff_period or "",
-        ])
+        writer.writerow(
+            [
+                record.timestamp,
+                record.kWh,
+                record.error_type,
+                record.direction,
+                record.fuel_type,
+                record.end_use or "",
+                record.kVA or "",
+                record.PF or "",
+                record.tariff_currency or "",
+                record.tariff_period or "",
+            ]
+        )
 
     return PlainTextResponse(
         content=output.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=odse-export-{export.site_id}.csv"}
+        headers={"Content-Disposition": f"attachment; filename=odse-export-{export.site_id}.csv"},
     )

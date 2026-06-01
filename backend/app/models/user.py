@@ -5,7 +5,6 @@ Phase TODO: Implement proper user management
 Currently provides stub implementation for development.
 """
 
-
 from pydantic import BaseModel
 
 

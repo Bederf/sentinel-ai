@@ -185,11 +185,7 @@ async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> dict[s
         }
 
         # Update in database with composite key (key, site_id)
-        (
-            supabase.table("system_settings")
-            .upsert(payload, on_conflict="key,site_id")
-            .execute()
-        )
+        (supabase.table("system_settings").upsert(payload, on_conflict="key,site_id").execute())
 
         logger.info(f"Updated health thresholds: site_id={thresholds.site_id}, values={thresholds.dict()}")
 
@@ -393,13 +389,7 @@ async def get_setting(key: str, site_id: str | None = None) -> dict[str, Any]:
 
         # Try site-specific first
         if site_id:
-            result = (
-                supabase.table("system_settings")
-                .select("*")
-                .eq("key", key)
-                .eq("site_id", site_id)
-                .execute()
-            )
+            result = supabase.table("system_settings").select("*").eq("key", key).eq("site_id", site_id).execute()
             if result.data:
                 setting = result.data[0]
                 return {

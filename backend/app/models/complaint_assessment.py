@@ -14,6 +14,7 @@ from datetime import datetime
 @dataclass
 class EquipmentAlert:
     """Active alert on an equipment unit."""
+
     alert_id: str
     title: str
     severity: str  # "critical", "warning"
@@ -24,6 +25,7 @@ class EquipmentAlert:
 @dataclass
 class EquipmentPrediction:
     """Active prediction on an equipment unit."""
+
     prediction_id: str
     severity: str  # "critical", "warning"
     prediction_type: str
@@ -39,22 +41,19 @@ class EquipmentStatus:
 
     One row per equipment (FCU, VAV, AHU, lighting controller, sensors).
     """
-    equipment_id: str      # UUID from equipment.id
-    code: str              # Equipment code e.g. "S002-FCU-L2-A"
+
+    equipment_id: str  # UUID from equipment.id
+    code: str  # Equipment code e.g. "S002-FCU-L2-A"
     name: str
-    type: str              # "fcu", "vav", "ahu", "lighting", "sensor"
-    health_score: int      # 0-100
-    status: str            # "normal", "warning", "critical", "fault", "off"
+    type: str  # "fcu", "vav", "ahu", "lighting", "sensor"
+    health_score: int  # 0-100
+    status: str  # "normal", "warning", "critical", "fault", "off"
     alerts: list[EquipmentAlert] = field(default_factory=list)
     predictions: list[EquipmentPrediction] = field(default_factory=list)
 
     @property
     def has_issues(self) -> bool:
-        return (
-            self.status in ("critical", "fault")
-            or bool(self.alerts)
-            or bool(self.predictions)
-        )
+        return self.status in ("critical", "fault") or bool(self.alerts) or bool(self.predictions)
 
     @property
     def has_critical_issues(self) -> bool:
@@ -68,12 +67,13 @@ class EquipmentStatus:
 @dataclass
 class VAVLiveReadings:
     """Live VAV box readings from BMS."""
+
     vav_id: str
-    damper_position: float | None      # 0-100 %
-    airflow_actual: float | None       # L/s
-    airflow_setpoint: float | None    # L/s
-    discharge_temp: float | None       # °C
-    reheat_valve: float | None         # 0-100 %
+    damper_position: float | None  # 0-100 %
+    airflow_actual: float | None  # L/s
+    airflow_setpoint: float | None  # L/s
+    discharge_temp: float | None  # °C
+    reheat_valve: float | None  # 0-100 %
     has_stuck_damper: bool = False
     has_airflow_mismatch: bool = False
     has_reheat_conflict: bool = False
@@ -87,21 +87,22 @@ class Recommendation:
     can_supervised_adjust: True if phase is supervised or auto (shows "Request Approval" button)
     can_auto_adjust:       True if phase is auto (shows "Auto-adjust" button)
     """
-    action: str           # Human-readable action e.g. "Lower FCU setpoint"
-    equipment_code: str   # e.g. "S002-FCU-L2-A"
-    parameter: str        # e.g. "temperature_setpoint"
+
+    action: str  # Human-readable action e.g. "Lower FCU setpoint"
+    equipment_code: str  # e.g. "S002-FCU-L2-A"
+    parameter: str  # e.g. "temperature_setpoint"
     current_value: float | None
     suggested_value: float | None
-    reason: str           # Why this helps
+    reason: str  # Why this helps
     can_supervised_adjust: bool = False
     can_auto_adjust: bool = False
 
 
 ASSESSMENT_STATUSES = (
-    "no_issues",          # All equipment healthy, no contextual factors
-    "equipment_fault",    # Equipment has health/alert/prediction issues
+    "no_issues",  # All equipment healthy, no contextual factors
+    "equipment_fault",  # Equipment has health/alert/prediction issues
     "contextual_factor",  # No equipment faults, but contextual factors present
-    "combined",           # Both equipment faults and contextual factors
+    "combined",  # Both equipment faults and contextual factors
 )
 
 
@@ -112,13 +113,14 @@ class ZoneAssessment:
 
     Produced by ZoneAssessmentService.assess_zone().
     """
+
     # Identity
     zone_id: str
     zone_name: str
     desk_id: str
     desk_floor: str
-    complaint_type: str          # "too_hot", "too_cold", "stuffy", "drafty", "noise"
-    site_id: str                 # e.g. "site-002"
+    complaint_type: str  # "too_hot", "too_cold", "stuffy", "drafty", "noise"
+    site_id: str  # e.g. "site-002"
 
     # Equipment in this zone
     equipment_statuses: list[EquipmentStatus]
@@ -129,35 +131,35 @@ class ZoneAssessment:
     # Zone readings
     zone_temp: float
     zone_setpoint: float
-    zone_status: str             # "running", "off", "fault", "unknown"
-    occupancy_pct: float          # 0-100
-    co2_level: float | None      # ppm
-    lighting_level: float         # 0-100 % dim
-    outdoor_temp: float | None    # °C — from AHU outdoor air temp sensor (telemetry)
+    zone_status: str  # "running", "off", "fault", "unknown"
+    occupancy_pct: float  # 0-100
+    co2_level: float | None  # ppm
+    lighting_level: float  # 0-100 % dim
+    outdoor_temp: float | None  # °C — from AHU outdoor air temp sensor (telemetry)
 
     # Desk context
     near_window: bool
     near_diffuser: bool
     near_printer: bool
-    orientation: str | None       # "N", "NE", "E", "SE", "S", "SW", "W", "NW"
+    orientation: str | None  # "N", "NE", "E", "SE", "S", "SW", "W", "NW"
 
     # Contextual factors (contributing but not faults)
-    solar_factor: str | None          # "morning_sun", "afternoon_sun", "north_facing", None
-    outdoor_extreme: bool             # outdoor_temp > 35°C or < 10°C
-    low_occupancy: bool              # occupancy_pct < 20
-    high_lighting_load: bool          # lighting_level > 70
-    after_hours: bool                # outside building hours
+    solar_factor: str | None  # "morning_sun", "afternoon_sun", "north_facing", None
+    outdoor_extreme: bool  # outdoor_temp > 35°C or < 10°C
+    low_occupancy: bool  # occupancy_pct < 20
+    high_lighting_load: bool  # lighting_level > 70
+    after_hours: bool  # outside building hours
 
     # Assessment result
-    status: str                  # ASSESSMENT_STATUSES
+    status: str  # ASSESSMENT_STATUSES
     root_causes: list[str]
-    confidence: str             # "high", "medium", "low"
+    confidence: str  # "high", "medium", "low"
     timestamp: str = field(default_factory=lambda: datetime.now().isoformat())
 
     # Recommendations (gated by control module + phase)
     recommendations: list[Recommendation] = field(default_factory=list)
     control_module_active: bool = False
-    phase: str = "shadow"       # "shadow", "advisory", "supervised", "auto"
+    phase: str = "shadow"  # "shadow", "advisory", "supervised", "auto"
 
     # Convenience properties
     @property
@@ -170,8 +172,13 @@ class ZoneAssessment:
 
     @property
     def has_contextual_factors(self) -> bool:
-        return bool(self.solar_factor or self.outdoor_extreme or self.low_occupancy
-                    or self.high_lighting_load or self.after_hours)
+        return bool(
+            self.solar_factor
+            or self.outdoor_extreme
+            or self.low_occupancy
+            or self.high_lighting_load
+            or self.after_hours
+        )
 
     @property
     def equipment_healthy(self) -> list[EquipmentStatus]:

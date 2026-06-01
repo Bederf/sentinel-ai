@@ -4,13 +4,13 @@ Tests for ODS-E Export Service
  Validates ODS-E v0.4.0 compliance and data transformation logic.
 """
 
+from datetime import datetime
+
 import pytest
-from datetime import datetime, timedelta
 
 from app.models.odse_models import (
     ODSEAssetExport,
     ODSETimeseriesExport,
-    ODSEValidationResult,
 )
 from app.services.odse_service import ODSEExportService
 
@@ -244,8 +244,9 @@ class TestODSERecordValidation:
 
     def test_odse_record_invalid_power_factor(self):
         """Test that invalid power factor raises validation error."""
-        from app.models.odse_models import ODSERecord
         from pydantic import ValidationError
+
+        from app.models.odse_models import ODSERecord
 
         with pytest.raises(ValidationError):
             ODSERecord(timestamp="2026-05-01T00:00:00Z", kWh=10.0, PF=1.5)
@@ -255,8 +256,9 @@ class TestODSERecordValidation:
 
     def test_odse_record_error_type_enum(self):
         """Test that error_type accepts only valid enum values."""
-        from app.models.odse_models import ODSERecord
         from pydantic import ValidationError
+
+        from app.models.odse_models import ODSERecord
 
         # Valid values
         for error_type in ["normal", "warning", "critical", "fault", "unknown"]:
@@ -269,8 +271,9 @@ class TestODSERecordValidation:
 
     def test_odse_record_direction_enum(self):
         """Test that direction accepts only valid enum values."""
-        from app.models.odse_models import ODSERecord
         from pydantic import ValidationError
+
+        from app.models.odse_models import ODSERecord
 
         # Valid values
         for direction in ["consumption", "generation", "net"]:
@@ -283,16 +286,13 @@ class TestODSERecordValidation:
 
     def test_odse_record_tariff_period_enum(self):
         """Test that tariff_period accepts only valid enum values."""
-        from app.models.odse_models import ODSERecord
         from pydantic import ValidationError
+
+        from app.models.odse_models import ODSERecord
 
         # Valid values
         for period in ["peak", "standard", "off_peak", None]:
-            record = ODSERecord(
-                timestamp="2026-05-01T00:00:00Z",
-                kWh=10.0,
-                tariff_period=period
-            )
+            record = ODSERecord(timestamp="2026-05-01T00:00:00Z", kWh=10.0, tariff_period=period)
             assert record.tariff_period == period
 
         # Invalid value

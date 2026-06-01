@@ -11,11 +11,12 @@ The bridge runs at BRIDGE_BASE and exposes:
 
 Authentication: Bearer token from BRIDGE_API_TOKEN_SITE_002 env var.
 """
+
 from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime, date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from app.services.ipmvp.ipmvp_engine import (
@@ -27,7 +28,9 @@ from app.services.ipmvp.ipmvp_engine import (
 logger = logging.getLogger(__name__)
 
 BRIDGE_BASE = os.getenv("BRIDGE_BASE_SITE002") or os.getenv("BRIDGE_BASE_URL", "http://localhost:8080")
-TOKEN = os.getenv("BRIDGE_API_TOKEN_SITE_002") or os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+TOKEN = (
+    os.getenv("BRIDGE_API_TOKEN_SITE_002") or os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+)
 
 
 class Site002DataFetcher(IPMVPDataFetcher):
@@ -42,6 +45,7 @@ class Site002DataFetcher(IPMVPDataFetcher):
     async def _get_client(self):
         if self._client is None:
             import httpx
+
             self._client = httpx.AsyncClient(
                 base_url=BRIDGE_BASE,
                 headers={"Authorization": f"Bearer {TOKEN}"},
@@ -117,14 +121,16 @@ class Site002DataFetcher(IPMVPDataFetcher):
             holiday = ts_date in holiday_dates
             occupied = self._is_occupied(ts, occupancy)
 
-            records.append(EnergyRecord(
-                timestamp=ts,
-                kwh=float(rec.get("kwh", rec.get("active_energy_kwh", 0))),
-                oat_celsius=oat_index.get(ts_str),
-                occupied=occupied,
-                load_shedding=ls_day,
-                holiday=holiday,
-            ))
+            records.append(
+                EnergyRecord(
+                    timestamp=ts,
+                    kwh=float(rec.get("kwh", rec.get("active_energy_kwh", 0))),
+                    oat_celsius=oat_index.get(ts_str),
+                    occupied=occupied,
+                    load_shedding=ls_day,
+                    holiday=holiday,
+                )
+            )
 
         return records
 
@@ -156,16 +162,18 @@ class Site002DataFetcher(IPMVPDataFetcher):
             except (KeyError, ValueError):
                 continue
 
-            events.append(EquipmentEvent(
-                event_id=rec.get("event_id", rec.get("id", "")),
-                timestamp=ts,
-                system_type=rec.get("system_type", "unknown"),
-                device_id=rec.get("device_id", ""),
-                point_name=rec.get("point_name", ""),
-                old_value=rec.get("old_value"),
-                new_value=rec.get("new_value"),
-                recommendation_id=rec.get("recommendation_id"),
-            ))
+            events.append(
+                EquipmentEvent(
+                    event_id=rec.get("event_id", rec.get("id", "")),
+                    timestamp=ts,
+                    system_type=rec.get("system_type", "unknown"),
+                    device_id=rec.get("device_id", ""),
+                    point_name=rec.get("point_name", ""),
+                    old_value=rec.get("old_value"),
+                    new_value=rec.get("new_value"),
+                    recommendation_id=rec.get("recommendation_id"),
+                )
+            )
 
         return events
 
@@ -226,6 +234,7 @@ class Site002DataFetcher(IPMVPDataFetcher):
 
     def _supabase(self):
         from app.database.supabase_client import get_supabase_client
+
         return get_supabase_client()
 
     async def persist_energy(self, records: list[EnergyRecord]) -> int:
@@ -246,11 +255,15 @@ class Site002DataFetcher(IPMVPDataFetcher):
             for r in records
         ]
         sb = self._supabase()
-        result = sb.table("ipmvp_energy").upsert(
-            rows,
-            on_conflict="site_id,timestamp",
-            ignore_duplicates=False,
-        ).execute()
+        result = (
+            sb.table("ipmvp_energy")
+            .upsert(
+                rows,
+                on_conflict="site_id,timestamp",
+                ignore_duplicates=False,
+            )
+            .execute()
+        )
         count = len(result.data) if result.data else 0
         logger.info("[IPMVP] Persisted %d energy records", count)
         return count
@@ -267,16 +280,21 @@ class Site002DataFetcher(IPMVPDataFetcher):
                 "oat_celsius": r.get("oat_celsius", r.get("outdoor_air_temp")),
                 "source": "bridge_ipmvp",
             }
-            for r in records if r.get("timestamp")
+            for r in records
+            if r.get("timestamp")
         ]
         if not rows:
             return 0
         sb = self._supabase()
-        result = sb.table("ipmvp_oat").upsert(
-            rows,
-            on_conflict="site_id,timestamp",
-            ignore_duplicates=False,
-        ).execute()
+        result = (
+            sb.table("ipmvp_oat")
+            .upsert(
+                rows,
+                on_conflict="site_id,timestamp",
+                ignore_duplicates=False,
+            )
+            .execute()
+        )
         count = len(result.data) if result.data else 0
         logger.info("[IPMVP] Persisted %d OAT records", count)
         return count
@@ -298,16 +316,21 @@ class Site002DataFetcher(IPMVPDataFetcher):
                 "reason": e.get("reason"),
                 "source": "bridge_ipmvp",
             }
-            for i, e in enumerate(events) if e.get("timestamp")
+            for i, e in enumerate(events)
+            if e.get("timestamp")
         ]
         if not rows:
             return 0
         sb = self._supabase()
-        result = sb.table("ipmvp_events").upsert(
-            rows,
-            on_conflict="site_id,event_id",
-            ignore_duplicates=True,
-        ).execute()
+        result = (
+            sb.table("ipmvp_events")
+            .upsert(
+                rows,
+                on_conflict="site_id,event_id",
+                ignore_duplicates=True,
+            )
+            .execute()
+        )
         count = len(result.data) if result.data else 0
         logger.info("[IPMVP] Persisted %d events", count)
         return count
@@ -317,15 +340,19 @@ class Site002DataFetcher(IPMVPDataFetcher):
         if not occupancy_data:
             return False
         sb = self._supabase()
-        result = sb.table("ipmvp_occupancy").upsert(
-            {
-                "site_id": self.site_id,
-                "schedule_data": occupancy_data,
-                "source": "bridge_ipmvp",
-                "updated_at": datetime.now(UTC).isoformat(),
-            },
-            on_conflict="site_id",
-        ).execute()
+        result = (
+            sb.table("ipmvp_occupancy")
+            .upsert(
+                {
+                    "site_id": self.site_id,
+                    "schedule_data": occupancy_data,
+                    "source": "bridge_ipmvp",
+                    "updated_at": datetime.now(UTC).isoformat(),
+                },
+                on_conflict="site_id",
+            )
+            .execute()
+        )
         ok = bool(result.data)
         if ok:
             logger.info("[IPMVP] Occupancy schedule persisted")
@@ -336,15 +363,19 @@ class Site002DataFetcher(IPMVPDataFetcher):
         if not tariff_data:
             return False
         sb = self._supabase()
-        result = sb.table("ipmvp_tariff").upsert(
-            {
-                "site_id": self.site_id,
-                "tariff_data": tariff_data,
-                "source": "bridge_ipmvp",
-                "updated_at": datetime.now(UTC).isoformat(),
-            },
-            on_conflict="site_id",
-        ).execute()
+        result = (
+            sb.table("ipmvp_tariff")
+            .upsert(
+                {
+                    "site_id": self.site_id,
+                    "tariff_data": tariff_data,
+                    "source": "bridge_ipmvp",
+                    "updated_at": datetime.now(UTC).isoformat(),
+                },
+                on_conflict="site_id",
+            )
+            .execute()
+        )
         ok = bool(result.data)
         if ok:
             logger.info("[IPMVP] Tariff data persisted")

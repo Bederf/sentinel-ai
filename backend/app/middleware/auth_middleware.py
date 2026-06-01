@@ -783,7 +783,6 @@ def _authenticate_request_sync(request: Request) -> AuthContext | None:
     # 2) Fallback: directly extract and validate Bearer token
     # This handles public-path endpoints that use optional_auth
     # but where the middleware skipped auth injection
-    from app.config.settings import settings
 
     token = _extract_bearer_token(request)
     if not token:

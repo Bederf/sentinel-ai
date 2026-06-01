@@ -7,7 +7,6 @@ The hero endpoint: POST /api/complaints/submit?desk_id=25&complaint_type=too_hot
 Returns instant AI diagnosis with BMS context and actionable suggestions.
 """
 
-
 from fastapi import APIRouter, HTTPException
 
 from app.security.prompt_guard import score_prompt

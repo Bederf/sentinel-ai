@@ -24,14 +24,17 @@ class TestGraphOAuthService:
         """Token acquisition calls MSAL and returns access token on success."""
         mock_result = {"access_token": "test-token-abc123", "expires_in": 3600}
 
-        with patch.dict(
-            os.environ,
-            {
-                "OUTLOOK_CLIENT_ID": "test-client-id",
-                "OUTLOOK_CLIENT_SECRET": "test-client-secret",
-                "OUTLOOK_TENANT_ID": "test-tenant-id",
-            },
-        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OUTLOOK_CLIENT_ID": "test-client-id",
+                    "OUTLOOK_CLIENT_SECRET": "test-client-secret",
+                    "OUTLOOK_TENANT_ID": "test-tenant-id",
+                },
+            ),
+            patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app,
+        ):
             mock_app = MagicMock()
             mock_app.acquire_token_for_client.return_value = mock_result
             mock_get_app.return_value = mock_app
@@ -54,9 +57,7 @@ class TestGraphOAuthService:
             asyncio.run(_run())
 
             assert result == "test-token-abc123"
-            mock_app.acquire_token_for_client.assert_called_once_with(
-                scopes=["https://graph.microsoft.com/.default"]
-            )
+            mock_app.acquire_token_for_client.assert_called_once_with(scopes=["https://graph.microsoft.com/.default"])
 
     def test_token_caching_returns_cached_token(self) -> None:
         """Second call within TTL uses cached token (no MSAL call)."""
@@ -97,14 +98,17 @@ class TestGraphOAuthService:
 
     def test_token_acquisition_failure_returns_none(self) -> None:
         """MSAL failure (empty result dict) returns None."""
-        with patch.dict(
-            os.environ,
-            {
-                "OUTLOOK_CLIENT_ID": "test-client-id",
-                "OUTLOOK_CLIENT_SECRET": "test-client-secret",
-                "OUTLOOK_TENANT_ID": "test-tenant-id",
-            },
-        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OUTLOOK_CLIENT_ID": "test-client-id",
+                    "OUTLOOK_CLIENT_SECRET": "test-client-secret",
+                    "OUTLOOK_TENANT_ID": "test-tenant-id",
+                },
+            ),
+            patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app,
+        ):
             mock_app = MagicMock()
             mock_app.acquire_token_for_client.return_value = {}  # Empty = failure
             mock_get_app.return_value = mock_app
@@ -136,14 +140,17 @@ class TestGraphOAuthService:
 
         fresh_token = {"access_token": "fresh-token", "expires_in": 3600}
 
-        with patch.dict(
-            os.environ,
-            {
-                "OUTLOOK_CLIENT_ID": "test-client-id",
-                "OUTLOOK_CLIENT_SECRET": "test-client-secret",
-                "OUTLOOK_TENANT_ID": "test-tenant-id",
-            },
-        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OUTLOOK_CLIENT_ID": "test-client-id",
+                    "OUTLOOK_CLIENT_SECRET": "test-client-secret",
+                    "OUTLOOK_TENANT_ID": "test-tenant-id",
+                },
+            ),
+            patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app,
+        ):
             mock_app = MagicMock()
             mock_app.acquire_token_for_client.return_value = fresh_token
             mock_get_app.return_value = mock_app
@@ -165,7 +172,7 @@ class TestGraphOAuthService:
             asyncio.run(_run())
 
             assert result == "fresh-token"
-                # Should have called MSAL since cache was expired
+            # Should have called MSAL since cache was expired
 
     def test_clear_token_cache(self) -> None:
         """clear_token_cache() resets the module-level cache."""
@@ -220,14 +227,17 @@ class TestGraphOAuthServiceConcurrent:
 
         mock_result = {"access_token": "shared-token", "expires_in": 3600}
 
-        with patch.dict(
-            os.environ,
-            {
-                "OUTLOOK_CLIENT_ID": "test-client-id",
-                "OUTLOOK_CLIENT_SECRET": "test-client-secret",
-                "OUTLOOK_TENANT_ID": "test-tenant-id",
-            },
-        ), patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app:
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "OUTLOOK_CLIENT_ID": "test-client-id",
+                    "OUTLOOK_CLIENT_SECRET": "test-client-secret",
+                    "OUTLOOK_TENANT_ID": "test-tenant-id",
+                },
+            ),
+            patch("app.services.graph_oauth_service._get_msal_app") as mock_get_app,
+        ):
             mock_app = MagicMock()
             mock_app.acquire_token_for_client.side_effect = _mock_acquire
             mock_get_app.return_value = mock_app

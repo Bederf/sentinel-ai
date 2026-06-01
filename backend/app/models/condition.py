@@ -155,9 +155,7 @@ class ServiceRecommendation(BaseModel):
     recommended_action: str = Field(..., description="Specific recommended maintenance action")
     urgency: Urgency = Field(default=Urgency.ROUTINE, description="Action urgency")
     reason: str = Field(..., description="Why this action is recommended")
-    estimated_days_remaining: float | None = Field(
-        None, description="Estimated days before failure (None if unknown)"
-    )
+    estimated_days_remaining: float | None = Field(None, description="Estimated days before failure (None if unknown)")
     confidence: float = Field(default=0.0, ge=0, le=1, description="Recommendation confidence")
     app_version: str | None = Field(None, description="Runtime application version")
     config_checksum: str | None = Field(None, description="Runtime configuration checksum")

@@ -8,7 +8,7 @@ Note: TestClient is incompatible with httpx 0.28.x + starlette 0.36.x,
 so API endpoint functions are tested directly with mocked dependencies.
 """
 
-from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -419,7 +419,6 @@ class TestPointWriteEndpoint:
 
         from app.api.niagara_bacnet import write_point
         from app.models.niagara import BACnetPointWriteRequest
-        from app.services.niagara.bacnet_client import BACnetWriteError
 
         mock_adapter.write_point = AsyncMock(side_effect=BACnetWriteError("Write rejected"))
 

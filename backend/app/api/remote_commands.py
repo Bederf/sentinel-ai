@@ -36,9 +36,7 @@ class ExecuteCommandRequest(BaseModel):
         ),
     )
     point: str | None = Field(None, description="Device point to write (optional for status_check)")
-    value: float | int | bool | str | None = Field(
-        None, description="Value to write (optional for status_check)"
-    )
+    value: float | int | bool | str | None = Field(None, description="Value to write (optional for status_check)")
     reason: str = Field("", description="Reason for the command (recommended)")
 
 

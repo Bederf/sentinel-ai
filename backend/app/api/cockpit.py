@@ -53,23 +53,23 @@ cockpit_issue_service = CockpitIssueFusionService()
 # ---------------------------------------------------------------------------
 
 __all__ = [
+    "_AUDIT_LOG_STORE",
+    "_ISSUE_SITE_LOOKUP",
+    "_ISSUE_STORE",
     "CockpitActionRequest",
+    "CockpitDecisionPayload",
     "CockpitIssue",
     "CockpitIssueEvidenceRef",
     "CockpitIssueLocation",
     "CockpitSourceStatus",
-    "CockpitDecisionPayload",
-    "cockpit_issue_service",
-    "_ISSUE_STORE",
-    "_AUDIT_LOG_STORE",
-    "_ISSUE_SITE_LOOKUP",
-    "_cache_site_issues",
     "_apply_action",
-    "_record_audit",
     "_available_actions",
     "_build_cockpit_payload",
-    "_fetch_site_phase",
+    "_cache_site_issues",
     "_fetch_control_enabled",
+    "_fetch_site_phase",
+    "_record_audit",
+    "cockpit_issue_service",
 ]
 
 
@@ -159,9 +159,7 @@ def _cache_site_issues(site_id: str, issues: list[CockpitIssue]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _available_actions(
-    status: IssueStatus, posture: str = "supervised"
-) -> list[CockpitActionType]:
+def _available_actions(status: IssueStatus, posture: str = "supervised") -> list[CockpitActionType]:
     """Return valid next actions for an issue in the given status and posture."""
     if posture == "advisory":
         # Read-only: only acknowledge allowed for new issues

@@ -1,6 +1,5 @@
 """Indoor Air Quality models."""
 
-
 from pydantic import BaseModel, Field
 
 

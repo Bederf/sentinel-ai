@@ -56,6 +56,12 @@ _PLATFORMS: dict[str, dict[str, Any]] = {
             {"key": "pv_system_id", "label": "PV System ID", "type": "text", "required": True},
         ],
     },
+    "home_assistant": {
+        "label": "Home Assistant",
+        "description": "Home Assistant via WireGuard VPN (local gateway)",
+        "auth_fields": [],
+        # No auth fields — WireGuard handles network auth; entity mapping via bot
+    },
     "other": {
         "label": "Other",
         "description": "Unsupported platform — manual configuration required",
@@ -97,12 +103,7 @@ class OnboardRequest(BaseModel):
 
 @router.get("/platforms")
 async def get_platforms() -> dict:
-    return {
-        "platforms": [
-            {"id": pid, **meta}
-            for pid, meta in _PLATFORMS.items()
-        ]
-    }
+    return {"platforms": [{"id": pid, **meta} for pid, meta in _PLATFORMS.items()]}
 
 
 @router.post("/onboard", dependencies=[Depends(require_role(4))])
@@ -113,6 +114,7 @@ async def onboard_residential_site(request: OnboardRequest) -> dict:
     extra: dict = {}
     if request.platform == "solarman":
         from app.config.settings import settings as _settings
+
         extra = {"app_id": _settings.solarman_app_id, "app_secret": _settings.solarman_app_secret}
 
     try:
@@ -128,9 +130,7 @@ async def onboard_residential_site(request: OnboardRequest) -> dict:
         raise HTTPException(status_code=504, detail="Platform authentication timed out (30s)") from None
 
     try:
-        manifests = await asyncio.wait_for(
-            adapter.discover_devices(), timeout=_DISCOVERY_TIMEOUT_SECONDS
-        )
+        manifests = await asyncio.wait_for(adapter.discover_devices(), timeout=_DISCOVERY_TIMEOUT_SECONDS)
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Device discovery timed out (30s)") from None
 
@@ -195,6 +195,49 @@ async def onboard_residential_site(request: OnboardRequest) -> dict:
     }
 
 
+# ── setarea ─────────────────────────────────────────────────────────────────────
+
+from app.services.residential.eskomsepush_client import validate_area_code as _validate_area_code  # noqa: E402
+
+
+class SetareaRequest(BaseModel):
+    site_id: str
+    eskom_area_code: str
+
+
+@router.patch("/setarea", dependencies=[Depends(require_role(4))])
+async def setarea_residential_site(request: SetareaRequest) -> dict:
+    """
+    Update eskom_area_code on a residential site.
+    Validates the area code via validate_area_code() (cached list, NOT live API)
+    before saving.
+    """
+    # Validate area code first — checks _area_cache, not live API
+    is_valid = await _validate_area_code(request.eskom_area_code)
+    if not is_valid:
+        raise HTTPException(status_code=400, detail="Area code not found. Check eskomsepush.co.za and try again.")
+
+    supabase = get_supabase_client()
+
+    existing = supabase.table("residential_sites").select("id,is_active").eq("site_id", request.site_id).execute()
+    if not existing.data:
+        raise HTTPException(status_code=404, detail=f"Residential site not found: {request.site_id}")
+
+    if not existing.data[0]["is_active"]:
+        raise HTTPException(status_code=400, detail="Site is not active.")
+
+    supabase.table("residential_sites").update({"eskom_area_code": request.eskom_area_code}).eq(
+        "site_id", request.site_id
+    ).execute()
+
+    logger.info("Updated eskom_area_code=%s for site_id=%s", request.eskom_area_code, request.site_id)
+
+    return {"status": "updated", "eskom_area_code": request.eskom_area_code}
+
+
+# ── deactivate ─────────────────────────────────────────────────────────────────
+
+
 @router.post("/deactivate/{site_id}", dependencies=[Depends(require_role(4))])
 async def deactivate_residential_site(site_id: str) -> dict:
     """Full teardown of a residential site — stops polling, revokes ACL, clears retained MQTT, marks inactive."""
@@ -229,7 +272,9 @@ async def deactivate_residential_site(site_id: str) -> dict:
             client = mqtt.Client(client_id=f"sentinel-residential-deactivate-{site_id}")
             if _settings.residential_mqtt_username:
                 client.username_pw_set(_settings.residential_mqtt_username, _settings.residential_mqtt_password)
-            client.connect(_settings.residential_mqtt_broker or "127.0.0.1", _settings.residential_mqtt_port, keepalive=10)
+            client.connect(
+                _settings.residential_mqtt_broker or "127.0.0.1", _settings.residential_mqtt_port, keepalive=10
+            )
             for pattern in _RETAINED_TOPIC_PATTERNS:
                 topic = pattern.format(site_id=site_id)
                 info = client.publish(topic, None, qos=1, retain=True)
@@ -241,6 +286,7 @@ async def deactivate_residential_site(site_id: str) -> dict:
 
     # 4. Mark inactive in DB
     import datetime as _dt
+
     deactivated_at = _dt.datetime.utcnow().isoformat()
     supabase.table("residential_sites").update({"is_active": False}).eq("site_id", site_id).execute()
 
@@ -251,6 +297,63 @@ async def deactivate_residential_site(site_id: str) -> dict:
         "site_id": site_id,
         "deactivated_at": deactivated_at,
         "topics_cleared": topics_cleared,
+    }
+
+
+# ── WireGuard peer admin endpoints ────────────────────────────────────────────────
+
+from app.services.residential.wireguard_peer_manager import WireGuardPeerManager  # noqa: E402
+
+
+@router.post("/wireguard/activate/{site_id}", dependencies=[Depends(require_role(4))])
+async def activate_wireguard_peer(site_id: str) -> dict:
+    """
+    Mark a WireGuard peer as active.
+
+    Called by the operator AFTER adding the [Peer] block to /etc/wireguard/wg0.conf.
+    This is a manual step — it's the operator who confirms the peer is in wg0.conf.
+
+    Returns 400 if no pending peer exists for this site_id.
+    """
+    wg = WireGuardPeerManager()
+    peer = wg.get_peer(site_id)
+
+    if peer is None:
+        raise HTTPException(status_code=404, detail=f"No WireGuard peer found for site: {site_id}")
+    if peer.status == "active":
+        return {"status": "already_active", "site_id": site_id, "assigned_ip": peer.assigned_ip}
+    if peer.status == "revoked":
+        raise HTTPException(
+            status_code=400, detail=f"Peer for {site_id} is revoked. User must /connect again to register a new peer."
+        )
+
+    wg.activate_peer(site_id)
+
+    logger.info("WireGuard peer activated: site_id=%s assigned_ip=%s", site_id, peer.assigned_ip)
+    return {
+        "status": "activated",
+        "site_id": site_id,
+        "assigned_ip": peer.assigned_ip,
+    }
+
+
+@router.get("/wireguard/pending", dependencies=[Depends(require_role(4))])
+async def list_pending_wireguard_peers() -> dict:
+    """
+    List all pending WireGuard peers awaiting wg0.conf activation.
+    Used by the operator to know which peers to add.
+    """
+    wg = WireGuardPeerManager()
+    peers = wg.list_pending()
+    return {
+        "pending": [
+            {
+                "site_id": p.site_id,
+                "assigned_ip": p.assigned_ip,
+                "created_at": p.created_at.isoformat() if p.created_at else None,
+            }
+            for p in peers
+        ]
     }
 
 

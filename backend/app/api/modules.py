@@ -369,9 +369,20 @@ async def get_recommendations(
                 continue
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 client = get_supabase_client()
-                ai_batch = client.table("recommendations").select("*").eq("site_id", sid).eq("status", "pending").eq("action_type", "ai_optimization").order("timestamp", desc=True).limit(50).execute()
+                ai_batch = (
+                    client.table("recommendations")
+                    .select("*")
+                    .eq("site_id", sid)
+                    .eq("status", "pending")
+                    .eq("action_type", "ai_optimization")
+                    .order("timestamp", desc=True)
+                    .limit(50)
+                    .execute()
+                )
                 from app.models.recommendation import Recommendation
+
                 seen_ids = {r.id for r in recs}
                 for row in ai_batch.data or []:
                     if row.get("id") not in seen_ids:

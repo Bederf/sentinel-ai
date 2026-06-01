@@ -18,9 +18,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from app.database.repositories.audit_repository import AuditRepository
 from app.database.supabase_client import get_supabase_client
 from app.models.audit_log import AuditActionType, AuditLogEntry, AuditResultType
-from app.database.repositories.audit_repository import AuditRepository
 from app.services.encryption_service import get_encryption_service
 
 logger = logging.getLogger(__name__)
@@ -200,21 +200,29 @@ class AuditLogger:
                 for entry in entries_to_flush:
                     entry_dict = entry.to_dict()
                     encrypted = self._encrypt_audit_entry(entry_dict)
-                    self._repo.create({
-                        "id": encrypted.get("id"),
-                        "timestamp": encrypted.get("timestamp"),
-                        "action": encrypted.get("action"),
-                        "user_id": encrypted.get("user"),
-                        "device_id": encrypted.get("device_id"),
-                        "point_name": encrypted.get("point_name"),
-                        "old_value": json.dumps(encrypted["old_value"]) if encrypted.get("old_value") is not None else None,
-                        "new_value": json.dumps(encrypted["new_value"]) if encrypted.get("new_value") is not None else None,
-                        "result": encrypted.get("result"),
-                        "safety_validation": json.dumps(encrypted["safety_validation"]) if encrypted.get("safety_validation") else None,
-                        "error_message": encrypted.get("error_message"),
-                        "correlation_id": encrypted.get("correlation_id"),
-                        "metadata": encrypted.get("metadata", {}),
-                    })
+                    self._repo.create(
+                        {
+                            "id": encrypted.get("id"),
+                            "timestamp": encrypted.get("timestamp"),
+                            "action": encrypted.get("action"),
+                            "user_id": encrypted.get("user"),
+                            "device_id": encrypted.get("device_id"),
+                            "point_name": encrypted.get("point_name"),
+                            "old_value": json.dumps(encrypted["old_value"])
+                            if encrypted.get("old_value") is not None
+                            else None,
+                            "new_value": json.dumps(encrypted["new_value"])
+                            if encrypted.get("new_value") is not None
+                            else None,
+                            "result": encrypted.get("result"),
+                            "safety_validation": json.dumps(encrypted["safety_validation"])
+                            if encrypted.get("safety_validation")
+                            else None,
+                            "error_message": encrypted.get("error_message"),
+                            "correlation_id": encrypted.get("correlation_id"),
+                            "metadata": encrypted.get("metadata", {}),
+                        }
+                    )
                 self.buffer = []
                 logger.debug(f"Flushed {len(entries_to_flush)} audit entries to Supabase")
             except Exception as e:
@@ -488,7 +496,11 @@ class AuditLogger:
             decrypted["user_id"] = decrypted.pop("user", "")
 
             # Apply time filters in Python (repo doesn't support range filter)
-            ts = datetime.fromisoformat(decrypted["timestamp"].replace("Z", "+00:00")) if isinstance(decrypted["timestamp"], str) else decrypted["timestamp"]
+            ts = (
+                datetime.fromisoformat(decrypted["timestamp"].replace("Z", "+00:00"))
+                if isinstance(decrypted["timestamp"], str)
+                else decrypted["timestamp"]
+            )
             if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
                 ts = ts.replace(tzinfo=None)
             if start_time and ts < start_time:
@@ -497,21 +509,23 @@ class AuditLogger:
                 continue
             if result and decrypted.get("result") != result.value:
                 continue
-            entries.append(AuditLogEntry(
-                id=decrypted["id"],
-                timestamp=ts,
-                action=AuditActionType(decrypted.get("action", "system_event")),
-                user=decrypted.get("user_id", ""),
-                result=AuditResultType(decrypted.get("result", "warning")),
-                device_id=decrypted.get("device_id"),
-                point_name=decrypted.get("point_name"),
-                old_value=decrypted.get("old_value"),
-                new_value=decrypted.get("new_value"),
-                safety_validation=decrypted.get("safety_validation"),
-                error_message=decrypted.get("error_message"),
-                correlation_id=decrypted.get("correlation_id"),
-                metadata=decrypted.get("metadata", {}),
-            ))
+            entries.append(
+                AuditLogEntry(
+                    id=decrypted["id"],
+                    timestamp=ts,
+                    action=AuditActionType(decrypted.get("action", "system_event")),
+                    user=decrypted.get("user_id", ""),
+                    result=AuditResultType(decrypted.get("result", "warning")),
+                    device_id=decrypted.get("device_id"),
+                    point_name=decrypted.get("point_name"),
+                    old_value=decrypted.get("old_value"),
+                    new_value=decrypted.get("new_value"),
+                    safety_validation=decrypted.get("safety_validation"),
+                    error_message=decrypted.get("error_message"),
+                    correlation_id=decrypted.get("correlation_id"),
+                    metadata=decrypted.get("metadata", {}),
+                )
+            )
         # Add buffered entries
         entries.extend(self.buffer)
         entries.sort(key=lambda x: x.timestamp, reverse=True)
@@ -523,17 +537,23 @@ class AuditLogger:
             rows = self._repo.get_all(limit=1000)
             all_entries = []
             for row in rows:
-                ts = datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00")) if isinstance(row["timestamp"], str) else row["timestamp"]
-                all_entries.append(AuditLogEntry(
-                    id=row["id"],
-                    timestamp=ts,
-                    action=AuditActionType(row.get("action", "system_event")),
-                    user=row.get("user_id", ""),
-                    result=AuditResultType(row.get("result", "warning")),
-                    device_id=row.get("device_id"),
-                    point_name=row.get("point_name"),
-                    metadata=row.get("metadata", {}),
-                ))
+                ts = (
+                    datetime.fromisoformat(row["timestamp"].replace("Z", "+00:00"))
+                    if isinstance(row["timestamp"], str)
+                    else row["timestamp"]
+                )
+                all_entries.append(
+                    AuditLogEntry(
+                        id=row["id"],
+                        timestamp=ts,
+                        action=AuditActionType(row.get("action", "system_event")),
+                        user=row.get("user_id", ""),
+                        result=AuditResultType(row.get("result", "warning")),
+                        device_id=row.get("device_id"),
+                        point_name=row.get("point_name"),
+                        metadata=row.get("metadata", {}),
+                    )
+                )
             all_entries.extend(self.buffer)
         except Exception:
             all_entries = list(self.buffer)
@@ -610,7 +630,9 @@ class AuditLogger:
         with self._lock:
             self.buffer = []
             try:
-                self._repo._client.table("audit_log").delete().neq("id", "00000000-0000-0000-0000-000000000000").execute()
+                self._repo._client.table("audit_log").delete().neq(
+                    "id", "00000000-0000-0000-0000-000000000000"
+                ).execute()
             except Exception:
                 pass
             logger.info("Cleared all audit logs")
@@ -659,10 +681,7 @@ class AuditLogger:
         try:
             supabase = get_supabase_client()
             result = await asyncio.to_thread(
-                supabase.table("audit_log")
-                .delete()
-                .lt("timestamp", cutoff_time.isoformat())
-                .execute
+                supabase.table("audit_log").delete().lt("timestamp", cutoff_time.isoformat()).execute
             )
             deleted = len(result.data) if result.data else 0
             logger.info(f"Archived {deleted} audit log entries older than {days_old} days")

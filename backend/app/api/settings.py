@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -70,14 +70,16 @@ def _upsert_setting(key: str, value: Any) -> None:
         if existing.data:
             supabase.table("system_settings").update({"value": value, "updated_at": now}).eq("key", key).execute()
         else:
-            supabase.table("system_settings").insert({
-                "key": key,
-                "value": value,
-                "category": key,
-                "data_type": "object",
-                "created_at": now,
-                "updated_at": now,
-            }).execute()
+            supabase.table("system_settings").insert(
+                {
+                    "key": key,
+                    "value": value,
+                    "category": key,
+                    "data_type": "object",
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            ).execute()
     except Exception as e:
         logger.error(f"Failed to save setting '{key}': {e}")
         raise HTTPException(status_code=500, detail=f"Failed to save setting: {e!s}")
@@ -111,6 +113,7 @@ async def get_all_settings(auth: AuthContext = Depends(require_role(1))) -> dict
         return _load_all()
     except Exception as e:
         import traceback
+
         logger.error(f"settings/all error: {e}\n{traceback.format_exc()}")
         raise
 
@@ -278,6 +281,7 @@ async def get_health_thresholds(
         return _get_setting(key) or {"healthy": 90, "warning": 70, "critical": 0}
     except Exception as e:
         import traceback
+
         logger.error(f"settings/health-thresholds error: {e}\n{traceback.format_exc()}")
         raise
 
@@ -493,6 +497,7 @@ async def set_site_mode(
 
     # Normalise frontend stage names (shadow → shadow_live, auto → automatic)
     from app.models.onboarding_phase import normalise_stage
+
     canonical_stage = normalise_stage(payload.stage)
 
     svc = SiteModePolicyService()
@@ -513,7 +518,7 @@ async def set_site_mode(
         raise HTTPException(
             status_code=400,
             detail=f"Cannot promote to '{gate_target}'. "
-                   f"Current: {current_stage}. Promotion gates not met: {'; '.join(reasons)}",
+            f"Current: {current_stage}. Promotion gates not met: {'; '.join(reasons)}",
         )
 
     state["current_stage"] = canonical_stage
@@ -521,20 +526,22 @@ async def set_site_mode(
     state["candidate_since"] = None
     state["violation_stage"] = None
     state["violation_since"] = None
-    state["last_evaluated_at"] = datetime.now(timezone.utc).isoformat()
+    state["last_evaluated_at"] = datetime.now(UTC).isoformat()
     svc._save_state(site_id, state)
 
     # Audit phase transition in phase_transition_log
     try:
         supabase = get_supabase_client()
-        supabase.table("phase_transition_log").insert({
-            "site_id": site_id,
-            "from_phase": state.get("current_stage", "unknown"),
-            "to_phase": canonical_stage,
-            "changed_by": auth.user_id or "system",
-            "reason": f"Manual phase change via settings API: {canonical_stage}",
-            "created_at": datetime.utcnow().isoformat(),
-        }).execute()
+        supabase.table("phase_transition_log").insert(
+            {
+                "site_id": site_id,
+                "from_phase": state.get("current_stage", "unknown"),
+                "to_phase": canonical_stage,
+                "changed_by": auth.user_id or "system",
+                "reason": f"Manual phase change via settings API: {canonical_stage}",
+                "created_at": datetime.utcnow().isoformat(),
+            }
+        ).execute()
     except Exception as e:
         logger.warning("Failed to log phase transition for %s: %s", site_id, e)
 
@@ -544,6 +551,7 @@ async def set_site_mode(
     # Sync stage to Supabase so mode gates and downstream services stay in sync
     try:
         from app.models.onboarding_phase import sync_site_phase_to_supabase
+
         await sync_site_phase_to_supabase(site_id, canonical_stage)
     except Exception as e:
         logger.error("Failed to sync site mode to Supabase for %s: %s", site_id, e)
@@ -553,8 +561,10 @@ async def set_site_mode(
 
     # Sync bridge policy stage when phase is changed manually
     try:
-        import httpx
         import os
+
+        import httpx
+
         bridge_url = f"http://10.99.0.1:8080/api/sites/{site_id}/ipmvp/policy-state"
         bridge_token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
         async with httpx.AsyncClient(timeout=10) as client:
@@ -659,5 +669,7 @@ async def update_aegis_settings(
         "current_stage": current_stage,
         "execution_allowed": execution_allowed,
         "gate_status": "open" if (settings.aegis_bess_writer_enabled and execution_allowed) else "closed",
-        "warning": None if execution_allowed else f"execution_blocked: site is in '{current_stage}' mode (requires supervised or automatic)",
+        "warning": None
+        if execution_allowed
+        else f"execution_blocked: site is in '{current_stage}' mode (requires supervised or automatic)",
     }

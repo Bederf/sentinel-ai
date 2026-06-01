@@ -383,9 +383,7 @@ async def create_inspection_result(result: InspectionResultCreate, current_user:
         return created_result
 
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create result: {e!s}"
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Failed to create result: {e!s}")
 
 
 @router.get(

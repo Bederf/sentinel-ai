@@ -21,6 +21,7 @@ def _clear_cache():
 
 # ── get_area_schedule ─────────────────────────────────────────────────────────
 
+
 def test_get_area_schedule_returns_none_when_empty():
     _clear_cache()
     assert get_area_schedule("sandton-2") is None
@@ -35,6 +36,7 @@ def test_get_area_schedule_returns_cached_entry():
 
 # ── _fetch_area_async ─────────────────────────────────────────────────────────
 
+
 def _mock_esp(is_configured: bool = True) -> MagicMock:
     """Return a MagicMock replacing _esp_service — avoids patching read-only property."""
     svc = MagicMock()
@@ -46,9 +48,7 @@ def _mock_esp(is_configured: bool = True) -> MagicMock:
 async def test_fetch_area_updates_cache():
     _clear_cache()
     api_response = {
-        "events": [
-            {"start": "2026-05-30T18:00:00Z", "end": "2026-05-30T20:30:00Z", "note": "Stage 2"}
-        ],
+        "events": [{"start": "2026-05-30T18:00:00Z", "end": "2026-05-30T20:30:00Z", "note": "Stage 2"}],
         "info": {"stage": "2"},
     }
     svc = _mock_esp()
@@ -106,6 +106,7 @@ async def test_fetch_area_noop_when_not_configured():
 
 # ── Shared cache: two sites same area → one API call ─────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_shared_cache_single_fetch_for_same_area():
     _clear_cache()
@@ -129,6 +130,7 @@ async def test_shared_cache_single_fetch_for_same_area():
 
 
 # ── validate_area_code ────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_validate_area_code_returns_true_when_found():

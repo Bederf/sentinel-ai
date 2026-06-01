@@ -100,7 +100,7 @@ else:
 if os.getenv("TESTING", "").lower() == "true":
     app.router.on_startup.clear()
     app.router.on_shutdown.clear()
-from datetime import UTC
+from datetime import UTC  # noqa: E402
 
 from app.services.audit_logger import AuditLogger  # noqa: E402
 from app.services.device_abstraction import DeviceManager  # noqa: E402
@@ -133,6 +133,15 @@ class _SyncASGIClient:
 
     def options(self, url: str, **kwargs):
         return self.request("OPTIONS", url, **kwargs)
+
+    def patch(self, url: str, **kwargs):
+        return self.request("PATCH", url, **kwargs)
+
+    def put(self, url: str, **kwargs):
+        return self.request("PUT", url, **kwargs)
+
+    def delete(self, url: str, **kwargs):
+        return self.request("DELETE", url, **kwargs)
 
 
 @pytest.fixture

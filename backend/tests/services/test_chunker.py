@@ -1,14 +1,12 @@
 """Unit tests for AdaptiveChunker — calibrated against S002 contractor report corpus."""
 
-import pytest
 from app.services.chunker import (
-    AdaptiveChunker,
-    AdaptiveChunk,
-    SectionDensity,
-    DENSE_THRESHOLD,
     BALANCED_THRESHOLD,
+    DENSE_THRESHOLD,
     SENT_WEIGHT,
-    TECHNICAL_MARKERS,
+    AdaptiveChunk,
+    AdaptiveChunker,
+    SectionDensity,
 )
 
 

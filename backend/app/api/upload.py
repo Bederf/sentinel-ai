@@ -205,7 +205,13 @@ def _sync_telemetry_runtime_to_equipment() -> int:
 
         # Collect max runtime per equipment type from all telemetry
         max_runtime_by_type: dict[str, float] = {}
-        for telemetry_class in (GeneratorTelemetryData, HVACTelemetryData, VSDTelemetryData, ChillerTelemetryData, PumpTelemetryData):
+        for telemetry_class in (
+            GeneratorTelemetryData,
+            HVACTelemetryData,
+            VSDTelemetryData,
+            ChillerTelemetryData,
+            PumpTelemetryData,
+        ):
             data = telemetry_class.load()
             for row in data:
                 asset_tag = row.get("asset_tag", "")
@@ -222,6 +228,7 @@ def _sync_telemetry_runtime_to_equipment() -> int:
 
         # Query all equipment and update by matching type
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
         all_equipment = client.table("equipment").select("id,code,type,operating_data").execute().data or []
 

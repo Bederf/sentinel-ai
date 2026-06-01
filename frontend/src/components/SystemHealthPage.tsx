@@ -451,7 +451,7 @@ export default function SystemHealthPage() {
               </div>
 
               <PhaseProgressCard
-                currentPhase={selectedSiteId === 'site-003' ? 'commissioning' : selectedSiteId === 'site-002' ? 'advisory' : 'commissioning'}
+                currentPhase={selectedSiteId === 'site-005' ? 'commissioning' : selectedSiteId === 'site-002' ? 'advisory' : 'commissioning'}
                 isLoading={loading}
               />
               <CommissioningGatePanel

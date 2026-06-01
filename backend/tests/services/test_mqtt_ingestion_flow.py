@@ -88,6 +88,7 @@ SAMPLE_OUT_OF_RANGE_DISTANCE = {
 # 1. Message parsing tests
 # ===========================================================================
 
+
 class TestParseMqttPresenceMessage:
     """Tests for parse_mqtt_presence_message()."""
 
@@ -136,6 +137,7 @@ class TestParseMqttPresenceMessage:
 # 2. Timestamp normalisation tests
 # ===========================================================================
 
+
 class TestTimestampNormalization:
     """Epoch ts > 2020-01-01 is parsed as UTC; ts < 2020-01-01 is treated as uptime."""
 
@@ -159,13 +161,17 @@ class TestTimestampNormalization:
 # 3. Distance filtering tests
 # ===========================================================================
 
+
 class TestDistanceFiltering:
     """_distance_in_valid_range() filters occupied readings outside [min, max] metres."""
 
     def test_within_range_accepted(self):
         event = MqttPresenceEvent(
-            site_id="FLN02", room_code="R1", sensor_id="S1",
-            occupied=True, distance_m=1.4,
+            site_id="FLN02",
+            room_code="R1",
+            sensor_id="S1",
+            occupied=True,
+            distance_m=1.4,
         )
         with patch("app.services.space_mqtt_listener.settings") as mock_settings:
             mock_settings.radar_distance_filter_enabled = True
@@ -175,8 +181,11 @@ class TestDistanceFiltering:
 
     def test_outside_range_rejected(self):
         event = MqttPresenceEvent(
-            site_id="FLN02", room_code="R1", sensor_id="S1",
-            occupied=True, distance_m=5.2,
+            site_id="FLN02",
+            room_code="R1",
+            sensor_id="S1",
+            occupied=True,
+            distance_m=5.2,
         )
         with patch("app.services.space_mqtt_listener.settings") as mock_settings:
             mock_settings.radar_distance_filter_enabled = True
@@ -186,8 +195,11 @@ class TestDistanceFiltering:
 
     def test_no_distance_data_bypasses_filter(self):
         event = MqttPresenceEvent(
-            site_id="FLN02", room_code="R1", sensor_id="S1",
-            occupied=True, distance_m=None,
+            site_id="FLN02",
+            room_code="R1",
+            sensor_id="S1",
+            occupied=True,
+            distance_m=None,
         )
         with patch("app.services.space_mqtt_listener.settings") as mock_settings:
             mock_settings.radar_distance_filter_enabled = True
@@ -197,6 +209,7 @@ class TestDistanceFiltering:
 # ===========================================================================
 # 4. Repository insert + latency assertion tests
 # ===========================================================================
+
 
 class TestSpaceRoomEventInsert:
     """insert_room_event() writes to space_room_events; measures actual latency."""
@@ -230,7 +243,9 @@ class TestSpaceRoomEventInsert:
             mock_get_client.return_value = mock_client
 
             # Patch insert BEFORE calling _get_client
-            with patch.object(mock_client.table("space_room_events"), "insert", return_value=MagicMock(execute=AsyncMock())):
+            with patch.object(
+                mock_client.table("space_room_events"), "insert", return_value=MagicMock(execute=AsyncMock())
+            ):
                 await insert_room_event(event)
 
     @pytest.mark.asyncio
@@ -298,6 +313,7 @@ class TestSpaceRoomEventInsert:
 # ===========================================================================
 # 5. Duplicate detection tests
 # ===========================================================================
+
 
 class TestDuplicateDetection:
     """Events with identical (room_code, sensor_id, timestamp) within a window are duplicates."""
@@ -381,6 +397,7 @@ class TestDuplicateDetection:
 # 6. Integration-style end-to-end test (publish → verify DB record)
 # ===========================================================================
 
+
 class TestMqttIngestionFlow:
     """Full flow: parse → distance-filter → insert → verify.
 
@@ -402,16 +419,16 @@ class TestMqttIngestionFlow:
             mock_settings.radar_distance_max_m = 3.0
 
             with patch("app.services.space_event_service.occupancy_store") as mock_store:
-                mock_store.save_event = lambda e: captured_event.update({
-                    "room_code": e.room_code,
-                    "sensor_id": e.sensor_id,
-                    "occupied": e.occupied,
-                    "event_type": getattr(e, "event_type", "state_change"),
-                })
-
-                result = await sml.process_mqtt_presence_message(
-                    "sentinel/space/fln02-node-001/presence", payload
+                mock_store.save_event = lambda e: captured_event.update(
+                    {
+                        "room_code": e.room_code,
+                        "sensor_id": e.sensor_id,
+                        "occupied": e.occupied,
+                        "event_type": getattr(e, "event_type", "state_change"),
+                    }
                 )
+
+                result = await sml.process_mqtt_presence_message("sentinel/space/fln02-node-001/presence", payload)
 
         assert captured_event.get("room_code") == "FA2-1Q4-MR28"
         assert captured_event.get("sensor_id") == "MMW-001"
@@ -432,9 +449,7 @@ class TestMqttIngestionFlow:
             with patch("app.services.space_event_service.occupancy_store") as mock_store:
                 mock_store.save_event = lambda e: None
 
-                result = await sml.process_mqtt_presence_message(
-                    "sentinel/space/fln02-node-003/presence", payload
-                )
+                result = await sml.process_mqtt_presence_message("sentinel/space/fln02-node-003/presence", payload)
 
                 # After distance filtering, occupied should be False
                 assert result["occupied"] is False

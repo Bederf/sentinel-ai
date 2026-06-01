@@ -44,7 +44,13 @@ class FMContextService:
         for site in sites:
             site_uuid = site["id"]
             eq_resp = client.table("equipment").select("id", count="exact").eq("site_id", site_uuid).execute()
-            alert_resp = client.table("alerts").select("id", count="exact").eq("site_id", site_uuid).eq("status", "active").execute()
+            alert_resp = (
+                client.table("alerts")
+                .select("id", count="exact")
+                .eq("site_id", site_uuid)
+                .eq("status", "active")
+                .execute()
+            )
             lines.append(
                 f"| {site.get('code', '')} | {site.get('name', '')} | {site.get('region', '')} | "
                 f"{site.get('type', '')} | {site.get('sqm', '')} | {eq_resp.count or 0} | {alert_resp.count or 0} |"
@@ -150,8 +156,7 @@ class FMContextService:
             eq_name = eq_lookup.get(alert.get("equipment_id"), "Unknown")
             title = (alert.get("title") or "")[:40]
             lines.append(
-                f"| {alert['id']} | **{alert['severity'].upper()}** | {site_name[:15]} | "
-                f"{eq_name} | {title} |"
+                f"| {alert['id']} | **{alert['severity'].upper()}** | {site_name[:15]} | {eq_name} | {title} |"
             )
 
         return "\n".join(lines)
@@ -169,9 +174,11 @@ class FMContextService:
         client = get_supabase_client()
 
         try:
-            query = client.table("anomalies").select(
-                "id, severity, type, confidence, status, site_id, equipment_id"
-            ).eq("status", "open")
+            query = (
+                client.table("anomalies")
+                .select("id, severity, type, confidence, status, site_id, equipment_id")
+                .eq("status", "open")
+            )
 
             if site_id:
                 site_uuid = self._get_site_uuid(site_id)
@@ -233,10 +240,14 @@ class FMContextService:
         client = get_supabase_client()
 
         try:
-            query = client.table("predictions").select(
-                "id, equipment_id, site_id, prediction_type, probability_percent, confidence, "
-                "predicted_failure_date, horizon_hours, severity, evidence, contributing_factors"
-            ).eq("status", "active")
+            query = (
+                client.table("predictions")
+                .select(
+                    "id, equipment_id, site_id, prediction_type, probability_percent, confidence, "
+                    "predicted_failure_date, horizon_hours, severity, evidence, contributing_factors"
+                )
+                .eq("status", "active")
+            )
 
             if site_id:
                 site_uuid = self._get_site_uuid(site_id)
@@ -292,7 +303,9 @@ class FMContextService:
             eq_name = eq_lookup.get(pred.get("equipment_id"), "Unknown")
             lines.append(f"#### {eq_name} at {site_name}")
             lines.append(f"**Prediction:** {pred['prediction_type'].replace('_', ' ').title()}")
-            lines.append(f"**Probability:** {pred['probability_percent']}% ({pred.get('confidence', 0):.0%} confidence)")
+            lines.append(
+                f"**Probability:** {pred['probability_percent']}% ({pred.get('confidence', 0):.0%} confidence)"
+            )
             lines.append(f"**Predicted Failure:** {pred.get('predicted_failure_date') or 'N/A'}")
             lines.append(f"**Timeframe:** {pred.get('horizon_hours', 0) or 0:.0f}h")
 

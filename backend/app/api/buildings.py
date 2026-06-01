@@ -25,7 +25,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.core.site_resolver import get_registered_sites
-from app.middleware.auth_middleware import optional_auth, require_role, require_site_access
+from app.middleware.auth_middleware import require_role, require_site_access
 from app.models.auth import AuthContext, SentinelRole
 from app.services.device_abstraction import device_manager
 from app.services.site_loader import get_site_loader
@@ -665,8 +665,11 @@ async def update_building_config(
             existing_meta = current.get("metadata") or {}
             if isinstance(existing_meta, str):
                 import json as _json
-                try: existing_meta = _json.loads(existing_meta)
-                except: existing_meta = {}
+
+                try:
+                    existing_meta = _json.loads(existing_meta)
+                except:
+                    existing_meta = {}
             existing_meta["contacts"] = contacts_meta
             updates["metadata"] = existing_meta
             changes["metadata.contacts"] = {"old": None, "new": contacts_meta}
@@ -759,7 +762,9 @@ async def create_building(building: BuildingCreate) -> dict:
         "display_name": building.display_name or building.name,
         "address": building.address,
         "region": building.region or "",
-        "building_type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(building.type or "", building.type or "regional_office"),
+        "building_type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(
+            building.type or "", building.type or "regional_office"
+        ),
         "sqm": building.sqm or 0,
         "timezone": building.timezone,
         "floors": building.floors,
@@ -798,6 +803,7 @@ async def create_building(building: BuildingCreate) -> dict:
     # Create Supabase record so site-profiles and modules can resolve the site
     try:
         import uuid
+
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
@@ -810,7 +816,9 @@ async def create_building(building: BuildingCreate) -> dict:
                 "address": building.address or "",
                 "region": building.region or "",
                 # Map wizard types to Supabase check constraint values
-                "type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(building.type or "", building.type or "regional_office"),
+                "type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(
+                    building.type or "", building.type or "regional_office"
+                ),
                 "sqm": building.sqm or 0,
                 "optimization_enabled": False,
                 "onboarding_phase": "commissioning",
@@ -1136,17 +1144,14 @@ async def get_equipment_summary(site_id: str, auth: AuthContext = Depends(requir
 
     # Fall back to JSON file counting (debug/development only if Supabase has no summary)
     from app.config.settings import settings
+
     if not settings.debug:
         # No JSON fallback in production: surface empty summary if Supabase has none
         return {
             "site_id": site_id,
             "site_name": site_id,
             "total_assets": 0,
-            "categories": {k: 0 for k in [
-                "equipment","hvac_zones","generators","generator_groups","diesel_tanks",
-                "energy_centres","mv_incomers","transformers","lv_switchboards","ats_units",
-                "power_meters","pfc_banks","ups_systems","feeders","dali_controllers"
-            ]},
+            "categories": dict.fromkeys(["equipment", "hvac_zones", "generators", "generator_groups", "diesel_tanks", "energy_centres", "mv_incomers", "transformers", "lv_switchboards", "ats_units", "power_meters", "pfc_banks", "ups_systems", "feeders", "dali_controllers"], 0),
             "supplementary": {"desks": 0, "luminaires": 0, "dali_sensors": 0},
             "source": "supabase",
         }
@@ -1290,6 +1295,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
     # Try Supabase first (direct query to avoid repository/cache issues)
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
         if not site_uuid:
             site_row = client.table("sites").select("id, name").eq("code", site_code).limit(1).execute()
@@ -1578,6 +1584,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
 
     # Fall back to JSON files only in debug; in production return empty if Supabase has none
     from app.config.settings import settings
+
     if not settings.debug:
         return {
             "site_id": site_id,
@@ -1626,9 +1633,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
     if zones_file.exists():
         with open(zones_file) as f:
             zones_payload = json.load(f)
-            zones_list = (
-                zones_payload.get("zones", []) if isinstance(zones_payload, dict) else zones_payload
-            )
+            zones_list = zones_payload.get("zones", []) if isinstance(zones_payload, dict) else zones_payload
             if not isinstance(zones_list, list):
                 zones_list = []
             for zone in zones_list:

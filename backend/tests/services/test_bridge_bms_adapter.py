@@ -109,12 +109,14 @@ class TestBridgeBmsAdapterDiscovery:
         adapter._site_id = "site-002"
         mock_resp = MagicMock()
         mock_resp.raise_for_status = MagicMock()
-        mock_resp.json = MagicMock(return_value={
-            "objects": [
-                {"object_id": "CH-1.ChwSupplyTemp", "object_name": "Chiller Supply", "point_type": "sensor"},
-                {"object_id": "AHU-B1.FanSpeed", "object_name": "Fan Speed", "point_type": "analog_value"},
-            ]
-        })
+        mock_resp.json = MagicMock(
+            return_value={
+                "objects": [
+                    {"object_id": "CH-1.ChwSupplyTemp", "object_name": "Chiller Supply", "point_type": "sensor"},
+                    {"object_id": "AHU-B1.FanSpeed", "object_name": "Fan Speed", "point_type": "analog_value"},
+                ]
+            }
+        )
 
         with patch("httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()

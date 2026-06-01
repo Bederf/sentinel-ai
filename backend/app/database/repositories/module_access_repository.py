@@ -212,9 +212,7 @@ class ModuleAccessRepository:
     def get_active_modules(self, *, site_code: str) -> list[str]:
         """Return enabled site modules with mandatory registry modules always included."""
         registry = module_registry.get_module_registry()
-        enabled_modules = {
-            module_type.value for module_type, definition in registry.items() if definition.enabled
-        }
+        enabled_modules = {module_type.value for module_type, definition in registry.items() if definition.enabled}
         mandatory_modules = {
             module_type.value
             for module_type, definition in registry.items()

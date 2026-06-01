@@ -91,6 +91,7 @@ class ActiveDirectoryService:
         """Index technicians from Supabase."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             if not client:
                 return

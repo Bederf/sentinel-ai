@@ -473,11 +473,22 @@ class Settings(BaseSettings):
     )
     telegram_secret_token: str = Field(default="", validation_alias="TELEGRAM_SECRET_TOKEN")
 
+    # Residential home bot Telegram token (Phase 214 — distinct from SENTRY_BOT_TOKEN)
+    sentinel_home_bot_token: str = Field(default="", validation_alias="SENTINEL_HOME_BOT_TOKEN")
+
     # Residential Cloud-to-MQTT Bridge (Phase 210)
     residential_mqtt_broker: str = Field(default="127.0.0.1", validation_alias="RESIDENTIAL_MQTT_BROKER")
     residential_mqtt_port: int = Field(default=1883, validation_alias="RESIDENTIAL_MQTT_PORT")
     residential_mqtt_username: str = Field(default="", validation_alias="RESIDENTIAL_MQTT_USERNAME")
     residential_mqtt_password: str = Field(default="", validation_alias="RESIDENTIAL_MQTT_PASSWORD")
+
+    # WireGuard VPN — Home Assistant gateway peer lifecycle (Phase 215)
+    # VPS-side values: operator populates wg0.conf on the VPS with these
+    wireguard_vpn_subnet: str = Field(default="", validation_alias="WIREGUARD_VPN_SUBNET")
+    wireguard_vps_public_key: str = Field(default="", validation_alias="WIREGUARD_VPS_PUBLIC_KEY")
+    wireguard_vps_endpoint: str = Field(
+        default="", validation_alias="WIREGUARD_VPS_ENDPOINT"
+    )  # e.g. "144.91.122.235:51820"
 
     # Fuel Tank MQTT Ingestion (Phase 148)
     fuel_mqtt_enabled: bool = False

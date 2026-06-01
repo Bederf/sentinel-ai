@@ -185,7 +185,7 @@ def main():
         print("Usage: python halo_gsd_analyze.py <trace_file> [trace_file2 ...] [-o output_file]", file=sys.stderr)
         print("Example: python halo_gsd_analyze.py gsd_traces/phase_193_gsd.jsonl", file=sys.stderr)
         print(
-            "Example: python halo_gsd_analyze.py gsd_traces/phase_193_gsd.jsonl gsd_traces/phase_194_gsd.jsonl -o findings.json",  # noqa: E501
+            "Example: python halo_gsd_analyze.py gsd_traces/phase_193_gsd.jsonl gsd_traces/phase_194_gsd.jsonl -o findings.json",
             file=sys.stderr,
         )
         sys.exit(1)

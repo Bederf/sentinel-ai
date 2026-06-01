@@ -128,11 +128,20 @@ class TierRoutingEngine:
         # 2. Phase gate check: resolve site onboarding phase for later autonomy capping
         caps_auto_execute: bool = False  # True when phase < supervised (cap at Tier 2)
         try:
-            from app.models.onboarding_phase import phase_allows as _phase_allows
             from app.database.supabase_client import get_supabase_client
+            from app.models.onboarding_phase import phase_allows as _phase_allows
+
             sb = get_supabase_client()
-            phase_row = sb.table("sites").select("onboarding_phase").eq("code", recommendation.get("site_id", "")).limit(1).execute()
-            site_phase = (phase_row.data[0].get("onboarding_phase") or "commissioning") if phase_row.data else "commissioning"
+            phase_row = (
+                sb.table("sites")
+                .select("onboarding_phase")
+                .eq("code", recommendation.get("site_id", ""))
+                .limit(1)
+                .execute()
+            )
+            site_phase = (
+                (phase_row.data[0].get("onboarding_phase") or "commissioning") if phase_row.data else "commissioning"
+            )
             if site_phase in ("commissioning", "shadow_live"):
                 logger.info("Phase %s caps Tier 1 (advisory only) for %s", site_phase, recommendation.get("site_id"))
                 emit_decision_event(
@@ -142,7 +151,12 @@ class TierRoutingEngine:
                     site_id=_site_id,
                     tier=TierLevel.TIER1.value,
                     status="advisory",
-                    details={"reason": f"Phase '{site_phase}' limits to Tier 1 advisory only", "confidence_score": confidence_score, "threshold_source": "phase_gate", "risk_level": risk_level},
+                    details={
+                        "reason": f"Phase '{site_phase}' limits to Tier 1 advisory only",
+                        "confidence_score": confidence_score,
+                        "threshold_source": "phase_gate",
+                        "risk_level": risk_level,
+                    },
                 )
                 return TierRoutingResult(
                     tier=TierLevel.TIER1.value,
@@ -158,7 +172,9 @@ class TierRoutingEngine:
                 )
             caps_auto_execute = not _phase_allows(site_phase, "approve_reject")
             if caps_auto_execute:
-                logger.info("Phase %s caps at Tier 2 (no auto-execute) for %s", site_phase, recommendation.get("site_id"))
+                logger.info(
+                    "Phase %s caps at Tier 2 (no auto-execute) for %s", site_phase, recommendation.get("site_id")
+                )
         except Exception as exc:
             logger.debug("Phase gate check failed, proceeding without: %s", exc)
 
@@ -172,7 +188,12 @@ class TierRoutingEngine:
                 site_id=_site_id,
                 tier=TierLevel.TIER1.value,
                 status="advisory",
-                details={"reason": "PARASITE master switch is disabled", "confidence_score": confidence_score, "threshold_source": "settings", "risk_level": risk_level},
+                details={
+                    "reason": "PARASITE master switch is disabled",
+                    "confidence_score": confidence_score,
+                    "threshold_source": "settings",
+                    "risk_level": risk_level,
+                },
             )
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,
@@ -199,7 +220,12 @@ class TierRoutingEngine:
                 site_id=_site_id,
                 tier=TierLevel.TIER1.value,
                 status="advisory",
-                details={"reason": "Recommendation has no device control action — advisory only", "confidence_score": confidence_score, "threshold_source": "actionability_gate", "risk_level": risk_level},
+                details={
+                    "reason": "Recommendation has no device control action — advisory only",
+                    "confidence_score": confidence_score,
+                    "threshold_source": "actionability_gate",
+                    "risk_level": risk_level,
+                },
             )
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,
@@ -226,7 +252,12 @@ class TierRoutingEngine:
                 site_id=_site_id,
                 tier=TierLevel.TIER1.value,
                 status="advisory",
-                details={"reason": "AI optimization recommendation — notified via optimizer path", "confidence_score": confidence_score, "threshold_source": "optimizer_gate", "risk_level": risk_level},
+                details={
+                    "reason": "AI optimization recommendation — notified via optimizer path",
+                    "confidence_score": confidence_score,
+                    "threshold_source": "optimizer_gate",
+                    "risk_level": risk_level,
+                },
             )
             return TierRoutingResult(
                 tier=TierLevel.TIER1.value,

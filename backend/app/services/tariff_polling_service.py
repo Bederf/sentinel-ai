@@ -36,12 +36,17 @@ class TariffPollingService:
                 "tariff_name": "LPU-TOU",
                 "tou_bands": [
                     {"name": "peak", "hours": [7, 8, 17, 18, 19, 20], "rate": 4.52, "unit": "ZAR/kWh"},
-                    {"name": "standard", "hours": [6, 9, 10, 11, 12, 13, 14, 15, 16, 21, 22], "rate": 2.28, "unit": "ZAR/kWh"},
-                    {"name": "off_peak", "hours": [0, 1, 2, 3, 4, 5, 23], "rate": 0.63, "unit": "ZAR/kWh"}
+                    {
+                        "name": "standard",
+                        "hours": [6, 9, 10, 11, 12, 13, 14, 15, 16, 21, 22],
+                        "rate": 2.28,
+                        "unit": "ZAR/kWh",
+                    },
+                    {"name": "off_peak", "hours": [0, 1, 2, 3, 4, 5, 23], "rate": 0.63, "unit": "ZAR/kWh"},
                 ],
                 "demand_charge_per_kva": 180.50,
                 "fixed_monthly_charge": 1200.00,
-                "network_charge_per_kwh": 0.45
+                "network_charge_per_kwh": 0.45,
             }
         },
         "water": {
@@ -51,13 +56,13 @@ class TariffPollingService:
                 "tiered_rates": [
                     {"tier": 1, "threshold_liters": 100000, "rate_r_per_kiloliter": 7.95},
                     {"tier": 2, "threshold_liters": 500000, "rate_r_per_kiloliter": 12.50},
-                    {"tier": 3, "threshold_liters": None, "rate_r_per_kiloliter": 18.95}
+                    {"tier": 3, "threshold_liters": None, "rate_r_per_kiloliter": 18.95},
                 ],
                 "sewerage_rate_r_per_kiloliter": 4.45,
                 "fixed_monthly_charge": 250.00,
-                "tier_thresholds": [100000, 500000]  # liters
+                "tier_thresholds": [100000, 500000],  # liters
             }
-        }
+        },
     }
 
     def __init__(self):
@@ -74,17 +79,15 @@ class TariffPollingService:
         Returns:
             Summary of polling results
         """
-        results = {
-            "sites_processed": 0,
-            "tariffs_updated": 0,
-            "errors": []
-        }
+        results = {"sites_processed": 0, "tariffs_updated": 0, "errors": []}
 
         try:
             # Get all sites with location info
-            sites_resp = self.client.table("sites").select(
-                "code, name, region, electricity_provider, latitude, longitude"
-            ).execute()
+            sites_resp = (
+                self.client.table("sites")
+                .select("code, name, region, electricity_provider, latitude, longitude")
+                .execute()
+            )
 
             sites = sites_resp.data or []
             results["sites_processed"] = len(sites)
@@ -106,7 +109,7 @@ class TariffPollingService:
                         results["tariffs_updated"] += 1
 
                 except Exception as e:
-                    error_msg = f"Site {site_code}: {str(e)}"
+                    error_msg = f"Site {site_code}: {e!s}"
                     logger.error(f"[TARIFF_POLL] {error_msg}")
                     results["errors"].append(error_msg)
 
@@ -118,16 +121,11 @@ class TariffPollingService:
 
         except Exception as e:
             logger.error(f"[TARIFF_POLL] Failed to poll tariffs: {e}")
-            results["errors"].append(f"Global error: {str(e)}")
+            results["errors"].append(f"Global error: {e!s}")
 
         return results
 
-    async def _poll_electricity_tariff(
-        self,
-        site_code: str,
-        region: str,
-        provider: str
-    ) -> bool:
+    async def _poll_electricity_tariff(self, site_code: str, region: str, provider: str) -> bool:
         """Poll electricity tariff for a site.
 
         Args:
@@ -148,8 +146,7 @@ class TariffPollingService:
 
             if not default:
                 logger.warning(
-                    f"[TARIFF_POLL] No default electricity tariff for {municipality}, "
-                    f"using Johannesburg fallback"
+                    f"[TARIFF_POLL] No default electricity tariff for {municipality}, using Johannesburg fallback"
                 )
                 default = self.DEFAULT_TARIFFS["electricity"]["johannesburg"]
 
@@ -164,10 +161,10 @@ class TariffPollingService:
                     "tou_bands": default["tou_bands"],
                     "demand_charge_per_kva": default["demand_charge_per_kva"],
                     "fixed_monthly_charge": default["fixed_monthly_charge"],
-                    "network_charge_per_kwh": default["network_charge_per_kwh"]
+                    "network_charge_per_kwh": default["network_charge_per_kwh"],
                 },
                 source_url=self.ESKOM_TARIFF_URL,
-                source_type="manual"  # Until we implement real API
+                source_type="manual",  # Until we implement real API
             )
 
             return True
@@ -201,7 +198,7 @@ class TariffPollingService:
                     tariff_name=tariff_data.get("tariff_name", "Commercial"),
                     tariff_structure=tariff_data["structure"],
                     source_url=self.RAND_WATER_URL,
-                    source_type="scrape" if tariff_data.get("fetched") else "manual"
+                    source_type="scrape" if tariff_data.get("fetched") else "manual",
                 )
                 logger.info(f"[TARIFF_POLL] Updated water tariff for {site_code} from Rand Water")
                 return True
@@ -220,12 +217,12 @@ class TariffPollingService:
                     tariff_structure={
                         "tiered_rates": default["tiered_rates"],
                         "sewerage_rate_r_per_kiloliter": default["sewerage_rate_r_per_kiloliter"],
-                        "fixed_monthly_charge": default["fixed_monthly_charge"]
+                        "fixed_monthly_charge": default["fixed_monthly_charge"],
                     },
                     source_url=self.RAND_WATER_URL,
                     source_type="manual",
                     fetch_status="error",
-                    fetch_error="Could not fetch from Rand Water, using defaults"
+                    fetch_error="Could not fetch from Rand Water, using defaults",
                 )
                 logger.warning(f"[TARIFF_POLL] Used default water tariff for {site_code}")
                 return True
@@ -262,8 +259,8 @@ class TariffPollingService:
 
             # Look for tariff patterns (example patterns)
             tariff_patterns = [
-                r'R\s*(\d+\.?\d*)\s*/?\s*kL',  # R 7.95 / kL
-                r'(\d+\.?\d*)\s*cents?\s*/?\s*litre',  # 0.795 cents/litre
+                r"R\s*(\d+\.?\d*)\s*/?\s*kL",  # R 7.95 / kL
+                r"(\d+\.?\d*)\s*cents?\s*/?\s*litre",  # 0.795 cents/litre
             ]
 
             rates_found = []
@@ -295,7 +292,7 @@ class TariffPollingService:
         source_url: str,
         source_type: str,
         fetch_status: str = "active",
-        fetch_error: str | None = None
+        fetch_error: str | None = None,
     ) -> None:
         """Store or update tariff in database.
 
@@ -318,21 +315,19 @@ class TariffPollingService:
             "source_type": source_type,
             "last_fetched_at": datetime.utcnow().isoformat(),
             "fetch_status": fetch_status,
-            "fetch_error": fetch_error
+            "fetch_error": fetch_error,
         }
 
         try:
             # Upsert - update if exists for this site/type/effective_date
-            result = self.client.table("utility_tariffs").upsert(
-                tariff_data,
-                on_conflict="site_id,utility_type,provider,tariff_name,effective_date"
-            ).execute()
+            result = (
+                self.client.table("utility_tariffs")
+                .upsert(tariff_data, on_conflict="site_id,utility_type,provider,tariff_name,effective_date")
+                .execute()
+            )
 
             if result.data:
-                logger.debug(
-                    f"[TARIFF_POLL] Stored {utility_type} tariff for {site_code} "
-                    f"({provider} - {tariff_name})"
-                )
+                logger.debug(f"[TARIFF_POLL] Stored {utility_type} tariff for {site_code} ({provider} - {tariff_name})")
 
         except Exception as e:
             logger.error(f"[TARIFF_POLL] Failed to store tariff: {e}")
@@ -362,7 +357,7 @@ class TariffPollingService:
             "benoni": "ekurhuleni",
             "kempton": "ekurhuleni",
             "midrand": "johannesburg",
-            "centurion": "tshwane"
+            "centurion": "tshwane",
         }
 
         for key, value in mappings.items():
@@ -372,10 +367,7 @@ class TariffPollingService:
         return "johannesburg"  # Default fallback
 
     def get_tariff_for_site(
-        self,
-        site_code: str,
-        utility_type: str,
-        as_of_date: date | None = None
+        self, site_code: str, utility_type: str, as_of_date: date | None = None
     ) -> dict[str, Any] | None:
         """Get current tariff for a site.
 
@@ -390,17 +382,17 @@ class TariffPollingService:
         check_date = as_of_date or date.today()
 
         try:
-            result = self.client.table("utility_tariffs").select("*").eq(
-                "site_id", site_code
-            ).eq(
-                "utility_type", utility_type
-            ).lte(
-                "effective_date", check_date.isoformat()
-            ).or_(
-                f"expiry_date.is.null,expiry_date.gte.{check_date.isoformat()}"
-            ).order(
-                "effective_date", desc=True
-            ).limit(1).execute()
+            result = (
+                self.client.table("utility_tariffs")
+                .select("*")
+                .eq("site_id", site_code)
+                .eq("utility_type", utility_type)
+                .lte("effective_date", check_date.isoformat())
+                .or_(f"expiry_date.is.null,expiry_date.gte.{check_date.isoformat()}")
+                .order("effective_date", desc=True)
+                .limit(1)
+                .execute()
+            )
 
             if result.data:
                 return result.data[0]
@@ -415,7 +407,7 @@ class TariffPollingService:
                     "provider": default.get("provider", "Default"),
                     "municipality": municipality.capitalize(),
                     "tariff_structure": default,
-                    "source_type": "default"
+                    "source_type": "default",
                 }
 
             return None
@@ -443,7 +435,7 @@ class TariffPollingService:
                 "water_cost": liters * rate,
                 "sewerage_cost": liters * 0.00445,
                 "total_cost": liters * (rate + 0.00445),
-                "fixed_charge": 250.0
+                "fixed_charge": 250.0,
             }
 
         structure = tariff.get("tariff_structure", {})
@@ -477,7 +469,7 @@ class TariffPollingService:
             "water_cost": round(water_cost, 2),
             "sewerage_cost": round(sewerage_cost, 2),
             "total_cost": round(water_cost + sewerage_cost, 2),
-            "fixed_charge": fixed_charge
+            "fixed_charge": fixed_charge,
         }
 
 

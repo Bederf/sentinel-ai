@@ -15,24 +15,21 @@ Site-scoped routing is enforced at query time via technician.site_id.
 from __future__ import annotations
 
 import logging
-import time
-from typing import Any
 
-from fastapi import APIRouter, Request, Header
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app.config.settings import settings
+from app.database.repositories.notification_repository import NotificationRepository
+from app.database.repositories.technician_repository import TechnicianRepository
 from app.services.telegram_conversation_manager import (
     ConversationSession,
     TelegramConversationManager,
     TelegramIntent,
 )
-from app.services.telegram_message_sender import get_telegram_sender, TelegramMessageSender
-from app.services.telegram_intent_classifier import classify_intent
 from app.services.telegram_flow_handlers import route_to_handler
-from app.database.repositories.technician_repository import TechnicianRepository
-from app.database.repositories.notification_repository import NotificationRepository
-from app.models.notification import ChannelType
+from app.services.telegram_intent_classifier import classify_intent
+from app.services.telegram_message_sender import TelegramMessageSender, get_telegram_sender
 
 logger = logging.getLogger("sentinel.telegram_webhook")
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
@@ -61,12 +58,10 @@ async def _get_site_list() -> list[dict[str, str]]:
     """Fetch active sites for the site picker."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         client = get_supabase_client()
         result = client.table("sites").select("id, code, name").eq("status", "active").execute()
-        return [
-            {"id": r["id"], "code": r["code"], "name": r.get("name") or r["code"]}
-            for r in (result.data or [])
-        ]
+        return [{"id": r["id"], "code": r["code"], "name": r.get("name") or r["code"]} for r in (result.data or [])]
     except Exception as e:
         logger.warning("Could not fetch site list: %s", e)
         return []
@@ -81,7 +76,9 @@ def _build_site_keyboard(sites: list[dict[str, str]]) -> dict:
     return {"inline_keyboard": rows}
 
 
-async def _send_registration_message(chat_id: str, step: str, sender: TelegramMessageSender, session: ConversationSession | None = None):
+async def _send_registration_message(
+    chat_id: str, step: str, sender: TelegramMessageSender, session: ConversationSession | None = None
+):
     """Send the appropriate message for each registration step."""
     sites = await _get_site_list()
 
@@ -98,17 +95,16 @@ async def _send_registration_message(chat_id: str, step: str, sender: TelegramMe
     elif step == STEP_NAME:
         await sender.send_text(
             chat_id,
-            f"📱 <b>Step 2/3 — Cell phone number</b>\n\n"
-            f"Tap the button below to share your number,\n"
-            f"or type it manually (e.g. +27 82 123 4567):",
+            "📱 <b>Step 2/3 — Cell phone number</b>\n\n"
+            "Tap the button below to share your number,\n"
+            "or type it manually (e.g. +27 82 123 4567):",
             keyboard=None,  # Add share contact button via reply_markup below
         )
         # NOTE: Telegram contact button is sent via reply_markup (see below)
     elif step == STEP_PHONE:
         await sender.send_text(
             chat_id,
-            f"🏢 <b>Step 3/3 — Select your site</b>\n\n"
-            f"Choose the building you work at:",
+            "🏢 <b>Step 3/3 — Select your site</b>\n\nChoose the building you work at:",
             keyboard=_build_site_keyboard(sites),
         )
     else:
@@ -152,6 +148,7 @@ async def _finalize_registration(chat_id: str, name: str, phone: str, site_id: s
             # Get site name for confirmation
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 client = get_supabase_client()
                 site_result = client.table("sites").select("name").eq("id", site_id).limit(1).execute()
                 site_name = site_result.data[0]["name"] if site_result.data else site_id
@@ -185,6 +182,7 @@ async def _finalize_registration(chat_id: str, name: str, phone: str, site_id: s
 
 
 # ==================== Telegram Webhook ====================
+
 
 class TelegramUpdate(BaseModel):
     update_id: int
@@ -247,13 +245,16 @@ async def telegram_webhook(request: Request):
 
         # Non-registration callbacks handled by flow handlers
         if session and session.flow in ("client_complaint", "technician_report", "wo_update", "ad_hoc_fault"):
-            await route_to_handler(session.intent, chat_id, "", callback_data=data, message_id=cq.get("message", {}).get("message_id"))
+            await route_to_handler(
+                session.intent, chat_id, "", callback_data=data, message_id=cq.get("message", {}).get("message_id")
+            )
             return {"ok": True}
 
         # Handle "Create Work Order" button on advisory notifications (no active session needed)
         if data.startswith("wo:rec_id:"):
             rec_uuid = data.split(":")[-1]
             from app.services.telegram_flow_handlers import _handle_create_wo_from_rec, get_telegram_sender
+
             sender = get_telegram_sender()
             await _handle_create_wo_from_rec(chat_id, rec_uuid, sender)
             return {"ok": True}
@@ -280,7 +281,9 @@ async def telegram_webhook(request: Request):
 
     # Check if we're in registration flow
     if session and session.flow == "registration":
-        step = REGISTRATION_STEPS[session.current_step] if session.current_step < len(REGISTRATION_STEPS) else STEP_WELCOME
+        step = (
+            REGISTRATION_STEPS[session.current_step] if session.current_step < len(REGISTRATION_STEPS) else STEP_WELCOME
+        )
 
         if step == STEP_WELCOME:
             # User responded to welcome/name prompt — treat as name entry

@@ -197,6 +197,7 @@ async def sync_site_phase_to_supabase(site_id: str, stage: str) -> bool:
     """
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         sb.table("sites").update({"onboarding_phase": stage}).eq("code", site_id).execute()
         return True

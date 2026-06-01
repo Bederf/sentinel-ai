@@ -292,7 +292,7 @@ class ShadowModePollingService:
         c = code.replace("_", "-")
         prefix = f"{self._site_prefix}-"
         if c.startswith(prefix):
-            c = c[len(prefix):]
+            c = c[len(prefix) :]
         m = re.match(r"^(.+)-B1-", c)
         if m:
             return f"{prefix}{m.group(1)}-B01"
@@ -330,15 +330,16 @@ class ShadowModePollingService:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
-            phase_rows = (
-                client.table("sites")
-                .select("onboarding_phase")
-                .eq("code", self.site_id)
-                .limit(1)
-                .execute()
-            )
+            phase_rows = client.table("sites").select("onboarding_phase").eq("code", self.site_id).limit(1).execute()
             phase = (phase_rows.data[0]["onboarding_phase"] if phase_rows.data else "commissioning") or "commissioning"
-            skip_pct = {"commissioning": 0.9, "shadow": 0.9, "shadow_live": 0.5, "advisory": 0.0, "supervised": 0.0, "automatic": 0.0}.get(phase, 0.5)
+            skip_pct = {
+                "commissioning": 0.9,
+                "shadow": 0.9,
+                "shadow_live": 0.5,
+                "advisory": 0.0,
+                "supervised": 0.0,
+                "automatic": 0.0,
+            }.get(phase, 0.5)
             if skip_pct > 0 and (self._poll_count % 100) / 100 < skip_pct:
                 logger.debug("[SHADOW] Phase %s — skipping poll %d", phase, self._poll_count)
                 result["gate"] = phase
@@ -557,7 +558,9 @@ class ShadowModePollingService:
 
                 system_status = bess_data.get("system_status", "")
                 if system_status:
-                    bess_readings["system_status"] = 1.0 if system_status in ("online", "running", "charging", "discharging") else 0.0
+                    bess_readings["system_status"] = (
+                        1.0 if system_status in ("online", "running", "charging", "discharging") else 0.0
+                    )
 
                 if bess_readings:
                     agg_states[f"{self._site_prefix}-BESS-B1-001"] = {

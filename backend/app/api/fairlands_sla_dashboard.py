@@ -11,7 +11,6 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends
 
-from app.middleware.auth_middleware import require_query_site_access
 from app.api.schemas.fairlands_sla_schemas import (
     ClusterAlertResponse,
     FirePumpComplianceResponse,
@@ -19,6 +18,7 @@ from app.api.schemas.fairlands_sla_schemas import (
     SLABreachResponse,
     SLASummaryResponse,
 )
+from app.middleware.auth_middleware import require_query_site_access
 from app.services.fire_pump_compliance_service import get_fire_pump_compliance_service
 from app.services.recommendation_milestone_service import get_recommendation_milestone_service
 

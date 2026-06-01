@@ -380,7 +380,6 @@ class HealthRatingCalculator:
             snapshot_at=datetime.utcnow().isoformat() + "Z",
         )
 
-
     async def calculate_from_sensors(
         self,
         equipment_id: str,
@@ -406,10 +405,13 @@ class HealthRatingCalculator:
         # Gate: skip non-scoreable equipment types
         try:
             from app.config.health_config import get_scoreability
+
             eq_type = equipment.get("type", "")
             score_cfg = get_scoreability(eq_type)
             if not score_cfg.get("scoreable", False):
-                logger.debug(f"[HEALTH-SENSORS] Skipping {equipment.get('code','?')} ({eq_type}): {score_cfg.get('reason', 'not scoreable')}")
+                logger.debug(
+                    f"[HEALTH-SENSORS] Skipping {equipment.get('code', '?')} ({eq_type}): {score_cfg.get('reason', 'not scoreable')}"
+                )
                 return None
         except Exception:
             pass
@@ -422,7 +424,11 @@ class HealthRatingCalculator:
         # Component 1: Baseline alignment from sensor deviation
         # Use temperature deviation if available
         baseline_score = 75.0  # neutral default
-        room_temp = sensor_readings.get("room_temp") or sensor_readings.get("chw_return_temp") or sensor_readings.get("return_air_temp")
+        room_temp = (
+            sensor_readings.get("room_temp")
+            or sensor_readings.get("chw_return_temp")
+            or sensor_readings.get("return_air_temp")
+        )
         setpoint = sensor_readings.get("setpoint") or op_data.get("setpoint")
         if room_temp is not None and setpoint is not None:
             try:
@@ -460,11 +466,11 @@ class HealthRatingCalculator:
         # Weighted composition (anomaly_health substitutes for trend_momentum in live path)
         # Weights: baseline 30%, anomaly 20%, service 20%, runtime 20%, fault 10%
         weighted = (
-            baseline_score * 0.30 +
-            anomaly_health * 0.20 +
-            service_score * 0.20 +
-            runtime_score * 0.20 +
-            fault_score * 0.10
+            baseline_score * 0.30
+            + anomaly_health * 0.20
+            + service_score * 0.20
+            + runtime_score * 0.20
+            + fault_score * 0.10
         )
 
         return round(max(0.0, min(100.0, weighted)), 2)

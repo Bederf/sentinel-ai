@@ -20,7 +20,6 @@ Services must NOT contain hardcoded model strings.
 
 from __future__ import annotations
 
-import contextlib
 import logging
 from collections.abc import AsyncGenerator
 
@@ -415,14 +414,14 @@ class ModelGateway:
                                 if delta:
                                     yield delta
                     usage_tracker.record(
-                                            provider="azure_openai",
-                                            model=model,
-                                            input_tokens=usage.get("prompt_tokens", 0),
-                                            output_tokens=usage.get("completion_tokens", 0),
-                                            source=source,
-                                            feature="gsd_orchestrator",
-                                            site_id=site_id or "unknown",
-                                        )
+                        provider="azure_openai",
+                        model=model,
+                        input_tokens=usage.get("prompt_tokens", 0),
+                        output_tokens=usage.get("completion_tokens", 0),
+                        source=source,
+                        feature="gsd_orchestrator",
+                        site_id=site_id or "unknown",
+                    )
 
                 return stream_gen()
             else:
@@ -672,7 +671,11 @@ class ModelGateway:
             logger.warning("escalation logging failed: %s", log_exc)
 
         logger.info(
-            "model_gateway.escalate reason='%s' to_class=%s mode=%s model=%s", reason.strip(), to_class, _mode, _primary_model
+            "model_gateway.escalate reason='%s' to_class=%s mode=%s model=%s",
+            reason.strip(),
+            to_class,
+            _mode,
+            _primary_model,
         )
 
         # Dispatch as a new routed call — not a retry

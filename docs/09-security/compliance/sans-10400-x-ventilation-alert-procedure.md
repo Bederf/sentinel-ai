@@ -124,7 +124,7 @@ ZONE_TYPE_MAP = {
 def _check_ventilation_compliance(self, zone_code: str, co2_ppm: float) -> dict:
     """
     Evaluates zone CO₂ against SANS 10400-X thresholds.
-    
+
     Returns dict with:
       - status: 'compliant' | 'advisory' | 'alert'
       - co2_ppm: current reading
@@ -133,14 +133,14 @@ def _check_ventilation_compliance(self, zone_code: str, co2_ppm: float) -> dict:
     """
     zone_type = self.ZONE_TYPE_MAP.get(zone_code, "office_floor")
     thresholds = self.ZONE_VENTILATION_THRESHOLDS.get(zone_type, self.ZONE_VENTILATION_THRESHOLDS["office_floor"])
-    
+
     if co2_ppm > thresholds["co2_alert"]:
         status = "alert"
     elif co2_ppm > thresholds["co2_advisory"]:
         status = "advisory"
     else:
         status = "compliant"
-    
+
     return {
         "status": status,
         "co2_ppm": co2_ppm,

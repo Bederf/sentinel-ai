@@ -112,11 +112,7 @@ async def _notify_technician(
     # --- Telegram via sentry CLI ---
     if tech_telegram_id:
         assigned = tech_name or "Pending"
-        msg = (
-            f"Work Order Created #{wo_code}\n"
-            f"Assigned: {assigned}\n"
-            f"Priority: {priority.upper()}"
-        )
+        msg = f"Work Order Created #{wo_code}\nAssigned: {assigned}\nPriority: {priority.upper()}"
         cli = get_sentry_bot_cli()
         try:
             await asyncio.to_thread(
@@ -418,8 +414,7 @@ async def _handle_reset(code: str, extra: str | None, user: str | None) -> Comma
 
     # Gate: only available in supervised or auto mode with control module active
     try:
-        from app.services.control_policy_engine import ControlPolicyEngine
-        from app.services.control_policy_engine import ControlMode
+        from app.services.control_policy_engine import ControlMode, ControlPolicyEngine
 
         engine = ControlPolicyEngine()
         mode = engine.get_control_mode()
@@ -547,8 +542,8 @@ async def _handle_status_wo(code: str, _extra: str | None, user: str | None) -> 
         lines = [
             f"## \ud83d\udccb Work Order {code}",
             "",
-            f"| Field | Value |",
-            f"|-------|-------|",
+            "| Field | Value |",
+            "|-------|-------|",
             f"| **Status** | {status} |",
         ]
         if priority:

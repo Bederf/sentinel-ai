@@ -20,14 +20,23 @@ _BRIDGE_EXCLUDE_TYPES = {"lum", "lighting", "dali_luminaire", "dali_lum"}
 # Local: http://127.0.0.1:55321 (Supabase local dev instance)
 # Prod: https://xxxx.supabase.co (via SUPABASE_REST_URL env var)
 import os as _os
+
 _SUPABASE_REST_URL = _os.getenv("SUPABASE_REST_URL", "http://127.0.0.1:55321/rest/v1")
-_SUPABASE_ANON_KEY = _os.getenv("SUPABASE_REST_KEY", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0")
+_SUPABASE_ANON_KEY = _os.getenv(
+    "SUPABASE_REST_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
+)
 
 
 def _rest_query(table: str, params: str = "", select: str = "*") -> list[dict]:
     """Execute a direct REST query against local Supabase."""
     import httpx
-    url = f"{_SUPABASE_REST_URL}/{table}?{params}&select={select}" if params else f"{_SUPABASE_REST_URL}/{table}?select={select}"
+
+    url = (
+        f"{_SUPABASE_REST_URL}/{table}?{params}&select={select}"
+        if params
+        else f"{_SUPABASE_REST_URL}/{table}?select={select}"
+    )
     try:
         with httpx.Client(timeout=15.0) as client:
             resp = client.get(url, headers={"apikey": _SUPABASE_ANON_KEY})
@@ -41,6 +50,7 @@ def _rest_query(table: str, params: str = "", select: str = "*") -> list[dict]:
 def _rest_count(table: str, filters: str = "") -> int:
     """Get row count from Supabase via REST."""
     import httpx
+
     url = f"{_SUPABASE_REST_URL}/{table}?{filters}&select=id"
     try:
         with httpx.Client(timeout=15.0) as client:
@@ -61,6 +71,7 @@ def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[st
     """
     # Bridge URL and token from environment — avoids settings init dependency
     import os
+
     base_url = os.getenv("SIMBIOT_API_URL") or os.getenv("BRIDGE_BASE_URL")
     api_token = os.getenv("SIMBIOT_API_KEY") or os.getenv("BRIDGE_API_TOKEN")
 
@@ -69,6 +80,7 @@ def _get_bridge_equipment_count(site_id: str = "site-002") -> tuple[int, dict[st
 
     try:
         import httpx
+
         url = f"{base_url.rstrip('/')}/api/sites/{site_id}/objects"
         headers = {"Authorization": f"Bearer {api_token}"}
 
@@ -185,7 +197,13 @@ def get_stats_from_supabase() -> dict | None:
         for b in sites:
             region = b.get("region") or "Unknown"
             if region not in region_stats:
-                region_stats[region] = {"region": region, "site_count": 0, "equipment_count": 0, "total_sqm": 0, "alert_count": 0}
+                region_stats[region] = {
+                    "region": region,
+                    "site_count": 0,
+                    "equipment_count": 0,
+                    "total_sqm": 0,
+                    "alert_count": 0,
+                }
             region_stats[region]["site_count"] += 1
             region_stats[region]["total_sqm"] += b.get("sqm") or 0
         by_region = list(region_stats.values())

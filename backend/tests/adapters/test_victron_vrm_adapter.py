@@ -46,6 +46,7 @@ def _patch_async_client(resp: MagicMock):
 
 # ── _derive_load ──────────────────────────────────────────────────────────────
 
+
 def test_derive_load_all_none_returns_none():
     assert _derive_load(None, None, None) is None
 
@@ -75,6 +76,7 @@ def test_derive_load_discharging_battery():
 
 
 # ── Token management ──────────────────────────────────────────────────────────
+
 
 def test_refresh_token_stores_token_and_id_user():
     adapter = _make_adapter()
@@ -162,6 +164,7 @@ def test_id_user_cached_from_site_config():
 
 # ── authenticate ──────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_authenticate_success():
     adapter = _make_adapter()
@@ -191,6 +194,7 @@ async def test_authenticate_failure_returns_false():
 
 
 # ── discover_devices ──────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_discover_devices_returns_manifests():
@@ -244,6 +248,7 @@ async def test_discover_devices_skips_missing_idsite():
 
 
 # ── get_realtime ──────────────────────────────────────────────────────────────
+
 
 def _make_widget_resp(records: dict) -> MagicMock:
     resp = MagicMock()
@@ -368,6 +373,7 @@ async def test_get_realtime_all_widgets_unavailable_load_is_none():
 
 # ── get_historical ────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_historical_returns_snapshots():
     adapter = _make_adapter()
@@ -412,6 +418,7 @@ async def test_get_historical_returns_snapshots():
 
 # ── get_alarms ────────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_get_alarms_normalises_severity():
     adapter = _make_adapter()
@@ -425,7 +432,13 @@ async def test_get_alarms_normalises_severity():
     alarms_resp.json.return_value = {
         "alarms": [
             {"idAlarm": 10, "description": "Low battery", "severity": "critical", "started": 1700000000, "ended": None},
-            {"idAlarm": 20, "description": "Grid lost", "severity": "warning", "started": 1700001000, "ended": 1700002000},
+            {
+                "idAlarm": 20,
+                "description": "Grid lost",
+                "severity": "warning",
+                "started": 1700001000,
+                "ended": 1700002000,
+            },
         ]
     }
 

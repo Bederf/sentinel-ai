@@ -3,11 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import os
 import time
 
 import redis
-import requests as http_requests
 
 from app.adapters.residential import SUPPORTED_PLATFORMS, build_adapter
 from app.config.settings import settings
@@ -15,19 +13,19 @@ from app.database.supabase_client import get_supabase_client
 from app.services.encryption_service import get_encryption_service
 from app.services.residential.bridge_scheduler import add_residential_polling_job
 from app.services.residential.mqtt_provisioner import get_mqtt_provisioner
+from app.services.residential.wireguard_peer_manager import WireGuardPeerManager
 from app.services.sentry.conversation_state import ConversationStateManager
 
 logger = logging.getLogger(__name__)
 
-# ── Bot token ──────────────────────────────────────────────────────────────────
+# ── Telegram sender (home bot — never commercial) ─────────────────────────────
 
-def _bot_token() -> str:
-    path = os.path.expanduser("~/.sentry/gateway/sentry.json")
-    with open(path) as f:
-        return json.load(f)["channels"]["telegram"]["accounts"]["client"]["botToken"]
+from app.services.residential.residential_telegram_sender import ResidentialTelegramSender  # noqa: E402
 
+_sender = ResidentialTelegramSender()
 
 # ── Rate limiting (3 attempts / hour / chat_id) ────────────────────────────────
+
 
 def _check_rate_limit(chat_id: int) -> tuple[bool, int]:
     """
@@ -62,22 +60,18 @@ def _reset_rate_limit(chat_id: int) -> None:
     r.delete(key)
 
 
-# ── Telegram helpers ───────────────────────────────────────────────────────────
+# ── Telegram helpers (home bot only — never commercial) ───────────────────────
 
-def _send(chat_id: int, text: str, reply_markup: dict | None = None, reply_to_message_id: int | None = None) -> dict | None:
-    payload = {"chat_id": chat_id, "text": text}
-    if reply_markup:
-        payload["reply_markup"] = reply_markup
-    if reply_to_message_id:
-        payload["reply_to_message_id"] = reply_to_message_id
+
+def _send(
+    chat_id: int, text: str, reply_markup: dict | None = None, reply_to_message_id: int | None = None
+) -> dict | None:
+    """Send text via ResidentialTelegramSender. Returns result dict on success."""
     try:
-        r = http_requests.post(
-            f"https://api.telegram.org/bot{_bot_token()}/sendMessage",
-            json=payload,
-            timeout=10,
-        )
-        r.raise_for_status()
-        return r.json().get("result")
+        import asyncio
+
+        result = asyncio.get_event_loop().run_until_complete(_sender.send_text(chat_id, text, reply_markup))
+        return {"message_id": 0} if result else None
     except Exception as exc:
         logger.error("Telegram send failed: %s", exc)
         return None
@@ -86,11 +80,9 @@ def _send(chat_id: int, text: str, reply_markup: dict | None = None, reply_to_me
 def _delete(chat_id: int, message_id: int) -> None:
     """Fire-and-forget — never blocks the flow."""
     try:
-        http_requests.post(
-            f"https://api.telegram.org/bot{_bot_token()}/deleteMessage",
-            json={"chat_id": chat_id, "message_id": message_id},
-            timeout=5,
-        )
+        import asyncio
+
+        asyncio.get_event_loop().run_until_complete(_sender.delete_message(chat_id, message_id))
     except Exception as exc:
         logger.warning("deleteMessage failed chat=%s msg=%s: %s", chat_id, message_id, exc)
 
@@ -98,16 +90,15 @@ def _delete(chat_id: int, message_id: int) -> None:
 def _answer_callback(callback_query_id: str) -> None:
     """Must be called FIRST on callback receipt to dismiss spinner."""
     try:
-        http_requests.post(
-            f"https://api.telegram.org/bot{_bot_token()}/answerCallbackQuery",
-            json={"callback_query_id": callback_query_id},
-            timeout=5,
-        )
+        import asyncio
+
+        asyncio.get_event_loop().run_until_complete(_sender.answer_callback_query(callback_query_id))
     except Exception as exc:
         logger.warning("answerCallbackQuery failed: %s", exc)
 
 
 # ── Platform label ─────────────────────────────────────────────────────────────
+
 
 def _platform_label(platform: str) -> str:
     return SUPPORTED_PLATFORMS.get(platform, {}).get("name", platform.title())
@@ -120,8 +111,20 @@ AWAITING_EMAIL = "awaiting_email"
 AWAITING_PASSWORD = "awaiting_password"
 DISCOVERING = "discovering"
 
+# Home Assistant onboarding states
+AWAITING_HA_PUBLIC_KEY = "awaiting_ha_public_key"
+AWAITING_HA_TUNNEL_READY = "awaiting_ha_tunnel_ready"
+MAPPING_HA_PV = "mapping_ha_pv"
+MAPPING_HA_BATTERY = "mapping_ha_battery"
+MAPPING_HA_GRID = "mapping_ha_grid"
+MAPPING_HA_LOAD = "mapping_ha_load"
+MAPPING_HA_GEYSER = "mapping_ha_geyser"
+MAPPING_HA_EV = "mapping_ha_ev"
+MAPPING_HA_COMPLETE = "mapping_ha_complete"
+
 
 # ── Service ─────────────────────────────────────────────────────────────────────
+
 
 class ResidentialOnboardService:
     """
@@ -168,10 +171,17 @@ class ResidentialOnboardService:
         self._state.set(chat_id, state)
 
         keyboard = {
-            "inline_keyboard": [[
-                {"text": "☀️ SOLARMAN Smart", "callback_data": "platform:solarman"},
-                {"text": "🔋 Victron VRM", "callback_data": "platform:victron"},
-            ]]
+            "inline_keyboard": [
+                [
+                    {"text": "☀️ SOLARMAN Smart", "callback_data": "platform:solarman"},
+                    {"text": "🔋 Victron VRM", "callback_data": "platform:victron"},
+                ],
+                [
+                    {
+                        {"text": "🏠 Home Assistant", "callback_data": "platform:home_assistant"},
+                    }
+                ],
+            ]
         }
         _send(chat_id, "Which platform monitors your solar system?", reply_markup=keyboard)
         return "Starting /connect flow..."
@@ -189,11 +199,273 @@ class ResidentialOnboardService:
             return
 
         state.data["platform"] = platform
-        state.step = AWAITING_EMAIL
         self._state.set(chat_id, state)
 
-        platform_name = _platform_label(platform)
-        _send(chat_id, f"Enter your {platform_name} account email:")
+        if platform == "home_assistant":
+            self._start_ha_onboarding(chat_id, state)
+        else:
+            state.step = AWAITING_EMAIL
+            self._state.set(chat_id, state)
+            platform_name = _platform_label(platform)
+            _send(chat_id, f"Enter your {platform_name} account email:")
+
+    def _start_ha_onboarding(self, chat_id: int, state) -> None:
+        """Begin the Home Assistant WireGuard onboarding flow."""
+        state.step = AWAITING_HA_PUBLIC_KEY
+        state.data["entity_map"] = {}
+        self._state.set(chat_id, state)
+        _send(
+            chat_id,
+            "🏠 Home Assistant connects to SENTINEL via WireGuard VPN.\n\n"
+            "Step 1: Install the WireGuard Add-on in Home Assistant\n"
+            "(Settings → Add-ons → Store → search WireGuard → Install).\n\n"
+            "Once installed, generate a key pair in the add-on\n"
+            "and send me your Public Key:\n\n"
+            "(Format: a 44-character string ending with =)",
+        )
+
+    def handle_ha_public_key(self, chat_id: int, public_key: str) -> str:
+        """Handle WireGuard public key submission from HA onboarding."""
+        state = self._state.get(chat_id)
+        if state is None or state.step != AWAITING_HA_PUBLIC_KEY:
+            return "Your session timed out. Send /connect to start again."
+
+        public_key = public_key.strip()
+        wg = WireGuardPeerManager()
+
+        if not wg.validate_public_key(public_key):
+            return (
+                "That doesn't look like a valid WireGuard public key.\n\n"
+                "In the HA WireGuard Add-on, tap 'Generate Keys' to create a new key pair,\n"
+                "then send me the Public Key (the one shown, not the Private Key).\n\n"
+                "Format: 44 characters ending with ="
+            )
+
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+
+        try:
+            peer = wg.register_peer(site_id, public_key)
+        except ValueError as exc:
+            return f"Registration failed: {exc}"
+
+        client_config = wg.generate_client_config(peer.assigned_ip)
+
+        state.data["wireguard_peer_id"] = str(peer.id)
+        state.data["assigned_ip"] = peer.assigned_ip
+        state.data["public_key"] = public_key
+        state.step = AWAITING_HA_TUNNEL_READY
+        self._state.set(chat_id, state)
+
+        return (
+            "✅ Peer registered!\n\n"
+            "Add this to your Home Assistant WireGuard Add-on config:\n\n"
+            f"<code>{client_config}</code>\n\n"
+            "Save the config and start the WireGuard Add-on,\n"
+            "then send me <code>/hapeer_ready</code>\n\n"
+            "(Your assigned VPN IP: <code>{}</code>)".format(peer.assigned_ip)
+        )
+
+    def handle_ha_tunnel_ready(self, chat_id: int) -> str:
+        """Check WireGuard tunnel reachability after user sends /hapeer_ready."""
+        state = self._state.get(chat_id)
+        if state is None or state.step != AWAITING_HA_TUNNEL_READY:
+            return "Your session timed out. Send /connect to start again."
+
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+        wg = WireGuardPeerManager()
+
+        # Check if peer is still pending (operator hasn't added to wg0.conf yet)
+        peer = wg.get_peer(site_id)
+        if peer is None:
+            return "Peer not found. Send /connect to start again."
+        if peer.status == "pending":
+            return (
+                "⏳ Tunnel not yet activated on the server side.\n\n"
+                "This usually means the operator hasn't added your peer to the\n"
+                "WireGuard configuration yet. Try /hapeer_ready again in a few minutes."
+            )
+
+        # Try reachability check
+        reachable = wg.check_reachability(site_id)
+        if not reachable:
+            return (
+                "🔍 Tunnel not detected.\n\n"
+                "Check the WireGuard Add-on is running in Home Assistant\n"
+                "and your config is correct, then try /hapeer_ready again."
+            )
+
+        # Tunnel is up — start entity mapping
+        state.step = MAPPING_HA_PV
+        self._state.set(chat_id, state)
+        return (
+            "✅ Tunnel connected!\n\n"
+            "Now map your solar entities. Find entity IDs in\n"
+            "Home Assistant → Developer Tools → States.\n\n"
+            "Type 'skip' for any you don't have.\n\n"
+            "PV Power entity ID:"
+        )
+
+    def _advance_ha_mapping(self, chat_id: int, state, field: str, entity_id: str) -> str:
+        """Helper to advance through HA entity mapping steps."""
+        entity_map = state.data.get("entity_map", {})
+
+        if entity_id.strip().lower() == "skip":
+            entity_map[field] = None
+        else:
+            entity_id = entity_id.strip()
+            # Validate entity ID format (no wildcards)
+            import re
+
+            if not re.match(r"^[a-z0-9_\.]+$", entity_id) or len(entity_id) > 100:
+                return f"Invalid entity ID format: '{entity_id}'\n\nUse only letters, numbers, dots, and underscores.\nMax 100 characters.\n\nTry again:"
+            entity_map[field] = entity_id
+
+        state.data["entity_map"] = entity_map
+        self._state.set(chat_id, state)
+        return None  # Signal: advance to next step
+
+    def handle_ha_entity_input(self, chat_id: int, text: str) -> str:
+        """Handle entity ID input during HA onboarding."""
+        state = self._state.get(chat_id)
+        if state is None:
+            return "Your session timed out. Send /connect to start again."
+
+        step = state.step
+        mapping_steps = {
+            MAPPING_HA_PV: ("pv_power_w", "Battery SOC entity ID:"),
+            MAPPING_HA_BATTERY: ("battery_soc_pct", "Grid Power entity ID:"),
+            MAPPING_HA_GRID: ("grid_power_w", "Load Power entity ID (or 'skip'):"),
+            MAPPING_HA_LOAD: ("load_power_w", "Geyser switch entity ID (or 'skip'):"),
+            MAPPING_HA_GEYSER: ("geyser_state", "EV Charger entity ID (or 'skip'):"),
+        }
+
+        if step not in mapping_steps:
+            return "Session error. Send /connect to start again."
+
+        field, next_prompt = mapping_steps[step]
+        error = self._advance_ha_mapping(chat_id, state, field, text)
+        if error:
+            return error
+
+        # Advance to next step
+        state = self._state.get(chat_id)
+        next_steps = {
+            MAPPING_HA_PV: MAPPING_HA_BATTERY,
+            MAPPING_HA_BATTERY: MAPPING_HA_GRID,
+            MAPPING_HA_GRID: MAPPING_HA_LOAD,
+            MAPPING_HA_LOAD: MAPPING_HA_GEYSER,
+            MAPPING_HA_GEYSER: MAPPING_HA_EV,
+        }
+        state.step = next_steps.get(step, MAPPING_HA_EV)
+        self._state.set(chat_id, state)
+
+        if state.step == MAPPING_HA_EV:
+            return next_prompt + "\n\n(EV Charger entity ID, or 'skip'):"
+
+        return next_prompt
+
+    def handle_ha_ev_input(self, chat_id: int, text: str) -> str:
+        """Handle final EV charger entity input and trigger onboarding."""
+        state = self._state.get(chat_id)
+        if state is None or state.step != MAPPING_HA_EV:
+            return "Your session timed out. Send /connect to start again."
+
+        entity_map = state.data.get("entity_map", {})
+        if text.strip().lower() != "skip":
+            entity_id = text.strip()
+            import re
+
+            if not re.match(r"^[a-z0-9_\.]+$", entity_id) or len(entity_id) > 100:
+                return "Invalid entity ID format.\n\nUse only letters, numbers, dots, and underscores.\nMax 100 characters.\n\nTry again:"
+            entity_map["ev_charger_power_w"] = entity_id
+        else:
+            entity_map["ev_charger_power_w"] = None
+
+        state.data["entity_map"] = entity_map
+        state.step = MAPPING_HA_COMPLETE
+        self._state.set(chat_id, state)
+
+        # Perform the actual onboarding
+        return self._complete_ha_onboarding(chat_id, state)
+
+    def _complete_ha_onboarding(self, chat_id: int, state) -> str:
+        """Write HA site to DB and start gateway subscription."""
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+        entity_map = state.data.get("entity_map", {})
+        platform = state.data.get("platform", "home_assistant")
+
+        # Check for minimum mapping — warn but allow
+        mapped_count = sum(1 for v in entity_map.values() if v)
+        if mapped_count < 1:
+            return (
+                "⚠️ No entities mapped. At least one entity is recommended.\n\n"
+                "You can re-configure by sending /connect again."
+            )
+
+        # Build site_config with entity_map
+        site_config = {
+            "entity_map": entity_map,
+            "mqtt_broker": settings.wireguard_vps_endpoint.split(":")[0]
+            if settings.wireguard_vps_endpoint
+            else "localhost",
+            "mqtt_port": 1883,
+        }
+
+        encrypted_config = get_encryption_service().encrypt(json.dumps(site_config))
+
+        supabase = get_supabase_client()
+
+        # Check for existing site (re-connect scenario)
+        existing = supabase.table("residential_sites").select("eskom_area_code").eq("site_id", site_id).execute()
+        has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
+
+        site_row = {
+            "site_id": site_id,
+            "platform": platform,
+            "deployment_tier": "full_simbiot",
+            "site_config": encrypted_config,
+            "eskom_area_code": None,
+            "tariff_type": None,
+            "polling_interval_seconds": 300,
+            "is_active": True,
+            "chat_id": chat_id,
+            "notification_channel": "telegram",
+            "onboarding_method": "telegram_bot",
+        }
+
+        result = supabase.table("residential_sites").upsert(site_row, on_conflict="site_id").execute()
+        if not result.data:
+            return "Failed to save your site. Please try again later."
+
+        # Clear state
+        self._state.clear(chat_id)
+
+        # Build mapped summary
+        field_names = {
+            "pv_power_w": "PV Power",
+            "battery_soc_pct": "Battery SOC",
+            "grid_power_w": "Grid Power",
+            "load_power_w": "Load Power",
+            "geyser_state": "Geyser",
+            "ev_charger_power_w": "EV Charger",
+        }
+        lines = []
+        for field, label in field_names.items():
+            entity = entity_map.get(field)
+            status = f"✅ {entity}" if entity else "⏭ skipped"
+            lines.append(f"• {label}: {status}")
+
+        msg = (
+            "✅ Connected via Home Assistant.\n\n"
+            "Mapped:\n" + "\n".join(lines) + "\n\n"
+            "SENTINEL is now monitoring your system.\n"
+            "Alerts will appear here when action is needed.\n\n"
+        )
+
+        if not has_existing_area:
+            msg += "💡 Enable loadshedding alerts: /setarea\n"
+        msg += "Disconnect: /disconnect"
+        return msg
 
     def handle_email(self, chat_id: int, email: str) -> str:
         """
@@ -213,10 +485,7 @@ class ResidentialOnboardService:
         self._state.set(chat_id, state)
 
         platform_name = _platform_label(state.data.get("platform", ""))
-        return (
-            f"Enter your {platform_name} password:\n\n"
-            "⚠️ Your message will be deleted immediately after I receive it."
-        )
+        return f"Enter your {platform_name} password:\n\n⚠️ Your message will be deleted immediately after I receive it."
 
     def handle_password(self, chat_id: int, message_id: int, password: str) -> str:
         """
@@ -270,10 +539,14 @@ class ResidentialOnboardService:
 
         # Discover devices while we still have the credentials in memory
         try:
-            manifests = asyncio.run(asyncio.wait_for(
-                build_adapter(platform, {"email": email, "password": password, "site_id": site_id}).discover_devices(),
-                timeout=30,
-            ))
+            manifests = asyncio.run(
+                asyncio.wait_for(
+                    build_adapter(
+                        platform, {"email": email, "password": password, "site_id": site_id}
+                    ).discover_devices(),
+                    timeout=30,
+                )
+            )
         except Exception as exc:
             logger.warning("device discovery failed for chat_id=%s: %s", chat_id, exc)
             return "Could not discover your devices. Please try again later."
@@ -289,8 +562,15 @@ class ResidentialOnboardService:
         state.data["site_id"] = site_id
         state.data["chat_id"] = chat_id
         state.data["encrypted_site_config"] = encrypted_config
-        state.data["manifests"] = [{"device_id": m.device_id, "device_name": m.device_name,
-                                     "device_type": m.device_type, "capabilities": m.capabilities} for m in manifests]
+        state.data["manifests"] = [
+            {
+                "device_id": m.device_id,
+                "device_name": m.device_name,
+                "device_type": m.device_type,
+                "capabilities": m.capabilities,
+            }
+            for m in manifests
+        ]
         state.step = DISCOVERING
         self._state.set(chat_id, state)
 
@@ -316,6 +596,10 @@ class ResidentialOnboardService:
         manifest_dicts: list[dict] = state.data.get("manifests", [])
 
         supabase = get_supabase_client()
+
+        # Check if eskom_area_code already set (re-connect scenario)
+        existing = supabase.table("residential_sites").select("eskom_area_code").eq("site_id", site_id).execute()
+        has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
 
         site_row = {
             "site_id": site_id,
@@ -368,12 +652,22 @@ class ResidentialOnboardService:
         device_count = len(manifest_dicts)
         plant_name = manifest_dicts[0].get("device_name", "your system") if manifest_dicts else "your system"
 
-        return (
+        base_message = (
             f"✅ Connected: {plant_name}\n"
             f"[{device_count}] devices found.\n\n"
-            "You'll receive alerts here when your system needs attention.\n"
-            "SENTINEL monitors your system and sends advice via Telegram.\n\n"
-            "To enable loadshedding alerts, send your Eskom area code.\n"
-            "Find it at eskomsepush.co.za\n\n"
-            "To disconnect at any time: /disconnect"
+            "You'll receive alerts here when your system\n"
+            "needs attention. All adjustments are made\n"
+            "through your SOLARMAN app."
         )
+
+        if not has_existing_area:
+            area_prompt = (
+                "\n\n"
+                "💡 To enable loadshedding alerts, send:\n"
+                "/setarea [your area code]\n"
+                "Find your code at eskomsepush.co.za"
+            )
+        else:
+            area_prompt = ""
+
+        return base_message + area_prompt + "\n\nTo disconnect: /disconnect"

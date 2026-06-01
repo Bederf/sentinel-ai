@@ -19,7 +19,6 @@ import pytest
 
 from app.models.fault_occurrence import FaultOccurrence
 
-
 # ---------------------------------------------------------------------------
 # FaultOccurrence model tests
 # ---------------------------------------------------------------------------

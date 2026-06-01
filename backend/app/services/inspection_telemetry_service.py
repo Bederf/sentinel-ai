@@ -13,7 +13,7 @@ ISO 10816 Class III thresholds (SA 50Hz context):
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from uuid import UUID
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,6 @@ def _rms_ms2_to_velocity(rms_ms2: float, dominant_freq_hz: float | None, default
 
 
 class InspectionTelemetryService:
-
     @staticmethod
     def score_from_phyphox(parsed_output: dict, analyzer_result: dict) -> float:
         """Convert phyphox + bearing analyzer output to a 0–100 inspection score.
@@ -168,6 +167,9 @@ class InspectionTelemetryService:
             Evidence UUID string, or None on failure
         """
         try:
+            from datetime import datetime
+            from uuid import UUID
+
             from app.database.repositories.asset_evidence_repository import AssetEvidenceRepository
             from app.database.repositories.equipment_repository import EquipmentRepository
             from app.models.asset_evidence import (
@@ -177,8 +179,6 @@ class InspectionTelemetryService:
                 ProvenanceType,
                 SourceType,
             )
-            from datetime import datetime
-            from uuid import UUID
 
             eq_repo = EquipmentRepository()
             eq = eq_repo.get_by_code(equipment_id)
@@ -195,7 +195,9 @@ class InspectionTelemetryService:
                 logger.warning(f"Inspection recording failed: site {site_id} not resolved")
                 return None
 
-            provenance = ProvenanceType.USER_UPLOAD if inspection_type == "phyphox_upload" else ProvenanceType.MANUAL_ENTRY
+            provenance = (
+                ProvenanceType.USER_UPLOAD if inspection_type == "phyphox_upload" else ProvenanceType.MANUAL_ENTRY
+            )
 
             payload = CreateAssetEvidenceInput(
                 site_id=site_uuid,
@@ -210,12 +212,16 @@ class InspectionTelemetryService:
                 assessment_relevance=True,
                 provenance_type=provenance,
                 provenance_uri=f"inspection:{inspected_by_user_id or 'unknown'}:{inspection_type}",
-                uploader_user_id=UUID(inspected_by_user_id) if inspected_by_user_id and len(inspected_by_user_id) == 36 else None,
+                uploader_user_id=UUID(inspected_by_user_id)
+                if inspected_by_user_id and len(inspected_by_user_id) == 36
+                else None,
             )
 
             repo = AssetEvidenceRepository()
             evidence = await repo.create(payload)
-            logger.info(f"Inspection evidence {evidence.evidence_id} recorded for {equipment_id} (score={inspection_score})")
+            logger.info(
+                f"Inspection evidence {evidence.evidence_id} recorded for {equipment_id} (score={inspection_score})"
+            )
             return str(evidence.evidence_id)
 
         except Exception as e:

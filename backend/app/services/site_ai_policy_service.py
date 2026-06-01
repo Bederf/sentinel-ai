@@ -36,12 +36,14 @@ def _save_site_ai_policies(policies: dict[str, Any]) -> None:
         if existing.data:
             supabase.table("system_settings").update({"value": policies}).eq("key", "siteAiPolicies").execute()
         else:
-            supabase.table("system_settings").insert({
-                "key": "siteAiPolicies",
-                "value": policies,
-                "category": "siteAiPolicies",
-                "data_type": "object",
-            }).execute()
+            supabase.table("system_settings").insert(
+                {
+                    "key": "siteAiPolicies",
+                    "value": policies,
+                    "category": "siteAiPolicies",
+                    "data_type": "object",
+                }
+            ).execute()
     except Exception as e:
         logger.error("Failed to save site AI policies: %s", e)
 

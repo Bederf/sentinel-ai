@@ -225,10 +225,13 @@ def validate_citations(
             valid.append(ref_stripped)
         else:
             # Try partial matching (doc ID prefix)
-            if any(ref_stripped.startswith(doc_id[:8]) for doc_id in retrieval_doc_ids) or (retrieval_doc_titles and any(
-                title.lower() in ref_stripped.lower() or ref_stripped.lower() in title.lower()
-                for title in retrieval_doc_titles
-            )):
+            if any(ref_stripped.startswith(doc_id[:8]) for doc_id in retrieval_doc_ids) or (
+                retrieval_doc_titles
+                and any(
+                    title.lower() in ref_stripped.lower() or ref_stripped.lower() in title.lower()
+                    for title in retrieval_doc_titles
+                )
+            ):
                 valid.append(ref_stripped)
             else:
                 invalid.append(ref_stripped)

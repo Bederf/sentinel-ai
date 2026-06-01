@@ -13,8 +13,7 @@ Age penalty tiers:
 Cap penalty at 40% (floor = 60)
 """
 
-from datetime import datetime, date
-from typing import Tuple
+from datetime import date, datetime
 
 
 def _age_years(commissioning_date: date, reference_date: date | None = None) -> float:
@@ -62,13 +61,13 @@ def _confidence_score(age_years: float) -> float:
     """Confidence in age-only baseline."""
     base = 0.35
     if age_years < 2:
-        return base + 0.15   # new equipment = more predictable
+        return base + 0.15  # new equipment = more predictable
     elif age_years < 5:
-        return base + 0.05   # normal range
+        return base + 0.05  # normal range
     elif age_years < 10:
-        return base          # moderate variance
+        return base  # moderate variance
     else:
-        return base - 0.05   # high variance in older equipment
+        return base - 0.05  # high variance in older equipment
 
 
 def calculate_baseline_health(
@@ -94,7 +93,7 @@ def calculate_baseline_health(
     confidence = round(_confidence_score(age), 2)
 
     if age < 1:
-        desc = f"<1 year old"
+        desc = "<1 year old"
     elif age < 2:
         desc = f"{age:.1f} years old"
     else:

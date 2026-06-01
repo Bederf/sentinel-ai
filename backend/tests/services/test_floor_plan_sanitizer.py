@@ -324,7 +324,9 @@ class TestIntegration:
     @pytest.mark.asyncio
     async def test_end_to_end_sanitization_export(self, sanitizer, simple_floor_plan):
         """Test saving sanitized image to disk and re-loading."""
-        sanitized_bytes, _lookup = sanitizer.sanitize_floor_plan(simple_floor_plan, remove_text=True, return_lookup=True)
+        sanitized_bytes, _lookup = sanitizer.sanitize_floor_plan(
+            simple_floor_plan, remove_text=True, return_lookup=True
+        )
 
         # Decode and verify we can work with the sanitized version
         nparr = np.frombuffer(sanitized_bytes, np.uint8)

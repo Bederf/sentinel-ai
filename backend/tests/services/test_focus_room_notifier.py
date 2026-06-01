@@ -14,9 +14,7 @@ async def test_send_focus_overstay_alert_whatsapp_via_notification_service():
     """WhatsApp is sent via notification_service.broadcast_alert with correct params."""
     from app.services.focus_room_notifier import send_focus_overstay_alert
 
-    mock_broadcast = AsyncMock(
-        return_value={"success": True, "recipients_notified": 1, "errors": []}
-    )
+    mock_broadcast = AsyncMock(return_value={"success": True, "recipients_notified": 1, "errors": []})
 
     with patch("app.services.focus_room_notifier.notification_service") as mock_ns:
         mock_ns.broadcast_alert = mock_broadcast
@@ -80,9 +78,7 @@ async def test_send_focus_overstay_alert_notification_service_failure():
             mock_settings.telegram_alert_chat_id = "-100999"
 
             with patch("app.services.focus_room_notifier.notification_service") as mock_ns:
-                mock_ns.broadcast_alert = AsyncMock(
-                    side_effect=RuntimeError("WhatsApp provider unavailable")
-                )
+                mock_ns.broadcast_alert = AsyncMock(side_effect=RuntimeError("WhatsApp provider unavailable"))
 
                 result = await send_focus_overstay_alert(
                     site_id="site-002",

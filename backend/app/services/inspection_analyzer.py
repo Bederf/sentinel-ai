@@ -163,7 +163,9 @@ class InspectionAnalyzer:
             confidence=0.7,
         )
 
-    def _check_resolved(self, findings_lower: str, health_before: int | None = None, health_after: int | None = None) -> bool:
+    def _check_resolved(
+        self, findings_lower: str, health_before: int | None = None, health_after: int | None = None
+    ) -> bool:
         """Check if findings indicate the issue was resolved."""
         # Keyword match for resolved status
         if any(keyword in findings_lower for keyword in self.RESOLVED_KEYWORDS):
@@ -189,7 +191,9 @@ class InspectionAnalyzer:
 
         return False
 
-    def _check_repair_needed(self, findings_lower: str, health_before: int | None = None, health_after: int | None = None) -> bool:
+    def _check_repair_needed(
+        self, findings_lower: str, health_before: int | None = None, health_after: int | None = None
+    ) -> bool:
         """Check if findings indicate repair is needed."""
         # Repair keywords found
         if any(keyword in findings_lower for keyword in self.REPAIR_KEYWORDS):

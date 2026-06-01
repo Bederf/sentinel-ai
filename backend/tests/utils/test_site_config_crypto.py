@@ -12,6 +12,7 @@ _TEST_CONFIG = {"email": "user@example.com", "password": "hunter2", "site_id": "
 
 # ── Round-trip ────────────────────────────────────────────────────────────────
 
+
 def test_encrypt_decrypt_round_trip():
     ciphertext = _encrypt_site_config(_TEST_CONFIG)
     svc = get_encryption_service()
@@ -36,6 +37,7 @@ def test_different_encryptions_differ():
 
 # ── Credential safety ─────────────────────────────────────────────────────────
 
+
 def test_password_not_in_ciphertext():
     svc = get_encryption_service()
     if not svc.enabled:
@@ -48,6 +50,7 @@ def test_password_not_in_ciphertext():
 def test_site_config_not_logged_during_onboard(caplog):
     """Ensure plaintext credentials do not appear in any log record."""
     import logging
+
     with caplog.at_level(logging.DEBUG):
         _encrypt_site_config(_TEST_CONFIG)
     for record in caplog.records:

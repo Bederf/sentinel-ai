@@ -102,7 +102,7 @@ const SITE_TOWER_PROFILES: Record<string, TowerProfile> = {
     widthScale: 1.0,
     depthScale: 1.0,
   },
-  'site-003': {
+  'site-005': {
     // Busamed Gateway Private Hospital: wider, lower hospital profile.
     towerFloors: ['L9', 'L8', 'L7', 'L6', 'L5', 'L4', 'L3', 'L2', 'L1', 'G'],
     managedFloors: ['G', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9'],

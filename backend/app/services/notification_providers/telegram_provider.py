@@ -44,7 +44,6 @@ class TelegramProvider(BaseNotificationProvider):
 
     def send_budget_alert(self, site_id: str, current: int, budget: int, pct: float) -> None:
         """Fire-and-forget budget alert via ThreadPoolExecutor."""
-        import json
         from concurrent.futures import ThreadPoolExecutor
 
         body = (

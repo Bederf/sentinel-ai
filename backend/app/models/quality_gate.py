@@ -4,7 +4,6 @@ API response models for the quality gate evaluation endpoint.
 Used by the /api/quality-gate/* routes to serialize gate results.
 """
 
-
 from pydantic import BaseModel, Field
 
 

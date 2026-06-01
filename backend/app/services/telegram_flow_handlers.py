@@ -12,7 +12,6 @@ import re
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from app.services.issue_classifier import (
     DISCIPLINE_TO_CATEGORY,
@@ -28,8 +27,8 @@ from app.services.telegram_intent_classifier import TelegramIntent
 from app.services.telegram_message_sender import (
     InlineButton,
     InlineKeyboard,
-    get_telegram_sender,
     TelegramMessageSender,
+    get_telegram_sender,
 )
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ logger = logging.getLogger(__name__)
 # Voice Response Integration
 # ---------------------------------------------------------------------------
 
-_VOICE_COORDINATOR: Optional["VoiceResponseCoordinator"] = None
+_VOICE_COORDINATOR: VoiceResponseCoordinator | None = None
 
 
 def _get_voice_coordinator():
@@ -88,6 +87,7 @@ async def _send_response(
         if not user_message:
             try:
                 from app.services.telegram_conversation_manager import get_conversation_manager
+
                 session = get_conversation_manager().get_session(chat_id)
                 if session:
                     user_message = session.answers.get("original_text", "") or ""
@@ -112,6 +112,7 @@ async def _send_response(
 
     # Fallback to text
     await sender.send_text(chat_id, text, keyboard=keyboard)
+
 
 # ---------------------------------------------------------------------------
 # Category mapping for complaint buttons
@@ -855,8 +856,7 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
     wo_code = created.get("code") or created.get("id", "unknown")
     await _send_response(
         chat_id,
-        f"Work order <b>{wo_code}</b> created for {target}.\n"
-        "A technician will be assigned shortly.",
+        f"Work order <b>{wo_code}</b> created for {target}.\nA technician will be assigned shortly.",
         sender,
     )
 
@@ -1067,7 +1067,8 @@ async def handle_focus_room(
             occupancy_store.extend_overstay_grace(active.session_id, 10)
             logger.info(
                 "Overstay grace +10min via concierge confirm: room=%s session=%s",
-                room_code, active.session_id,
+                room_code,
+                active.session_id,
             )
         status_text = "occupied"
     else:
@@ -1231,6 +1232,7 @@ async def _create_complaint_wo(
         desk_number = ""
         if not equipment_code:
             import re
+
             m = re.search(r"(?:desk|Desk)\s*(\d{3})", location)
             if m:
                 desk_number = m.group(1)
@@ -1275,9 +1277,12 @@ async def _create_complaint_wo(
                     # Last resort: any active technician with a Telegram ID
                     if not tech:
                         try:
-                            tech_result = sb.table("technicians").select(
-                                "id, name, email, phone, telegram_id"
-                            ).eq("active", True).execute()
+                            tech_result = (
+                                sb.table("technicians")
+                                .select("id, name, email, phone, telegram_id")
+                                .eq("active", True)
+                                .execute()
+                            )
                             with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
                             if with_telegram:
                                 tech = with_telegram[0]
@@ -1290,20 +1295,22 @@ async def _create_complaint_wo(
         if tech and tech.get("telegram_id"):
             try:
                 notifier = WorkOrderNotifier()
-                await notifier.notify_technician({
-                    "code": wo_code,
-                    "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
-                    "equipment_code": equipment_code,
-                    "equipment_id": equipment_code or f"site-002",
-                    "equipment_name": title,
-                    "site_id": "site-002",
-                    "technician_id": tech.get("telegram_id"),
-                    "technician_name": tech.get("name", "Technician"),
-                    "service_type": "callout",
-                    "criticality": priority.upper(),
-                    "problem_description": description,
-                    "desk_number": desk_number,
-                })
+                await notifier.notify_technician(
+                    {
+                        "code": wo_code,
+                        "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
+                        "equipment_code": equipment_code,
+                        "equipment_id": equipment_code or "site-002",
+                        "equipment_name": title,
+                        "site_id": "site-002",
+                        "technician_id": tech.get("telegram_id"),
+                        "technician_name": tech.get("name", "Technician"),
+                        "service_type": "callout",
+                        "criticality": priority.upper(),
+                        "problem_description": description,
+                        "desk_number": desk_number,
+                    }
+                )
             except Exception as e:
                 logger.warning("Complaint WO notification failed: %s", e)
 
@@ -1427,6 +1434,7 @@ async def _handle_staff_wo_status(
 ) -> None:
     """Handle /status_WO-{code} — staff follow-up on their own reported WO."""
     import httpx
+
     from app.services.telegram_message_sender import get_telegram_sender
 
     sender = get_telegram_sender()
@@ -1479,9 +1487,7 @@ async def _handle_staff_wo_status(
     updated_at = data.get("updated_at", "")
     completed_at = data.get("completed_at", "")
 
-    status_emoji = {"completed": "✅", "in_progress": "🔄", "scheduled": "📋", "blocked": "⛔"}.get(
-        status, "📋"
-    )
+    status_emoji = {"completed": "✅", "in_progress": "🔄", "scheduled": "📋", "blocked": "⛔"}.get(status, "📋")
 
     lines = [
         f"{status_emoji} Work Order {wo_code}",
@@ -1556,7 +1562,6 @@ async def _notify_manager_of_complaint_wo(
         logger.warning("[COMPLAINT-WO] FM notification error for %s: %s", wo_code, e)
 
 
-
 async def _email_facilities_desk(
     wo_code: str,
     title: str,
@@ -1595,6 +1600,7 @@ async def _email_facilities_desk(
 
         # Reuse the same SMTP path as WO email notifications
         from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
         notifier = WorkOrderNotifier()
         sent = await notifier._send_email_via_native_smtp(
             to_email=facilities_email,

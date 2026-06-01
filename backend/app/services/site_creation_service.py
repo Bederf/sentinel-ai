@@ -29,6 +29,7 @@ class SiteCreationService:
     def supabase(self):
         if self._supabase is None:
             from app.database import get_supabase_client as get_supabase
+
             self._supabase = get_supabase()
         return self._supabase
 
@@ -130,8 +131,7 @@ class SiteCreationService:
                 if "23505" in error_str or "unique constraint" in error_str.lower():
                     if attempt < _MAX_CREATE_RETRIES - 1:
                         logger.warning(
-                            "[SCS] Site code collision for %s, retrying with new ID "
-                            "(attempt %d/%d)",
+                            "[SCS] Site code collision for %s, retrying with new ID (attempt %d/%d)",
                             site_code,
                             attempt + 1,
                             _MAX_CREATE_RETRIES,
@@ -139,8 +139,7 @@ class SiteCreationService:
                         site_code = self.generate_next_site_code()
                         continue
                     raise RuntimeError(
-                        f"Failed to create site after {_MAX_CREATE_RETRIES} attempts "
-                        f"due to repeated code collisions"
+                        f"Failed to create site after {_MAX_CREATE_RETRIES} attempts due to repeated code collisions"
                     ) from exc
                 raise
 
@@ -148,7 +147,5 @@ class SiteCreationService:
 
     def get_site_by_code(self, site_code: str) -> dict[str, Any] | None:
         """Fetch a site by its code, or None if not found."""
-        result = self.supabase.table("sites").select("*").eq(
-            "code", site_code
-        ).execute()
+        result = self.supabase.table("sites").select("*").eq("code", site_code).execute()
         return result.data[0] if result.data else None

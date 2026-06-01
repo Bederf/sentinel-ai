@@ -3,9 +3,7 @@ WhatsApp event handlers for SENTRY notifications.
 Maps BMS events to WhatsApp messages for technicians and facility managers.
 """
 
-import json
 import logging
-import os
 from datetime import datetime
 from typing import Any
 
@@ -26,6 +24,7 @@ class WhatsAppHandler:
         """Load technician WhatsApp phone numbers from Supabase."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             if client:
                 result = client.table("technicians").select("*").eq("active", True).execute()

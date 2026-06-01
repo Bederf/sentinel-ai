@@ -5,7 +5,8 @@ Tests BOLA protection, response shapes, and site_code filtering.
 
 import os
 from datetime import UTC, date, datetime, timedelta
-from unittest.mock import AsyncMock, mock as mock_module, patch
+from unittest.mock import AsyncMock, patch
+from unittest.mock import mock as mock_module
 
 import pytest
 
@@ -126,7 +127,7 @@ async def test_milestones_empty_for_site_with_no_recommendations(client):
 @pytest.mark.asyncio
 async def test_breaches_returns_list_of_sla_breaches(client):
     """GET /api/fairlands/sla/breaches returns list of SLABreachResponse."""
-    from app.models.recommendation import Recommendation, MilestoneStatus
+    from app.models.recommendation import MilestoneStatus, Recommendation
 
     mock_rec = Recommendation(
         id="rec-002",
@@ -166,7 +167,7 @@ async def test_breaches_returns_list_of_sla_breaches(client):
 @pytest.mark.asyncio
 async def test_breaches_filters_by_site(client):
     """Breaches endpoint filters to the requested site."""
-    from app.models.recommendation import Recommendation, MilestoneStatus
+    from app.models.recommendation import MilestoneStatus, Recommendation
 
     # Create a breach for a DIFFERENT site
     other_site_rec = Recommendation(

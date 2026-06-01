@@ -96,9 +96,7 @@ async def capture_baselines_for_unscored_equipment():
             continue
 
         try:
-            health_score, confidence, desc = calculate_baseline_health(
-                comm_date, sh_rec.get("equipment_type")
-            )
+            health_score, confidence, desc = calculate_baseline_health(comm_date, sh_rec.get("equipment_type"))
         except Exception as e:
             logger.error("%s: baseline calculation failed: %s", code, e)
             failed += 1
@@ -118,7 +116,11 @@ async def capture_baselines_for_unscored_equipment():
             context = f"replaced {replaced_on}" if replaced_on else "newly discovered"
             logger.info(
                 "%s | %s | health=%.1f | conf=%.2f | %s",
-                event_type, code, health_score, confidence, context,
+                event_type,
+                code,
+                health_score,
+                confidence,
+                context,
             )
             captured += 1
         except Exception as e:
@@ -128,5 +130,8 @@ async def capture_baselines_for_unscored_equipment():
     skipped = len(items) - captured - synthetic - failed
     logger.info(
         "Baseline capture done: %s age-only, %s synthetic, %s failed, %s skipped",
-        captured, synthetic, failed, skipped,
+        captured,
+        synthetic,
+        failed,
+        skipped,
     )

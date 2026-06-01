@@ -953,14 +953,16 @@ async def get_doors(request: Request, site: str = Query(..., description="Buildi
 
         doors = []
         for point in points:
-            doors.append({
-                "door_id": point.get("access_point_id") or point.get("id") or "unknown",
-                "door_name": point.get("name") or point.get("location") or "Unknown Door",
-                "zone_id": point.get("location") or point.get("zone_id") or "unknown",
-                "status": "secure",
-                "last_event": point.get("last_event_timestamp") or None,
-                "reader_status": "online",
-            })
+            doors.append(
+                {
+                    "door_id": point.get("access_point_id") or point.get("id") or "unknown",
+                    "door_name": point.get("name") or point.get("location") or "Unknown Door",
+                    "zone_id": point.get("location") or point.get("zone_id") or "unknown",
+                    "status": "secure",
+                    "last_event": point.get("last_event_timestamp") or None,
+                    "reader_status": "online",
+                }
+            )
 
         secure = sum(1 for d in doors if d["status"] == "secure")
         return {"doors": doors, "count": len(doors), "secure": secure}

@@ -4260,7 +4260,6 @@ async def close_work_order_chat(
     to 'completed', stamps completed_at, and records resolution notes.
     """
     try:
-
         from app.database.repositories.work_order_repository import get_work_order_repository
 
         repo = get_work_order_repository()
@@ -4360,8 +4359,8 @@ async def respond_in_voice_chat(
             return {"success": False, "error": "Speech synthesis failed"}
 
         # Save audio bytes to temp file
-        import tempfile
         import uuid
+
         audio_path = f"/tmp/sentry_voice_{uuid.uuid4()}.mp3"
         with open(audio_path, "wb") as f:
             f.write(audio_bytes)
@@ -4378,6 +4377,7 @@ async def respond_in_voice_chat(
         finally:
             # Clean up temp file
             import os
+
             try:
                 os.remove(audio_path)
             except Exception:

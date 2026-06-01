@@ -17,12 +17,12 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
+from app.core.site_resolver import normalize_site_id
 from app.models.audit_log import AuditResultType
 from app.models.remote_ops import COMMAND_AUTHORIZATION, AuthorizationLevel
 from app.services.audit_logger import AuditLogger
 from app.services.auth_service import get_authorization_service
 from app.services.device_abstraction import device_manager
-from app.core.site_resolver import normalize_site_id
 
 logger = logging.getLogger(__name__)
 

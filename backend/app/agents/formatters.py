@@ -122,13 +122,15 @@ def _parse_diagnosis_text(diagnosis_text: str) -> dict:
                     alerts = [None] * int(alert_m.group(1))
                 if pred_m:
                     predictions = [None] * int(pred_m.group(1))
-                result["equipment"].append({
-                    "name": name,
-                    "status": status,
-                    "health": health,
-                    "alerts": alerts,
-                    "predictions": predictions,
-                })
+                result["equipment"].append(
+                    {
+                        "name": name,
+                        "status": status,
+                        "health": health,
+                        "alerts": alerts,
+                        "predictions": predictions,
+                    }
+                )
 
         # Part 2: VAV readings (if present)
         if len(parts) > 2 and "VAV" in parts[2]:
@@ -237,9 +239,7 @@ def format_for_chat(
                 status_emoji = " 🟢"
             alerts_str = f" · {len(eq['alerts'])} alert(s)" if eq["alerts"] else ""
             preds_str = f" · {len(eq['predictions'])} prediction(s)" if eq["predictions"] else ""
-            lines.append(
-                f"| {eq['name']}{status_emoji} | {eq['status']} | {health_bar_str}{alerts_str}{preds_str} |"
-            )
+            lines.append(f"| {eq['name']}{status_emoji} | {eq['status']} | {health_bar_str}{alerts_str}{preds_str} |")
         lines.append("")
 
     # --- Environment section ---
@@ -252,7 +252,11 @@ def format_for_chat(
             temp_str = f"Temperature: **{disp_temp}°C** (setpoint {disp_setpoint}°C, {parsed['zone_delta_str']})"
         else:
             delta = _temp_delta_str(disp_temp, disp_setpoint) if disp_setpoint is not None else ""
-            temp_str = f"Temperature: **{disp_temp}°C** (setpoint {disp_setpoint}°C, {delta})" if disp_setpoint else f"Temperature: **{disp_temp}°C**"
+            temp_str = (
+                f"Temperature: **{disp_temp}°C** (setpoint {disp_setpoint}°C, {delta})"
+                if disp_setpoint
+                else f"Temperature: **{disp_temp}°C**"
+            )
         env_parts.append(temp_str)
         env_parts.append(temp_str)
 
@@ -293,10 +297,7 @@ def format_for_chat(
     # --- No issues header ---
     no_issues = (
         parsed["is_no_issues"]
-        or (
-            diagnosis.diagnosis
-            and "no issues" in diagnosis.diagnosis.lower()
-        )
+        or (diagnosis.diagnosis and "no issues" in diagnosis.diagnosis.lower())
         or (
             not parsed["equipment"]
             and not parsed["contextual_factors"]
@@ -324,10 +325,12 @@ def format_for_chat(
 
     # --- History context ---
     if history and history.get("count", 0) > 0:
-        lines.extend([
-            "### Complaint History",
-            f"{history['count']} in last 7 days",
-        ])
+        lines.extend(
+            [
+                "### Complaint History",
+                f"{history['count']} in last 7 days",
+            ]
+        )
         if history.get("escalation_recommended"):
             lines.append("⚠️ **Escalation recommended** — recurring issue.")
         lines.append("")
@@ -339,10 +342,12 @@ def format_for_chat(
             lines.append(f"{i}. {suggestion}")
 
         if diagnosis.needs_dispatch:
-            lines.extend([
-                "",
-                "> A technician dispatch is recommended for this issue.",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "> A technician dispatch is recommended for this issue.",
+                ]
+            )
 
     return "\n".join(lines)
 
@@ -395,8 +400,13 @@ def format_for_whatsapp(
     if parsed["equipment"]:
         eq_parts = []
         for eq in parsed["equipment"]:
-            health_icon = "🟢" if eq["status"] in ("normal", "running") and eq["health"] >= 70 else \
-                          "🟡" if eq["status"] in ("warning") else "🔴"
+            health_icon = (
+                "🟢"
+                if eq["status"] in ("normal", "running") and eq["health"] >= 70
+                else "🟡"
+                if eq["status"] in ("warning")
+                else "🔴"
+            )
             eq_parts.append(f"{eq['name']} {health_icon}{eq['health']}%")
         lines.append(" | ".join(eq_parts))
     else:
@@ -420,18 +430,22 @@ def format_for_whatsapp(
 
     # History
     if history and history.get("count", 0) > 0:
-        lines.extend([
-            "",
-            f"\u26a0\ufe0f {history['count']} similar complaint"
-            f"{'s' if history['count'] > 1 else ''} this week at this desk.",
-        ])
+        lines.extend(
+            [
+                "",
+                f"\u26a0\ufe0f {history['count']} similar complaint"
+                f"{'s' if history['count'] > 1 else ''} this week at this desk.",
+            ]
+        )
 
     # Root cause
     if diagnosis.root_cause and diagnosis.root_cause not in ("no_issues", "unknown"):
-        lines.extend([
-            "",
-            f"*Probable cause:* {diagnosis.root_cause}",
-        ])
+        lines.extend(
+            [
+                "",
+                f"*Probable cause:* {diagnosis.root_cause}",
+            ]
+        )
 
     # Suggestions
     if diagnosis.suggestions:
@@ -441,11 +455,13 @@ def format_for_whatsapp(
             lines.append(f"{i}. {suggestion}")
 
     if diagnosis.needs_dispatch or (history and history.get("escalation_recommended")):
-        lines.extend([
-            "",
-            "Given repeat complaints, a work order may be warranted.",
-            "Reply *WO* to create one.",
-        ])
+        lines.extend(
+            [
+                "",
+                "Given repeat complaints, a work order may be warranted.",
+                "Reply *WO* to create one.",
+            ]
+        )
 
     return "\n".join(lines)
 
@@ -478,15 +494,12 @@ def format_for_telegram(
         )
     else:
         delta = zone.current_temp - zone.setpoint
-        lines.append(
-            f"Temp: {zone.current_temp}°C (setpoint {zone.setpoint}°C, delta {delta:+.1f}°C)"
-        )
+        lines.append(f"Temp: {zone.current_temp}°C (setpoint {zone.setpoint}°C, delta {delta:+.1f}°C)")
 
     # Equipment
     if parsed["equipment"]:
         for eq in parsed["equipment"]:
-            status_icon = "✅" if eq["status"] in ("normal", "running") else \
-                          "⚠️" if eq["status"] == "warning" else "🚨"
+            status_icon = "✅" if eq["status"] in ("normal", "running") else "⚠️" if eq["status"] == "warning" else "🚨"
             alerts_str = f" · {len(eq['alerts'])}alerts" if eq["alerts"] else ""
             preds_str = f" · {len(eq['predictions'])}preds" if eq["predictions"] else ""
             lines.append(f"  {status_icon} {eq['name']}: {eq['status']} ({eq['health']}%){alerts_str}{preds_str}")
@@ -528,11 +541,13 @@ def format_for_telegram(
 
     # Root cause + suggestions
     if diagnosis.root_cause and diagnosis.root_cause not in ("no_issues", "unknown"):
-        lines.extend([
-            "",
-            f"Root cause: {diagnosis.root_cause}",
-            f"Confidence: {diagnosis.confidence}",
-        ])
+        lines.extend(
+            [
+                "",
+                f"Root cause: {diagnosis.root_cause}",
+                f"Confidence: {diagnosis.confidence}",
+            ]
+        )
 
     if diagnosis.suggestions:
         lines.append("")

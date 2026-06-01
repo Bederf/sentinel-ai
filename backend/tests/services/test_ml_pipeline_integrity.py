@@ -34,6 +34,7 @@ from app.services.ml_config import (
 # Constants — ml_config.py integrity
 # ===========================================================================
 
+
 class TestMlConfigConstants:
     """Assert ml_config.py constants match the Phase 185 specification."""
 
@@ -58,16 +59,19 @@ class TestMlConfigConstants:
     def test_anomaly_alert_threshold_min_087(self):
         # Phase 183 spec: conservative at 72h
         from app.services.ml_config import ANOMALY_ALERT_THRESHOLD_MIN
+
         assert ANOMALY_ALERT_THRESHOLD_MIN == 0.87
 
     def test_anomaly_alert_threshold_max_075(self):
         from app.services.ml_config import ANOMALY_ALERT_THRESHOLD_MAX
+
         assert ANOMALY_ALERT_THRESHOLD_MAX == 0.75
 
 
 # ===========================================================================
 # Trust weight function
 # ===========================================================================
+
 
 class TestGetMlTrustWeight:
     """get_ml_trust_weight() scaling: 0 @ 0h → 0.30 @ 72h → 0.80 @ 2000h."""
@@ -111,6 +115,7 @@ class TestGetMlTrustWeight:
 # Anomaly alert threshold function
 # ===========================================================================
 
+
 class TestGetAnomalyAlertThreshold:
     """get_anomaly_alert_threshold() scales from 0.87 @ 72h → 0.75 @ 2000h."""
 
@@ -135,6 +140,7 @@ class TestGetAnomalyAlertThreshold:
 # Shadow exit criteria — check_shadow_exit_criteria()
 # ===========================================================================
 
+
 class TestCheckShadowExitCriteria:
     """check_shadow_exit_criteria() evaluates 5 quantitative gates."""
 
@@ -148,7 +154,9 @@ class TestCheckShadowExitCriteria:
                 data=[{"ml_hours_ingested": 25.0}]
             )
 
-            with patch("app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository") as mock_repo_cls:
+            with patch(
+                "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository"
+            ) as mock_repo_cls:
                 mock_repo = MagicMock()
                 mock_repo_cls.return_value = mock_repo
                 mock_repo.get_decisions_since = MagicMock(return_value=[])
@@ -171,7 +179,9 @@ class TestCheckShadowExitCriteria:
                 data=[{"ml_hours_ingested": 73.0}]
             )
 
-            with patch("app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository") as mock_repo_cls:
+            with patch(
+                "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository"
+            ) as mock_repo_cls:
                 mock_repo = MagicMock()
                 mock_repo_cls.return_value = mock_repo
                 mock_repo.get_decisions_since = MagicMock(return_value=[])
@@ -193,7 +203,9 @@ class TestCheckShadowExitCriteria:
                 data=[{"ml_hours_ingested": 100.0}]
             )
 
-            with patch("app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository") as mock_repo_cls:
+            with patch(
+                "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository"
+            ) as mock_repo_cls:
                 mock_repo = MagicMock()
                 mock_repo_cls.return_value = mock_repo
                 blocked_decision = {
@@ -222,12 +234,14 @@ class TestCheckShadowExitCriteria:
                 data=[{"ml_hours_ingested": 100.0}]
             )
 
-            with patch("app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository") as mock_repo_cls:
+            with patch(
+                "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository"
+            ) as mock_repo_cls:
                 mock_repo = MagicMock()
                 mock_repo_cls.return_value = mock_repo
-                mock_repo.get_decisions_since = MagicMock(return_value=[
-                    {"site_id": "S002", "write_status": "success", "tier": "tier1"}
-                ])
+                mock_repo.get_decisions_since = MagicMock(
+                    return_value=[{"site_id": "S002", "write_status": "success", "tier": "tier1"}]
+                )
 
                 result = await check_shadow_exit_criteria("S002")
 
@@ -247,12 +261,14 @@ class TestCheckShadowExitCriteria:
                 data=[{"ml_hours_ingested": 100.0}]
             )
 
-            with patch("app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository") as mock_repo_cls:
+            with patch(
+                "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository"
+            ) as mock_repo_cls:
                 mock_repo = MagicMock()
                 mock_repo_cls.return_value = mock_repo
-                mock_repo.get_decisions_since = MagicMock(return_value=[
-                    {"site_id": "S002", "write_status": "failed", "tier": "tier3", "safety_result": "ok"}
-                ])
+                mock_repo.get_decisions_since = MagicMock(
+                    return_value=[{"site_id": "S002", "write_status": "failed", "tier": "tier3", "safety_result": "ok"}]
+                )
 
                 result = await check_shadow_exit_criteria("S002")
 
@@ -272,14 +288,18 @@ class TestCheckShadowExitCriteria:
                 data=[{"ml_hours_ingested": 100.0}]
             )
 
-            with patch("app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository") as mock_repo_cls:
+            with patch(
+                "app.database.repositories.parasite_decision_repository.ParasiteDecisionRepository"
+            ) as mock_repo_cls:
                 mock_repo = MagicMock()
                 mock_repo_cls.return_value = mock_repo
-                mock_repo.get_decisions_since = MagicMock(return_value=[
-                    {"site_id": "S002", "write_status": "success", "tier": "tier1"},
-                    {"site_id": "S002", "write_status": "success", "tier": "tier2"},
-                    {"site_id": "S002", "write_status": "blocked", "tier": "tier1"},
-                ])
+                mock_repo.get_decisions_since = MagicMock(
+                    return_value=[
+                        {"site_id": "S002", "write_status": "success", "tier": "tier1"},
+                        {"site_id": "S002", "write_status": "success", "tier": "tier2"},
+                        {"site_id": "S002", "write_status": "blocked", "tier": "tier1"},
+                    ]
+                )
 
                 result = await check_shadow_exit_criteria("S002")
 
@@ -292,39 +312,48 @@ class TestCheckShadowExitCriteria:
 # Phase ordering — onboarding_phase.py
 # ===========================================================================
 
+
 class TestPhaseAllowsFeatureGates:
     """phase_allows() enforces correct phase → feature mapping."""
 
     def test_shadow_blocks_recommendations_ui(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("shadow", "recommendations_ui") is False
 
     def test_advisory_allows_recommendations_ui(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("advisory", "recommendations_ui") is True
 
     def test_advisory_blocks_approve_reject(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("advisory", "approve_reject") is False
 
     def test_supervised_allows_approve_reject(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("supervised", "approve_reject") is True
 
     def test_supervised_blocks_auto_apply(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("supervised", "auto_apply") is False
 
     def test_auto_allows_auto_apply(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("auto", "auto_apply") is True
 
     def test_unknown_feature_denied(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows("auto", "nonexistent_feature") is False
 
     def test_none_phase_treated_as_shadow(self):
         from app.models.onboarding_phase import phase_allows
+
         assert phase_allows(None, "recommendations_ui") is False
         assert phase_allows(None, "auto_apply") is False
 
@@ -333,6 +362,7 @@ class TestPhaseAllowsFeatureGates:
 # Integration: trust weight + phase gates end-to-end
 # ===========================================================================
 
+
 class TestTrustWeightScalesWithHours:
     """Comprehensive table of trust weight values at key hour milestones.
 
@@ -340,18 +370,21 @@ class TestTrustWeightScalesWithHours:
     ML context assembly) relies on.
     """
 
-    @pytest.mark.parametrize("hours,min_weight,max_weight", [
-        (0, 0.0, 0.0),
-        (24, 0.0, 0.0),
-        (71.9, 0.0, 0.0),
-        (72, 0.30, 0.33),        # actual: 0.318
-        (100, 0.28, 0.37),
-        (500, 0.40, 0.45),       # actual: 0.425
-        (1000, 0.40, 0.55),
-        (1500, 0.55, 0.70),
-        (2000, 0.79, 0.81),
-        (5000, 0.80, 0.80),
-    ])
+    @pytest.mark.parametrize(
+        "hours,min_weight,max_weight",
+        [
+            (0, 0.0, 0.0),
+            (24, 0.0, 0.0),
+            (71.9, 0.0, 0.0),
+            (72, 0.30, 0.33),  # actual: 0.318
+            (100, 0.28, 0.37),
+            (500, 0.40, 0.45),  # actual: 0.425
+            (1000, 0.40, 0.55),
+            (1500, 0.55, 0.70),
+            (2000, 0.79, 0.81),
+            (5000, 0.80, 0.80),
+        ],
+    )
     def test_trust_weight_table(self, hours, min_weight, max_weight):
         result = get_ml_trust_weight(hours)
         assert min_weight <= result <= max_weight, f"hours={hours}: expected [{min_weight},{max_weight}], got {result}"
@@ -361,17 +394,21 @@ class TestTrustWeightScalesWithHours:
 # Alert threshold table — key hour milestones
 # ===========================================================================
 
+
 class TestAnomalyAlertThresholdTable:
     """Alert threshold contract at key hour milestones."""
 
-    @pytest.mark.parametrize("hours,min_thresh,max_thresh", [
-        (72, 0.86, 0.87),      # conservative; actual: 0.8657
-        (200, 0.83, 0.87),
-        (500, 0.82, 0.86),    # actual: 0.84
-        (1000, 0.77, 0.81),
-        (2000, 0.74, 0.76),   # actual: 0.75
-        (5000, 0.75, 0.75),
-    ])
+    @pytest.mark.parametrize(
+        "hours,min_thresh,max_thresh",
+        [
+            (72, 0.86, 0.87),  # conservative; actual: 0.8657
+            (200, 0.83, 0.87),
+            (500, 0.82, 0.86),  # actual: 0.84
+            (1000, 0.77, 0.81),
+            (2000, 0.74, 0.76),  # actual: 0.75
+            (5000, 0.75, 0.75),
+        ],
+    )
     def test_alert_threshold_table(self, hours, min_thresh, max_thresh):
         result = get_anomaly_alert_threshold(hours)
         assert min_thresh <= result <= max_thresh, f"hours={hours}: expected [{min_thresh},{max_thresh}], got {result}"

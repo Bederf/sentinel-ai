@@ -104,7 +104,9 @@ class BearingAnalyzer:
         bearing_band = eq_range["bearing_band"]
 
         # Filter peaks within bearing frequency band
-        bearing_peaks = [(f, a) for f, a in zip(peak_freqs, peak_amps, strict=False) if bearing_band[0] <= f <= bearing_band[1]]
+        bearing_peaks = [
+            (f, a) for f, a in zip(peak_freqs, peak_amps, strict=False) if bearing_band[0] <= f <= bearing_band[1]
+        ]
 
         result["analysis_details"]["total_peaks"] = len(peak_freqs)
         result["analysis_details"]["peaks_in_bearing_band"] = len(bearing_peaks)

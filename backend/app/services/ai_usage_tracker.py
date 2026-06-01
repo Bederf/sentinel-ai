@@ -19,11 +19,12 @@ Persists to JSON with daily rollup. No external dependencies.
 import asyncio
 import json
 import logging
-from datetime import date, datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from threading import Lock
 from typing import Optional
+from zoneinfo import ZoneInfo
+
 from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
@@ -138,7 +139,7 @@ class AiUsageTracker:
         try:
             result = self._supabase.table("ai_usage_daily").select("*").eq("date", today).execute()
             for row in result.data:
-                key = f"{row['provider']}/{row['model']}|{row.get('site_id','unknown')}"
+                key = f"{row['provider']}/{row['model']}|{row.get('site_id', 'unknown')}"
                 self._today_cache[key] = {
                     "provider": row["provider"],
                     "model": row["model"],
@@ -249,6 +250,7 @@ class AiUsageTracker:
         pct = (current / budget * 100) if budget > 0 else 0
         try:
             from concurrent.futures import ThreadPoolExecutor
+
             from app.services.notification_providers.telegram_provider import TelegramProvider
 
             tp = TelegramProvider()
@@ -266,9 +268,7 @@ class AiUsageTracker:
         except Exception as e:
             logger.warning("Failed to send token budget alert: %s", e)
 
-    async def _check_and_enforce_budget(
-        self, site_id: str, tokens: int, task_class: str
-    ) -> None:
+    async def _check_and_enforce_budget(self, site_id: str, tokens: int, task_class: str) -> None:
         """Check budget and raise TokenBudgetExceeded or send alert as needed."""
         from app.config.settings import settings
 
@@ -299,25 +299,28 @@ class AiUsageTracker:
 
     def _flush_daily_to_db(self, key: str, entry: dict):
         """Write a daily usage row to Supabase."""
-        parts = key.split('|')
-        provider = parts[0].split('/')[0] if '/' in parts[0] else parts[0]
-        model = parts[0].split('/')[1] if '/' in parts[0] else parts[0]
-        site_id = parts[1] if len(parts) > 1 else 'unknown'
+        parts = key.split("|")
+        provider = parts[0].split("/")[0] if "/" in parts[0] else parts[0]
+        model = parts[0].split("/")[1] if "/" in parts[0] else parts[0]
+        site_id = parts[1] if len(parts) > 1 else "unknown"
         today = date.today().isoformat()
         try:
-            self._supabase.table("ai_usage_daily").upsert({
-                "date": today,
-                "provider": provider,
-                "model": model,
-                "site_id": site_id,
-                "calls": entry.get("calls", 0),
-                "input_tokens": entry.get("input_tokens", 0),
-                "output_tokens": entry.get("output_tokens", 0),
-                "cache_read_tokens": entry.get("cache_read_tokens", 0),
-                "cache_creation_tokens": entry.get("cache_creation_tokens", 0),
-                "cost_usd": entry.get("cost_usd", 0),
-                "sources": entry.get("sources", {}),
-            }, on_conflict="date,provider,model,site_id").execute()
+            self._supabase.table("ai_usage_daily").upsert(
+                {
+                    "date": today,
+                    "provider": provider,
+                    "model": model,
+                    "site_id": site_id,
+                    "calls": entry.get("calls", 0),
+                    "input_tokens": entry.get("input_tokens", 0),
+                    "output_tokens": entry.get("output_tokens", 0),
+                    "cache_read_tokens": entry.get("cache_read_tokens", 0),
+                    "cache_creation_tokens": entry.get("cache_creation_tokens", 0),
+                    "cost_usd": entry.get("cost_usd", 0),
+                    "sources": entry.get("sources", {}),
+                },
+                on_conflict="date,provider,model,site_id",
+            ).execute()
         except Exception as exc:
             logger.warning("Failed to flush usage to DB: %s", exc)
 
@@ -549,19 +552,23 @@ class AiUsageTracker:
 
         with self._write_lock:
             try:
-                self._supabase.table("ai_usage_escalations").insert({
-                    "timestamp": event["timestamp"],
-                    "provider": event.get("provider", ""),
-                    "escalation_type": "escalation_triggered",
-                    "site_id": event.get("mode", ""),
-                    "details": json.dumps({
-                        "from_class": event.get("from_class"),
-                        "to_class": event.get("to_class"),
-                        "reason": event.get("reason"),
-                        "resolved_model": event.get("resolved_model"),
-                        "session_id": event.get("session_id"),
-                    }),
-                }).execute()
+                self._supabase.table("ai_usage_escalations").insert(
+                    {
+                        "timestamp": event["timestamp"],
+                        "provider": event.get("provider", ""),
+                        "escalation_type": "escalation_triggered",
+                        "site_id": event.get("mode", ""),
+                        "details": json.dumps(
+                            {
+                                "from_class": event.get("from_class"),
+                                "to_class": event.get("to_class"),
+                                "reason": event.get("reason"),
+                                "resolved_model": event.get("resolved_model"),
+                                "session_id": event.get("session_id"),
+                            }
+                        ),
+                    }
+                ).execute()
             except Exception as exc:
                 logger.warning("Failed to write escalation to DB: %s", exc)
 
@@ -619,9 +626,12 @@ class AiUsageTracker:
         """Calculate cache efficiency metrics from Supabase (primary store)."""
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         try:
-            result = self._supabase.table("ai_usage_daily").select(
-                "input_tokens,cache_read_tokens,output_tokens"
-            ).gte("date", cutoff).execute()
+            result = (
+                self._supabase.table("ai_usage_daily")
+                .select("input_tokens,cache_read_tokens,output_tokens")
+                .gte("date", cutoff)
+                .execute()
+            )
             total_input = 0
             total_cache_read = 0
             total_output = 0
@@ -673,9 +683,12 @@ class AiUsageTracker:
         """Group usage by feature from Supabase (primary store)."""
         cutoff = (date.today() - timedelta(days=days)).isoformat()
         try:
-            result = self._supabase.table("ai_usage_daily").select(
-                "sources,calls,input_tokens,output_tokens,cost_usd"
-            ).gte("date", cutoff).execute()
+            result = (
+                self._supabase.table("ai_usage_daily")
+                .select("sources,calls,input_tokens,output_tokens,cost_usd")
+                .gte("date", cutoff)
+                .execute()
+            )
             by_feature: dict = {}
             for row in result.data:
                 sources = row.get("sources", {}) or {}
@@ -719,7 +732,11 @@ class AiUsageTracker:
                     if str(key).startswith("_"):
                         continue
                     src_map = entry.get("sources", {}) or {}
-                    feature = entry.get("feature") or entry.get("source") or (list(src_map.keys())[0] if src_map else "unknown")
+                    feature = (
+                        entry.get("feature")
+                        or entry.get("source")
+                        or (list(src_map.keys())[0] if src_map else "unknown")
+                    )
                     if feature not in by_feature:
                         by_feature[feature] = {"calls": 0, "tokens": 0, "cost_usd": 0.0}
                     by_feature[feature]["calls"] += entry.get("calls", 0)
@@ -973,7 +990,6 @@ class AiUsageTracker:
         # Token budget section (Phase 185 Wave 2)
         import asyncio
 
-        from app.config.settings import settings
 
         budget = settings.daily_token_budget_per_site
         budget_lines = ["", "--- Token Budget ---"]
@@ -1010,27 +1026,33 @@ class AiUsageTracker:
         # Cache efficiency (30-day)
         cache_stats = monthly.get("cache_stats")
         if cache_stats and cache_stats.get("total_input_tokens", 0) > 0:
-            lines.extend([
-                "",
-                "--- Cache Efficiency (30d) ---",
-                f"  Input Tokens:     {cache_stats['total_input_tokens']:,}",
-                f"  Cache Read:      {cache_stats['cache_read_tokens']:,}",
-                f"  Hit Rate:        {cache_stats['cache_hit_pct']:.1f}%",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "--- Cache Efficiency (30d) ---",
+                    f"  Input Tokens:     {cache_stats['total_input_tokens']:,}",
+                    f"  Cache Read:      {cache_stats['cache_read_tokens']:,}",
+                    f"  Hit Rate:        {cache_stats['cache_hit_pct']:.1f}%",
+                ]
+            )
         else:
-            lines.extend([
-                "",
-                "--- Cache Efficiency (30d) ---",
-                "  (no cache data available)",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "--- Cache Efficiency (30d) ---",
+                    "  (no cache data available)",
+                ]
+            )
 
         # By feature (30-day)
         by_feature = monthly.get("by_feature")
         if by_feature:
-            lines.extend([
-                "",
-                "--- By Feature (30d) ---",
-            ])
+            lines.extend(
+                [
+                    "",
+                    "--- By Feature (30d) ---",
+                ]
+            )
             for feature, fdata in sorted(by_feature.items(), key=lambda x: -x[1]["tokens"]):
                 lines.append(
                     f"  {feature}: {fdata['calls']} calls, "

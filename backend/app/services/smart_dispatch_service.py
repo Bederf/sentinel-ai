@@ -108,6 +108,7 @@ class SmartDispatchService:
         """Load technician data from Supabase (source of truth)."""
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             if client:
                 result = client.table("technicians").select("*").eq("active", True).execute()

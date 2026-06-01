@@ -47,6 +47,33 @@
         "target_setpoint_changes": 5,
         "max_runtime_hours_per_equipment": 16
       }
+    },
+    "residential_solar": {
+      "name": "Residential Solar",
+      "description": "South African home with solar, battery, and loadshedding. Optimise for energy independence, battery longevity, and loadshedding resilience.",
+      "weights": {
+        "cost": 0.35,
+        "energy": 0.30,
+        "runtime": 0.20,
+        "comfort": 0.10,
+        "maintenance": 0.05
+      },
+      "thresholds": {
+        "battery_soc_critical": 10,
+        "battery_soc_pre_shed": 30,
+        "battery_soc_full": 90,
+        "battery_soc_opportunity": 80,
+        "pv_surplus_opportunity_w": 1500,
+        "pv_surplus_clear_w": 1000,
+        "geyser_solar_threshold_w": 1500,
+        "ev_battery_min_soc": 40,
+        "grid_voltage_min": 210,
+        "grid_voltage_max": 250
+      },
+      "site_type": "residential",
+      "delivery_channel": "telegram",
+      "auto_execute": false,
+      "dedup_window_hours": 4
     }
   }
 }

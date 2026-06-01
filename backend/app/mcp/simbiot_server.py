@@ -187,8 +187,14 @@ async def get_sites_tool(
         # Apply status filter
         if (
             (status_filter == "critical" and health_metrics["critical_alarms"] == 0)
-            or (status_filter == "warning" and health_metrics["warnings"] == 0 and health_metrics["critical_alarms"] == 0)
-            or (status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0))
+            or (
+                status_filter == "warning"
+                and health_metrics["warnings"] == 0
+                and health_metrics["critical_alarms"] == 0
+            )
+            or (
+                status_filter == "healthy" and (health_metrics["critical_alarms"] > 0 or health_metrics["warnings"] > 0)
+            )
         ):
             continue
 
@@ -713,7 +719,11 @@ async def get_alarms_tool(
 
         # Apply state filter
         alert_status = alert.get("status", "active")
-        if (state == "active" and alert_status != "active") or (state == "acknowledged" and not alert.get("acknowledged", False)) or (state == "cleared" and alert_status != "cleared"):
+        if (
+            (state == "active" and alert_status != "active")
+            or (state == "acknowledged" and not alert.get("acknowledged", False))
+            or (state == "cleared" and alert_status != "cleared")
+        ):
             continue
 
         # Apply time filters
@@ -2673,24 +2683,28 @@ async def add_site_devices_tool(
     # 1. Try to write equipment to Supabase
     try:
         from app.config.settings import settings
+
         if settings.supabase_url and settings.supabase_service_role_key:
             from app.database.repositories import EquipmentRepository, HVACZoneRepository
+
             eq_repo = EquipmentRepository()
             zone_repo = HVACZoneRepository()
             site_uuid = zone_repo.get_site_uuid(site_id)
             if site_uuid:
                 supabase_equipment = []
                 for dev in new_devices:
-                    supabase_equipment.append({
-                        "code": dev["device_id"],
-                        "site_id": site_uuid,
-                        "name": dev.get("name", dev["device_id"]),
-                        "type": dev.get("device_type", "").upper(),
-                        "status": dev.get("status", "online"),
-                        "location": dev.get("location", site_id),
-                        "device_info": dev.get("metadata", {}),
-                        "operating_data": dev.get("points", {}),
-                    })
+                    supabase_equipment.append(
+                        {
+                            "code": dev["device_id"],
+                            "site_id": site_uuid,
+                            "name": dev.get("name", dev["device_id"]),
+                            "type": dev.get("device_type", "").upper(),
+                            "status": dev.get("status", "online"),
+                            "location": dev.get("location", site_id),
+                            "device_info": dev.get("metadata", {}),
+                            "operating_data": dev.get("points", {}),
+                        }
+                    )
                 eq_repo.upsert_many(supabase_equipment)
                 supabase_written = True
                 logger.info(f"Wrote {len(supabase_equipment)} equipment to Supabase for {site_id}")
@@ -2701,6 +2715,7 @@ async def add_site_devices_tool(
                     model_val = metadata.get("model") if isinstance(metadata, dict) else None
                     if mfr and model_val:
                         import asyncio
+
                         asyncio.ensure_future(
                             _populate_parts_background(
                                 equipment_code=dev["device_id"],

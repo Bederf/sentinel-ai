@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.database.repositories.spare_parts_repository import SparePartsRepository
 

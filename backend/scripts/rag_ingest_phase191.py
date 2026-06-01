@@ -12,9 +12,8 @@ import sys
 import uuid
 from pathlib import Path
 
-from supabase import create_client
-
 from app.services.embedding_service import get_embedding_service
+from supabase import create_client
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)

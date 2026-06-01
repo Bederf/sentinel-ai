@@ -222,12 +222,15 @@ class TestHybridQueryService:
             "status": "running",
         }
 
-        with patch(
-            "app.services.hybrid_query_service.HybridQueryService._gather_brick_context",
-            new_callable=AsyncMock,
-        ), patch(
-            "app.database.repositories.equipment_repository.get_equipment_repository",
-            return_value=mock_repo,
+        with (
+            patch(
+                "app.services.hybrid_query_service.HybridQueryService._gather_brick_context",
+                new_callable=AsyncMock,
+            ),
+            patch(
+                "app.database.repositories.equipment_repository.get_equipment_repository",
+                return_value=mock_repo,
+            ),
         ):
             ctx = await svc.query(
                 equipment_id="S002-CHILLER-B1-001",
@@ -256,10 +259,13 @@ class TestHybridQueryService:
             ]
         }
 
-        with patch(
-            "app.services.concept_document_search.get_concept_document_search_service",
-            return_value=mock_search_svc,
-        ), patch.object(svc, "_record_retrieval_telemetry") as mock_record:
+        with (
+            patch(
+                "app.services.concept_document_search.get_concept_document_search_service",
+                return_value=mock_search_svc,
+            ),
+            patch.object(svc, "_record_retrieval_telemetry") as mock_record,
+        ):
             await svc._gather_document_context(
                 ctx=ctx,
                 equipment_id="S002-GEN-B1-001",

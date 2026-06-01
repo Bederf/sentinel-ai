@@ -109,11 +109,15 @@ class GateEvaluationService:
     ) -> list[dict[str, Any]]:
         """Fetch all enabled gates for a transition from Supabase."""
         try:
-            result = self.supabase.table("phase_promotion_gates").select(
-                "gate_name, gate_type, threshold_value, operator, allowed_values, description"
-            ).eq("site_id", site_id).eq("from_phase", from_phase).eq(
-                "to_phase", to_phase
-            ).eq("enabled", True).execute()
+            result = (
+                self.supabase.table("phase_promotion_gates")
+                .select("gate_name, gate_type, threshold_value, operator, allowed_values, description")
+                .eq("site_id", site_id)
+                .eq("from_phase", from_phase)
+                .eq("to_phase", to_phase)
+                .eq("enabled", True)
+                .execute()
+            )
             return result.data or []
         except Exception as e:
             logger.error("Failed to fetch promotion gates for %s %s->%s: %s", site_id, from_phase, to_phase, e)
@@ -253,9 +257,13 @@ class GateEvaluationService:
         metrics: dict[str, Any] = {}
 
         # Fetch site row for ml_hours_ingested + onboarding_phase (for time_in_advisory_days)
-        site_row = client.table("sites").select(
-            "id, ml_hours_ingested, onboarding_phase, created_at"
-        ).eq("code", site_id).limit(1).execute()
+        site_row = (
+            client.table("sites")
+            .select("id, ml_hours_ingested, onboarding_phase, created_at")
+            .eq("code", site_id)
+            .limit(1)
+            .execute()
+        )
 
         if site_row.data:
             row = site_row.data[0]
@@ -305,6 +313,7 @@ class GateEvaluationService:
             return 0
         try:
             from datetime import datetime
+
             created = datetime.fromisoformat(created_at.replace("Z", "+00:00"))
             now = datetime.now(tz=UTC)
             days = (now - created).days
@@ -320,8 +329,8 @@ class GateEvaluationService:
         in-process singleton has never polled (poll_count=0 always).
         """
         try:
-            from supabase import create_client
             from app.config.settings import settings
+            from supabase import create_client
 
             client = create_client(settings.supabase_url, settings.supabase_service_role_key)
             source_name = f"Shadow Bridge ({site_id})"
@@ -356,9 +365,13 @@ class GateEvaluationService:
     async def _get_bridge_uptime_pct(self, site_id: str) -> float:
         """Get bridge uptime % from adapter_health_current."""
         try:
-            result = self.supabase.table("adapter_health_current").select(
-                "uptime_24h_percent"
-            ).eq("site_id", site_id).eq("adapter_name", "bridge").execute()
+            result = (
+                self.supabase.table("adapter_health_current")
+                .select("uptime_24h_percent")
+                .eq("site_id", site_id)
+                .eq("adapter_name", "bridge")
+                .execute()
+            )
             if result.data:
                 return float(result.data[0].get("uptime_24h_percent") or 0.0)
             return 0.0
@@ -375,25 +388,30 @@ class GateEvaluationService:
             cutoff = datetime.now(tz=UTC) - timedelta(minutes=30)
             # Query equipment table for rows with recent anomaly_score in operating_data
             # Use operating_data ? 'anomaly_score' JSONB existence check
-            rows = client.table("equipment").select(
-                "id", count="exact"
-            ).eq("site_id", site_uuid).not_.is_("operating_data", "null").gte(
-                "updated_at", cutoff.isoformat()
-            ).execute()
+            rows = (
+                client.table("equipment")
+                .select("id", count="exact")
+                .eq("site_id", site_uuid)
+                .not_.is_("operating_data", "null")
+                .gte("updated_at", cutoff.isoformat())
+                .execute()
+            )
             # Filter to those with actual anomaly_score in operating_data
             if hasattr(rows, "count"):
                 # Total equipment updated in window — need to count those with anomaly_score
                 pass
             total = len(rows.data or [])
             # Count equipment with non-null anomaly_score in operating_data
-            has_score = client.table("equipment").select(
-                "id"
-            ).eq("site_id", site_uuid).not_.is_("operating_data", "null").gte(
-                "updated_at", cutoff.isoformat()
-            ).execute()
+            has_score = (
+                client.table("equipment")
+                .select("id")
+                .eq("site_id", site_uuid)
+                .not_.is_("operating_data", "null")
+                .gte("updated_at", cutoff.isoformat())
+                .execute()
+            )
             count = sum(
-                1 for r in (has_score.data or [])
-                if r.get("operating_data", {}).get("anomaly_score") is not None
+                1 for r in (has_score.data or []) if r.get("operating_data", {}).get("anomaly_score") is not None
             )
             return count
         except Exception as e:
@@ -403,9 +421,7 @@ class GateEvaluationService:
     async def _get_freshness_max(self, site_id: str, client) -> float:
         """Get max data age across all sources in data_freshness."""
         try:
-            result = client.table("data_freshness").select(
-                "age_seconds"
-            ).eq("site_id", site_id).execute()
+            result = client.table("data_freshness").select("age_seconds").eq("site_id", site_id).execute()
             if result.data:
                 return max((r.get("age_seconds") or 0) / 3600.0 for r in result.data)
             return 0.0
@@ -417,9 +433,7 @@ class GateEvaluationService:
         if not site_uuid:
             return 0
         try:
-            rows = client.table("recommendations").select(
-                "id", count="exact"
-            ).eq("site_id", site_uuid).execute()
+            rows = client.table("recommendations").select("id", count="exact").eq("site_id", site_uuid).execute()
             return rows.count if hasattr(rows, "count") else len(rows.data or [])
         except Exception:
             return 0
@@ -429,9 +443,13 @@ class GateEvaluationService:
         if not site_uuid:
             return 0
         try:
-            rows = client.table("recommendations").select(
-                "id", count="exact"
-            ).eq("site_id", site_uuid).neq("status", "pending").execute()
+            rows = (
+                client.table("recommendations")
+                .select("id", count="exact")
+                .eq("site_id", site_uuid)
+                .neq("status", "pending")
+                .execute()
+            )
             return rows.count if hasattr(rows, "count") else len(rows.data or [])
         except Exception:
             return 0
@@ -444,11 +462,14 @@ class GateEvaluationService:
             if not site_uuid:
                 return False
             cutoff = datetime.now(tz=UTC) - timedelta(days=days)
-            rows = client.table("alerts").select(
-                "id", count="exact"
-            ).eq("site_id", site_uuid).eq("severity", "critical").gte(
-                "created_at", cutoff.isoformat()
-            ).execute()
+            rows = (
+                client.table("alerts")
+                .select("id", count="exact")
+                .eq("site_id", site_uuid)
+                .eq("severity", "critical")
+                .gte("created_at", cutoff.isoformat())
+                .execute()
+            )
             count = rows.count if hasattr(rows, "count") else len(rows.data or [])
             return count == 0
         except Exception:
@@ -458,9 +479,13 @@ class GateEvaluationService:
         """Get adapter error rate % from adapter_health_history."""
         try:
             cutoff = datetime.now(tz=UTC) - timedelta(hours=1)
-            rows = client.table("adapter_health").select(
-                "is_healthy"
-            ).eq("site_id", site_id).gte("timestamp", cutoff.isoformat()).execute()
+            rows = (
+                client.table("adapter_health")
+                .select("is_healthy")
+                .eq("site_id", site_id)
+                .gte("timestamp", cutoff.isoformat())
+                .execute()
+            )
             if not rows.data:
                 return 0.0
             healthy = sum(1 for r in rows.data if r.get("is_healthy"))
@@ -483,16 +508,24 @@ class GateEvaluationService:
             if total_equipment == 0:
                 return 0.0
             # Map coverage: equipment with non-empty network_info (BACnet point mapping)
-            mapped = client.table("equipment").select(
-                "id"
-            ).eq("site_id", site_uuid).not_.is_("network_info", "null").execute()
+            mapped = (
+                client.table("equipment")
+                .select("id")
+                .eq("site_id", site_uuid)
+                .not_.is_("network_info", "null")
+                .execute()
+            )
             # Count those where network_info is not empty dict
             mapped_data = [r for r in (mapped.data or [])]
             mapped_count = sum(1 for r in mapped_data if r.get("id"))
             # Re-query with filter for non-empty network_info
-            non_empty = client.table("equipment").select(
-                "id", "network_info"
-            ).eq("site_id", site_uuid).not_.is_("network_info", "null").execute()
+            non_empty = (
+                client.table("equipment")
+                .select("id", "network_info")
+                .eq("site_id", site_uuid)
+                .not_.is_("network_info", "null")
+                .execute()
+            )
             real_mapped = len([r for r in (non_empty.data or []) if r.get("network_info") and r["network_info"] != {}])
             return round(real_mapped / total_equipment * 100, 1) if total_equipment > 0 else 0.0
         except Exception:
@@ -502,15 +535,19 @@ class GateEvaluationService:
         """Count consecutive days where all health checks passed."""
         try:
             cutoff = datetime.now(tz=UTC) - timedelta(days=30)
-            rows = client.table("adapter_health").select(
-                "timestamp, is_healthy"
-            ).eq("site_id", site_id).gte("timestamp", cutoff.isoformat()).order(
-                "timestamp", desc=True
-            ).execute()
+            rows = (
+                client.table("adapter_health")
+                .select("timestamp, is_healthy")
+                .eq("site_id", site_id)
+                .gte("timestamp", cutoff.isoformat())
+                .order("timestamp", desc=True)
+                .execute()
+            )
             if not rows.data:
                 return 0
             # Group by date, check if each day had all healthy
             from collections import defaultdict
+
             by_date: dict[str, list[bool]] = defaultdict(list)
             for row in rows.data:
                 ts = row.get("timestamp", "")

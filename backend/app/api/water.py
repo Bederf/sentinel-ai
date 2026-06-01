@@ -35,7 +35,7 @@ router = APIRouter(
                 site_keys=("site", "site_id"),
             )
         )
-    ]
+    ],
 )
 
 

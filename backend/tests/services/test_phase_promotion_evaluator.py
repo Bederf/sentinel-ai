@@ -6,15 +6,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
+# Pre-import modules patched via string paths — these are imported inside
+# method bodies so not in the parent namespace by default
+import app.services.notification_service  # noqa: F401
 from app.services.phase_promotion_evaluator import (
     GateResult,
     PhasePromotionEvaluator,
     get_phase_promotion_evaluator,
 )
-
-# Pre-import modules patched via string paths — these are imported inside
-# method bodies so not in the parent namespace by default
-import app.services.notification_service  # noqa: F401
 
 
 @pytest.fixture
@@ -73,18 +72,19 @@ def _make_supabase(tables: dict[str, list | None] = None):
 @pytest.mark.asyncio
 async def test_promotion_shadow_to_advisory_all_gates_pass(evaluator):
     """All shadow_live gates pass → eligible and promoted."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 85.0}],
-        "equipment_analytics": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 85.0}],
+            "equipment_analytics": [],
+        }
+    )
     # anomaly_scores_writing → 1 recent anomaly
     chains["equipment_analytics"].execute.return_value.count = 1
 
     with (
         patch.object(evaluator, "_ensure_config", AsyncMock()),
         patch("supabase.create_client", return_value=client),
-        patch("app.services.simbiot_service.simbiot_service.get_site_status",
-              AsyncMock(return_value={"status": "ok"})),
+        patch("app.services.simbiot_service.simbiot_service.get_site_status", AsyncMock(return_value={"status": "ok"})),
         patch("httpx.AsyncClient") as mock_httpx,
         patch("app.services.notification_service.notification_service.send_alert_direct", AsyncMock()),
     ):
@@ -112,9 +112,11 @@ async def test_promotion_shadow_to_advisory_all_gates_pass(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_shadow_blocked_insufficient_hours(evaluator):
     """Insufficient ml_hours → not eligible, not promoted."""
-    client, _ = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 30.0}],
-    })
+    client, _ = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 30.0}],
+        }
+    )
 
     with (
         patch.object(evaluator, "_ensure_config", AsyncMock()),
@@ -135,10 +137,12 @@ async def test_promotion_shadow_blocked_insufficient_hours(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_advisory_to_supervised_all_gates_pass(evaluator):
     """All advisory gates pass → eligible and promoted."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 600.0}],
-        "audit_log": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 600.0}],
+            "audit_log": [],
+        }
+    )
 
     # Build a recommendations chain that returns different counts based on
     # which query pattern is used
@@ -178,9 +182,11 @@ async def test_promotion_advisory_to_supervised_all_gates_pass(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_advisory_blocked_no_acknowledgements(evaluator):
     """No recommendation acknowledgements → blocked."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 550.0}],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 550.0}],
+        }
+    )
 
     # Generated → 12, acknowledged → 0
     rec_chain = _make_table_chain(count=12)
@@ -208,10 +214,12 @@ async def test_promotion_advisory_blocked_no_acknowledgements(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_calls_api_not_direct_db(evaluator):
     """Promotion must call PATCH /api/sites/{site_id}/phase, not write DB directly."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
-        "equipment_analytics": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
+            "equipment_analytics": [],
+        }
+    )
     chains["equipment_analytics"].execute.return_value.count = 2
 
     api_called = False
@@ -230,8 +238,7 @@ async def test_promotion_calls_api_not_direct_db(evaluator):
     with (
         patch.object(evaluator, "_ensure_config", AsyncMock()),
         patch("supabase.create_client", return_value=client),
-        patch("app.services.simbiot_service.simbiot_service.get_site_status",
-              AsyncMock(return_value={"status": "ok"})),
+        patch("app.services.simbiot_service.simbiot_service.get_site_status", AsyncMock(return_value={"status": "ok"})),
         patch("httpx.AsyncClient") as mock_httpx,
         patch("app.services.notification_service.notification_service.send_alert_direct", AsyncMock()),
     ):
@@ -256,10 +263,12 @@ async def test_promotion_calls_api_not_direct_db(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_sends_telegram_notification(evaluator):
     """Telegram notification should be sent on successful promotion."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
-        "equipment_analytics": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
+            "equipment_analytics": [],
+        }
+    )
     chains["equipment_analytics"].execute.return_value.count = 2
 
     telegram_called = False
@@ -273,11 +282,11 @@ async def test_promotion_sends_telegram_notification(evaluator):
     with (
         patch.object(evaluator, "_ensure_config", AsyncMock()),
         patch("supabase.create_client", return_value=client),
-        patch("app.services.simbiot_service.simbiot_service.get_site_status",
-              AsyncMock(return_value={"status": "ok"})),
+        patch("app.services.simbiot_service.simbiot_service.get_site_status", AsyncMock(return_value={"status": "ok"})),
         patch("httpx.AsyncClient") as mock_httpx,
-        patch("app.services.notification_service.notification_service.send_alert_direct",
-              side_effect=_capture_telegram),
+        patch(
+            "app.services.notification_service.notification_service.send_alert_direct", side_effect=_capture_telegram
+        ),
     ):
         mock_httpx_cm = AsyncMock()
         mock_httpx.return_value = mock_httpx_cm
@@ -301,10 +310,12 @@ async def test_promotion_sends_telegram_notification(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_logs_to_phase_transition_log(evaluator):
     """API endpoint should log transition to phase_transition_log table."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
-        "equipment_analytics": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
+            "equipment_analytics": [],
+        }
+    )
     chains["equipment_analytics"].execute.return_value.count = 1
 
     api_payload = None
@@ -319,8 +330,7 @@ async def test_promotion_logs_to_phase_transition_log(evaluator):
     with (
         patch.object(evaluator, "_ensure_config", AsyncMock()),
         patch("supabase.create_client", return_value=client),
-        patch("app.services.simbiot_service.simbiot_service.get_site_status",
-              AsyncMock(return_value={"status": "ok"})),
+        patch("app.services.simbiot_service.simbiot_service.get_site_status", AsyncMock(return_value={"status": "ok"})),
         patch("httpx.AsyncClient") as mock_httpx,
         patch("app.services.notification_service.notification_service.send_alert_direct", AsyncMock()),
     ):
@@ -347,9 +357,11 @@ async def test_promotion_logs_to_phase_transition_log(evaluator):
 @pytest.mark.asyncio
 async def test_promotion_does_not_double_promote(evaluator):
     """Already-promoted site at target phase should not trigger another promotion."""
-    client, _ = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
-    })
+    client, _ = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 100.0}],
+        }
+    )
 
     with (
         patch.object(evaluator, "_ensure_config", AsyncMock()),
@@ -419,11 +431,12 @@ def test_gate_result_captures_value_and_threshold():
 @pytest.mark.asyncio
 async def test_false_positive_rate_gate_passes(evaluator):
     """false_positive_rate <= 0.10 gate computes correctly."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 2500.0,
-                    "human_approved_autonomous": True}],
-        "parasite_decisions": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 2500.0, "human_approved_autonomous": True}],
+            "parasite_decisions": [],
+        }
+    )
 
     # Build recommendations chain that branches per query:
     #   eq("status","approved")  → count 30
@@ -435,11 +448,7 @@ async def test_false_positive_rate_gate_passes(evaluator):
     non_pending = _make_table_chain(count=50)
 
     rec_chain = _make_table_chain(count=50)
-    rec_chain.eq.side_effect = lambda f, v: (
-        rejected if v == "rejected"
-        else approved if v == "approved"
-        else rec_chain
-    )
+    rec_chain.eq.side_effect = lambda f, v: rejected if v == "rejected" else approved if v == "approved" else rec_chain
     rec_chain.neq.side_effect = lambda f, v: non_pending if v == "pending" else rec_chain
     chains["recommendations"] = rec_chain
 
@@ -464,11 +473,12 @@ async def test_false_positive_rate_gate_passes(evaluator):
 @pytest.mark.asyncio
 async def test_human_approved_autonomous_gate_blocks(evaluator):
     """supervised → automatic blocked when human_approved_autonomous is False."""
-    client, chains = _make_supabase({
-        "sites": [{"id": "uuid-001", "ml_hours_ingested": 2500.0,
-                    "human_approved_autonomous": False}],
-        "parasite_decisions": [],
-    })
+    client, chains = _make_supabase(
+        {
+            "sites": [{"id": "uuid-001", "ml_hours_ingested": 2500.0, "human_approved_autonomous": False}],
+            "parasite_decisions": [],
+        }
+    )
 
     # All other gates pass (approval_accuracy, FPR, recs_approved)
     approved = _make_table_chain(count=30)
@@ -476,11 +486,7 @@ async def test_human_approved_autonomous_gate_blocks(evaluator):
     non_pending = _make_table_chain(count=50)
 
     rec_chain = _make_table_chain(count=50)
-    rec_chain.eq.side_effect = lambda f, v: (
-        rejected if v == "rejected"
-        else approved if v == "approved"
-        else rec_chain
-    )
+    rec_chain.eq.side_effect = lambda f, v: rejected if v == "rejected" else approved if v == "approved" else rec_chain
     rec_chain.neq.side_effect = lambda f, v: non_pending if v == "pending" else rec_chain
     chains["recommendations"] = rec_chain
 

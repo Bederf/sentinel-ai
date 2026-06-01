@@ -4,7 +4,6 @@ These templates are designed to produce structured output that can be parsed
 into actionable maintenance recommendations.
 """
 
-
 # Base template for prediction explanation
 PREDICTION_EXPLANATION_TEMPLATE = (
     """You are a BMS (Building Management System) expert explaining """

@@ -20,7 +20,6 @@ Provides real-time and historical data for solar installations:
   - Financial reporting: monthly savings, YTD summary, carbon offset (34-09)
 """
 
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.api.dependencies.module_access import require_active_module
@@ -51,7 +50,7 @@ router = APIRouter(
                 site_keys=("site_id", "site"),
             )
         )
-    ]
+    ],
 )
 
 

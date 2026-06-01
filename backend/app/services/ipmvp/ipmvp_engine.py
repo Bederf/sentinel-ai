@@ -17,11 +17,9 @@ Usage:
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -34,6 +32,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class EnergyRecord:
     """Single 15-minute energy reading."""
+
     timestamp: datetime
     kwh: float
     oat_celsius: float | None = None
@@ -55,6 +54,7 @@ class EnergyRecord:
 @dataclass
 class EquipmentEvent:
     """A change to equipment setpoints (lighting, HVAC, BESS, solar)."""
+
     event_id: str
     timestamp: datetime
     system_type: str  # lighting | hvac | chiller | bess | solar | power
@@ -93,6 +93,7 @@ class EquipmentEvent:
 @dataclass
 class BaselineModel:
     """OLS baseline regression model for one period (occupied or unoccupied)."""
+
     period: str  # "occupied" | "unoccupied"
     equation: str  # human-readable, e.g. "kWh = 0.45 × OAT + 120.3"
     coefficients: dict[str, float]
@@ -106,6 +107,7 @@ class BaselineModel:
 @dataclass
 class SavingsResult:
     """IPMVP savings calculation result."""
+
     recommendation_id: str | None
     reporting_start: datetime
     reporting_end: datetime
@@ -157,6 +159,7 @@ class SavingsResult:
 @dataclass
 class IPMVPReport:
     """Complete IPMVP M&V report for a reporting period."""
+
     site_id: str
     generated_at: datetime
     reporting_start: datetime
@@ -181,7 +184,8 @@ class IPMVPReport:
             "aggregate_cv_rmse_pct": round(self.aggregate_cv_rmse_pct, 1),
             "individual_results": [r.to_dict() for r in self.results],
             "notes": [
-                f"IPMVP {self.option} — Whole Facility M&V" if self.option == "C"
+                f"IPMVP {self.option} — Whole Facility M&V"
+                if self.option == "C"
                 else f"IPMVP {self.option} — Retrofit Isolation",
                 "Uncertainty assessed per IPMVP 2022 Volume III Chapter 5",
                 "Baseline model excludes load shedding event days",
@@ -253,10 +257,7 @@ class IPMVPDataFetcher:
         #     WHERE {self.energy_ts_col} BETWEEN %s AND %s
         #     ORDER BY {self.energy_ts_col}
         # """, (start, end))
-        raise NotImplementedError(
-            "IPMVPDataFetcher.fetch_energy_and_oat() — "
-            "plug in your DB query before using"
-        )
+        raise NotImplementedError("IPMVPDataFetcher.fetch_energy_and_oat() — plug in your DB query before using")
 
     async def fetch_equipment_events(
         self,
@@ -270,10 +271,7 @@ class IPMVPDataFetcher:
         - timestamp between start/end
         - optional system_type IN (...)
         """
-        raise NotImplementedError(
-            "IPMVPDataFetcher.fetch_equipment_events() — "
-            "plug in your DB query before using"
-        )
+        raise NotImplementedError("IPMVPDataFetcher.fetch_equipment_events() — plug in your DB query before using")
 
     async def fetch_tariff(self) -> dict[str, Any]:
         """Fetch tariff structure (Eskom MegaFlex or custom).
@@ -287,10 +285,7 @@ class IPMVPDataFetcher:
           "weekday_only": True,
         }
         """
-        raise NotImplementedError(
-            "IPMVPDataFetcher.fetch_tariff() — "
-            "plug in your tariff query before using"
-        )
+        raise NotImplementedError("IPMVPDataFetcher.fetch_tariff() — plug in your tariff query before using")
 
     async def fetch_load_shedding_days(
         self,
@@ -302,10 +297,7 @@ class IPMVPDataFetcher:
         Used to exclude those days from baseline training.
         Override with actual query.
         """
-        raise NotImplementedError(
-            "IPMVPDataFetcher.fetch_load_shedding_days() — "
-            "plug in your query before using"
-        )
+        raise NotImplementedError("IPMVPDataFetcher.fetch_load_shedding_days() — plug in your query before using")
 
     # ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -314,10 +306,7 @@ class IPMVPDataFetcher:
 
         Override if you have an occupancy sensor or schedule table.
         """
-        return (
-            dt.weekday() < 5
-            and self.occupied_start_hour <= dt.hour < self.occupied_end_hour
-        )
+        return dt.weekday() < 5 and self.occupied_start_hour <= dt.hour < self.occupied_end_hour
 
     def _is_load_shedding_day(self, dt: datetime, ls_days: set[datetime.date]) -> bool:
         return dt.date() in ls_days
@@ -361,20 +350,21 @@ class BaselineRegressor:
         Feature vector: [OAT, hour, day_of_week, holiday_flag]
         """
         # Filter to period
-        filtered = [r for r in records if (r.occupied and period == "occupied")
-                    or (not r.occupied and period == "unoccupied")]
+        filtered = [
+            r for r in records if (r.occupied and period == "occupied") or (not r.occupied and period == "unoccupied")
+        ]
 
         # Exclude load shedding days
         filtered = [r for r in filtered if not r.load_shedding]
 
         if len(filtered) < self.min_samples:
             logger.warning(
-                f"BaselineRegressor: only {len(filtered)} samples for {period}, "
-                f"need {self.min_samples}. Skipping."
+                f"BaselineRegressor: only {len(filtered)} samples for {period}, need {self.min_samples}. Skipping."
             )
             return None
 
         import numpy as np
+
         try:
             import statsmodels.api as sm
         except ImportError:
@@ -382,10 +372,7 @@ class BaselineRegressor:
             return None
 
         # Build feature matrix
-        X = np.array([
-            [r.oat_celsius or 20.0, r.timestamp.hour, r.timestamp.weekday(), r.holiday]
-            for r in filtered
-        ])
+        X = np.array([[r.oat_celsius or 20.0, r.timestamp.hour, r.timestamp.weekday(), r.holiday] for r in filtered])
         y = np.array([r.kwh for r in filtered])
 
         # Add constant for intercept
@@ -394,7 +381,7 @@ class BaselineRegressor:
 
         # CV(RMSE)% — IPMVP uncertainty metric
         residuals = model.resid
-        rmse = np.sqrt(np.mean(residuals ** 2))
+        rmse = np.sqrt(np.mean(residuals**2))
         cv_rmse_pct = (rmse / np.mean(y)) * 100 if np.mean(y) > 0 else 0
 
         # Coefficients: [const, oat, hour, dow, holiday]
@@ -469,10 +456,7 @@ class SavingsCalculator:
             hourly_detail: If True, return per-hour savings breakdown
         """
         # Filter to reporting period
-        period_records = [
-            r for r in records
-            if reporting_start <= r.timestamp <= reporting_end
-        ]
+        period_records = [r for r in records if reporting_start <= r.timestamp <= reporting_end]
 
         # Identify load shedding days
         ls_days = {r.timestamp.date() for r in period_records if r.load_shedding}
@@ -501,16 +485,18 @@ class SavingsCalculator:
             total_actual_kwh += actual_kwh
 
             if hourly_detail:
-                hourly_savings.append({
-                    "timestamp": record.timestamp.isoformat(),
-                    "occupied": record.occupied,
-                    "load_shedding": record.load_shedding,
-                    "oat_celsius": record.oat_celsius,
-                    "baseline_kwh": round(baseline_kwh, 3),
-                    "actual_kwh": round(actual_kwh, 3),
-                    "savings_kwh": round(savings_kwh, 3),
-                    "savings_zar": round(savings_zar, 3),
-                })
+                hourly_savings.append(
+                    {
+                        "timestamp": record.timestamp.isoformat(),
+                        "occupied": record.occupied,
+                        "load_shedding": record.load_shedding,
+                        "oat_celsius": record.oat_celsius,
+                        "baseline_kwh": round(baseline_kwh, 3),
+                        "actual_kwh": round(actual_kwh, 3),
+                        "savings_kwh": round(savings_kwh, 3),
+                        "savings_zar": round(savings_zar, 3),
+                    }
+                )
 
         # Aggregate
         savings_kwh = total_baseline_kwh - total_actual_kwh
@@ -548,9 +534,9 @@ class SavingsCalculator:
             recommendation_id=recommendation_id,
             reporting_start=reporting_start,
             reporting_end=reporting_end,
-            baseline=primary_model or BaselineRegressor().train(
-                [r for r in records if not r.load_shedding], "occupied"
-            ) or BaselineModel("occupied", "", {}, 0, 0, 999, 0, 0),
+            baseline=primary_model
+            or BaselineRegressor().train([r for r in records if not r.load_shedding], "occupied")
+            or BaselineModel("occupied", "", {}, 0, 0, 999, 0, 0),
             savings_kwh=savings_kwh,
             savings_zar=savings_zar,
             cv_rmse_pct=cv,
@@ -658,13 +644,15 @@ class RetrofitIsolator:
         savings_kwh_normal = savings_kwh - ls_savings_excluded
 
         avg_rate = (
-            sum(r.kwh * self._rate_for(r.timestamp, tariff) for r in post_records)
-            / sum(r.kwh for r in post_records) if post_records else 1.5
+            sum(r.kwh * self._rate_for(r.timestamp, tariff) for r in post_records) / sum(r.kwh for r in post_records)
+            if post_records
+            else 1.5
         )
         savings_zar = savings_kwh_normal * avg_rate
 
         # Uncertainty: CV of the two means
         import numpy as np
+
         pre_vals = np.array([r.kwh for r in pre_records])
         post_vals = np.array([r.kwh for r in post_records])
         combined_std = np.sqrt(np.var(pre_vals) / len(pre_vals) + np.var(post_vals) / len(post_vals))
@@ -687,9 +675,7 @@ class RetrofitIsolator:
             savings_kwh=savings_kwh_normal,
             savings_zar=savings_zar,
             cv_rmse_pct=round(cv_rmse_pct, 1),
-            occupancy_retained_pct=(
-                (1 - len(ls_records) / len(post_records)) * 100 if post_records else 0
-            ),
+            occupancy_retained_pct=((1 - len(ls_records) / len(post_records)) * 100 if post_records else 0),
             excluded_load_shedding_kwh=ls_savings_excluded,
             n_days_in_period=len({r.timestamp.date() for r in post_records}),
             n_load_shedding_days_excluded=len({r.timestamp.date() for r in ls_records}),
@@ -784,7 +770,8 @@ class IPMVPEngine:
         # 3. Option A — isolate specific event
         elif option == "A":
             events = await self.fetcher.fetch_equipment_events(
-                reporting_start, reporting_end,
+                reporting_start,
+                reporting_end,
             )
             if not events:
                 return IPMVPReport(
@@ -812,7 +799,9 @@ class IPMVPEngine:
         overall_zar = sum(r.savings_zar for r in results)
         n_total = sum(r.n_days_in_period for r in results)
         n_samples = sum(r.baseline.n_samples for r in results if r.baseline)
-        agg_cv = sum(r.cv_rmse_pct * r.baseline.n_samples for r in results if r.baseline) / n_samples if n_samples else 999
+        agg_cv = (
+            sum(r.cv_rmse_pct * r.baseline.n_samples for r in results if r.baseline) / n_samples if n_samples else 999
+        )
 
         return IPMVPReport(
             site_id=self.site_id,
@@ -826,8 +815,8 @@ class IPMVPEngine:
             aggregate_cv_rmse_pct=round(agg_cv, 2),
             methodology=(
                 "IPMVP 2022 Edition Volume III Chapter 5 — Option C Whole Facility"
-                if option == "C" else
-                "IPMVP 2022 Edition Volume III Chapter 5 — Option A Retrofit Isolation"
+                if option == "C"
+                else "IPMVP 2022 Edition Volume III Chapter 5 — Option A Retrofit Isolation"
             ),
         )
 

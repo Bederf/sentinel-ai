@@ -3,7 +3,6 @@
 Runs against real Anthropic Haiku API to validate extraction quality.
 """
 
-import json
 import pytest
 
 from app.models.preference import PreferenceType

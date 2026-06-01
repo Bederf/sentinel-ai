@@ -8,6 +8,7 @@ from app.adapters.residential.victron_vrm import VictronVRMAdapter
 
 # ── SUPPORTED_PLATFORMS content ───────────────────────────────────────────────
 
+
 def test_both_platforms_present():
     assert "solarman" in SUPPORTED_PLATFORMS
     assert "victron" in SUPPORTED_PLATFORMS
@@ -40,6 +41,7 @@ def test_no_adapter_class_exposed_in_name_field():
 
 
 # ── build_adapter ─────────────────────────────────────────────────────────────
+
 
 def test_build_adapter_solarman_returns_correct_type():
     adapter = build_adapter(

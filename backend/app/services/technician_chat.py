@@ -673,6 +673,7 @@ class DiagnosisFlowEngine:
 
         # --- MAINTENANCE GUIDANCE ENRICHMENT ---
         from app.services.maintenance_recommender import DEFAULT_MAINTENANCE_ACTIONS
+
         mfr_risk = "medium"
         mfr_actions = DEFAULT_MAINTENANCE_ACTIONS.get(equip_type) or DEFAULT_MAINTENANCE_ACTIONS.get("default", {})
         guidance = mfr_actions.get(mfr_risk, [])
@@ -707,6 +708,7 @@ class DiagnosisFlowEngine:
             return []
         try:
             from app.database.repositories.spare_parts_repository import SparePartsRepository
+
             repo = SparePartsRepository()
             return repo.get_parts_for_type(equipment_type)
         except Exception as e:

@@ -279,7 +279,6 @@ async def extract_from_pdf(
         Building configuration with floors, equipment, zones
     """
     import base64
-    import io
 
     try:
         if not file.filename.lower().endswith(".pdf"):

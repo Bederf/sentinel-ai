@@ -6,10 +6,10 @@ import pytest
 
 from app.services.simbiot import BmsConnectionConfig, BmsWriteRequest
 from app.services.simbiot.obix_bms_adapter import (
-    ObixBmsAdapter,
-    _normalize_unit,
     UNIT_CONVERSIONS,
     UNIT_OFFSET_CORRECTIONS,
+    ObixBmsAdapter,
+    _normalize_unit,
 )
 
 

@@ -14,11 +14,11 @@ Manager control additions:
 """
 
 import base64
-from pathlib import Path
 import hmac
 import logging
 import os
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -821,6 +821,7 @@ async def process_pending_sentry_notifications(
 # Building Handbook (GET + POST)
 # ============================================================================
 
+
 class BuildingHandbookPost(BaseModel):
     site_id: str
     content: str
@@ -847,7 +848,13 @@ async def get_building_handbook(
     supabase = get_supabase_client()
 
     # Try DB first
-    result = supabase.table("site_handbooks").select("content, uploaded_by, version, updated_at").eq("site_id", site_id).limit(1).execute()
+    result = (
+        supabase.table("site_handbooks")
+        .select("content, uploaded_by, version, updated_at")
+        .eq("site_id", site_id)
+        .limit(1)
+        .execute()
+    )
     if result.data:
         return {
             "content": result.data[0]["content"],
@@ -858,7 +865,9 @@ async def get_building_handbook(
         }
 
     # Fallback: check filesystem
-    handbook_path = Path(__file__).parent.parent.parent.parent / "sentry-agents" / "staff-workspace" / "BUILDING_HANDBOOK.md"
+    handbook_path = (
+        Path(__file__).parent.parent.parent.parent / "sentry-agents" / "staff-workspace" / "BUILDING_HANDBOOK.md"
+    )
     if handbook_path.exists():
         return {
             "content": handbook_path.read_text(),
@@ -883,8 +892,9 @@ async def save_building_handbook(
     """
     _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="building-handbook")
 
-    from app.database.supabase_client import get_supabase_client
     from datetime import UTC
+
+    from app.database.supabase_client import get_supabase_client
 
     supabase = get_supabase_client()
     now = datetime.now(UTC).isoformat()
@@ -1478,9 +1488,12 @@ async def sentry_call_log(
                     # Last resort: any active technician with a Telegram ID
                     if not tech:
                         try:
-                            tech_result = sb.table("technicians").select(
-                                "id, name, email, phone, telegram_id"
-                            ).eq("active", True).execute()
+                            tech_result = (
+                                sb.table("technicians")
+                                .select("id, name, email, phone, telegram_id")
+                                .eq("active", True)
+                                .execute()
+                            )
                             # Filter to ones with telegram_id
                             with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
                             if with_telegram:
@@ -1551,9 +1564,7 @@ async def sentry_call_log(
         logger.info(f"Call-log invoking notify_technician with data={wo_notify_data}")
         try:
             notify_response = await work_order_notifier.notify_technician(wo_notify_data)
-            is_success = (
-                notify_response.get("success") if isinstance(notify_response, dict) else bool(notify_response)
-            )
+            is_success = notify_response.get("success") if isinstance(notify_response, dict) else bool(notify_response)
             notify_sent = is_success and bool(notify_response)
         except Exception as e:
             logger.warning(f"Notification failed for call-log WO: {e}")
@@ -1709,6 +1720,7 @@ async def save_call_log_location_memory(
 
 class WoStatusResponse(BaseModel):
     """Work order status response for staff WO lookup."""
+
     success: bool
     found: bool
     code: str = ""
@@ -1759,6 +1771,7 @@ async def sentry_wo_status(
         if equipment_id and len(str(equipment_id)) > 5:
             try:
                 from app.database.supabase_client import get_supabase_client
+
                 sb = get_supabase_client()
                 eq_result = sb.table("equipment").select("notes").eq("id", equipment_id).limit(1).execute()
                 if eq_result.data and eq_result.data[0].get("notes"):
@@ -1795,6 +1808,7 @@ async def sentry_wo_status(
 
 class WoMilestoneRequest(BaseModel):
     """Advance a work order's SLA milestone."""
+
     wo_code: str = Field(..., description="Work order code (e.g. WO-2026-0001)")
     milestone: str = Field(..., description="New milestone: assigned|in_progress|resolved|verified")
     notes: str = Field("", description="Technician notes for the work order")
@@ -1804,6 +1818,7 @@ class WoMilestoneRequest(BaseModel):
 
 class WoMilestoneResponse(BaseModel):
     """Response after advancing a work order milestone."""
+
     success: bool
     wo_id: str = ""
     wo_code: str = ""
@@ -1830,7 +1845,6 @@ async def advance_wo_milestone(
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="wo_milestone")
 
-    from datetime import UTC
     from app.database.repositories.work_order_repository import WorkOrderRepository
     from app.services.telegram_message_sender import get_telegram_sender
 
@@ -1875,7 +1889,9 @@ async def advance_wo_milestone(
                 try:
                     from app.services.telegram_message_sender import TelegramMessageSender
 
-                    staff_bot_token = os.getenv("SENTRY_CLIENT_BOT_TOKEN") or "***TELEGRAM_BOT_TOKEN_REDACTED***"
+                    staff_bot_token = (
+                        os.getenv("SENTRY_CLIENT_BOT_TOKEN") or "***TELEGRAM_BOT_TOKEN_REDACTED***"
+                    )
                     sender = TelegramMessageSender(staff_bot_token)
                     outcome_emoji = {
                         "fixed": "✅",
@@ -1933,9 +1949,10 @@ def _dt_iso(val) -> str:
     if isinstance(val, str):
         return val
     from datetime import timedelta, timezone
+
     sast = timezone(timedelta(hours=2))
     if val.tzinfo is None:
-        val = val.replace(tzinfo=timezone.utc)
+        val = val.replace(tzinfo=UTC)
     return val.astimezone(sast).isoformat()
 
 
@@ -2452,10 +2469,18 @@ async def list_rooms(site_id: str = Query("site-002")):
     """List meeting rooms for a site."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         if not sb:
             return {"rooms": [], "source": "unavailable"}
-        result = sb.table("meeting_rooms").select("*").eq("site_id", site_id).neq("room_type", "focus").order("floor").execute()
+        result = (
+            sb.table("meeting_rooms")
+            .select("*")
+            .eq("site_id", site_id)
+            .neq("room_type", "focus")
+            .order("floor")
+            .execute()
+        )
         return {"rooms": result.data or [], "source": "supabase"}
     except Exception as e:
         logger.error(f"Failed to fetch rooms: {e}")
@@ -2467,6 +2492,7 @@ async def get_building_info(site_id: str = Query("site-002")):
     """Get building info for a site."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         if not sb:
             return {"error": "unavailable"}
@@ -2484,11 +2510,13 @@ async def update_building_info(data: dict, x_sentry_secret: str | None = Header(
     site_id = data.get("site_id", "site-002")
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         if not sb:
             return {"success": False, "error": "unavailable"}
-        from datetime import datetime, timezone
-        data["updated_at"] = datetime.now(timezone.utc).isoformat()
+        from datetime import datetime
+
+        data["updated_at"] = datetime.now(UTC).isoformat()
         result = sb.table("building_info").upsert(data, on_conflict="site_id").execute()
         return {"success": True, "data": result.data[0] if result.data else data}
     except Exception as e:
@@ -2501,23 +2529,35 @@ async def focus_room_status(site_id: str = Query("site-002")):
     """Get focus room active sessions and recent history."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         if not sb:
             return {"error": "unavailable"}
 
-        active = sb.table("space_focus_room_sessions").select("*").is_("end_time", None).eq("site_id", site_id).execute()
-        recent = sb.table("space_focus_room_sessions").select("*").eq("site_id", site_id).not_.is_("end_time", None).order("end_time", desc=True).limit(20).execute()
+        active = (
+            sb.table("space_focus_room_sessions").select("*").is_("end_time", None).eq("site_id", site_id).execute()
+        )
+        recent = (
+            sb.table("space_focus_room_sessions")
+            .select("*")
+            .eq("site_id", site_id)
+            .not_.is_("end_time", None)
+            .order("end_time", desc=True)
+            .limit(20)
+            .execute()
+        )
 
-        from datetime import datetime, timezone
-        now = datetime.now(timezone.utc)
+        from datetime import datetime
+
+        now = datetime.now(UTC)
         nearing = []
-        for s in (active.data or []):
+        for s in active.data or []:
             start = s.get("start_time")
             if start:
                 if isinstance(start, str):
                     start_dt = datetime.fromisoformat(start.replace("Z", "+00:00"))
                 else:
-                    start_dt = start if start.tzinfo else start.replace(tzinfo=timezone.utc)
+                    start_dt = start if start.tzinfo else start.replace(tzinfo=UTC)
                 elapsed_min = (now - start_dt).total_seconds() / 60
                 s["elapsed_minutes"] = round(elapsed_min, 1)
                 s["nearing_limit"] = elapsed_min >= 90
@@ -2544,17 +2584,31 @@ async def available_rooms(
     """List meeting rooms available for a given date/time slot."""
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         if not sb:
             return {"error": "unavailable"}
 
-        rooms = sb.table("meeting_rooms").select("*").eq("site_id", site_id).neq("room_type", "focus").gte("capacity", capacity).execute()
+        rooms = (
+            sb.table("meeting_rooms")
+            .select("*")
+            .eq("site_id", site_id)
+            .neq("room_type", "focus")
+            .gte("capacity", capacity)
+            .execute()
+        )
         all_rooms = rooms.data or []
 
-        bookings = sb.table("room_bookings").select("room_id,start_time,end_time").eq("site_id", site_id).eq("meeting_date", date).execute()
+        bookings = (
+            sb.table("room_bookings")
+            .select("room_id,start_time,end_time")
+            .eq("site_id", site_id)
+            .eq("meeting_date", date)
+            .execute()
+        )
 
         booked_room_ids = set()
-        for b in (bookings.data or []):
+        for b in bookings.data or []:
             bs = b.get("start_time", "")
             be = b.get("end_time", "")
             if bs and be and start_time < be and end_time > bs:
@@ -2573,20 +2627,27 @@ async def book_room(data: dict, x_sentry_secret: str | None = Header(None)):
     _require_sentry_secret(x_sentry_secret, endpoint_name="book_room")
     try:
         from app.database.supabase_client import get_supabase_client
+
         sb = get_supabase_client()
         if not sb:
             return {"success": False, "error": "unavailable"}
-        result = sb.table("room_bookings").insert({
-            "room_id": data.get("room_name"),
-            "site_id": data.get("site_id", "site-002"),
-            "booker_name": data.get("booker_name", ""),
-            "booker_email": data.get("booker_email", ""),
-            "meeting_title": data.get("meeting_title", ""),
-            "meeting_date": data.get("date"),
-            "start_time": data.get("start_time"),
-            "end_time": data.get("end_time"),
-            "attendees": data.get("attendees", 1),
-        }).execute()
+        result = (
+            sb.table("room_bookings")
+            .insert(
+                {
+                    "room_id": data.get("room_name"),
+                    "site_id": data.get("site_id", "site-002"),
+                    "booker_name": data.get("booker_name", ""),
+                    "booker_email": data.get("booker_email", ""),
+                    "meeting_title": data.get("meeting_title", ""),
+                    "meeting_date": data.get("date"),
+                    "start_time": data.get("start_time"),
+                    "end_time": data.get("end_time"),
+                    "attendees": data.get("attendees", 1),
+                }
+            )
+            .execute()
+        )
         return {"success": True, "booking_id": str(result.data[0]["id"])} if result.data else {"success": False}
     except Exception as e:
         logger.error(f"Room booking failed: {e}")

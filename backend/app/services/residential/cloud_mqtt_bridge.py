@@ -32,9 +32,9 @@ _MAX_AUTH_FAILURES = 3
 _BACKOFF_BASE_SECONDS = 60
 
 # SOC thresholds for dynamic polling interval (with hysteresis)
-_SOC_LOW_THRESHOLD = 25.0   # reduce interval below this
+_SOC_LOW_THRESHOLD = 25.0  # reduce interval below this
 _SOC_HIGH_THRESHOLD = 30.0  # restore interval above this
-_SOC_ALERT_INTERVAL = 60    # seconds when battery is low
+_SOC_ALERT_INTERVAL = 60  # seconds when battery is low
 
 
 @dataclass
@@ -104,7 +104,10 @@ class CloudToMQTTBridge:
             state.auth_failures += 1
             logger.warning(
                 "Poll failed for site %s (failure %d/%d): %s",
-                site_id, state.auth_failures, _MAX_AUTH_FAILURES, exc,
+                site_id,
+                state.auth_failures,
+                _MAX_AUTH_FAILURES,
+                exc,
             )
             if state.auth_failures >= _MAX_AUTH_FAILURES:
                 backoff = _BACKOFF_BASE_SECONDS * (2 ** (state.auth_failures - _MAX_AUTH_FAILURES))
@@ -112,9 +115,7 @@ class CloudToMQTTBridge:
                 state.devices = []
                 logger.error("Site %s exceeded max failures — backing off %ds", site_id, backoff)
 
-    def _maybe_adjust_polling_interval(
-        self, site_id: str, state: _SiteState, snapshot: EnergySnapshot
-    ) -> None:
+    def _maybe_adjust_polling_interval(self, site_id: str, state: _SiteState, snapshot: EnergySnapshot) -> None:
         """Apply SOC hysteresis: reduce polling when battery is low, restore when recovered."""
         soc = snapshot.battery_soc_pct
         if soc is None:
@@ -149,6 +150,7 @@ class CloudToMQTTBridge:
             return
         try:
             from app.services.residential.eskomsepush_client import get_area_schedule
+
             schedule = get_area_schedule(state.eskom_area_code)
         except Exception:
             return
@@ -157,11 +159,14 @@ class CloudToMQTTBridge:
             return
 
         from app.config.settings import settings as _settings
+
         try:
             client = mqtt.Client(client_id=f"sentinel-residential-ls-{site_id}")
             if _settings.residential_mqtt_username:
                 client.username_pw_set(_settings.residential_mqtt_username, _settings.residential_mqtt_password)
-            client.connect(_settings.residential_mqtt_broker or "127.0.0.1", _settings.residential_mqtt_port, keepalive=10)
+            client.connect(
+                _settings.residential_mqtt_broker or "127.0.0.1", _settings.residential_mqtt_port, keepalive=10
+            )
 
             if schedule is None:
                 for suffix in ("stage", "next_slot", "source"):
@@ -185,11 +190,14 @@ class CloudToMQTTBridge:
         if mqtt is None:
             return
         from app.config.settings import settings as _settings
+
         try:
             client = mqtt.Client(client_id=f"sentinel-residential-hb-{site_id}")
             if _settings.residential_mqtt_username:
                 client.username_pw_set(_settings.residential_mqtt_username, _settings.residential_mqtt_password)
-            client.connect(_settings.residential_mqtt_broker or "127.0.0.1", _settings.residential_mqtt_port, keepalive=10)
+            client.connect(
+                _settings.residential_mqtt_broker or "127.0.0.1", _settings.residential_mqtt_port, keepalive=10
+            )
             ts = datetime.now(UTC).isoformat()
             info = client.publish(f"sentinel/{site_id}/energy/last_updated", json.dumps(ts), qos=1, retain=True)
             info.wait_for_publish(timeout=2.0)

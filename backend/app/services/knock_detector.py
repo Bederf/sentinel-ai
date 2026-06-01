@@ -77,7 +77,9 @@ class KnockDetector:
         knock_range = profile["knock_range"]
 
         # Look for low frequency peaks (engine knock signature)
-        low_freq_peaks = [(f, a) for f, a in zip(peak_freqs, peak_amps, strict=False) if knock_range[0] <= f <= knock_range[1]]
+        low_freq_peaks = [
+            (f, a) for f, a in zip(peak_freqs, peak_amps, strict=False) if knock_range[0] <= f <= knock_range[1]
+        ]
 
         result["analysis_details"]["peaks_in_knock_range"] = len(low_freq_peaks)
 

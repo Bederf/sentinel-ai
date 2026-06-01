@@ -133,7 +133,9 @@ def generate_branded_qr() -> dict[str, Path]:
 
     badge = Image.new("RGBA", (target_size + 20, target_size + 20), (255, 255, 255, 0))
     bdraw = ImageDraw.Draw(badge)
-    bdraw.ellipse((0, 0, badge.width - 1, badge.height - 1), fill=(255, 255, 255, 245), outline=(15, 95, 47, 255), width=4)
+    bdraw.ellipse(
+        (0, 0, badge.width - 1, badge.height - 1), fill=(255, 255, 255, 245), outline=(15, 95, 47, 255), width=4
+    )
     badge.paste(logo, (10, 10), logo)
 
     x = (qr_img.width - badge.width) // 2
@@ -238,8 +240,7 @@ if __name__ == "__main__":
         raise SystemExit(main())
     except ModuleNotFoundError as exc:
         print(
-            "Missing dependency. Install with:\n"
-            "  pip install segno qrcode-artistic pillow",
+            "Missing dependency. Install with:\n  pip install segno qrcode-artistic pillow",
             file=sys.stderr,
         )
         raise SystemExit(1) from exc

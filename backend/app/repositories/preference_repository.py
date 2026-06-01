@@ -1,11 +1,10 @@
 """Preference repository — Supabase-backed CRUD for user_preferences table."""
 
 import logging
-from datetime import datetime, timezone
-from typing import Optional
+from datetime import UTC, datetime
 
 from app.database.supabase_client import get_supabase_client
-from app.models.preference import UserPreference, PreferenceType
+from app.models.preference import PreferenceType, UserPreference
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +19,10 @@ class PreferenceRepository:
         client = get_supabase_client()
         data = pref.model_dump(exclude={"id"}, exclude_none=True)
         if "created_at" not in data or data.get("created_at") is None:
-            data["created_at"] = datetime.now(tz=timezone.utc).isoformat()
+            data["created_at"] = datetime.now(tz=UTC).isoformat()
 
         # Upsert: on conflict (site_id, user_id, preference_type) update the row
-        result = (
-            client.table(_PREFERENCE_TABLE)
-            .upsert(data, on_conflict="site_id, user_id, preference_type")
-            .execute()
-        )
+        result = client.table(_PREFERENCE_TABLE).upsert(data, on_conflict="site_id, user_id, preference_type").execute()
         if result.data:
             return UserPreference(**result.data[0])
         raise RuntimeError("Failed to insert preference")
@@ -47,7 +42,7 @@ class PreferenceRepository:
 
     async def fetch_by_type(
         self, site_id: str, user_id: str, preference_type: PreferenceType
-    ) -> Optional[UserPreference]:
+    ) -> UserPreference | None:
         """Fetch a single preference by type for a user."""
         client = get_supabase_client()
         result = (
@@ -69,7 +64,7 @@ class PreferenceRepository:
         Returns count of marked rows.
         """
         client = get_supabase_client()
-        cutoff = datetime.now(tz=timezone.utc).isoformat()
+        cutoff = datetime.now(tz=UTC).isoformat()
         # Soft-delete: set confidence to 0 to indicate stale
         result = (
             client.table(_PREFERENCE_TABLE)

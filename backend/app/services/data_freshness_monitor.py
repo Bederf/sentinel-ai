@@ -60,13 +60,8 @@ class DataFreshnessMonitor:
 
             # Also discover sites from active bridge adapters — handles sites that
             # haven't been seeded into data_freshness yet (new site deployments).
-            adapter_result = (
-                supabase.table("site_adapter_config")
-                .select("site_id")
-                .eq("enabled", True)
-                .execute()
-            )
-            for row in (adapter_result.data or []):
+            adapter_result = supabase.table("site_adapter_config").select("site_id").eq("enabled", True).execute()
+            for row in adapter_result.data or []:
                 if row.get("site_id"):
                     sites.add(row["site_id"])
 
@@ -293,9 +288,9 @@ class DataFreshnessMonitor:
                 await self._send_unrecoverable_alert(site_id, data_source, age_seconds, target, breach_duration)
 
                 # Mark alert as sent
-                supabase.table("data_freshness_breaches").update(
-                    {"alert_sent": True}
-                ).eq("id", active_breach[0]["id"]).execute()
+                supabase.table("data_freshness_breaches").update({"alert_sent": True}).eq(
+                    "id", active_breach[0]["id"]
+                ).execute()
 
             return {"breach_started": False, "breach_resolved": False}
 

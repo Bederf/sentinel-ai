@@ -201,9 +201,7 @@ class ZoneAssessmentService:
     # Step 2: Resolve zone → equipment IDs
     # -------------------------------------------------------------------------
 
-    def _resolve_zone_equipment(
-        self, zone_data: dict[str, Any], site_code: str | None = None
-    ) -> dict[str, str | None]:
+    def _resolve_zone_equipment(self, zone_data: dict[str, Any], site_code: str | None = None) -> dict[str, str | None]:
         """Extract equipment IDs from zone record, deriving from naming convention if not stored.
 
         Equipment naming convention: S{site_prefix}-{TYPE}-{ZONE_CODE}

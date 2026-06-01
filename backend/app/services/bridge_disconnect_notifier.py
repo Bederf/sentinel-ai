@@ -29,9 +29,9 @@ _last_alert_sent_at: dict[str, datetime] = {}
 # site_id → True once we've sent the initial "down" alert (cleared on recovery)
 _alert_active: dict[str, bool] = {}
 
-FAILURE_THRESHOLD = 3          # consecutive failures before alerting
-THROTTLE_MINUTES = 60          # re-alert interval while still down
-RECOVERY_MIN_FAILURES = 1      # must have had at least this many failures to send recovery msg
+FAILURE_THRESHOLD = 3  # consecutive failures before alerting
+THROTTLE_MINUTES = 60  # re-alert interval while still down
+RECOVERY_MIN_FAILURES = 1  # must have had at least this many failures to send recovery msg
 
 
 def record_poll_result(site_id: str, *, has_errors: bool, site_name: str | None = None) -> None:
@@ -94,9 +94,7 @@ def check_and_alert(site_id: str, *, site_name: str | None = None) -> None:
     _alert_active[site_id] = True
 
 
-async def _send_down_alert(
-    site_id: str, site_label: str, failure_count: int, down_minutes: int
-) -> None:
+async def _send_down_alert(site_id: str, site_label: str, failure_count: int, down_minutes: int) -> None:
     try:
         from app.models.notification import AlertLevel
         from app.services.notification_service import notification_service
@@ -109,9 +107,7 @@ async def _send_down_alert(
             f"Impact: No telemetry, recommendations, or control signals.\n"
             f"Action: Check WireGuard tunnel + bridge service on VPS."
         )
-        result = await notification_service.send_alert_direct(
-            title=title, body=body, alert_level=AlertLevel.CRITICAL
-        )
+        result = await notification_service.send_alert_direct(title=title, body=body, alert_level=AlertLevel.CRITICAL)
         if result.get("success"):
             logger.warning("[BRIDGE-ALERT] Sent disconnect alert for %s (%d failures)", site_id, failure_count)
         else:
@@ -132,9 +128,7 @@ async def _send_recovery_alert(site_id: str, site_label: str, prev_failure_count
             f"Previous failures: {prev_failure_count} consecutive polls\n"
             f"Telemetry is flowing again."
         )
-        result = await notification_service.send_alert_direct(
-            title=title, body=body, alert_level=AlertLevel.INFO
-        )
+        result = await notification_service.send_alert_direct(title=title, body=body, alert_level=AlertLevel.INFO)
         if result.get("success"):
             logger.info("[BRIDGE-ALERT] Sent recovery alert for %s", site_id)
         else:

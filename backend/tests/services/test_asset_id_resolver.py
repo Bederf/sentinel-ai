@@ -19,6 +19,7 @@ from app.services.asset_id_resolver import AssetIDResolver
 # Fixtures
 # --------------------------------------------------------------------------- #
 
+
 @pytest.fixture
 def mock_db():
     """Minimal async-style mock matching self.db.table().execute() pattern."""
@@ -73,6 +74,7 @@ def _make_alias_result(alias_data):
 # Enum & dataclass tests
 # --------------------------------------------------------------------------- #
 
+
 class TestResolutionEnums:
     def test_resolution_method_values(self):
         assert ResolutionMethod.EXACT.value == "exact"
@@ -110,7 +112,8 @@ class TestResolutionResult:
 
     def test_dataclass_is_frozen(self):
         r = ResolutionResult(
-            asset_id="X", confidence=0.5,
+            asset_id="X",
+            confidence=0.5,
             confidence_band=ResolutionConfidence.MEDIUM,
             method=ResolutionMethod.FUZZY,
             matched_on="display_name",
@@ -124,6 +127,7 @@ class TestResolutionResult:
 # --------------------------------------------------------------------------- #
 # Normalise tests
 # --------------------------------------------------------------------------- #
+
 
 class TestNormalise:
     def test_lowercase(self):
@@ -148,6 +152,7 @@ class TestNormalise:
 # --------------------------------------------------------------------------- #
 # Confidence band tests
 # --------------------------------------------------------------------------- #
+
 
 class TestConfidenceBand:
     def test_085_is_high(self):
@@ -179,6 +184,7 @@ class TestConfidenceBand:
 # Stage 1 — Alias match tests
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.asyncio
 class TestStage1AliasMatch:
     async def test_known_alias_returns_high_exact(self, mock_db):
@@ -201,7 +207,9 @@ class TestStage1AliasMatch:
 
         # Both aliases and equipment table return data
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         # Mock LLM to return null (no match)
         mock_call = AsyncMock(return_value='{"asset_id": null, "confidence": 0.1, "reason": "no match"}')
@@ -222,13 +230,16 @@ class TestStage1AliasMatch:
 # Stage 2 — Exact code match tests
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.asyncio
 class TestStage2ExactMatch:
     async def test_exact_code_match_returns_high(self, mock_db, equipment_data):
         """Stage 2: exact code match → HIGH, EXACT, no review."""
         # Empty aliases, equipment has the code
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
         result = await resolver.resolve("S002-CHILLER-B1-001")
@@ -241,7 +252,9 @@ class TestStage2ExactMatch:
     async def test_exact_code_case_insensitive(self, mock_db, equipment_data):
         """Stage 2: exact code match is case-insensitive (normalised)."""
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
         result = await resolver.resolve("s002-chiller-b1-001")
@@ -254,12 +267,15 @@ class TestStage2ExactMatch:
 # Stage 3 — Fuzzy match tests
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.asyncio
 class TestStage3FuzzyMatch:
     async def test_fuzzy_high_score_returns_high_or_medium(self, mock_db, equipment_data):
         """Score >= 0.85 → HIGH; 0.60-0.84 → MEDIUM (review flag)."""
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
         # "Chiller B1 primary" should fuzzy-match to "Chiller B1 — Primary"
@@ -272,7 +288,9 @@ class TestStage3FuzzyMatch:
     async def test_fuzzy_medium_score_flagged_for_review(self, mock_db, equipment_data):
         """Score 0.60-0.84 → MEDIUM, needs_review=True with reason."""
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
         result = await resolver.resolve("Chiller B1 compressor")
@@ -284,7 +302,9 @@ class TestStage3FuzzyMatch:
     async def test_fuzzy_below_060_returns_unresolved(self, mock_db, equipment_data):
         """Score < 0.60 → stage 4 LLM called (now async); test with alien description."""
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
         # "telephone exchange switching system" scores ~0.21-0.31 vs all equipment → below 0.60
@@ -296,6 +316,7 @@ class TestStage3FuzzyMatch:
 # --------------------------------------------------------------------------- #
 # Empty description tests
 # --------------------------------------------------------------------------- #
+
 
 @pytest.mark.asyncio
 class TestEmptyDescription:
@@ -318,6 +339,7 @@ class TestEmptyDescription:
 # KNOWN_ALIASES fallback (table missing) tests
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.asyncio
 class TestKnownAliasesFallback:
     async def test_table_missing_uses_known_aliases(self, mock_db):
@@ -325,6 +347,7 @@ class TestKnownAliasesFallback:
         When asset_resolver_aliases table doesn't exist (query raises),
         KNOWN_ALIASES should still work as fallback.
         """
+
         def raise_on_aliases(*args, **kwargs):
             raise Exception("relation 'asset_resolver_aliases' does not exist")
 
@@ -340,6 +363,7 @@ class TestKnownAliasesFallback:
 # --------------------------------------------------------------------------- #
 # Site ID validation tests
 # --------------------------------------------------------------------------- #
+
 
 class TestSiteIdValidation:
     def test_none_raises_valueerror(self, mock_db):
@@ -359,6 +383,7 @@ class TestSiteIdValidation:
 # Equipment cache tests
 # --------------------------------------------------------------------------- #
 
+
 @pytest.mark.asyncio
 class TestEquipmentCache:
     async def test_equipment_queried_once_across_multiple_resolves(self, mock_db, equipment_data):
@@ -367,7 +392,9 @@ class TestEquipmentCache:
         Subsequent resolves reuse the cache — no extra DB calls for equipment.
         """
         mock_db.table.return_value.select.return_value.eq.return_value.execute.return_value = _make_alias_result([])
-        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = _make_equipment_result(equipment_data)
+        mock_db.table.return_value.select.return_value.eq.return_value.eq.return_value.execute.return_value = (
+            _make_equipment_result(equipment_data)
+        )
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
@@ -377,8 +404,7 @@ class TestEquipmentCache:
 
         # Count how many times equipment table was called
         equipment_call_count = sum(
-            1 for call in mock_db.table.call_args_list
-            if call.args and call.args[0] == "equipment"
+            1 for call in mock_db.table.call_args_list if call.args and call.args[0] == "equipment"
         )
         assert equipment_call_count == 1, f"Expected 1 equipment call, got {equipment_call_count}"
 
@@ -386,6 +412,7 @@ class TestEquipmentCache:
 # --------------------------------------------------------------------------- #
 # LLM stage / end-to-end tests
 # --------------------------------------------------------------------------- #
+
 
 @pytest.mark.asyncio
 class TestLlmStageStub:

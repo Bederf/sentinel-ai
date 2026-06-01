@@ -12,8 +12,6 @@ import email as email_lib
 import hashlib
 import imaplib
 import logging
-import re
-from datetime import datetime, timezone
 from email.message import Message
 from pathlib import Path
 from typing import Any
@@ -172,9 +170,9 @@ class RoomsEmailIntakeService:
         date_str = msg.get("Date", "")
 
         try:
-            from app.services.signal_emitter import emit_email_signal
-
             import asyncio
+
+            from app.services.signal_emitter import emit_email_signal
 
             result = asyncio.run(
                 emit_email_signal(

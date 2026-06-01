@@ -10,7 +10,6 @@ Deviation classification is baseline-specific (NOT from HealthThresholdService):
 - "critical": max deviation >= 30%
 """
 
-
 from pydantic import BaseModel, Field
 
 
@@ -39,9 +38,7 @@ class AssetHealthBaseline(BaseModel):
     baseline_source: str | None = Field(None, description="'manual' | 'bms_average' | 'mobile_sensor' | None")
 
     # Deviation (last 24h from baseline_comparisons)
-    max_deviation_percent_24h: float | None = Field(
-        None, description="Maximum deviation % observed in last 24 hours"
-    )
+    max_deviation_percent_24h: float | None = Field(None, description="Maximum deviation % observed in last 24 hours")
     deviation_status: str | None = Field(None, description="'normal' | 'warning' | 'critical' | None")
 
     # Health assessment timeline fields (Phase 109B — optional for backward compat)

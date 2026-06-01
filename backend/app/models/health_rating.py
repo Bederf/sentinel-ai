@@ -10,7 +10,6 @@ Key invariant: health_status is ALWAYS determined by HealthThresholdService,
 never computed locally by the calculator.
 """
 
-
 from pydantic import BaseModel, Field
 
 

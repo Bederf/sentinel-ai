@@ -285,9 +285,12 @@ class TestUploadPipelineOrdering:
                 call_order.append("upsert")
                 return "doc-123"
 
-            with patch.object(ManualUploadAdapter, "_upsert", mock_upsert), patch(
-                "app.services.llm_extraction_service.LLMExtractionService.extract_equipment_description",
-                mock_extract,
+            with (
+                patch.object(ManualUploadAdapter, "_upsert", mock_upsert),
+                patch(
+                    "app.services.llm_extraction_service.LLMExtractionService.extract_equipment_description",
+                    mock_extract,
+                ),
             ):
                 adapter = ManualUploadAdapter()
                 response = _make_response()

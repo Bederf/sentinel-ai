@@ -510,7 +510,7 @@ class AdapterHealthMonitor:
             )
             # Build dedupe keys from existing alerts using the new format
             existing_keys = set()
-            for r in (existing.data or []):
+            for r in existing.data or []:
                 eq_id = r.get("equipment_id") or "UNKNOWN"
                 # Reconstruct key from title which contains the code used at insert time
                 existing_keys.add(f"{eq_id}")

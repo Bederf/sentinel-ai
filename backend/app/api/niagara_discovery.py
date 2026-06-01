@@ -80,9 +80,7 @@ class CorrectRequest(BaseModel):
 
     point_id: str = Field(..., description="Original point name to correct")
     equipment_id: str | None = Field(None, description="New equipment ID to assign point to")
-    point_type: str | None = Field(
-        None, description="Corrected point type (sensor, setpoint, command, status, alarm)"
-    )
+    point_type: str | None = Field(None, description="Corrected point type (sensor, setpoint, command, status, alarm)")
     equipment_type: str | None = Field(None, description="Corrected equipment type (chiller, ahu, fcu, etc.)")
 
 

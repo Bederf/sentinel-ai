@@ -10,7 +10,6 @@ Phase: Health Score Threshold Consistency Fix
 
 import logging
 from datetime import datetime, timedelta
-
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client

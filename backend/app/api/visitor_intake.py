@@ -161,9 +161,7 @@ async def create_visit_from_intake(
     # Reload to get updated fields
     visit = repo.get_visit_by_id(visit.id) or visit
 
-    logger.info(
-        "[VisitorIntake] Created visit %s for %s — awaiting acceptance", visit.id, request.visitor_email
-    )
+    logger.info("[VisitorIntake] Created visit %s for %s — awaiting acceptance", visit.id, request.visitor_email)
 
     return VisitIntakeResponse(
         success=True,
@@ -331,6 +329,7 @@ async def handle_rsvp(
 async def confirm_visitor(token: str):
     """Confirm a visitor by token and send QR code — called by concierge when visitor accepts."""
     from uuid import UUID
+
     from app.database.repositories.visit_repository import VisitRepository
 
     try:
@@ -355,6 +354,7 @@ async def confirm_visitor(token: str):
     email_sent = False
     try:
         from app.services.visitor_email_service import VisitorEmailService
+
         email_svc = VisitorEmailService()
         email_sent = email_svc.send_visitor_confirmation(updated)
     except Exception as exc:

@@ -15,7 +15,6 @@ from app.services.semantic_priority_classifier import (
     get_semantic_priority_classifier,
 )
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================

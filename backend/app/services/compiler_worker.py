@@ -163,6 +163,7 @@ class CompilerWorker:
     def _get_conn(self):
         """Get a raw psycopg2 connection for this method."""
         import os
+
         import psycopg2
 
         database_url = os.getenv("DATABASE_URL")

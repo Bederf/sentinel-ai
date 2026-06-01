@@ -83,7 +83,8 @@ async def create_site(request: CreateSiteRequest):
             if seeded:
                 logger.info(
                     "Seeded base modules for %s via SIMBIOT wizard: %s",
-                    site_code, seeded,
+                    site_code,
+                    seeded,
                 )
         except Exception as mod_err:
             logger.warning("Failed to seed base modules for %s: %s", site.get("code"), mod_err)

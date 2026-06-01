@@ -550,15 +550,14 @@ class BackgroundSchedulerService:
                     urgent_equipment: set[str] = set()
                     try:
                         from app.database.repositories.work_order_repository import WorkOrderRepository
+
                         wo_repo = WorkOrderRepository()
                         _wo_loop = asyncio.new_event_loop()
                         asyncio.set_event_loop(_wo_loop)
                         try:
                             urgent_wos = _wo_loop.run_until_complete(wo_repo.get_open_urgent_work_orders(site_id))
                             urgent_equipment = {
-                                wo.get("equipment_code")
-                                for wo in urgent_wos
-                                if wo.get("equipment_code")
+                                wo.get("equipment_code") for wo in urgent_wos if wo.get("equipment_code")
                             }
                             if urgent_equipment:
                                 logger.warning(
@@ -898,9 +897,15 @@ class BackgroundSchedulerService:
                             metadata={
                                 "group_recommendation": is_grouped,
                                 "affected_equipment": affected,
+                                # Best-effort name for grouped recommendations; pick first affected item with a name
+                                "equipment_name": (
+                                    affected[0].get("name") if (is_grouped and isinstance(affected, list) and affected and isinstance(affected[0], dict)) else None
+                                )
+                                if is_grouped
+                                else rec_dict.get("metadata", {}).get("equipment_name"),
                             }
                             if is_grouped
-                            else {},
+                            else {"equipment_name": rec_dict.get("metadata", {}).get("equipment_name")},
                         )
 
                         loop = asyncio.new_event_loop()
@@ -1498,9 +1503,7 @@ class BackgroundSchedulerService:
         try:
             from app.config.settings import settings
 
-            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
-                settings, "sentry_fm_chat_id", None
-            )
+            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
             if not chat_id:
                 logger.debug(f"[REC-PROC] No Telegram chat ID configured for {site_id}")
                 return
@@ -1981,9 +1984,12 @@ class BackgroundSchedulerService:
                         related_modules=[],
                         telemetry_context={
                             "equipment_id": eq.get("code", eq["id"]),
+                            "equipment_name": eq.get("name"),
                             "equipment_type": eq.get("type", "unknown"),
                             "health_score": health,
-                            "site_id": site_code,
+                            "site_id": f"site-{site_code[1:]}"
+                            if site_code.startswith("S") and site_code[1:].isdigit()
+                            else site_code,
                             "site_name": site_name,
                             "manufacturer": eq.get("manufacturer"),
                             "model": eq.get("model"),
@@ -2039,7 +2045,9 @@ class BackgroundSchedulerService:
                         client.table("recommendations").insert(
                             {
                                 "id": str(uuid.uuid4()),
-                                "site_id": site_code,
+                                "site_id": f"site-{site_code[1:]}"
+                                if site_code.startswith("S") and site_code[1:].isdigit()
+                                else site_code,
                                 "timestamp": datetime.utcnow().isoformat(),
                                 "action_type": _action_type,
                                 "risk_level": _priority_map.get(ai_rec.priority, ActionRiskLevel.MEDIUM).value,
@@ -2100,7 +2108,11 @@ class BackgroundSchedulerService:
         metadata = rec.metadata or {}
         adjustments = metadata.get("all_adjustments", [])
         building_assessment = metadata.get("building_assessment", "")
-        title = metadata.get("title", f"Adjustment for {rec.target_equipment}")
+        title = metadata.get("title") or (
+            f"Adjustment for {metadata.get('equipment_name', rec.target_equipment)}"
+            if metadata.get("equipment_name")
+            else f"Adjustment for {rec.target_equipment}"
+        )
         saving = metadata.get("saving", "")
         confidence = rec.confidence_score or 0.0
         confidence_basis = metadata.get("confidence_basis", "")
@@ -2115,25 +2127,38 @@ class BackgroundSchedulerService:
             current = rec.action.get("current_value", "")
             unit = rec.action.get("unit", "")
             if point and value is not None:
-                adjustments = [{
-                    "equipment_id": rec.target_equipment,
-                    "point": point,
-                    "current_value": current,
-                    "recommended_value": value,
-                    "unit": unit,
-                }]
+                adjustments = [
+                    {
+                        "equipment_id": rec.target_equipment,
+                        "point": point,
+                        "current_value": current,
+                        "recommended_value": value,
+                        "unit": unit,
+                    }
+                ]
 
         adj_lines = []
+        # Build equipment name cache from all_adjustments for display
+        eq_name_cache = {}
+        for adj in adjustments:
+            eq_code = adj.get("equipment_id", "")
+            if eq_code and eq_code not in eq_name_cache:
+                eq_name_cache[eq_code] = (
+                    metadata.get("equipment_name") if metadata.get("equipment_id") == eq_code else eq_code
+                )
+
         for adj in adjustments[:5]:
-            equip = adj.get("equipment_id", "")
+            equip_code = adj.get("equipment_id", "")
+            equip_name = eq_name_cache.get(equip_code) or equip_code
             point = adj.get("point", "").replace("_", " ").title()
             curr = adj.get("current_value", "")
             recd = adj.get("recommended_value", "")
             unit = adj.get("unit", "")
+            display_name = equip_name if equip_name != equip_code else equip_code
             if curr:
-                adj_lines.append(f"\u2022 {equip}: {point} {curr}{unit} -> {recd}{unit}")
+                adj_lines.append(f"\u2022 {display_name}: {point} {curr}{unit} -> {recd}{unit}")
             else:
-                adj_lines.append(f"\u2022 {equip}: Set {point} to {recd}{unit}")
+                adj_lines.append(f"\u2022 {display_name}: Set {point} to {recd}{unit}")
         if len(adjustments) > 5:
             adj_lines.append(f"\u2022 ...and {len(adjustments) - 5} more zones")
 
@@ -5637,26 +5662,35 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             warning_assets = []
             healthy_count = 0
             total_assets = 0
+            site_uuid = None
             try:
                 from app.database.supabase_client import get_supabase_client
 
                 sb = get_supabase_client()
-                resp = (
-                    sb.table("equipment")
-                    .select("code,name,type,health_score,location,status,manufacturer")
-                    .eq("site_id", site_id)
-                    .execute()
+                # Resolve site UUID from resolver ID (site-002 -> UUID)
+                site_resp = (
+                    sb.table("sites").select("id").eq("code", site_id.upper().replace("SITE-", "S")).limit(1).execute()
                 )
-                if resp.data:
-                    total_assets = len(resp.data)
-                    for eq in resp.data:
-                        hs = eq.get("health_score") or 100
-                        if hs < 70:
-                            critical_assets.append(eq)
-                        elif hs < 90:
-                            warning_assets.append(eq)
-                        else:
-                            healthy_count += 1
+                site_uuid = site_resp.data[0]["id"] if site_resp.data else None
+                if not site_uuid:
+                    logger.warning(f"[DIGEST] Site not found: {site_id}")
+                else:
+                    resp = (
+                        sb.table("equipment")
+                        .select("code,name,type,health_score,location,status,manufacturer")
+                        .eq("site_id", site_uuid)
+                        .execute()
+                    )
+                    if resp.data:
+                        total_assets = len(resp.data)
+                        for eq in resp.data:
+                            hs = eq.get("health_score") or 100
+                            if hs < 70:
+                                critical_assets.append(eq)
+                            elif hs < 90:
+                                warning_assets.append(eq)
+                            else:
+                                healthy_count += 1
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch equipment health: {e}")
 
@@ -5667,7 +5701,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 from app.database.repositories.alert_repository import AlertRepository
 
                 alert_repo = AlertRepository()
-                alerts = await alert_repo.get_all(status="active")
+                alerts = await alert_repo.get_all(status="active", site_id=site_uuid)
                 if alerts and alerts.data:
                     alert_count = len(alerts.data)
                     critical_alerts = [
@@ -5692,7 +5726,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             ai_recs = []
             try:
                 svc = get_recommendation_service()
-                pending = await svc.get_pending_recommendations(site_id, limit=20)
+                # Convert site-002 -> S002 for recommendation queries (column stores site code)
+                site_code = site_id.upper().replace("SITE-", "S") if site_id.startswith("site-") else site_id
+                pending = await svc.get_pending_recommendations(site_code, limit=20)
                 ADVISORY_TYPES = {"ai_optimization"}
                 ai_recs = [r for r in pending if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES]
             except Exception as e:

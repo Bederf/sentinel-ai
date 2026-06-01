@@ -62,21 +62,67 @@ CHUNK_SIZES = {
 # Confirmed from S002 real document scoring + SA building services corpus
 TECHNICAL_MARKERS: set[str] = {
     # Core technical terms
-    "fault", "error", "failed", "replaced", "measured",
-    "reading", "pressure", "temperature", "voltage",
-    "current", "flow", "rpm", "hz", "kpa", "bar",
-    "amps", "kw", "kwh", "setpoint", "alarm", "trip",
-    "hours", "litres", "oil", "filter", "belt", "bearing",
+    "fault",
+    "error",
+    "failed",
+    "replaced",
+    "measured",
+    "reading",
+    "pressure",
+    "temperature",
+    "voltage",
+    "current",
+    "flow",
+    "rpm",
+    "hz",
+    "kpa",
+    "bar",
+    "amps",
+    "kw",
+    "kwh",
+    "setpoint",
+    "alarm",
+    "trip",
+    "hours",
+    "litres",
+    "oil",
+    "filter",
+    "belt",
+    "bearing",
     # SA building services
-    "kva", "rcd", "mcb", "isolator", "reticulation",
-    "earthing", "db", "board", "lpg", "borehole",
+    "kva",
+    "rcd",
+    "mcb",
+    "isolator",
+    "reticulation",
+    "earthing",
+    "db",
+    "board",
+    "lpg",
+    "borehole",
     # HVAC / refrigeration
-    "evaporator", "condenser", "compressor", "refrigerant",
-    "chiller", "ahu", "msb", "ats", "ups",
-    "cop", "cwt", "louvre", "retorque", "fretting",
+    "evaporator",
+    "condenser",
+    "compressor",
+    "refrigerant",
+    "chiller",
+    "ahu",
+    "msb",
+    "ats",
+    "ups",
+    "cop",
+    "cwt",
+    "louvre",
+    "retorque",
+    "fretting",
     # Confirmed from real contractor corpus
-    "thermographic", "ir", "rod-out", "biological",
-    "legionella", "capex", "oem",
+    "thermographic",
+    "ir",
+    "rod-out",
+    "biological",
+    "legionella",
+    "capex",
+    "oem",
 }
 
 
@@ -116,11 +162,7 @@ class AdaptiveChunker:
         dot_count = max(text.count("."), 1)
         avg_sentence_len = len(words) / dot_count
 
-        density_score = (
-            (numeric_ratio * 0.4)
-            + (technical_ratio * 0.4)
-            + (min(avg_sentence_len, 30) / 30 * SENT_WEIGHT)
-        )
+        density_score = (numeric_ratio * 0.4) + (technical_ratio * 0.4) + (min(avg_sentence_len, 30) / 30 * SENT_WEIGHT)
 
         if density_score > DENSE_THRESHOLD:
             return SectionDensity.DENSE, density_score

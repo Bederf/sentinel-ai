@@ -11,7 +11,6 @@ from typing import Any
 from app.database.repositories.recommendation_repository import get_recommendation_repository
 from app.database.repositories.recommendation_sla_repository import get_recommendation_sla_repository
 from app.models.recommendation import MilestoneStatus, Recommendation
-from app.services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 
@@ -148,12 +147,14 @@ class RecommendationMilestoneService:
                 if rec.sla_deadline_at and rec.sla_deadline_at < now:
                     if rec.milestone_status != MilestoneStatus.VERIFIED:
                         pct = self._elapsed_pct(rec)
-                        breached.append({
-                            "recommendation": rec,
-                            "breach_minutes": int((now - rec.sla_deadline_at).total_seconds() / 60),
-                            "elapsed_pct": round(pct, 3),
-                            "milestone": rec.milestone_status.value,
-                        })
+                        breached.append(
+                            {
+                                "recommendation": rec,
+                                "breach_minutes": int((now - rec.sla_deadline_at).total_seconds() / 60),
+                                "elapsed_pct": round(pct, 3),
+                                "milestone": rec.milestone_status.value,
+                            }
+                        )
         except Exception as e:
             logger.error("Breach check failed: %s", e)
 
@@ -165,9 +166,13 @@ class RecommendationMilestoneService:
         if not self.rec_repo.client:
             return []
         try:
-            result = self.rec_repo.client.table("recommendations").select("*").neq(
-                "milestone_status", "verified"
-            ).not_.is_("sla_deadline_at", "null").execute()
+            result = (
+                self.rec_repo.client.table("recommendations")
+                .select("*")
+                .neq("milestone_status", "verified")
+                .not_.is_("sla_deadline_at", "null")
+                .execute()
+            )
             return [Recommendation.from_dict(row) for row in (result.data or [])]
         except Exception as e:
             logger.error("Active recommendations fetch failed: %s", e)
@@ -186,9 +191,7 @@ class RecommendationMilestoneService:
 
     # --- Escalation ---
 
-    async def escalate_breach(
-        self, recommendation_id: str, breach_info: dict[str, Any]
-    ) -> None:
+    async def escalate_breach(self, recommendation_id: str, breach_info: dict[str, Any]) -> None:
         """Trigger escalation for a breached recommendation.
 
         Checks 50/75/90% thresholds and fires Sentry alerts via existing
@@ -233,9 +236,7 @@ class RecommendationMilestoneService:
             return "notice"
         return None
 
-    async def _send_sentry_alert(
-        self, rec: Recommendation, elapsed_pct: float, tier: str
-    ) -> None:
+    async def _send_sentry_alert(self, rec: Recommendation, elapsed_pct: float, tier: str) -> None:
         """Send Sentry alert via SystemNotifier Telegram dispatch."""
         try:
             from app.services.system_notifier import SystemNotifier
@@ -245,7 +246,7 @@ class RecommendationMilestoneService:
             milestone = rec.milestone_status.value
             msg = (
                 f"[{tier.upper()}] SLA {milestone} breached — "
-                f"{site_label} | rec={rec.id[:8]} | {elapsed_pct*100:.0f}% elapsed"
+                f"{site_label} | rec={rec.id[:8]} | {elapsed_pct * 100:.0f}% elapsed"
             )
             await notifier.send_telegram_alert(
                 message=msg,

@@ -44,12 +44,15 @@ class TestEventIntelligenceSchedulerWiring:
         mock_ei_svc = AsyncMock()
         mock_ei_svc.process_site = AsyncMock(return_value=[])
 
-        with patch(
-            "app.core.site_resolver.get_registered_site_ids",
-            return_value=["site-002", "site-003"],
-        ), patch(
-            "app.services.event_intelligence_service.get_event_intelligence_service",
-            return_value=mock_ei_svc,
+        with (
+            patch(
+                "app.core.site_resolver.get_registered_site_ids",
+                return_value=["site-002", "site-003"],
+            ),
+            patch(
+                "app.services.event_intelligence_service.get_event_intelligence_service",
+                return_value=mock_ei_svc,
+            ),
         ):
             await svc._run_event_intelligence_async()
 
@@ -90,12 +93,15 @@ class TestEventIntelligenceSchedulerWiring:
 
         mock_ei_svc.process_site = AsyncMock(side_effect=side_effect)
 
-        with patch(
-            "app.core.site_resolver.get_registered_site_ids",
-            return_value=["site-002", "site-003"],
-        ), patch(
-            "app.services.event_intelligence_service.get_event_intelligence_service",
-            return_value=mock_ei_svc,
+        with (
+            patch(
+                "app.core.site_resolver.get_registered_site_ids",
+                return_value=["site-002", "site-003"],
+            ),
+            patch(
+                "app.services.event_intelligence_service.get_event_intelligence_service",
+                return_value=mock_ei_svc,
+            ),
         ):
             await svc._run_event_intelligence_async()
             # Both sites should have been attempted

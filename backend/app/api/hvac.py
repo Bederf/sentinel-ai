@@ -312,6 +312,7 @@ async def get_hvac_overview(
         # Fallback: query latest power readings from equipment_sensor_readings
         try:
             from app.database.supabase_client import get_supabase_client
+
             sb = get_supabase_client()
             sensor_types = {"hvac_kw", "lighting_kw", "total_kw"}
             power_readings = {}

@@ -172,7 +172,9 @@ class ModelRegistry:
             return self._resolve_model_paths(self.registry["models"][model_id])
         return None
 
-    def list_models(self, model_type: str | None = None, equipment_type: str | None = None, status: str | None = None) -> list[dict]:
+    def list_models(
+        self, model_type: str | None = None, equipment_type: str | None = None, status: str | None = None
+    ) -> list[dict]:
         """List registered models with optional filters.
 
         Returns copies with paths resolved to absolute.

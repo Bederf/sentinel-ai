@@ -67,6 +67,7 @@ class ProfileService:
         """Get active profile for a site.
 
         Returns the profile object that corresponds to the site's active profile setting.
+        Residential sites (res-{chat_id}) always get residential_solar profile.
 
         Args:
             site_id: Site identifier
@@ -74,6 +75,10 @@ class ProfileService:
         Returns:
             Profile dictionary or None if not found
         """
+        # Residential sites always use residential_solar profile
+        if self.is_residential_site(site_id):
+            return self.get_residential_profile()
+
         config = self.load_site_profile_config(site_id)
         logger.warning(
             f"[PROFILE] get_site_profile({site_id!r}) -> config.active_profile={config.active_profile if config else None}"
@@ -100,6 +105,22 @@ class ProfileService:
         except Exception as e:
             logger.debug(f"Could not load feedback scoring inputs for {site_id}: {e}")
 
+        return profile
+
+    def is_residential_site(self, site_id: str) -> bool:
+        """Check if site_id is a residential site (res-{chat_id} format)."""
+        return site_id.startswith("res-")
+
+    def get_residential_profile(self) -> dict[str, Any]:
+        """Return the residential_solar optimization profile.
+
+        Residential sites always use this profile regardless of DB settings.
+        Returns a deep copy to prevent mutation of the global profile.
+        """
+        profile = copy.deepcopy(self.profiles.get("residential_solar"))
+        if not profile:
+            logger.error("residential_solar profile not found in optimization_profiles.json")
+            return {}
         return profile
 
     def get_zone_profile(self, site_id: str, zone_id: str) -> dict[str, Any] | None:

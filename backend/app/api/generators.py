@@ -3,7 +3,6 @@
 SCADA-style monitoring for generator sets with DeepSea DSE controllers.
 """
 
-
 from fastapi import APIRouter, HTTPException, Query
 
 from app.services.generator_service import get_generator_service

@@ -81,7 +81,9 @@ Keep the language practical and technical but accessible to field technicians.""
             Formatted context string with wrapped chunks.
         """
         if use_hybrid:
-            results = await self.vector_db.hybrid_search(query=query, n_results=n_results, equipment_type=equipment_type)
+            results = await self.vector_db.hybrid_search(
+                query=query, n_results=n_results, equipment_type=equipment_type
+            )
         else:
             results = self.vector_db.search(query=query, n_results=n_results, equipment_type=equipment_type)
 

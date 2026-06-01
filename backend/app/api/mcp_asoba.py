@@ -6,7 +6,6 @@ Registered under /api/mcp/asoba
 """
 
 import logging
-import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException

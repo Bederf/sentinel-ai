@@ -62,10 +62,7 @@ class SparePartsRepository:
     def get_part_by_id(self, part_id: str) -> dict[str, Any] | None:
         """Get single part by UUID with inventory."""
         response = (
-            self.client.table("spare_parts")
-            .select("*, spare_parts_inventory!left(*)")
-            .eq("id", part_id)
-            .execute()
+            self.client.table("spare_parts").select("*, spare_parts_inventory!left(*)").eq("id", part_id).execute()
         )
         return response.data[0] if response.data else None
 
@@ -91,12 +88,7 @@ class SparePartsRepository:
     def update_part(self, part_id: str, part_data: dict[str, Any]) -> dict[str, Any] | None:
         """Update spare part fields."""
         part_data["updated_at"] = datetime.now().isoformat()
-        response = (
-            self.client.table("spare_parts")
-            .update(part_data)
-            .eq("id", part_id)
-            .execute()
-        )
+        response = self.client.table("spare_parts").update(part_data).eq("id", part_id).execute()
         return response.data[0] if response.data else None
 
     def update_inventory(
@@ -105,11 +97,13 @@ class SparePartsRepository:
         """Update stock quantity for a spare part."""
         inv = (
             self.client.table("spare_parts_inventory")
-            .update({
-                "quantity_on_hand": quantity_on_hand,
-                "updated_at": datetime.now().isoformat(),
-                **({"location": location} if location else {}),
-            })
+            .update(
+                {
+                    "quantity_on_hand": quantity_on_hand,
+                    "updated_at": datetime.now().isoformat(),
+                    **({"location": location} if location else {}),
+                }
+            )
             .eq("part_id", part_id)
             .execute()
         )
@@ -117,12 +111,7 @@ class SparePartsRepository:
 
     def decrement_stock(self, part_id: str, quantity: int = 1) -> dict[str, Any] | None:
         """Decrement inventory quantity (after part used in work order)."""
-        current = (
-            self.client.table("spare_parts_inventory")
-            .select("quantity_on_hand")
-            .eq("part_id", part_id)
-            .execute()
-        )
+        current = self.client.table("spare_parts_inventory").select("quantity_on_hand").eq("part_id", part_id).execute()
         if not current.data:
             return None
         current_qty = current.data[0]["quantity_on_hand"]
@@ -134,10 +123,7 @@ class SparePartsRepository:
         response = (
             self.client.table("spare_parts")
             .select("*, spare_parts_inventory!left(*)")
-            .or_(
-                f"part_name.ilike.%{query}%,"
-                f"part_number.ilike.%{query}%"
-            )
+            .or_(f"part_name.ilike.%{query}%,part_number.ilike.%{query}%")
             .eq("is_active", True)
             .limit(limit)
             .execute()
@@ -146,11 +132,7 @@ class SparePartsRepository:
 
     def get_low_stock_parts(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Get parts where quantity_on_hand <= min_threshold."""
-        query = (
-            self.client.table("spare_parts")
-            .select("*, spare_parts_inventory!left(*)")
-            .eq("is_active", True)
-        )
+        query = self.client.table("spare_parts").select("*, spare_parts_inventory!left(*)").eq("is_active", True)
         response = query.execute()
         parts = response.data or []
         low = []

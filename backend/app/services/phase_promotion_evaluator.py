@@ -6,7 +6,7 @@ itself — operators make the final decision and flip the phase manually.
 """
 
 import logging
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime, timedelta
 
 logger = logging.getLogger("sentinel.phase_promotion")
@@ -305,7 +305,9 @@ class PhasePromotionEvaluator:
         if gate.startswith("bridge_polls_successful >="):
             threshold = int(gate.split(">=")[1].strip())
             try:
-                polls_row = client.table("site_polling_state").select("poll_count").eq("site_id", site_id).limit(1).execute()
+                polls_row = (
+                    client.table("site_polling_state").select("poll_count").eq("site_id", site_id).limit(1).execute()
+                )
                 if polls_row.data and polls_row.data[0].get("poll_count") is not None:
                     count = int(polls_row.data[0]["poll_count"])
                     return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
@@ -313,7 +315,12 @@ class PhasePromotionEvaluator:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
             # Fallback: count from equipment_sensor_readings as polling proxy
             try:
-                readings = client.table("equipment_sensor_readings").select("id", count="exact").eq("site_id", site_id).execute()
+                readings = (
+                    client.table("equipment_sensor_readings")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .execute()
+                )
                 count = readings.count if hasattr(readings, "count") else len(readings.data or [])
                 passed = count >= 50  # At least 50 sensor readings = bridge is working
                 return GateResult(gate=gate, passed=passed, value=count, threshold=threshold)
@@ -327,17 +334,35 @@ class PhasePromotionEvaluator:
             try:
                 # Check fault-to-normal ratio from equipment_sensor_readings
                 # Good quality = most readings are normal, few are faults/alarms
-                readings = client.table("equipment_sensor_readings").select("sensor_type", count="exact").eq("site_id", site_id).execute()
+                readings = (
+                    client.table("equipment_sensor_readings")
+                    .select("sensor_type", count="exact")
+                    .eq("site_id", site_id)
+                    .execute()
+                )
                 total = readings.count if hasattr(readings, "count") else len(readings.data or [])
                 if total < 10:
                     return GateResult(gate=gate, passed=False, value=0.0, threshold=threshold)
                 # Count anomaly-related sensor types as potential fault indicators
-                fault_types = client.table("equipment_sensor_readings").select("sensor_type", count="exact").eq("site_id", site_id).in_("sensor_type", ["anomaly_score", "fault_code", "alarm_status"]).execute()
+                fault_types = (
+                    client.table("equipment_sensor_readings")
+                    .select("sensor_type", count="exact")
+                    .eq("site_id", site_id)
+                    .in_("sensor_type", ["anomaly_score", "fault_code", "alarm_status"])
+                    .execute()
+                )
                 fault_count = fault_types.count if hasattr(fault_types, "count") else len(fault_types.data or [])
                 # Also check equipment_fault_events
                 try:
-                    fault_events = client.table("equipment_fault_events").select("id", count="exact").eq("site_id", site_id).execute()
-                    fault_count += fault_events.count if hasattr(fault_events, "count") else len(fault_events.data or [])
+                    fault_events = (
+                        client.table("equipment_fault_events")
+                        .select("id", count="exact")
+                        .eq("site_id", site_id)
+                        .execute()
+                    )
+                    fault_count += (
+                        fault_events.count if hasattr(fault_events, "count") else len(fault_events.data or [])
+                    )
                 except Exception:
                     pass
                 quality = max(0.0, min(1.0, 1.0 - (fault_count / max(total, 1))))

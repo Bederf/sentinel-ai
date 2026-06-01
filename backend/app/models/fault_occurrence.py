@@ -55,7 +55,7 @@ class FaultOccurrence:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "FaultOccurrence":
+    def from_dict(cls, data: dict[str, Any]) -> FaultOccurrence:
         """Deserialize from dict."""
         occurred_at = data.get("occurred_at", "")
         if isinstance(occurred_at, str) and occurred_at:

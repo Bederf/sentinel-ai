@@ -71,10 +71,13 @@ class TestLocalInferenceUnavailableError:
     async def test_local_mode_raises_on_failure(self):
         """local_full mode must raise LocalInferenceUnavailableError on Ollama failure."""
         gw = ModelGateway()
-        with patch(
-            "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
-            side_effect=ConnectionRefusedError("Ollama unreachable"),
-        ), pytest.raises(LocalInferenceUnavailableError):
+        with (
+            patch(
+                "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
+                side_effect=ConnectionRefusedError("Ollama unreachable"),
+            ),
+            pytest.raises(LocalInferenceUnavailableError),
+        ):
             await gw._call_local(
                 provider="ollama",
                 model="qwen2.5:7b-instruct",
@@ -215,10 +218,13 @@ class TestLocalFullHardFail:
         original = settings_mod.SENTINEL_ROUTING_PROFILE
         try:
             settings_mod.SENTINEL_ROUTING_PROFILE = "local_full"
-            with patch(
-                "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
-                side_effect=Exception("Connection refused"),
-            ), pytest.raises(LocalInferenceUnavailableError):
+            with (
+                patch(
+                    "app.services.hybrid_ai_service.hybrid_ai_service.query_ollama",
+                    side_effect=Exception("Connection refused"),
+                ),
+                pytest.raises(LocalInferenceUnavailableError),
+            ):
                 await ModelGateway().call(
                     task_class="medium",
                     messages=[{"role": "user", "content": "test"}],

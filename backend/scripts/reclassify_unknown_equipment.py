@@ -15,8 +15,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import httpx
-from app.database.repositories.equipment_repository import EquipmentRepository
+
 from app.config.settings import settings
+from app.database.repositories.equipment_repository import EquipmentRepository
 
 SITE_ID = "site-002"
 
@@ -92,6 +93,7 @@ async def main():
 
     # Resolve site UUID for site-002
     from supabase import create_client
+
     sb = create_client(settings.supabase_url, settings.supabase_service_role_key)
     site_rows = sb.table("sites").select("id").eq("code", SITE_ID).execute()
     site_uuid = site_rows.data[0]["id"] if site_rows.data else None

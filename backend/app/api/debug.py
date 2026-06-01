@@ -127,7 +127,6 @@ async def trigger_energy_poll() -> dict:
         raise HTTPException(status_code=404, detail="Not found")
 
     try:
-        import asyncio
 
         from app.services.shadow_mode_polling import get_shadow_mode_polling_service
 

@@ -251,7 +251,9 @@ class DispatchPredictor:
 
         # Weighted accuracy (consider confidence)
         weighted_correct = sum(
-            pred.confidence_pct / 100.0 for pred, actual in zip(predictions, actual_actions, strict=False) if pred.action == actual
+            pred.confidence_pct / 100.0
+            for pred, actual in zip(predictions, actual_actions, strict=False)
+            if pred.action == actual
         )
         weighted_accuracy = (weighted_correct / len(predictions)) * 100 if predictions else 0.0
 

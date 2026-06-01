@@ -56,21 +56,20 @@ class TestConnection:
         with patch(
             "app.services.simbiot.modbus_bms_adapter.AsyncModbusTcpClient",
             return_value=mock_client,
+        ), patch.object(
+            adapter,
+            "get_status",
+            AsyncMock(
+                return_value=BmsConnectionStatus(
+                    connected=True,
+                    site_id="site-002",
+                    source_type="modbus",
+                    status="connected",
+                    message="Modbus TCP client ready",
+                )
+            ),
         ):
-            with patch.object(
-                adapter,
-                "get_status",
-                AsyncMock(
-                    return_value=BmsConnectionStatus(
-                        connected=True,
-                        site_id="site-002",
-                        source_type="modbus",
-                        status="connected",
-                        message="Modbus TCP client ready",
-                    )
-                ),
-            ):
-                status = await adapter.connect(_make_config())
+            status = await adapter.connect(_make_config())
 
         assert status.connected is True
         assert status.status == "connected"

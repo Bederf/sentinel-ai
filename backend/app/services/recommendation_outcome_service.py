@@ -10,7 +10,6 @@ the recommendation achieved its goal and feeds the result back into:
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any

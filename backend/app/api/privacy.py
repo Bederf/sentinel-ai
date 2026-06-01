@@ -165,6 +165,7 @@ async def enforce_retention(
 # Supabase SQL Table Retention (POPIA Section 14 — S14(1) / S14(2))
 # =============================================================================
 
+
 @router.get("/retention/sql-status", response_model=dict)
 async def get_sql_retention_status(
     _auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
@@ -200,6 +201,7 @@ async def enforce_sql_retention(
     # Log to retention_execution_log
     try:
         from app.config.database import supabase_client
+
         for result, tier_label in [
             (ml, "ml_training"),
             (snap, "operational"),
@@ -218,6 +220,7 @@ async def enforce_sql_retention(
                 ).execute()
     except Exception as e:
         import logging
+
         logging.warning(f"Failed to log retention execution: {e}")
 
     return {
@@ -238,6 +241,7 @@ async def get_sql_retention_history(
     """Get last N retention execution log entries."""
     try:
         from app.config.database import supabase_client
+
         result = (
             supabase_client.table("retention_execution_log")
             .select("*")

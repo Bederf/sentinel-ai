@@ -5,7 +5,7 @@ Defines the data structures for ODS-E v0.4.0 compliant energy data export.
 """
 
 from datetime import datetime
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 

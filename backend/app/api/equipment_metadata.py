@@ -1,6 +1,5 @@
 """Equipment Metadata API - Endpoints for equipment notes and metadata management."""
 
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -331,7 +330,6 @@ async def mark_equipment_replaced(equipment_id: str, request: MarkReplacedReques
     and recalculates from the new commissioning date. The old record stays
     in place with its historical health data for audit.
     """
-    from datetime import datetime
 
     supabase = get_supabase_client()
 
@@ -339,14 +337,16 @@ async def mark_equipment_replaced(equipment_id: str, request: MarkReplacedReques
     if not eq.data:
         raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
 
-    supabase.table("equipment").update({
-        "replaced_on": request.replaced_on,
-        "replacement_notes": request.replacement_notes or "",
-        "health_score": None,
-        "health_score_confidence": None,
-        "baseline_sourced_from": "pending_replacement",
-        "last_baseline_update": None,
-    }).eq("id", equipment_id).execute()
+    supabase.table("equipment").update(
+        {
+            "replaced_on": request.replaced_on,
+            "replacement_notes": request.replacement_notes or "",
+            "health_score": None,
+            "health_score_confidence": None,
+            "baseline_sourced_from": "pending_replacement",
+            "last_baseline_update": None,
+        }
+    ).eq("id", equipment_id).execute()
 
     return {
         "status": "marked_replaced",

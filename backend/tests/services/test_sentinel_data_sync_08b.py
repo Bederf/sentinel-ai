@@ -1,5 +1,3 @@
-
-
 from app.services.sentinel_data_sync import _blend_health_score
 
 
@@ -75,9 +73,7 @@ class TestLSTMAnomalyScoreKeySeparation:
         # Manually add buffer data so score_lstm_anomaly produces results
         feeder._code_to_type["S002-FCU-001"] = "fcu"
         feeder._buffers.setdefault("fcu", {})
-        feeder._buffers["fcu"]["supply_temp"] = [
-            22.0 + i * 0.1 for i in range(80)
-        ]  # 80 readings, trending up
+        feeder._buffers["fcu"]["supply_temp"] = [22.0 + i * 0.1 for i in range(80)]  # 80 readings, trending up
 
         lstm_scores = feeder.score_lstm_anomaly()
         anomaly_scores = feeder.score_anomaly()
@@ -108,9 +104,7 @@ class TestLSTMAnomalyScoreKeySeparation:
         feeder._code_to_type["S002-CHILLER-B1-001"] = "chiller"
         feeder._buffers.setdefault("chiller", {})
         # Trending signal — prediction error should be non-zero
-        feeder._buffers["chiller"]["chw_supply_temp"] = [
-            6.0 + i * 0.05 for i in range(80)
-        ]
+        feeder._buffers["chiller"]["chw_supply_temp"] = [6.0 + i * 0.05 for i in range(80)]
 
         scores = feeder.score_lstm_anomaly()
         for code, score in scores.items():

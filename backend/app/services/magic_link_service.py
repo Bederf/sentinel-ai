@@ -128,6 +128,7 @@ class MagicLinkService:
 
     def _client(self):
         from app.database.supabase_client import get_supabase_client
+
         return get_supabase_client()
 
     def generate_invite_token(
@@ -152,15 +153,21 @@ class MagicLinkService:
         token = secrets.token_urlsafe(32)
         expires_at = datetime.now(UTC) + timedelta(hours=INVITE_TOKEN_EXPIRY_HOURS)
 
-        result = client.table("magic_link_tokens").insert({
-            "token": token,
-            "email": email.strip().lower(),
-            "full_name": full_name.strip(),
-            "role": role,
-            "site_id": site_id,
-            "invited_by": invited_by,
-            "expires_at": expires_at.isoformat(),
-        }).execute()
+        result = (
+            client.table("magic_link_tokens")
+            .insert(
+                {
+                    "token": token,
+                    "email": email.strip().lower(),
+                    "full_name": full_name.strip(),
+                    "role": role,
+                    "site_id": site_id,
+                    "invited_by": invited_by,
+                    "expires_at": expires_at.isoformat(),
+                }
+            )
+            .execute()
+        )
 
         if not result.data:
             raise RuntimeError("Failed to create invite token")
@@ -196,13 +203,7 @@ class MagicLinkService:
         if not client:
             return None
 
-        result = (
-            client.table("magic_link_tokens")
-            .select("*")
-            .eq("token", token)
-            .limit(1)
-            .execute()
-        )
+        result = client.table("magic_link_tokens").select("*").eq("token", token).limit(1).execute()
         if not result.data:
             return None
 
@@ -280,7 +281,7 @@ class MagicLinkService:
         )
 
         # Create session record
-        from app.services.token_blacklist_service import token_blacklist
+
         refresh_jti = secrets.token_urlsafe(16)
         session_id = self._session_svc.create_session(
             user_id=user_id,
@@ -315,14 +316,16 @@ class MagicLinkService:
             # Update existing user with password
             result = (
                 client.table("sentinel_users")
-                .update({
-                    "full_name": full_name,
-                    "role": role,
-                    "password_hash": password_hash,
-                    "must_set_password": False,
-                    "is_active": True,
-                    "updated_at": datetime.now(UTC).isoformat(),
-                })
+                .update(
+                    {
+                        "full_name": full_name,
+                        "role": role,
+                        "password_hash": password_hash,
+                        "must_set_password": False,
+                        "is_active": True,
+                        "updated_at": datetime.now(UTC).isoformat(),
+                    }
+                )
                 .eq("email", email)
                 .execute()
             )
@@ -333,14 +336,16 @@ class MagicLinkService:
             # Create new user
             result = (
                 client.table("sentinel_users")
-                .insert({
-                    "email": email,
-                    "full_name": full_name,
-                    "role": role,
-                    "password_hash": password_hash,
-                    "must_set_password": False,
-                    "is_active": True,
-                })
+                .insert(
+                    {
+                        "email": email,
+                        "full_name": full_name,
+                        "role": role,
+                        "password_hash": password_hash,
+                        "must_set_password": False,
+                        "is_active": True,
+                    }
+                )
                 .execute()
             )
             if result.data:
@@ -351,11 +356,13 @@ class MagicLinkService:
         client = self._client()
         if not client:
             return
-        client.table("magic_link_tokens").update({
-            "accepted_at": datetime.now(UTC).isoformat(),
-            "accepted_ip": ip,
-            "accepted_user_agent": user_agent,
-        }).eq("token", token).execute()
+        client.table("magic_link_tokens").update(
+            {
+                "accepted_at": datetime.now(UTC).isoformat(),
+                "accepted_ip": ip,
+                "accepted_user_agent": user_agent,
+            }
+        ).eq("token", token).execute()
 
 
 def get_magic_link_service() -> MagicLinkService:

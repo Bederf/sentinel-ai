@@ -363,7 +363,11 @@ class CommissioningService:
                     "all_gates_passed": all_gates_passed,
                     "scorecard_data": {
                         "gates": gate_data,
-                        "summary": {"passed": sum(1 for g in gates if g.passed), "failed": sum(1 for g in gates if not g.passed), "total": len(gates)},
+                        "summary": {
+                            "passed": sum(1 for g in gates if g.passed),
+                            "failed": sum(1 for g in gates if not g.passed),
+                            "total": len(gates),
+                        },
                     },
                 }
             ).execute()

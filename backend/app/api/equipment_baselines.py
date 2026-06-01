@@ -53,13 +53,10 @@ async def seed_equipment_baseline(
             captured_by=captured_by,
         )
         # source parameter is used when we enhance the service
-        _ = source  # noqa: ARG001
+        _ = source
 
         if baseline is None:
-            raise HTTPException(
-                status_code=500,
-                detail=f"Baseline capture failed for {equipment_id}"
-            )
+            raise HTTPException(status_code=500, detail=f"Baseline capture failed for {equipment_id}")
 
         return {
             "status": status,
@@ -68,10 +65,10 @@ async def seed_equipment_baseline(
             "baseline": {
                 "id": baseline.id,
                 "equipment_id": baseline.equipment_id,
-                "baseline_date": baseline.baseline_date.isoformat() if hasattr(baseline, 'baseline_date') else None,
+                "baseline_date": baseline.baseline_date.isoformat() if hasattr(baseline, "baseline_date") else None,
                 "captured_by": baseline.captured_by,
-                "baseline_type": baseline.baseline_type.value if hasattr(baseline, 'baseline_type') else None,
-                "status": baseline.status.value if hasattr(baseline, 'status') else None,
+                "baseline_type": baseline.baseline_type.value if hasattr(baseline, "baseline_type") else None,
+                "status": baseline.status.value if hasattr(baseline, "status") else None,
             },
         }
 
@@ -139,9 +136,6 @@ async def get_equipment_baseline(
     baseline = await repo.get_active_equipment_baseline(equipment_id)
 
     if not baseline:
-        raise HTTPException(
-            status_code=404,
-            detail=f"No active baseline found for equipment {equipment_id}"
-        )
+        raise HTTPException(status_code=404, detail=f"No active baseline found for equipment {equipment_id}")
 
     return baseline

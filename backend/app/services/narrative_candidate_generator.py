@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
-from typing import Any
 from datetime import UTC, datetime
+from typing import Any
 
 from app.schemas.cockpit import CockpitIssue, CockpitSourceStatus
 from app.services.building_state_models import NarrativeCandidate, NarrativeLocation, PropagationDirection, Voice

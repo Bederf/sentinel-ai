@@ -841,12 +841,7 @@ class WorkOrderNotifier:
             code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
             eq_line = f"\nEquipment: {equipment_code}" if equipment_code else ""
 
-            msg = (
-                f"Work Order Created #{wo_ref}\n"
-                f"Assigned: {tech_name}\n"
-                f"Priority: {pri}"
-                f"{eq_line}"
-            )
+            msg = f"Work Order Created #{wo_ref}\nAssigned: {tech_name}\nPriority: {pri}{eq_line}"
 
             # Build inline buttons for the technician
             import json

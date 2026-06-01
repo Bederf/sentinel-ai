@@ -102,7 +102,7 @@ function GridHelperMemo() {
 
 const SITE_MAP_TEXTURES: Record<string, string> = {
   'site-002': '/images/sandton-map.png',
-  'site-003': '/images/busamed-map.png',
+  'site-005': '/images/busamed-map.png',
 }
 
 function GroundPlane({ siteId, lat, lng }: { siteId?: string; lat?: number | null; lng?: number | null }) {

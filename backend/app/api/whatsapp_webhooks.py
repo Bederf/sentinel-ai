@@ -273,8 +273,8 @@ async def route_incoming_message(
         normalized_phone = _normalise_whatsapp_number(from_number)
 
         # --- WhatsApp onboarding flow ---
-        from app.services.whatsapp_conversation_manager import get_whatsapp_conversation_manager
         from app.database.repositories.occupant_repository import SiteOccupantRepository
+        from app.services.whatsapp_conversation_manager import get_whatsapp_conversation_manager
 
         occupant_repo = SiteOccupantRepository()
         mgr = get_whatsapp_conversation_manager()
@@ -332,9 +332,7 @@ async def route_incoming_message(
                 )
                 await whatsapp_service.send_text_message(
                     normalized_phone,
-                    "👋 <b>Welcome!</b>\n\n"
-                    "You're messaging the facilities team.\n\n"
-                    "First, what's your name?",
+                    "👋 <b>Welcome!</b>\n\nYou're messaging the facilities team.\n\nFirst, what's your name?",
                 )
                 return
 

@@ -12,7 +12,6 @@ import pytest
 from app.models.recommendation import MilestoneStatus, Recommendation
 from app.models.sla_term import RecommendationSLATerm
 
-
 # =============================================================================
 # Fixtures
 # =============================================================================
@@ -152,44 +151,55 @@ class TestMilestoneServiceAdvance:
 
     @pytest.fixture
     def svc(self):
-        with patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"), \
-             patch("app.services.recommendation_milestone_service.get_recommendation_repository"):
+        with (
+            patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"),
+            patch("app.services.recommendation_milestone_service.get_recommendation_repository"),
+        ):
             from app.services.recommendation_milestone_service import RecommendationMilestoneService
+
             return RecommendationMilestoneService()
 
     def test_advance_sets_in_progress_timestamp(self):
         rec = make_rec(milestone_status=MilestoneStatus.ASSIGNED)
 
-        with patch("app.services.recommendation_milestone_service.get_recommendation_repository") as mock_get_rec_repo, \
-             patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"):
+        with (
+            patch("app.services.recommendation_milestone_service.get_recommendation_repository") as mock_get_rec_repo,
+            patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"),
+        ):
             mock_rec_repo = MagicMock()
             mock_get_rec_repo.return_value = mock_rec_repo
             mock_rec_repo.get = AsyncMock(return_value=rec)
             mock_rec_repo.update = AsyncMock(return_value=rec)
 
             from app.services.recommendation_milestone_service import RecommendationMilestoneService
+
             svc = RecommendationMilestoneService()
             svc._rec_repo = mock_rec_repo
 
             import asyncio
+
             result = asyncio.get_event_loop().run_until_complete(
                 svc.advance_milestone(rec.id, MilestoneStatus.IN_PROGRESS)
             )
             mock_rec_repo.update.assert_called_once()
 
     def test_advance_unknown_rec_raises(self):
-        with patch("app.services.recommendation_milestone_service.get_recommendation_repository") as mock_get_rec_repo, \
-             patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"):
+        with (
+            patch("app.services.recommendation_milestone_service.get_recommendation_repository") as mock_get_rec_repo,
+            patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"),
+        ):
             mock_rec_repo = MagicMock()
             mock_get_rec_repo.return_value = mock_rec_repo
             mock_rec_repo.get = AsyncMock(return_value=None)
 
             from app.services.recommendation_milestone_service import RecommendationMilestoneService
+
             svc = RecommendationMilestoneService()
             svc._rec_repo = mock_rec_repo
 
             with pytest.raises(ValueError, match="not found"):
                 import asyncio
+
                 asyncio.get_event_loop().run_until_complete(
                     svc.advance_milestone("fake-id", MilestoneStatus.IN_PROGRESS)
                 )
@@ -201,9 +211,12 @@ class TestMilestoneServiceBreachCheck:
 
     @pytest.fixture
     def svc(self):
-        with patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"), \
-             patch("app.services.recommendation_milestone_service.get_recommendation_repository"):
+        with (
+            patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"),
+            patch("app.services.recommendation_milestone_service.get_recommendation_repository"),
+        ):
             from app.services.recommendation_milestone_service import RecommendationMilestoneService
+
             return RecommendationMilestoneService()
 
     def test_elapsed_pct_within_sla(self, svc):
@@ -282,9 +295,12 @@ class TestFullMilestoneCycle:
 
     @pytest.fixture
     def svc(self):
-        with patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"), \
-             patch("app.services.recommendation_milestone_service.get_recommendation_repository"):
+        with (
+            patch("app.services.recommendation_milestone_service.get_recommendation_sla_repository"),
+            patch("app.services.recommendation_milestone_service.get_recommendation_repository"),
+        ):
             from app.services.recommendation_milestone_service import RecommendationMilestoneService
+
             return RecommendationMilestoneService()
 
     def test_full_cycle_assigned_in_progress_resolved_verified(self, svc):
@@ -324,11 +340,13 @@ class TestFullMilestoneCycle:
 class TestSchedulerMilestoneJob:
     def test_milestone_timer_method_exists(self):
         from app.services.background_scheduler import BackgroundSchedulerService
+
         svc = BackgroundSchedulerService()
         assert hasattr(svc, "add_milestone_timer_job")
 
     def test_milestone_timer_job_can_be_added(self):
         from app.services.background_scheduler import BackgroundSchedulerService
+
         svc = BackgroundSchedulerService()
         try:
             svc.add_milestone_timer_job(interval_seconds=300)
@@ -339,5 +357,6 @@ class TestSchedulerMilestoneJob:
 
     def test_check_milestone_deadlines_method_exists(self):
         from app.services.background_scheduler import BackgroundSchedulerService
+
         svc = BackgroundSchedulerService()
         assert hasattr(svc, "_check_milestone_deadlines")

@@ -1,6 +1,7 @@
 """Tests for InspectionTelemetryService."""
 
 import pytest
+
 from app.services.inspection_telemetry_service import InspectionTelemetryService, _rms_ms2_to_velocity
 
 

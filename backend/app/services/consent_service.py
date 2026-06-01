@@ -18,9 +18,9 @@ import logging
 import os
 import threading
 import uuid
+from pathlib import Path
 
 from dotenv import load_dotenv
-from pathlib import Path
 
 # Load .env before checking env vars — backend runs from /opt/bms-intelligence/backend
 load_dotenv(Path(__file__).parent.parent.parent / ".env")

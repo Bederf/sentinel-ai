@@ -26,6 +26,7 @@ class SiteAdapterManager:
     def supabase(self):
         if self._supabase is None:
             from app.database import get_supabase_client as get_supabase
+
             self._supabase = get_supabase()
         return self._supabase
 
@@ -142,9 +143,12 @@ class SiteAdapterManager:
         Returns:
             List of {protocol, enabled, connection_config} dicts
         """
-        result = self.supabase.table("site_adapter_config").select(
-            "protocol, enabled, connection_config"
-        ).eq("site_id", site_id).execute()
+        result = (
+            self.supabase.table("site_adapter_config")
+            .select("protocol, enabled, connection_config")
+            .eq("site_id", site_id)
+            .execute()
+        )
 
         return result.data if result.data else []
 
@@ -178,10 +182,14 @@ class SiteAdapterManager:
             "poll_interval_seconds": poll_interval_seconds,
         }
 
-        result = self.supabase.table("site_adapter_config").upsert(
-            payload,
-            on_conflict="site_id,protocol",
-        ).execute()
+        result = (
+            self.supabase.table("site_adapter_config")
+            .upsert(
+                payload,
+                on_conflict="site_id,protocol",
+            )
+            .execute()
+        )
 
         if result.data is None:
             logger.error("[SAM] Failed to save %s config for %s", protocol, site_id)
@@ -197,9 +205,7 @@ class SiteAdapterManager:
         Returns:
             List of {site_id, site_code} dicts
         """
-        result = self.supabase.table("sites").select("id, code").eq(
-            "optimization_enabled", True
-        ).execute()
+        result = self.supabase.table("sites").select("id, code").eq("optimization_enabled", True).execute()
         return result.data if result.data else []
 
     def get_enabled_adapters_for_all_sites(self) -> dict[str, list[dict[str, Any]]]:
@@ -207,9 +213,12 @@ class SiteAdapterManager:
         Return all enabled adapter configs keyed by site_id.
         Used by ShadowModePollingService to iterate over all sites.
         """
-        result = self.supabase.table("site_adapter_config").select(
-            "site_id, protocol, enabled, connection_config, poll_interval_seconds"
-        ).eq("enabled", True).execute()
+        result = (
+            self.supabase.table("site_adapter_config")
+            .select("site_id, protocol, enabled, connection_config, poll_interval_seconds")
+            .eq("enabled", True)
+            .execute()
+        )
 
         by_site: dict[str, list[dict[str, Any]]] = {}
         for row in result.data or []:

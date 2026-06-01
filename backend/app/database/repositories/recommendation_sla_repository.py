@@ -58,9 +58,7 @@ class RecommendationSLARepository:
         logger.warning("SLA term %s/%s fell back to JSON", term.site_code, term.milestone.value)
         return term
 
-    async def get_by_site_milestone(
-        self, site_code: str, milestone: MilestoneStatus
-    ) -> RecommendationSLATerm | None:
+    async def get_by_site_milestone(self, site_code: str, milestone: MilestoneStatus) -> RecommendationSLATerm | None:
         """Get SLA term for a specific site + milestone."""
         if self.client:
             try:
@@ -82,12 +80,7 @@ class RecommendationSLARepository:
         """Get all SLA terms for a site."""
         if self.client:
             try:
-                result = (
-                    self.client.table(self._TABLE)
-                    .select("*")
-                    .eq("site_code", site_code)
-                    .execute()
-                )
+                result = self.client.table(self._TABLE).select("*").eq("site_code", site_code).execute()
                 return [RecommendationSLATerm.from_dict(row) for row in (result.data or [])]
             except Exception as e:
                 logger.error("Supabase SLA terms for site failed: %s", e)

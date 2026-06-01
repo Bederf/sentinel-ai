@@ -976,12 +976,15 @@ class AIOptimizerService:
             # ── Active urgent work orders — prevent recommendations on faulty equipment ──
             try:
                 from app.database.repositories.work_order_repository import WorkOrderRepository
+
                 wo_repo = WorkOrderRepository()
                 urgent_wos = await wo_repo.get_open_urgent_work_orders(site_id)
                 if urgent_wos:
                     conditions["active_urgent_work_orders"] = [
                         {
-                            "equipment_code": (wo.get("equipment") or {}).get("code") if isinstance(wo.get("equipment"), dict) else None,
+                            "equipment_code": (wo.get("equipment") or {}).get("code")
+                            if isinstance(wo.get("equipment"), dict)
+                            else None,
                             "title": wo.get("title"),
                             "priority": wo.get("priority"),
                             "status": wo.get("status"),
@@ -1769,9 +1772,9 @@ State both cost saving (ZAR) AND comfort impact (°C change) for each recommenda
         base_intent = PROFILE_INTENTS.get(profile, PROFILE_INTENTS["balanced"])
         tariff_line = f"\nCurrent TOU: R{current_rate}/kWh ({band.upper()}) — next change: {next_change}\n"
         return f"""
-{'='*60}
+{"=" * 60}
 LAYER 1 — ACTIVE GOAL
-{'='*60}
+{"=" * 60}
 {base_intent}
 {tariff_line}
 """
@@ -1984,10 +1987,7 @@ SAFETY LIMITS:
 
         # Active urgent work orders \u2014 do not recommend adjustments on faulty equipment
         if urgent_wos:
-            wo_lines = "\n".join(
-                f"  - {wo['equipment_code']}: {wo['title']} ({wo['priority']})"
-                for wo in urgent_wos
-            )
+            wo_lines = "\n".join(f"  - {wo['equipment_code']}: {wo['title']} ({wo['priority']})" for wo in urgent_wos)
             sections.append(f"""
 ACTIVE URGENT WORK ORDERS \u2014 do not recommend operational adjustments for these:
 {wo_lines}
@@ -2014,9 +2014,9 @@ symptoms or interfere with the maintenance response. Flag the equipment as
         task_instruction = f"""
 TASK — FIND AND RECOMMEND EFFICIENCY OPPORTUNITIES
 
-Current time: {current_time.strftime('%A %H:%M')} SAST
-Building status: {'Occupied' if is_occupied else 'Unoccupied'}
-Active profile: {profile.upper().replace('_', ' ')}
+Current time: {current_time.strftime("%A %H:%M")} SAST
+Building status: {"Occupied" if is_occupied else "Unoccupied"}
+Active profile: {profile.upper().replace("_", " ")}
 Current tariff: R{current_rate}/kWh ({tariff})
 
 YOUR DEFAULT ASSUMPTION: There is almost always an efficiency opportunity
@@ -2403,7 +2403,9 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             try:
                 json_text = self._extract_json(response_text)
                 result = json.loads(json_text)
-                logger.debug(f"[PARSE] LLM raw JSON keys: {list(result.keys())}, recs={len(result.get('recommendations', []))}, no_action={len(result.get('no_action_reasons', []))}")
+                logger.debug(
+                    f"[PARSE] LLM raw JSON keys: {list(result.keys())}, recs={len(result.get('recommendations', []))}, no_action={len(result.get('no_action_reasons', []))}"
+                )
 
                 # Log data_requests for observability (Phase 2: data request mechanism)
                 data_requests = result.get("data_requests", [])
@@ -2457,10 +2459,12 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
                 # Validate and resolve equipment codes — drop any hallucinated codes
                 resolved = []
-                logger.debug(f"[RESOLVE] Starting resolution loop for {len(normalised_recommendations)} normalised recs")
+                logger.debug(
+                    f"[RESOLVE] Starting resolution loop for {len(normalised_recommendations)} normalised recs"
+                )
                 for i, r in enumerate(normalised_recommendations):
                     raw_code = r.get("target_equipment", "")
-                    logger.debug(f"[RESOLVE]   Rec {i+1}: raw_code='{raw_code}'")
+                    logger.debug(f"[RESOLVE]   Rec {i + 1}: raw_code='{raw_code}'")
                     if raw_code:
                         valid_code = await self._resolve_equipment_code(raw_code, site_id)
                         if valid_code:
@@ -2468,11 +2472,11 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                                 logger.info(f"[AI-OPT] Equipment code corrected: {raw_code} → {valid_code}")
                             r["target_equipment"] = valid_code
                             resolved.append(r)
-                            logger.debug(f"[RESOLVE]   Rec {i+1}: ✅ resolved to {valid_code}")
+                            logger.debug(f"[RESOLVE]   Rec {i + 1}: ✅ resolved to {valid_code}")
                         else:
-                            logger.warning(f"[AI-OPT] Dropping rec {i+1}: unresolvable equipment '{raw_code}'")
+                            logger.warning(f"[AI-OPT] Dropping rec {i + 1}: unresolvable equipment '{raw_code}'")
                     else:
-                        logger.warning(f"[RESOLVE]   Rec {i+1}: no target_equipment — passing through as-is")
+                        logger.warning(f"[RESOLVE]   Rec {i + 1}: no target_equipment — passing through as-is")
                         resolved.append(r)
                 normalised_recommendations = resolved
                 logger.warning(
@@ -2601,7 +2605,9 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         import uuid
 
         result = []
-        logger.debug(f"[PARSE] Processing {len(recommendations)} LLM recommendations, building_assessment='{building_assessment}'")
+        logger.debug(
+            f"[PARSE] Processing {len(recommendations)} LLM recommendations, building_assessment='{building_assessment}'"
+        )
         for rec in recommendations:
             adjustments = rec.get("adjustments", [])
             logger.debug(f"[PARSE]   rec keys={list(rec.keys())} adjustments={'yes' if adjustments else 'NO'}")
@@ -2705,7 +2711,9 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         """
         out = dict(raw)
         logger.debug(f"[NORM] Raw rec keys: {list(out.keys())}")
-        logger.debug(f"[NORM] target_equipment={out.get('target_equipment')} equipment_id={out.get('equipment_id')} action={out.get('action')} adjustments={out.get('adjustments')}")
+        logger.debug(
+            f"[NORM] target_equipment={out.get('target_equipment')} equipment_id={out.get('equipment_id')} action={out.get('action')} adjustments={out.get('adjustments')}"
+        )
 
         # Normalise equipment_id → target_equipment
         if "equipment_id" in out and "target_equipment" not in out:
@@ -3191,6 +3199,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         site_uuid = None
         try:
             from app.database.supabase_client import get_supabase_client
+
             sb = get_supabase_client()
             site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
             if site_resp.data:

@@ -15,7 +15,7 @@ The simulation layer (simulation_persistence.py) writes JSON only.
 import json
 import logging
 import os
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from typing import Any
 
 from app.api.metrics import sentinel_data_freshness_violations_total
@@ -54,10 +54,18 @@ def _blend_health_score(
 
 
 EQUIPMENT_EXPECTED_LIFE: dict[str, int] = {
-    'chiller': 20, 'ahu': 15, 'fcu': 15, 'vav': 20,
-    'pump': 15, 'cooling_tower': 20, 'bess': 10,
-    'generator': 25, 'ups': 10, 'meter': 20,
-    'lighting': 15, 'dali': 15,
+    "chiller": 20,
+    "ahu": 15,
+    "fcu": 15,
+    "vav": 20,
+    "pump": 15,
+    "cooling_tower": 20,
+    "bess": 10,
+    "generator": 25,
+    "ups": 10,
+    "meter": 20,
+    "lighting": 15,
+    "dali": 15,
 }
 
 
@@ -88,7 +96,7 @@ def calculate_age_based_health(
         service_penalty = 10.0
 
     health_score = round(max(30.0, age_health - service_penalty), 1)
-    return health_score, 'low'
+    return health_score, "low"
 
 
 class SentinelDataSync:
@@ -158,13 +166,12 @@ class SentinelDataSync:
                 site_uuid = sites_resp.data[0]["id"]
                 sources_resp = client.table("log_sources").select("last_sync_at").eq("site_id", site_uuid).execute()
                 if sources_resp.data and sources_resp.data[0].get("last_sync_at"):
-                    from datetime import timezone as tz
 
-                    now = datetime.now(tz=tz.utc)
+                    now = datetime.now(tz=UTC)
                     sync_at = sources_resp.data[0]["last_sync_at"]
                     sync_time = datetime.fromisoformat(sync_at.replace("Z", "+00:00"))
                     if sync_time.tzinfo is None:
-                        sync_time = sync_time.replace(tzinfo=tz.utc)
+                        sync_time = sync_time.replace(tzinfo=UTC)
                     data_freshness_hours = (now - sync_time).total_seconds() / 3600
                     logger.info(
                         f"[ML FEEDER] Freshness check: site_id={self.site_id} site_code={site_code_for_query} last_sync={sync_at} freshness_hours={data_freshness_hours:.2f}"
@@ -307,7 +314,9 @@ class SentinelDataSync:
 
         # 2a. Calculate age-based health for equipment with no live telemetry
         try:
-            results["no_telemetry_health_updated"] = await self._update_no_telemetry_health(simulated_time, equipment_states)
+            results["no_telemetry_health_updated"] = await self._update_no_telemetry_health(
+                simulated_time, equipment_states
+            )
         except Exception as e:
             results["errors"].append(f"no_telemetry_health: {e}")
 
@@ -461,7 +470,18 @@ class SentinelDataSync:
             trend = health_calc.calculate_trend(final_health_score or 0, prev_score)
             data_freshness = op_age  # already computed above
 
-            updates.append((code, json.dumps(operating_data), h, status, confidence, trend, data_freshness, simulated_time.isoformat()))
+            updates.append(
+                (
+                    code,
+                    json.dumps(operating_data),
+                    h,
+                    status,
+                    confidence,
+                    trend,
+                    data_freshness,
+                    simulated_time.isoformat(),
+                )
+            )
 
         if not updates:
             return 0
@@ -471,7 +491,10 @@ class SentinelDataSync:
             conn.autocommit = True
             cur = conn.cursor()
 
-            values_sql = ",".join(cur.mogrify("(%s, %s::jsonb, %s::int, %s, %s, %s, %s::int, %s::timestamptz)", row).decode() for row in updates)
+            values_sql = ",".join(
+                cur.mogrify("(%s, %s::jsonb, %s::int, %s, %s, %s, %s::int, %s::timestamptz)", row).decode()
+                for row in updates
+            )
 
             cur.execute(
                 f"""
@@ -568,8 +591,7 @@ class SentinelDataSync:
             health_int = round(score)
             updates.append((code, health_int, confidence, "unknown", simulated_time.isoformat()))
             logger.debug(
-                f"[HEALTH] {code} \u2014 age-based score: {score}%% "
-                f"(no telemetry, install_date={raw_install})"
+                f"[HEALTH] {code} \u2014 age-based score: {score}%% (no telemetry, install_date={raw_install})"
             )
 
         if not updates:
@@ -581,8 +603,7 @@ class SentinelDataSync:
             cur = conn.cursor()
 
             values_sql = ",".join(
-                cur.mogrify("(%s, %s::int, %s, %s, %s::timestamptz)", row).decode()
-                for row in updates
+                cur.mogrify("(%s, %s::int, %s, %s, %s::timestamptz)", row).decode() for row in updates
             )
 
             cur.execute(

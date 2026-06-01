@@ -85,7 +85,9 @@ class WorkOrderRepository:
                 "estimated_duration_hours": work_order.get("estimated_duration_hours"),
                 "created_by": work_order.get("created_by", "SENTINEL"),
                 "milestone_status": work_order.get("milestone_status", "assigned"),
-                "sla_hours": work_order.get("sla_hours", {"assigned": 24, "in_progress": 48, "resolved": 72, "verified": 168}),
+                "sla_hours": work_order.get(
+                    "sla_hours", {"assigned": 24, "in_progress": 48, "resolved": 72, "verified": 168}
+                ),
             }
 
             if equipment_id:
@@ -225,7 +227,8 @@ class WorkOrderRepository:
         if not self.client:
             return None
 
-        from datetime import UTC, datetime, timedelta
+        from datetime import datetime
+
         SAST = timezone(timedelta(hours=2))
         from app.database.repositories.recommendation_sla_repository import get_recommendation_sla_repository
 
@@ -410,13 +413,7 @@ class WorkOrderRepository:
 
         try:
             # Resolve equipment_code → equipment_id (UUID)
-            eq_result = (
-                self.client.table("equipment")
-                .select("id")
-                .eq("code", equipment_code)
-                .limit(1)
-                .execute()
-            )
+            eq_result = self.client.table("equipment").select("id").eq("code", equipment_code).limit(1).execute()
             if not eq_result.data:
                 return []
             equipment_id = eq_result.data[0]["id"]
@@ -502,13 +499,7 @@ class WorkOrderRepository:
 
         try:
             # Resolve equipment_code → equipment_id (UUID)
-            eq_result = (
-                self.client.table("equipment")
-                .select("id")
-                .eq("code", equipment_code)
-                .limit(1)
-                .execute()
-            )
+            eq_result = self.client.table("equipment").select("id").eq("code", equipment_code).limit(1).execute()
             if not eq_result.data:
                 return None
             equipment_id = eq_result.data[0]["id"]

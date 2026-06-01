@@ -264,16 +264,20 @@ class TestLLMResolution:
     def _make_async_gateway(self, response_text: str):
         """Return a mock gateway whose call() async method returns response_text."""
         mock = MagicMock()
+
         async def fake_call(**kwargs):
             return response_text
+
         mock.call = fake_call
         return mock
 
     def _make_failing_gateway(self, exc: Exception):
         """Return a mock gateway whose call() async method raises exc."""
         mock = MagicMock()
+
         async def fake_call(**kwargs):
             raise exc
+
         mock.call = fake_call
         return mock
 
@@ -294,6 +298,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve(
             "Primary chiller for building B1",
             equipment_data,
@@ -326,6 +331,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve("some equipment", equipment_data, None, gateway=mock_gw)
         resolved = asyncio.get_event_loop().run_until_complete(result)
 
@@ -335,9 +341,7 @@ class TestLLMResolution:
 
     def test_llm_resolve_null_asset_id_quarantined(self, mock_db, equipment_data):
         """LLM returns null asset_id → quarantined (LOW confidence)."""
-        mock_gw = self._make_async_gateway(
-            '{"asset_id": null, "confidence": 0.30, "reason": "no match found"}'
-        )
+        mock_gw = self._make_async_gateway('{"asset_id": null, "confidence": 0.30, "reason": "no match found"}')
 
         mock_exec = MagicMock()
         mock_exec.data = equipment_data
@@ -350,6 +354,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve("unknown equipment xyz", equipment_data, "work_order", gateway=mock_gw)
         resolved = asyncio.get_event_loop().run_until_complete(result)
 
@@ -371,6 +376,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve("chiller unit", equipment_data, None, gateway=mock_gw)
         resolved = asyncio.get_event_loop().run_until_complete(result)
 
@@ -394,6 +400,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve("chiller unit", equipment_data, None, gateway=mock_gw)
         resolved = asyncio.get_event_loop().run_until_complete(result)
 
@@ -424,6 +431,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve(
             "Chiller {B1} compressor {unit}",
             equipment_data,
@@ -463,6 +471,7 @@ class TestLLMResolution:
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         import asyncio
+
         result = resolver._llm_resolve(
             "Air handler unit",
             equipment_data,
@@ -521,8 +530,10 @@ class TestResolveAndApply:
 
         response = '{"asset_id": "S002-CHILLER-B1-001", "confidence": 0.90, "reason": ""}'
         mock_gw = MagicMock()
+
         async def fake_call(**kwargs):
             return response
+
         mock_gw.call = fake_call
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
@@ -534,6 +545,7 @@ class TestResolveAndApply:
     @pytest.mark.asyncio
     async def test_resolve_and_apply_document_not_found(self, mock_db):
         """Document not found → UNRESOLVED returned, no apply called."""
+
         def make_table_side_effect(name):
             mock_t = MagicMock()
             mock_select = MagicMock()
@@ -564,6 +576,7 @@ class TestResolveIntegration:
     @pytest.mark.asyncio
     async def test_resolve_calls_llm_when_fuzzy_misses(self, mock_db, equipment_data):
         """Best fuzzy score < 0.60 → Stage 4 called via gateway injection."""
+
         def make_table_side_effect(name):
             mock_t = MagicMock()
             if name == "equipment":
@@ -589,16 +602,16 @@ class TestResolveIntegration:
 
         response = '{"asset_id": "S002-AHU-001", "confidence": 0.75, "reason": "partial match"}'
         mock_gw = MagicMock()
+
         async def fake_call(**kwargs):
             return response
+
         mock_gw.call = fake_call
 
         resolver = AssetIDResolver(db=mock_db, site_id="site-002")
 
         # Description that won't fuzzy-match
-        result = await resolver.resolve(
-            "Compressor unit XYZ xyz unknown", "work_order", gateway=mock_gw
-        )
+        result = await resolver.resolve("Compressor unit XYZ xyz unknown", "work_order", gateway=mock_gw)
 
         assert result.method == ResolutionMethod.LLM_ASSISTED
         assert result.asset_id == "S002-AHU-001"

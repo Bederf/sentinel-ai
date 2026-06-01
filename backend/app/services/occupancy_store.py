@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from datetime import UTC, datetime, timezone
+from datetime import UTC, datetime
 
 from app.config.settings import settings
 from app.database.supabase_client import get_supabase_client
@@ -158,7 +158,7 @@ def room_sensor_is_alive(room_code: str, max_silence_minutes: int = 0) -> bool:
     last_seen = last.received_at if last.received_at else last.timestamp
     if last_seen.tzinfo is None:
         last_seen = last_seen.replace(tzinfo=UTC)
-    age_minutes = (datetime.now(timezone.utc) - last_seen).total_seconds() / 60
+    age_minutes = (datetime.now(UTC) - last_seen).total_seconds() / 60
     return age_minutes <= max_silence_minutes
 
 
@@ -308,10 +308,10 @@ def update_ghost_finding_status(
                 status = "confirmed_empty"
             r["status"] = status
             if status in ("verified_occupied", "confirmed_empty", "dismissed"):
-                r["resolved_at"] = _dt_to_str(datetime.now(timezone.utc))
+                r["resolved_at"] = _dt_to_str(datetime.now(UTC))
             if inspected_by:
                 r["inspected_by"] = inspected_by
-                r["inspected_at"] = _dt_to_str(datetime.now(timezone.utc))
+                r["inspected_at"] = _dt_to_str(datetime.now(UTC))
             if response_message_id:
                 r["response_message_id"] = response_message_id
             if response_text:
@@ -382,7 +382,7 @@ def mark_ghost_finding_notified(
             if not rows:
                 return None
             r = rows[0]
-            now_str = _dt_to_str(datetime.now(timezone.utc))
+            now_str = _dt_to_str(datetime.now(UTC))
             r["notification_sent"] = bool(r.get("notification_sent")) or email_sent or whatsapp_sent
             r["notification_sent_at"] = now_str
             if concierge_email:
@@ -423,7 +423,7 @@ def mark_ghost_finding_reminder_sent(
             if not rows:
                 return None
             r = rows[0]
-            now_str = _dt_to_str(datetime.now(timezone.utc))
+            now_str = _dt_to_str(datetime.now(UTC))
             r["reminder_sent"] = True
             r["reminder_sent_at"] = now_str
             if whatsapp_message_id:
@@ -705,19 +705,25 @@ def extend_overstay_grace(session_id: str, additional_minutes: int = 10) -> bool
     with _lock:
         try:
             client = _client()
-            resp = client.table("space_focus_room_sessions").select("overstay_grace_minutes").eq(
-                "session_id", session_id
-            ).limit(1).execute()
+            resp = (
+                client.table("space_focus_room_sessions")
+                .select("overstay_grace_minutes")
+                .eq("session_id", session_id)
+                .limit(1)
+                .execute()
+            )
             if not resp.data:
                 return False
             current = resp.data[0].get("overstay_grace_minutes", 0) or 0
             new_total = current + additional_minutes
-            client.table("space_focus_room_sessions").update(
-                {"overstay_grace_minutes": new_total}
-            ).eq("session_id", session_id).execute()
+            client.table("space_focus_room_sessions").update({"overstay_grace_minutes": new_total}).eq(
+                "session_id", session_id
+            ).execute()
             logger.info(
                 "Overstay grace extended: session=%s +%d min (now %d min)",
-                session_id, additional_minutes, new_total,
+                session_id,
+                additional_minutes,
+                new_total,
             )
             return True
         except Exception as exc:

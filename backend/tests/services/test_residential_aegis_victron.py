@@ -41,6 +41,7 @@ def _rule_ids(results) -> list[str]:
 
 # ── RES_BATTERY_DEGRADED ──────────────────────────────────────────────────────
 
+
 def test_battery_degraded_fires_below_70_pct():
     snap = _snap(battery_soh_pct=69.0)
     results = _eval(snap)
@@ -83,6 +84,7 @@ def test_battery_degraded_message_includes_soh_value():
 
 # ── RES_INPUT_VOLTAGE_LOW (Victron-specific) ──────────────────────────────────
 
+
 def test_input_voltage_low_fires_below_195v():
     snap = _snap(grid_voltage_v=194.0)
     assert "RES_INPUT_VOLTAGE_LOW" in _rule_ids(_eval(snap))
@@ -123,6 +125,7 @@ def test_input_voltage_low_silent_when_voltage_zero():
 
 # ── Platform scoping: Victron rules must NOT fire for solarman ────────────────
 
+
 def test_battery_degraded_does_not_fire_for_solarman():
     snap = _snap(battery_soh_pct=50.0, source_system="solarman")
     assert "RES_BATTERY_DEGRADED" not in _rule_ids(_eval(snap))
@@ -140,6 +143,7 @@ def test_battery_degraded_does_not_fire_for_growatt():
 
 # ── Existing generic rules still fire for Victron snapshots ───────────────────
 
+
 def test_battery_critical_low_still_fires_for_victron():
     snap = _snap(battery_soc_pct=8.0, source_system="victron")
     assert "RES_BATTERY_CRITICAL_LOW" in _rule_ids(_eval(snap))
@@ -152,6 +156,7 @@ def test_grid_voltage_anomaly_still_fires_for_victron():
 
 
 # ── Existing generic rules still fire for solarman (no regression) ───────────
+
 
 def test_battery_critical_low_fires_for_solarman():
     snap = _snap(battery_soc_pct=5.0, source_system="solarman")

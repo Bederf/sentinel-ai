@@ -23,7 +23,7 @@ from app.config.settings import settings
 from app.database.repositories.checklist_template_repository import (
     get_checklist_template_repository,
 )
-from app.services.issue_classifier import CALL_LOG_TAXONOMY, classify_issue
+from app.services.issue_classifier import classify_issue
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,9 @@ class ChecklistService:
         templates = self._load_templates()
         return [t for t in templates.values() if t.get("equipment_type") == equipment_type]
 
-    def get_oem_template(self, equipment_type: str, manufacturer: str, model: str | None = None) -> dict[str, Any] | None:
+    def get_oem_template(
+        self, equipment_type: str, manufacturer: str, model: str | None = None
+    ) -> dict[str, Any] | None:
         """
         Get OEM-specific template by manufacturer.
 

@@ -952,10 +952,14 @@ def _match_reasons(
         reasons.append(document.document_type)
     if hints.equipment_categories and document.equipment_category in hints.equipment_categories:
         reasons.append(document.equipment_category)
-    if hints.annual_intent and "annual" not in reasons and (
-        "annual" in combined_tokens
-        or "annual" in document.title.lower()
-        or "annual" in document.cleaned_text.lower()
+    if (
+        hints.annual_intent
+        and "annual" not in reasons
+        and (
+            "annual" in combined_tokens
+            or "annual" in document.title.lower()
+            or "annual" in document.cleaned_text.lower()
+        )
     ):
         reasons.append("annual")
 

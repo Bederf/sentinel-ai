@@ -310,7 +310,9 @@ class SupabaseTrainingDataLoader:
             Array of shape (hours, n_features) or None
         """
         df = self.load_equipment_type_dataframe(
-            equipment_type, min_hours=min_hours, lookback_days=lookback_days,
+            equipment_type,
+            min_hours=min_hours,
+            lookback_days=lookback_days,
             delete_after_load=delete_after_load,
         )
         if df is None:

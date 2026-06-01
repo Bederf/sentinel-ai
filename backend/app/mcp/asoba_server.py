@@ -27,11 +27,7 @@ ASOBA_ENABLED = os.getenv("ASOBA_ENABLED", "false").lower() == "true"
 _SITE_MAP: dict[str, str] = {}
 if os.getenv("ASOBA_SITE_MAPPING"):
     try:
-        _SITE_MAP = dict(
-            pair.split(":")
-            for pair in os.getenv("ASOBA_SITE_MAPPING", "").split(",")
-            if ":" in pair
-        )
+        _SITE_MAP = dict(pair.split(":") for pair in os.getenv("ASOBA_SITE_MAPPING", "").split(",") if ":" in pair)
     except Exception as e:
         logger.error(f"Failed to parse ASOBA_SITE_MAPPING: {e}")
 

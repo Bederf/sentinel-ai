@@ -47,7 +47,7 @@ class EquipmentIDConverter:
         "lum": "LUM",
         "luminaire": "LUM",
         "lighting": "LUM",
-        "zone": "DALI",          # Niagara zone controller → DALI lighting
+        "zone": "DALI",  # Niagara zone controller → DALI lighting
         "zone_controller": "DALI",
         # Energy
         "gen": "GEN",

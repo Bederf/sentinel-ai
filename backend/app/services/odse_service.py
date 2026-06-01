@@ -14,7 +14,6 @@ from app.models.odse_models import (
     ODSEAssetRecord,
     ODSEBuilding,
     ODSELocation,
-    ODSELocation,
     ODSERecord,
     ODSESentinelExtensions,
     ODSETimeseriesExport,
@@ -204,9 +203,7 @@ class ODSEExportService:
             tariff_period=tariff_period,
         )
 
-    def _map_equipment_to_odse_asset(
-        self, equipment: dict[str, Any], include_health: bool
-    ) -> ODSEAssetRecord:
+    def _map_equipment_to_odse_asset(self, equipment: dict[str, Any], include_health: bool) -> ODSEAssetRecord:
         """Map Sentinel equipment to ODS-E asset record."""
         equipment_code = equipment.get("equipment_code", "")
         equipment_type = equipment.get("equipment_type", "unknown")
@@ -314,14 +311,16 @@ class ODSEExportService:
         mock_readings = []
         current = start
         while current < end:
-            mock_readings.append({
-                "timestamp": current,
-                "kwh": 12.4 + (current.hour % 5),  # Mock varying consumption
-                "equipment_type": "CHILLER",
-                "health_score": 82.0,
-                "power_factor": 0.95,
-                "kva": 13.1,
-            })
+            mock_readings.append(
+                {
+                    "timestamp": current,
+                    "kwh": 12.4 + (current.hour % 5),  # Mock varying consumption
+                    "equipment_type": "CHILLER",
+                    "health_score": 82.0,
+                    "power_factor": 0.95,
+                    "kva": 13.1,
+                }
+            )
             current += timedelta(minutes=interval_minutes)
 
         return mock_readings
@@ -379,10 +378,7 @@ class ODSEExportService:
         ]
 
         if equipment_type:
-            mock_equipment = [
-                eq for eq in mock_equipment
-                if eq["equipment_type"].upper() == equipment_type.upper()
-            ]
+            mock_equipment = [eq for eq in mock_equipment if eq["equipment_type"].upper() == equipment_type.upper()]
 
         return mock_equipment
 

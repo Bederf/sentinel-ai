@@ -1023,9 +1023,11 @@ async def create_technician_work_order(
         if not parts_required and order.equipment_id:
             try:
                 from app.database.repositories.equipment_repository import EquipmentRepository
+
                 eq = EquipmentRepository().get_by_id(order.equipment_id)
                 if eq:
                     from app.database.repositories.spare_parts_repository import SparePartsRepository
+
                     sp_repo = SparePartsRepository()
                     equip_type = (eq.get("type") or "").lower()
                     catalog_parts = sp_repo.get_parts_for_type(equip_type)
@@ -1302,6 +1304,7 @@ async def complete_technician_work_order(
     # Decrement spare_parts_inventory for parts_used
     try:
         from app.database.repositories.spare_parts_repository import SparePartsRepository
+
         sp_repo = SparePartsRepository()
         used_parts = completion.parts_used or []
         for used in used_parts:
@@ -1312,7 +1315,9 @@ async def complete_technician_work_order(
                     inv = inv[0] if inv else {}
                 if isinstance(inv, dict) and inv.get("quantity_on_hand", 0) > 0:
                     sp_repo.decrement_stock(sp["id"])
-                    logger.info("[PARTS] Decremented %s (%s) from inventory", sp.get("part_name"), sp.get("part_number"))
+                    logger.info(
+                        "[PARTS] Decremented %s (%s) from inventory", sp.get("part_name"), sp.get("part_number")
+                    )
                     break
     except Exception as e:
         logger.debug("[PARTS] Could not decrement inventory: %s", e)

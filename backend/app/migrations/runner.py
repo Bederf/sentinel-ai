@@ -138,14 +138,21 @@ def run_pending_migrations(dry_run: bool = False) -> list[str]:
 
         sql = path.read_text()
         try:
+            needs_autocommit = "CONCURRENTLY" in sql.upper()
+            if needs_autocommit:
+                conn.autocommit = True
             with conn.cursor() as cur:
                 cur.execute(sql)
-            conn.commit()
+            if needs_autocommit:
+                conn.autocommit = False
+            else:
+                conn.commit()
             _upsert_lock(conn, filename, current_checksum)
             logger.info("Applied: %s", filename)
             applied.append(filename)
         except Exception as e:
-            conn.rollback()
+            if not needs_autocommit:
+                conn.rollback()
             raise RuntimeError(f"Migration failed: {filename}: {e}") from e
 
     conn.close()

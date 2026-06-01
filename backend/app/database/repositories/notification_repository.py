@@ -482,8 +482,13 @@ class NotificationRepository:
         """Convert NotificationDeliveryLog model to dictionary."""
         # Columns that actually exist in notification_delivery_log
         valid_cols = {
-            "notification_type", "channel_type", "status", "recipient_identifier",
-            "error_message", "provider", "external_message_id",
+            "notification_type",
+            "channel_type",
+            "status",
+            "recipient_identifier",
+            "error_message",
+            "provider",
+            "external_message_id",
         }
         payload: dict[str, Any] = {
             "notification_type": model.notification_type,

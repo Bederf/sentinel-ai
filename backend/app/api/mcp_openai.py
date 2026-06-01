@@ -441,9 +441,7 @@ async def well_known_openapi():
         required: list[str] = []
         schema_props = input_schema.get("properties", {})
         for prop_name, prop_def in schema_props.items():
-            properties[prop_name] = {
-                k: v for k, v in prop_def.items() if k != "description"
-            }
+            properties[prop_name] = {k: v for k, v in prop_def.items() if k != "description"}
             if prop_def.get("required"):
                 required.append(prop_name)
 
@@ -462,20 +460,12 @@ async def well_known_openapi():
                 "tags": ["SENTINEL BMS"],
                 "requestBody": {
                     "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": request_body_schema
-                        }
-                    },
+                    "content": {"application/json": {"schema": request_body_schema}},
                 },
                 "responses": {
                     "200": {
                         "description": "Successful response",
-                        "content": {
-                            "application/json": {
-                                "schema": {"type": "object"}
-                            }
-                        }
+                        "content": {"application/json": {"schema": {"type": "object"}}},
                     }
                 },
             }
@@ -541,7 +531,9 @@ async def openapi_json():
 
         schema_body = {"type": "object"}
         if properties:
-            schema_body["properties"] = {k: {**v, "description": v.get("description", "")} for k, v in properties.items()}
+            schema_body["properties"] = {
+                k: {**v, "description": v.get("description", "")} for k, v in properties.items()
+            }
         if required:
             schema_body["required"] = required
 
