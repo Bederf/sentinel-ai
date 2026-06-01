@@ -114,12 +114,15 @@ DISCOVERING = "discovering"
 # Home Assistant onboarding states
 AWAITING_HA_PUBLIC_KEY = "awaiting_ha_public_key"
 AWAITING_HA_TUNNEL_READY = "awaiting_ha_tunnel_ready"
+AWAITING_HA_DEPLOYMENT = "awaiting_ha_deployment_type"
+AWAITING_HA_READY = "awaiting_ha_ready"
 MAPPING_HA_PV = "mapping_ha_pv"
 MAPPING_HA_BATTERY = "mapping_ha_battery"
 MAPPING_HA_GRID = "mapping_ha_grid"
 MAPPING_HA_LOAD = "mapping_ha_load"
 MAPPING_HA_GEYSER = "mapping_ha_geyser"
 MAPPING_HA_EV = "mapping_ha_ev"
+MAPPING_HA_BATT_TEMP = "mapping_ha_battery_temp"
 MAPPING_HA_COMPLETE = "mapping_ha_complete"
 
 
@@ -210,18 +213,92 @@ class ResidentialOnboardService:
             _send(chat_id, f"Enter your {platform_name} account email:")
 
     def _start_ha_onboarding(self, chat_id: int, state) -> None:
-        """Begin the Home Assistant WireGuard onboarding flow."""
-        state.step = AWAITING_HA_PUBLIC_KEY
+        """Begin the Home Assistant onboarding flow: choose deployment type."""
+        state.step = AWAITING_HA_DEPLOYMENT
         state.data["entity_map"] = {}
         self._state.set(chat_id, state)
-        _send(
-            chat_id,
-            "🏠 Home Assistant connects to SENTINEL via WireGuard VPN.\n\n"
-            "Step 1: Install the WireGuard Add-on in Home Assistant\n"
-            "(Settings → Add-ons → Store → search WireGuard → Install).\n\n"
-            "Once installed, generate a key pair in the add-on\n"
-            "and send me your Public Key:\n\n"
-            "(Format: a 44-character string ending with =)",
+        keyboard = {
+            "inline_keyboard": [
+                [
+                    {"text": "🏠 Home network (Pi/NUC)", "callback_data": "ha:deploy:local"},
+                ],
+                [
+                    {"text": "☁️ VPS / Cloud server", "callback_data": "ha:deploy:vps"},
+                ],
+            ]
+        }
+        _send(chat_id, "Where is Home Assistant running?", reply_markup=keyboard)
+
+    def handle_ha_deployment_callback(self, chat_id: int, callback_query_id: str, deployment: str) -> None:
+        """Handle HA deployment type selection (local|vps)."""
+        _answer_callback(callback_query_id)
+        state = self._state.get(chat_id)
+        if state is None or state.step != AWAITING_HA_DEPLOYMENT:
+            _send(chat_id, "Your session timed out. Send /connect to start again.")
+            return
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+        if deployment == "local":
+            # Original WireGuard flow
+            state.step = AWAITING_HA_PUBLIC_KEY
+            self._state.set(chat_id, state)
+            _send(
+                chat_id,
+                "🏠 Home Assistant connects to SENTINEL via WireGuard VPN.\n\n"
+                "Step 1: Install the WireGuard Add-on in Home Assistant\n"
+                "(Settings → Add-ons → Store → search WireGuard → Install).\n\n"
+                "Once installed, generate a key pair in the add-on\n"
+                "and send me your Public Key:\n\n"
+                "(Format: a 44-character string ending with =)",
+            )
+            return
+
+        if deployment == "vps":
+            from app.services.residential.mqtt_provisioner import get_mqtt_provisioner
+
+            prov = get_mqtt_provisioner()
+            creds = prov.provision_vps_client(site_id, chat_id)
+            state.data["ha_deployment_type"] = "vps"
+            self._state.set(chat_id, state)
+
+            yaml_block = creds.config_yaml
+            msg = (
+                "⚙️ Generating your MQTT credentials...\n\n"
+                "✅ Credentials ready. Add this to your Home Assistant configuration.yaml:\n\n"
+                f"<code>{yaml_block}</code>\n\n"
+                "⚠️ Keep this configuration private. Delete this message after saving the config to your configuration.yaml.\n\n"
+                "When done, restart Home Assistant and send /ha_ready"
+            )
+            _send(chat_id, msg)
+            state.step = AWAITING_HA_READY
+            self._state.set(chat_id, state)
+            return
+
+        _send(chat_id, "Unknown selection. Send /connect to start again.")
+
+    def handle_ha_ready(self, chat_id: int) -> str:
+        """Handle /ha_ready for VPS onboarding."""
+        state = self._state.get(chat_id)
+        if state is None or state.step != AWAITING_HA_READY:
+            return "Send /connect to start the onboarding flow."
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+        from app.services.residential.mqtt_provisioner import get_mqtt_provisioner
+
+        ok = get_mqtt_provisioner().verify_vps_connection(site_id, timeout_seconds=30)
+        if not ok:
+            return (
+                "Connection not detected yet.\n\n"
+                "Check your configuration.yaml and restart Home Assistant.\n"
+                "Send /ha_ready again after restart."
+            )
+        # Connected → proceed to mapping
+        state.step = MAPPING_HA_PV
+        self._state.set(chat_id, state)
+        return (
+            "✅ Connected to SENTINEL!\n\n"
+            "Now map your solar entities. Find entity IDs in\n"
+            "Home Assistant → Developer Tools → States.\n\n"
+            "Type 'skip' for any you don't have.\n\n"
+            "PV Power entity ID:"
         )
 
     def handle_ha_public_key(self, chat_id: int, public_key: str) -> str:
@@ -382,10 +459,34 @@ class ResidentialOnboardService:
             entity_map["ev_charger_power_w"] = None
 
         state.data["entity_map"] = entity_map
+        # Prompt optional battery temperature mapping (Pylontech)
+        state.step = MAPPING_HA_BATT_TEMP
+        self._state.set(chat_id, state)
+        return "Battery Temperature entity ID (or 'skip'):"
+
+    def handle_ha_batt_temp_input(self, chat_id: int, text: str) -> str:
+        """Optional battery temperature mapping; then complete onboarding."""
+        state = self._state.get(chat_id)
+        if state is None or state.step != MAPPING_HA_BATT_TEMP:
+            return "Your session timed out. Send /connect to start again."
+
+        entity_map = state.data.get("entity_map", {})
+        if text.strip().lower() != "skip":
+            entity_id = text.strip()
+            import re as _re
+
+            if not _re.match(r"^[a-z0-9_\.]+$", entity_id) or len(entity_id) > 100:
+                return (
+                    "Invalid entity ID format.\n\nUse only letters, numbers, dots, and underscores.\n"
+                    "Max 100 characters.\n\nTry again:"
+                )
+            entity_map["battery_temp_c"] = entity_id
+        else:
+            entity_map["battery_temp_c"] = None
+
+        state.data["entity_map"] = entity_map
         state.step = MAPPING_HA_COMPLETE
         self._state.set(chat_id, state)
-
-        # Perform the actual onboarding
         return self._complete_ha_onboarding(chat_id, state)
 
     def _complete_ha_onboarding(self, chat_id: int, state) -> str:
@@ -448,6 +549,7 @@ class ResidentialOnboardService:
             "load_power_w": "Load Power",
             "geyser_state": "Geyser",
             "ev_charger_power_w": "EV Charger",
+            "battery_temp_c": "Battery Temp",
         }
         lines = []
         for field, label in field_names.items():
