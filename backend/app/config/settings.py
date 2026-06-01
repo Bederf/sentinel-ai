@@ -561,6 +561,10 @@ class Settings(BaseSettings):
     whatsapp_business_id: str = ""  # Meta Business ID
     whatsapp_enabled: bool = False
 
+    # Residential VPS MQTT broker (public)
+    mqtt_broker_public_host: str = Field(default="", validation_alias="MQTT_BROKER_PUBLIC_HOST")
+    mqtt_broker_port: int = Field(default=1883, validation_alias="MQTT_BROKER_PORT")
+
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:
         """Resolve ingestion mode from configured value with safe fallback."""

@@ -137,7 +137,7 @@ def evaluate(
     # ── Home Assistant-specific rules ─────────────────────────────────────────
     # These rules require device-level visibility (geyser, EV charger) that
     # cloud-only platform APIs cannot provide. Only fires for HA gateway sites.
-    if snapshot.source_system == "home_assistant":
+  if snapshot.source_system == "home_assistant":
         # P1: Geyser ON during impending loadshedding — drain battery faster
         geyser_state = getattr(snapshot, "geyser_state", None)
         if geyser_state == "on" and area_schedule is not None:
@@ -217,6 +217,59 @@ def evaluate(
                         f"Battery at {soc:.0f}%. "
                         f"Good time to run geyser via Home Assistant — "
                         f"use free solar instead of exporting."
+                    ),
+                    triggered=True,
+            )
+            )
+
+        # NEW (Phase 217): Multi-inverter mismatch (Deye/Sunsynk, PV arrays)
+        pv_list = getattr(snapshot, "pv_powers", None)
+        if pv_list and isinstance(pv_list, list) and len(pv_list) > 1:
+            try:
+                max_pv = max(float(x) for x in pv_list)
+                min_pv = min(float(x) for x in pv_list)
+                if max_pv > 500 and min_pv < max_pv * 0.4:
+                    results.append(
+                        AEGISResult(
+                            rule_id="RES_INVERTER_MISMATCH",
+                            severity="P2",
+                            message=(
+                                f"One inverter generating significantly less than others "
+                                f"({min_pv:.0f}W vs {max_pv:.0f}W). Possible fault, shading, or disconnected string. "
+                                f"Check Home Assistant for individual inverter status."
+                            ),
+                            triggered=True,
+                        )
+                    )
+            except Exception:
+                pass
+
+        # NEW (Phase 217): Battery overtemperature (Pylontech) with hysteresis note
+        # Fire > 45°C, clear < 42°C (hysteresis handled by dedup/delivery layer)
+        batt_temp = getattr(snapshot, "battery_temp_c", None)
+        if batt_temp is not None and batt_temp > 45:
+            results.append(
+                AEGISResult(
+                    rule_id="RES_BATTERY_OVERTEMP",
+                    severity="P1",
+                    message=(
+                        f"Battery temperature {batt_temp:.0f}°C — above safe operating range. "
+                        "Check ventilation around battery bank immediately. Open Home Assistant for details."
+                    ),
+                    triggered=True,
+                )
+            )
+
+        # NEW (Phase 217): Battery SOH low for HA/Pylontech
+        soh = getattr(snapshot, "battery_soh_pct", None)
+        if soh is not None and soh < 70:
+            results.append(
+                AEGISResult(
+                    rule_id="RES_BATTERY_SOH_LOW",
+                    severity="P2",
+                    message=(
+                        f"Battery health at {soh:.0f}%. Consider scheduling a battery health check with your installer. "
+                        "Check Home Assistant for battery details."
                     ),
                     triggered=True,
                 )
