@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 
 from app.adapters.residential.base import ResidentialEnergyAdapter
 from app.services.background_scheduler import scheduler_service
@@ -232,3 +233,49 @@ def cancel_residential_recommendations(site_id: str) -> None:
     if scheduler_service.scheduler.get_job(job_id):
         scheduler_service.scheduler.remove_job(job_id)
         logger.info("Cancelled residential recommendations for %s", site_id)
+
+
+# ── Morning Summary Scheduler ─────────────────────────────────────────────────
+
+_MORNING_JOB_PREFIX = "morning:"
+
+
+def _morning_job_id(site_id: str) -> str:
+    return f"{_MORNING_JOB_PREFIX}{site_id}"
+
+
+def _run_morning_summary_sync(site_id: str) -> None:
+    from app.services.residential.morning_summary_service import MorningSummaryService
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        svc = MorningSummaryService()
+        loop.run_until_complete(svc.send_summary(site_id))
+    finally:
+        loop.close()
+
+
+def schedule_morning_summary(site_id: str) -> None:
+    """Schedule daily 07:00 SAST morning summary for a residential site."""
+    job_id = _morning_job_id(site_id)
+    if scheduler_service.scheduler.get_job(job_id):
+        scheduler_service.scheduler.remove_job(job_id)
+    scheduler_service.scheduler.add_job(
+        func=_run_morning_summary_sync,
+        args=[site_id],
+        trigger=CronTrigger(hour=7, minute=0, timezone="Africa/Johannesburg"),
+        id=job_id,
+        name=f"Morning summary — {site_id}",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+    logger.info("Scheduled morning summary for %s at 07:00 SAST", site_id)
+
+
+def cancel_morning_summary(site_id: str) -> None:
+    job_id = _morning_job_id(site_id)
+    if scheduler_service.scheduler.get_job(job_id):
+        scheduler_service.scheduler.remove_job(job_id)
+        logger.info("Cancelled morning summary for %s", site_id)

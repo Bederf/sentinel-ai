@@ -564,6 +564,7 @@ class Settings(BaseSettings):
     # Residential VPS MQTT broker (public)
     mqtt_broker_public_host: str = Field(default="", validation_alias="MQTT_BROKER_PUBLIC_HOST")
     mqtt_broker_port: int = Field(default=1883, validation_alias="MQTT_BROKER_PORT")
+    residential_tariff_zar: float = Field(default=3.50, validation_alias="RESIDENTIAL_TARIFF_ZAR")
 
     @property
     def resolved_ingestion_mode(self) -> IngestionMode:

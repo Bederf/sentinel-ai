@@ -183,6 +183,13 @@ async def onboard_residential_site(request: OnboardRequest) -> dict:
             )
         except Exception as exc:
             logger.warning("Failed to schedule residential polling for %s: %s", request.site_id, exc)
+    # Schedule morning summary for all residential platforms
+    try:
+        from app.services.residential.bridge_scheduler import schedule_morning_summary
+
+        schedule_morning_summary(request.site_id)
+    except Exception as exc:
+        logger.warning("Failed to schedule morning summary for %s: %s", request.site_id, exc)
 
     return {
         "status": "onboarded",
@@ -289,6 +296,14 @@ async def deactivate_residential_site(site_id: str) -> dict:
 
     deactivated_at = _dt.datetime.utcnow().isoformat()
     supabase.table("residential_sites").update({"is_active": False}).eq("site_id", site_id).execute()
+
+    # Remove morning summary job (idempotent)
+    try:
+        from app.services.residential.bridge_scheduler import cancel_morning_summary
+
+        cancel_morning_summary(site_id)
+    except Exception as exc:
+        logger.warning("Could not cancel morning job for %s: %s", site_id, exc)
 
     logger.info("Residential site deactivated: %s (topics_cleared=%d)", site_id, topics_cleared)
 
