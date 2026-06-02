@@ -470,6 +470,9 @@ class VectorDBService:
         Returns:
             List of matching document chunks
         """
+        # Resolve site code to UUID if needed
+        resolved_site_id = self._resolve_site_uuid(site_id)
+
         # Generate query embedding
         query_embedding = self.embedding_service.embed_text(query)
 
@@ -482,7 +485,7 @@ class VectorDBService:
                 "filter_equipment_type": equipment_type,
                 "filter_document_type": document_type,
                 "filter_manufacturer": manufacturer,
-                "filter_site_id": site_id,
+                "filter_site_id": resolved_site_id,
                 "similarity_threshold": similarity_threshold,
             },
         ).execute()
@@ -544,6 +547,8 @@ class VectorDBService:
         else:
             query_embedding = self.embedding_service.embed_text(query)
 
+        resolved_site_id = self._resolve_site_uuid(site_id)
+
         result = self.client.rpc(
             "hybrid_search_chunks",
             {
@@ -551,7 +556,7 @@ class VectorDBService:
                 "query_embedding": query_embedding,
                 "match_count": n_results,
                 "filter_equipment_type": equipment_type,
-                "filter_site_id": site_id,
+                "filter_site_id": resolved_site_id,
                 "keyword_weight": keyword_weight,
                 "semantic_weight": semantic_weight,
             },
