@@ -23,6 +23,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Query, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.config.settings import settings
@@ -2742,98 +2743,75 @@ async def handle_telegram_message(
 # ---------------------------------------------------------------------------
 
 
-@router.post("/telegram/webhook/home")
+@router.post("/telegram/webhook/home", status_code=status.HTTP_200_OK)
 async def handle_home_bot_webhook(request: Request):
-    """Receive ALL Telegram updates for @Sentinelaihomebot directly.
+    """Phase 220: Direct Telegram webhook for @Sentinelaihomebot."""
+    import asyncio
 
-    Validates with X-Telegram-Bot-Api-Secret-Token, then routes:
-    - /connect or text during flow → state machine
-    - callback_query (platform selection) → handle_platform_callback
-    - Other messages → fall through (AI handled later or generic response)
-    """
     secret_token = request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     expected = settings.home_bot_webhook_secret
     if not expected or not secret_token or not hmac.compare_digest(secret_token, expected):
         raise HTTPException(status_code=403, detail="Unauthorized")
 
     body = await request.json()
-    logger.info("home_bot_webhook received: %s", json.dumps(body, default=str)[:500])
+    logger.info("home_bot_webhook: %s", json.dumps(body, default=str)[:300])
 
     message = body.get("message") or body.get("edited_message")
     callback = body.get("callback_query")
 
+    result = {}
+
     if callback:
-        return await _handle_home_callback(callback)
+        data = callback.get("data", "")
+        cb_id = callback.get("id", "")
+        msg_data = callback.get("message", {})
+        cb_chat_id = msg_data.get("chat", {}).get("id")
+        if cb_chat_id and data and data.startswith("platform:"):
+            from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+            service = ResidentialOnboardService()
+            service.handle_platform_callback(int(cb_chat_id), cb_id, data.split(":", 1)[1])
+            result = {"status": "platform", "platform": data}
+        else:
+            result = {"status": "unknown_callback", "data": data}
 
-    if message:
-        return await _handle_home_message(message)
+    elif message:
+        from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+        from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
 
-    return {"status": "ignored"}
+        chat_id = message.get("chat", {}).get("id")
+        user_id = message.get("from", {}).get("id")
+        text = (message.get("text") or "").strip()
 
+        if chat_id and text:
+            service = ResidentialOnboardService()
 
-async def _handle_home_message(msg: dict) -> dict:
-    """Process a Telegram message for the home bot."""
-    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
-    from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
+            if text == "/connect":
+                service.handle_connect(chat_id)
+                result = {"status": "connect"}
 
-    chat_id = msg.get("chat", {}).get("id")
-    user_id = msg.get("from", {}).get("id")
-    text = (msg.get("text") or "").strip()
+            elif text == "/start":
+                # Fire-and-forget the welcome message
+                async def send_welcome():
+                    sender = ResidentialTelegramSender()
+                    await sender.send_text(chat_id,
+                        "Welcome to SENTINEL Home! ☀️\n\n"
+                        "Send /connect to link your solar system."
+                    )
+                asyncio.create_task(send_welcome())
+                result = {"status": "start"}
 
-    if not chat_id or not text:
-        return {"status": "empty"}
+            else:
+                state = service._state.get(chat_id)
+                if state is not None:
+                    service.handle_message(chat_id, text, str(user_id))
+                    result = {"status": "flow", "step": state.step}
+                else:
+                    result = {"status": "no_flow"}
 
-    service = ResidentialOnboardService()
+        else:
+            result = {"status": "empty"}
 
-    if text == "/start":
-        sender = ResidentialTelegramSender()
-        await sender.send_text(chat_id,
-            "Welcome to SENTINEL Home! ☀️\n\n"
-            "I monitor your solar system, battery, and load shedding schedule.\n\n"
-            "To get started, send /connect to link your solar system."
-        )
-        return {"status": "start"}
+    else:
+        result = {"status": "ignored"}
 
-    if text == "/connect":
-        service.handle_connect(chat_id)
-        return {"status": "connect"}
-
-    state = service._state.get(chat_id)
-    if state is not None:
-        service.handle_message(chat_id, text, str(user_id))
-        return {"status": "flow", "step": state.step}
-
-    # Not in flow, not a command — let openclaw handle via fallback
-    # For now, send a helpful prompt
-    sender = ResidentialTelegramSender()
-    await sender.send_text(chat_id,
-        "I'm here to help with your solar system! ☀️\n\n"
-        "Available commands:\n"
-        "/connect — Link your solar system\n"
-        "/disconnect — Remove a connected system\n"
-        "/setarea — Set your Eskom area code\n\n"
-        "Or just ask me about your solar, battery, or load shedding."
-    )
-    return {"status": "help"}
-
-
-async def _handle_home_callback(callback: dict) -> dict:
-    """Process an inline button callback for the home bot."""
-    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
-
-    data = callback.get("data", "")
-    cb_id = callback.get("id", "")
-    msg = callback.get("message", {})
-    chat_id = msg.get("chat", {}).get("id")
-
-    if not chat_id or not data:
-        return {"status": "invalid_callback"}
-
-    service = ResidentialOnboardService()
-
-    if data.startswith("platform:"):
-        platform = data.split(":", 1)[1]
-        service.handle_platform_callback(int(chat_id), cb_id, platform)
-        return {"status": "platform", "platform": platform}
-
-    return {"status": "unknown_callback", "data": data}
+    return JSONResponse(content=result)

@@ -234,8 +234,13 @@ class DataFreshnessMonitor:
         if sli_pass and active_breach:
             # Breach is resolved
             breach_id = active_breach[0]["id"]
-            breach_time = datetime.fromisoformat(active_breach[0]["breach_time"].replace("Z", "+00:00"))
-            duration = int((now - breach_time).total_seconds())
+            raw_breach_time = active_breach[0].get("breach_time")
+            if raw_breach_time:
+                breach_time = datetime.fromisoformat(raw_breach_time.replace("Z", "+00:00"))
+                duration = int((now - breach_time).total_seconds())
+            else:
+                breach_time = now
+                duration = 0
 
             supabase.table("data_freshness_breaches").update(
                 {"resolved_at": now.isoformat(), "duration_seconds": duration}
@@ -256,6 +261,7 @@ class DataFreshnessMonitor:
                     "breach_type": "data_freshness",
                     "severity": "medium",
                     "detected_at": now.isoformat(),
+                    "breach_time": now.isoformat(),
                     "data_source": data_source,
                     "age_seconds": age_seconds,
                     "sli_target": target,
@@ -273,8 +279,13 @@ class DataFreshnessMonitor:
 
         elif not sli_pass and active_breach:
             # Ongoing breach — check if we've exceeded auto-recovery window
-            breach_time = datetime.fromisoformat(active_breach[0]["breach_time"].replace("Z", "+00:00"))
-            breach_duration = int((now - breach_time).total_seconds())
+            raw_breach_time = active_breach[0].get("breach_time")
+            if raw_breach_time:
+                breach_time = datetime.fromisoformat(raw_breach_time.replace("Z", "+00:00"))
+                breach_duration = int((now - breach_time).total_seconds())
+            else:
+                breach_time = now
+                breach_duration = 0
             alert_sent = active_breach[0].get("alert_sent", False)
 
             # Alert only if:
@@ -367,7 +378,7 @@ class DataFreshnessMonitor:
 
             if not bot_token:
                 logger.warning("[FRESHNESS] TELEGRAM_BOT_TOKEN not set - skipping Telegram alert")
-                self._fallback_log(site_id, data_source, age_seconds, target, "No bot token configured")
+                self._fallback_log(site_id, data_source, None, 0, "No bot token configured")
                 return
 
             minutes = duration_seconds // 60
