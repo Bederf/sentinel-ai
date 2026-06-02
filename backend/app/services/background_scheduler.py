@@ -535,9 +535,9 @@ class BackgroundSchedulerService:
                         pass
 
                     try:
-                        optimization_result = asyncio.run_coroutine_threadsafe(
-                            get_ai_optimizer().analyze_building(site_id), self._main_loop
-                        ).result(timeout=120)
+                        optimization_result = asyncio.run(
+                            get_ai_optimizer().analyze_building(site_id)
+                        )
                     except Exception:
                         logger.exception(f"[AI-OPT] analyze_building failed for {site_id}")
                         continue
@@ -2071,21 +2071,8 @@ class BackgroundSchedulerService:
         metadata = rec.metadata or {}
         adjustments = metadata.get("all_adjustments", [])
         building_assessment = metadata.get("building_assessment", "")
-        # Resolve equipment name for title (live DB lookup if not in metadata)
-        title_eq_name = metadata.get("equipment_name")
-        if not title_eq_name and rec.target_equipment:
-            try:
-                from app.database.supabase_client import get_supabase_client
-                sb = get_supabase_client()
-                eq_resp = sb.table("equipment").select("name").eq("code", rec.target_equipment).limit(1).execute()
-                if eq_resp.data:
-                    title_eq_name = eq_resp.data[0].get("name")
-            except Exception:
-                pass
         title = metadata.get("title") or (
-            f"Adjustment for {title_eq_name}"
-            if title_eq_name
-            else f"Adjustment for {rec.target_equipment}"
+            f"Adjustment for {rec.target_equipment}" if rec.target_equipment else "SENTINEL Advisory"
         )
         saving = metadata.get("saving", "")
         confidence = rec.confidence_score or 0.0
@@ -2112,37 +2099,14 @@ class BackgroundSchedulerService:
                 ]
 
         adj_lines = []
-        # Build equipment name cache: try metadata first, then live DB lookup
-        eq_name_cache = {}
-        for adj in adjustments:
-            eq_code = adj.get("equipment_id", "")
-            if eq_code and eq_code not in eq_name_cache:
-                # Check if stored in metadata
-                stored_name = None
-                if metadata.get("equipment_id") == eq_code:
-                    stored_name = metadata.get("equipment_name")
-                eq_name_cache[eq_code] = stored_name
-
-        # Live lookup for any missing names
-        try:
-            from app.database.supabase_client import get_supabase_client
-            sb = get_supabase_client()
-            for eq_code in eq_name_cache:
-                if eq_name_cache[eq_code] is None:
-                    eq_resp = sb.table("equipment").select("name").eq("code", eq_code).limit(1).execute()
-                    if eq_resp.data:
-                        eq_name_cache[eq_code] = eq_resp.data[0].get("name") or eq_code
-        except Exception:
-            pass
 
         for adj in adjustments[:5]:
             equip_code = adj.get("equipment_id", "")
-            equip_name = eq_name_cache.get(equip_code) or equip_code
             point = adj.get("point", "").replace("_", " ").title()
             curr = adj.get("current_value", "")
             recd = adj.get("recommended_value", "")
             unit = adj.get("unit", "")
-            display_name = equip_name if equip_name != equip_code else equip_code
+            display_name = equip_code
             if curr:
                 adj_lines.append(f"\u2022 {display_name}: {point} {curr}{unit} -> {recd}{unit}")
             else:

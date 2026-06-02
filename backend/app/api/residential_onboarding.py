@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import json
 import logging
 import re
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from app.adapters.residential import build_adapter
@@ -531,3 +533,61 @@ try:
     import paho.mqtt.client as mqtt
 except ImportError:
     mqtt = None  # type: ignore[assignment]
+
+
+@router.post("/telegram/webhook")
+async def residential_telegram_webhook(request: Request):
+    """Phase 220 — Direct Telegram webhook for @Sentinelaihomebot."""
+    import hmac
+    from fastapi.responses import JSONResponse
+    from app.config.settings import settings
+    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+
+    import hmac
+    from fastapi.responses import JSONResponse
+    from app.config.settings import settings
+    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+
+    try:
+        token = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        expected = settings.home_bot_webhook_secret
+        if not expected or not hmac.compare_digest(token, expected):
+            return JSONResponse(status_code=401, content={"detail": "Authentication required"})
+
+        body = await request.json()
+        message = body.get("message") or body.get("edited_message")
+        if not message:
+            return JSONResponse(content={"status": "ignored"})
+
+        chat_id = message.get("chat", {}).get("id")
+        user_id = message.get("from", {}).get("id")
+        text = (message.get("text") or "").strip()
+
+        if not chat_id or not text:
+            return JSONResponse(content={"status": "empty"})
+
+        service = ResidentialOnboardService()
+
+        if text == "/connect":
+            service.handle_connect(chat_id)
+            return JSONResponse(content={"status": "connect"})
+
+        if text == "/start":
+            from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
+            sender = ResidentialTelegramSender()
+            await sender.send_text(chat_id,
+                "Welcome to SENTINEL Home!\n\n"
+                "Send /connect to link your solar system."
+            )
+            return JSONResponse(content={"status": "start"})
+
+        state = service._state.get(chat_id)
+        if state is not None:
+            service.handle_message(chat_id, text, str(user_id))
+            return JSONResponse(content={"status": "flow", "step": state.step})
+
+        return JSONResponse(content={"status": "ok"})
+
+    except Exception:
+        logger.exception("webhook error")
+        return JSONResponse(status_code=500, content={"status": "error"})

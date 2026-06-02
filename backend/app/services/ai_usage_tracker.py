@@ -1083,7 +1083,7 @@ class AiUsageTracker:
 
         msg = MIMEMultipart("alternative")
         msg["Subject"] = f"SENTINEL Service Costs: R {total_zar:.2f} — {day_str}"
-        msg["From"] = f"SENTINEL AI Ops <{username}>"
+        msg["From"] = "info@sentinel-ai.co.za"
         msg["To"] = to_email
         msg.attach(MIMEText(body, "plain"))
 
