@@ -129,11 +129,18 @@ class CrossSystemAnalyzer:
                 return {}
 
             # Get device (sync wrapper around async)
-            loop = asyncio.new_event_loop()
             try:
-                device = loop.run_until_complete(dm.get_device(vav_id))
-            finally:
-                loop.close()
+                loop = asyncio.get_event_loop()
+                if loop.is_running():
+                    device = asyncio.run_coroutine_threadsafe(dm.get_device(vav_id), loop).result(timeout=30)
+                else:
+                    device = loop.run_until_complete(dm.get_device(vav_id))
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                try:
+                    device = loop.run_until_complete(dm.get_device(vav_id))
+                finally:
+                    loop.close()
 
             if not device:
                 logger.warning(f"VAV device {vav_id} not found")

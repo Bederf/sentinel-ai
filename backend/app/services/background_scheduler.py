@@ -5571,12 +5571,7 @@ def _run_daily_health_sweep_sync():
             except Exception as tf_err:
                 logger.warning(f"[HEALTH-SWEEP] Telegram notification failed: {tf_err}")
 
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(_sweep())
-    finally:
-        loop.close()
+    asyncio.run_coroutine_threadsafe(_sweep(), scheduler_service._main_loop).result(timeout=300)
 
 
 def _run_rag_doc_sync():
