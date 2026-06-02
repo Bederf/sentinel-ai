@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any
+import re
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.adapters.residential import build_adapter
 from app.database.supabase_client import get_supabase_client
@@ -376,6 +377,152 @@ async def list_pending_wireguard_peers() -> dict:
             }
             for p in peers
         ]
+    }
+
+
+# ── addon-register ──────────────────────────────────────────────────────────────
+
+
+class EntityMapping(BaseModel):
+    """Single HA entity to metric mapping."""
+    entity_id: str
+    metric_type: str
+
+    @field_validator("entity_id")
+    @classmethod
+    def validate_entity_id(cls, v: str) -> str:
+        if len(v) > 100:
+            raise ValueError("entity_id must be 100 chars or less")
+        if not re.match(r"^[a-z0-9_\.]+$", v):
+            raise ValueError("entity_id must contain only lowercase letters, digits, dots, and underscores")
+        return v
+
+
+class AddonRegisterRequest(BaseModel):
+    """Payload for POST /api/residential/addon-register."""
+    chat_id: str
+    entities: list[EntityMapping]
+    platform: Literal["home_assistant"]
+
+    @field_validator("entities")
+    @classmethod
+    def validate_entities_length(cls, v: list[EntityMapping]) -> list[EntityMapping]:
+        if len(v) > 20:
+            raise ValueError("Maximum 20 entities per request")
+        return v
+
+
+@router.post("/addon-register")
+async def addon_register(request: AddonRegisterRequest) -> dict:
+    """
+    Home Assistant Add-on registration endpoint.
+    Provisions MQTT credentials for an HA add-on that will push metrics to SENTINEL.
+
+    Flow:
+    1. Verify HA Supervisor reachable via /api/supervisor/info
+    2. Upsert residential_sites record (site_id = res-{chat_id})
+       - On conflict: revoke existing MQTT credentials, provision fresh
+    3. Return MQTT broker credentials
+
+    Returns 502 if HA Supervisor not reachable.
+    Returns 422 if any entity_id fails format validation.
+    """
+    import httpx
+
+    site_id = f"res-{request.chat_id}"
+
+    # ── Step 1: Verify HA Supervisor reachable ────────────────────────────────
+    ha_token = None
+    # Try to load HA token from existing site_config (encrypted)
+    try:
+        from app.config.settings import settings as _settings
+
+        ha_token = getattr(_settings, "ha_supervisor_token", "") or None
+    except Exception:
+        pass
+
+    if ha_token:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(
+                    "http://supervisor/api/supervisor/info",
+                    headers={"Authorization": f"Bearer {ha_token}", "Content-Type": "application/json"},
+                )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"HA Supervisor not reachable: status={resp.status_code}")
+        except httpx.TimeoutException:
+            raise HTTPException(status_code=502, detail="HA Supervisor not reachable: timeout")
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.warning("HA supervisor health check failed: %s", exc)
+            raise HTTPException(status_code=502, detail=f"HA Supervisor not reachable: {exc}")
+    else:
+        # No token configured — skip HA verification, proceed to provisioning
+        logger.debug("No HA supervisor token configured, skipping supervisor verification")
+
+    # ── Step 2: Revoke existing MQTT credentials (if re-registration) ─────────
+    try:
+        get_mqtt_provisioner().revoke_site(site_id)
+    except Exception as exc:
+        logger.warning("MQTT credential revoke failed for %s (continuing): %s", site_id, exc)
+
+    # ── Step 3: Provision fresh MQTT credentials ────────────────────────────
+    try:
+        from app.config.settings import settings as _settings
+
+        creds = get_mqtt_provisioner().provision_vps_client(site_id, int(request.chat_id) if request.chat_id.isdigit() else 0)
+    except Exception as exc:
+        logger.error("MQTT provisioning failed for %s: %s", site_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to provision MQTT credentials") from exc
+
+    # ── Step 4: Upsert residential_sites record ─────────────────────────────
+    entity_map = {e.metric_type: e.entity_id for e in request.entities}
+
+    site_config = {
+        "entity_map": entity_map,
+        "mqtt_client_id": creds.client_id,
+        "mqtt_password": creds.password,
+        "ha_deployment_type": "addon",
+        "platform": "home_assistant",
+    }
+    encrypted_config = get_encryption_service().encrypt(json.dumps(site_config))
+
+    supabase = get_supabase_client()
+
+    site_row = {
+        "site_id": site_id,
+        "platform": "home_assistant",
+        "deployment_tier": "cloud_only",
+        "site_config": encrypted_config,
+        "eskom_area_code": None,
+        "tariff_type": None,
+        "polling_interval_seconds": 300,
+        "is_active": True,
+        "chat_id": int(request.chat_id) if request.chat_id.isdigit() else None,
+        "notification_channel": "telegram",
+        "onboarding_method": "addon_register",
+        "ha_deployment_type": "addon",
+    }
+
+    try:
+        result = supabase.table("residential_sites").upsert(site_row, on_conflict="site_id").execute()
+    except Exception as exc:
+        logger.error("Failed to upsert residential site for %s: %s", site_id, exc)
+        raise HTTPException(status_code=500, detail="Failed to save residential site") from exc
+
+    if not result.data:
+        raise HTTPException(status_code=500, detail="Failed to create residential site record")
+
+    # ── Step 5: Return MQTT credentials ─────────────────────────────────────
+    from app.config.settings import settings as _settings
+
+    return {
+        "site_id": site_id,
+        "mqtt_host": _settings.mqtt_broker_public_host or "localhost",
+        "mqtt_port": _settings.mqtt_broker_port or 1883,
+        "mqtt_username": creds.client_id,
+        "mqtt_password": creds.password,
     }
 
 

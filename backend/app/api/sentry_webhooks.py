@@ -2323,6 +2323,19 @@ async def handle_telegram_callback(
                 "confidence": 1.0,
             }
 
+    # Residential onboarding — platform selection buttons (platform:solarman, platform:victron, etc.)
+    if payload.data.startswith("platform:"):
+        from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+
+        platform = payload.data.split(":", 1)[1] if ":" in payload.data else ""
+        service = ResidentialOnboardService()
+        service.handle_platform_callback(
+            chat_id=int(payload.chat_id),
+            callback_query_id=payload.callback_query_id,
+            platform=platform,
+        )
+        return {"success": True, "intent": "residential_onboarding", "confidence": 1.0}
+
     # Recommendation acknowledgement from morning digest inline buttons
     if payload.data.startswith("rec:accept:") or payload.data.startswith("rec:dismiss:"):
         from app.services.recommendation_service import get_recommendation_service
@@ -2652,3 +2665,74 @@ async def book_room(data: dict, x_sentry_secret: str | None = Header(None)):
     except Exception as e:
         logger.error(f"Room booking failed: {e}")
         return {"success": False, "error": str(e)}
+
+
+# ---------------------------------------------------------------------------
+# Residential onboarding — /connect, state check, message forwarding
+# ---------------------------------------------------------------------------
+
+
+@router.post("/telegram/connect")
+async def handle_telegram_connect(
+    payload: dict,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Initialize onboarding state machine when user sends /connect.
+
+    Called by the gateway skill when user sends /connect.
+    Creates Redis conversation state and sends platform selection keyboard.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="telegram_connect")
+
+    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+
+    chat_id = int(payload.get("chat_id", 0))
+    if not chat_id:
+        return {"success": False, "error": "chat_id required"}
+
+    service = ResidentialOnboardService()
+    result = service.handle_connect(chat_id)
+    return {"success": True, "result": result}
+
+
+@router.post("/telegram/check-onboarding")
+async def check_onboarding_state(
+    payload: dict,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Called by gateway extension before routing a text message to LLM."""
+    _require_sentry_secret(x_sentry_secret, endpoint_name="check_onboarding")
+
+    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+
+    chat_id = int(payload.get("chat_id", 0))
+    service = ResidentialOnboardService()
+    state = service._state.get(chat_id)
+
+    if state is None:
+        return {"in_flow": False, "step": None}
+
+    return {"in_flow": True, "step": state.step}
+
+
+@router.post("/telegram/message")
+async def handle_telegram_message(
+    payload: dict,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Called by gateway extension when user is in a state machine flow."""
+    _require_sentry_secret(x_sentry_secret, endpoint_name="telegram_message")
+
+    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
+
+    chat_id = int(payload.get("chat_id", 0))
+    text = payload.get("text", "").strip()
+    user_id = payload.get("user_id", "")
+
+    if not text:
+        return {"handled": False}
+
+    service = ResidentialOnboardService()
+    handled = service.handle_message(chat_id, text, user_id)
+    return {"handled": handled}
+

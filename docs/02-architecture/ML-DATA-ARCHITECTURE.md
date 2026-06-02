@@ -256,7 +256,37 @@ asset_criticality: defined per asset in asset registry
 
 ---
 
-## 5. Implementation Status
+## 5. ML Training Hours Tracking
+
+`ml_hours_ingested` (`sites` table) tracks cumulative time the system has been collecting telemetry. This metric drives phase promotion gates (72h → advisory, 500h → supervised).
+
+### How it's computed
+
+- **Persisted base**: The last known cumulative value is read from `sites.ml_hours_ingested` on each poll cycle via `calculate_actual_ml_hours()` in `sentinel_ml_feeder.py`.
+- **Session delta**: Wall-clock time since the current backend process started (`_ml_session_start`) is added to the base.
+- **Cross-restart**: Each restart reads the last persisted value and resumes from there.
+
+### What does NOT affect it
+
+- **24h retention on `equipment_sensor_readings`**: That table is pruned for POPIA compliance, but `ml_hours_ingested` is tracked independently and is not affected by the cleanup.
+
+### Persistence
+
+Computed value is persisted to `sites.ml_hours_ingested` on every bridge poll cycle (every 5 min) via `ingest_equipment_states()` in `sentinel_data_sync.py`.
+
+### Training gates
+
+| Threshold | Phase transition |
+|-----------|------------------|
+| 72h | shadow_live → advisory |
+| 500h | advisory → supervised |
+| 2000h | supervised → automatic |
+
+See `policy-gate-system.md` for full gate definitions.
+
+---
+
+## 6. Implementation Status
 
 ### Current State (v32.0)
 
@@ -281,7 +311,7 @@ asset_criticality: defined per asset in asset registry
 
 ---
 
-## 6. Implementation Notes
+## 7. Implementation Notes
 
 **Model Storage**: Each model is versioned and stored with metadata (training date, dataset size, performance metrics, feature list) in the model registry (`ml/models/registry.json`).
 

@@ -68,10 +68,27 @@ def _send(
 ) -> dict | None:
     """Send text via ResidentialTelegramSender. Returns result dict on success."""
     try:
-        import asyncio
+        import asyncio, os, requests
 
-        result = asyncio.get_event_loop().run_until_complete(_sender.send_text(chat_id, text, reply_markup))
-        return {"message_id": 0} if result else None
+        token = os.environ.get("SENTINEL_HOME_BOT_TOKEN") or settings.sentinel_home_bot_token
+        if not token:
+            logger.error("Telegram send failed: SENTINEL_HOME_BOT_TOKEN not set")
+            return None
+
+        payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
+        resp = requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json=payload,
+            timeout=15,
+        )
+        result = resp.json()
+        if not result.get("ok"):
+            logger.error("Telegram sendMessage failed: %s", result)
+            return None
+        return {"message_id": result["result"]["message_id"]}
     except Exception as exc:
         logger.error("Telegram send failed: %s", exc)
         return None
@@ -149,6 +166,70 @@ class ResidentialOnboardService:
             updated_at="",
         )
 
+    def handle_message(self, chat_id: int, text: str, user_id: str) -> bool:
+        """
+        Route a text message to the correct step handler.
+        Called by gateway extension when user is in a state machine flow.
+        Returns True if handled, False to fall through to LLM.
+        """
+        state = self._state.get(chat_id)
+        if state is None:
+            return False  # No active flow — let LLM handle
+
+        step = state.step
+
+        if step == AWAITING_EMAIL:
+            return self._handle_email(chat_id, text, state)
+        elif step == AWAITING_PASSWORD:
+            return self._handle_password(chat_id, text, state)
+        elif step == AWAITING_HA_TUNNEL_READY:
+            return self._handle_ha_tunnel_ready_text(chat_id, text, state)
+        elif step == AWAITING_HA_PUBLIC_KEY:
+            return self._handle_ha_public_key_text(chat_id, text, state)
+        else:
+            # Unknown step — clear and let LLM handle
+            self._state.clear(chat_id)
+            return False
+
+    def _handle_email(self, chat_id: int, text: str, state) -> bool:
+        email = text.strip()
+        if not email or "@" not in email:
+            _send(chat_id, "Please enter a valid email address:")
+            return True
+        state.data["email"] = email
+        state.step = AWAITING_PASSWORD
+        self._state.set(chat_id, state)
+        _send(chat_id, "Enter your SOLARMAN password:")
+        return True
+
+    def _handle_password(self, chat_id: int, text: str, state) -> bool:
+        # Fire-and-forget deletion handled asynchronously
+        _delete(chat_id, 0)
+        password = text.strip()
+        if not password:
+            _send(chat_id, "Please enter your password:")
+            return True
+        platform = state.data.get("platform", "solarman")
+        email = state.data.get("email", "")
+        result = self._discover_and_register(chat_id, platform, email, password, state)
+        _send(chat_id, result)
+        return True
+
+    def _handle_ha_tunnel_ready_text(self, chat_id: int, text: str, state) -> bool:
+        _send(chat_id, "Tap the button above to confirm when your tunnel is ready.")
+        return True
+
+    def _handle_ha_public_key_text(self, chat_id: int, text: str, state) -> bool:
+        pubkey = text.strip()
+        if len(pubkey) < 32:
+            _send(chat_id, "That doesn't look like a valid public key. Please paste the full key:")
+            return True
+        state.data["ha_public_key"] = pubkey
+        state.step = AWAITING_HA_TUNNEL_READY
+        self._state.set(chat_id, state)
+        _send(chat_id, "Public key saved. Now set up WireGuard — see /ha_ready for instructions.")
+        return True
+
     # ── Entry points ──────────────────────────────────────────────────────────
 
     def handle_connect(self, chat_id: int) -> str:
@@ -180,9 +261,8 @@ class ResidentialOnboardService:
                     {"text": "🔋 Victron VRM", "callback_data": "platform:victron"},
                 ],
                 [
-                    {
-                        {"text": "🏠 Home Assistant", "callback_data": "platform:home_assistant"},
-                    }
+                    {"text": "🏠 Home Assistant Add-on", "callback_data": "platform:ha_addon"},
+                    {"text": "🏠 Home Assistant Manual", "callback_data": "platform:home_assistant"},
                 ],
             ]
         }
@@ -203,6 +283,19 @@ class ResidentialOnboardService:
 
         state.data["platform"] = platform
         self._state.set(chat_id, state)
+
+        if platform == "ha_addon":
+            # Direct user to the REST API endpoint
+            _send(
+                chat_id,
+                "🏠 Home Assistant Add-on selected.\n\n"
+                "Use the SENTINEL Home Assistant Add-on to complete registration.\n"
+                "It will call the /api/residential/addon-register endpoint automatically.\n\n"
+                "If you need the endpoint details:\n"
+                "POST /api/residential/addon-register\n"
+                "Body: {chat_id, entities:[{entity_id, metric_type}], platform:\"home_assistant\"}"
+            )
+            return
 
         if platform == "home_assistant":
             self._start_ha_onboarding(chat_id, state)

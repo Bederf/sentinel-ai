@@ -228,6 +228,12 @@ mqtt:
             for attempt in range(3):
                 try:
                     client = mqtt.Client(client_id=f"sentinel-verify-{site_id}")
+                    # Use backend credentials (broker requires allow_anonymous false)
+                    try:
+                        if getattr(settings, "residential_mqtt_username", ""):
+                            client.username_pw_set(settings.residential_mqtt_username, settings.residential_mqtt_password)
+                    except Exception:
+                        pass
                     client.on_message = _on_message
                     # Anonymous connect attempt — if broker requires auth, this will fail
                     client.connect(settings.mqtt_broker_public_host, settings.mqtt_broker_port, keepalive=10)

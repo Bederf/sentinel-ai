@@ -3210,8 +3210,12 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         all_equipment = eq_repo.get_all(site_id=site_uuid) if site_uuid else eq_repo.get_all()
         all_codes = {eq.get("code"): eq for eq in all_equipment if eq.get("code")}
 
-        # Try exact match first
+        # Try exact match first — prefer normalized form if available
         if generated_code in all_codes:
+            normalised = self._normalize_code_format(generated_code)
+            if normalised != generated_code and normalised in all_codes:
+                logger.info(f"[RESOLVE] ✅ Preferring normalized over exact: {generated_code} → {normalised}")
+                return normalised
             logger.debug(f"[RESOLVE] Exact match: {generated_code}")
             return generated_code
 
@@ -3256,8 +3260,24 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         S002-CHILLER-B1-001 → S002-CHILLER-B01
         S002-CT-R-001 → S002-CT-R01
         S002-FCU-L0-001 → S002-FCU-001
+        S002-VAV-L1-B → S002-VAV-102  (B=2 → Level 1 Zone 2)
+        S002-VAV-L2-A → S002-VAV-201  (A=1 → Level 2 Zone 1)
         """
         import re
+
+        # Pattern: S002-TYPE-L{floor}-{letter} → S002-TYPE-{floor*100 + letter_num}
+        # e.g. S002-VAV-L1-B → S002-VAV-102 (floor=1, B=2 → 1*100+2)
+        # e.g. S002-VAV-L2-A → S002-VAV-201 (floor=2, A=1 → 2*100+1)
+        match = re.match(r"^(S\d+)-(\w+)-L(\d+)-([A-Z])$", code)
+        if match:
+            site, equip_type, floor, letter = match.groups()
+            letter_num = ord(letter.upper()) - ord("A") + 1
+            numeric_floor = int(floor)
+            if numeric_floor == 0:
+                normalized_seq = f"{letter_num:03d}"
+            else:
+                normalized_seq = numeric_floor * 100 + letter_num
+            return f"{site}-{equip_type}-{normalized_seq}"
 
         # Pattern: S002-TYPE-L{floor}-{seq} → S002-TYPE-{floor*100 + seq}
         # e.g. S002-FCU-L1-001 → S002-FCU-101 (1*100 + 1)

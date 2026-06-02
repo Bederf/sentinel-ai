@@ -273,6 +273,9 @@ async def list_alerts(
     # Sort by priority
     result.sort(key=lambda a: a.priority)
 
+    # Count total before applying limit (fix: total was computed after slice)
+    total_count = len(result)
+
     # Apply limit
     limited_results = result[:limit]
 
@@ -297,7 +300,7 @@ async def list_alerts(
         pass
 
     return AlertListResponse(
-        total=len(limited_results),
+        total=total_count,
         by_severity=by_severity,
         alerts=limited_results,
         pending_recommendations=pending_recommendations,

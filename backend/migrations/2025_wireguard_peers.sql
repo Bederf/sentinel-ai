@@ -4,7 +4,7 @@
 
 CREATE TABLE wireguard_peers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    site_id VARCHAR NOT NULL REFERENCES sites(site_id),
+    site_id              UUID        NOT NULL REFERENCES residential_sites(id),
     public_key VARCHAR(44) NOT NULL,
     assigned_ip VARCHAR NOT NULL,
     peer_config TEXT NOT NULL,  -- [Peer] block for wg0.conf — server-side only

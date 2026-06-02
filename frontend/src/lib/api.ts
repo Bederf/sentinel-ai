@@ -1695,18 +1695,19 @@ export const api = {
   /**
    * Get active alerts
    */
-  async getAlerts(siteId?: string): Promise<{ alerts: Alert[]; pending_recommendations: number }> {
+  async getAlerts(siteId?: string): Promise<{ alerts: Alert[]; total: number; pending_recommendations: number }> {
     try {
       const response = await fetchApi<{ total: number; alerts: Alert[]; pending_recommendations: number }>("/api/alerts");
       const alerts = response.alerts || [];
       return {
         alerts: siteId ? alerts.filter((a) => a.site_id === siteId) : alerts,
+        total: response.total ?? alerts.length,
         pending_recommendations: response.pending_recommendations ?? 0,
       };
     } catch (err) {
       const apiError = err as ApiError | undefined;
       if (apiError?.status === 429) {
-        return { alerts: [], pending_recommendations: 0 };
+        return { alerts: [], total: 0, pending_recommendations: 0 };
       }
       throw err;
     }

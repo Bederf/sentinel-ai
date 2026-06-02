@@ -382,7 +382,7 @@ class SentinelDataSync:
             client = get_supabase_client()
             resp = (
                 client.table("equipment")
-                .select("id, code, type, age_years, runtime_hours, operating_data, health_score")
+                .select("id, code, type, age_years, runtime_hours, operating_data, health_score, updated_at")
                 .in_("code", equipment_codes)
                 .execute()
             )
@@ -464,6 +464,17 @@ class SentinelDataSync:
                             break
                         except Exception:
                             pass
+            if op_age is None:
+                # Fallback: compute freshness from equipment.updated_at
+                eq_updated = eq_meta.get("updated_at")
+                if eq_updated:
+                    try:
+                        eq_ts = datetime.fromisoformat(str(eq_updated).replace("Z", "+00:00"))
+                        if eq_ts.tzinfo is None:
+                            eq_ts = eq_ts.replace(tzinfo=UTC)
+                        op_age = int((simulated_time - eq_ts).total_seconds() / 60)
+                    except Exception:
+                        pass
             confidence = health_calc.calculate_confidence(has_live, op_age, ml_hours)
 
             prev_score = eq_meta.get("health_score")

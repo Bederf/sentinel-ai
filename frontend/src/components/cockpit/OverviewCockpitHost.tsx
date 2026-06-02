@@ -247,6 +247,7 @@ function useCockpitIssues(siteId: string) {
 function buildCockpitSummary(
   props: OverviewCockpitHostProps,
   lastUpdatedAt: number | null,
+  loading: boolean,
 ) {
   return {
     siteId: props.siteId,
@@ -368,6 +369,7 @@ export function OverviewCockpitHost({
     const summary = buildCockpitSummary(
       { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, siteFloors },
       lastUpdatedAt,
+      loading,
     )
     // Extract floor_id from zone_key (e.g. Zone-L1-1 → L1, Zone-L3-ICU → L3)
     const MECHANICAL_TYPES = new Set(['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler', 'generator'])

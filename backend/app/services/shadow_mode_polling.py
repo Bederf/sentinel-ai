@@ -498,31 +498,69 @@ class ShadowModePollingService:
                 }
 
             # ── Map AHU telemetry to individual equipment ────────────────────
-            # Bridge telemetry ahu1/ahu2/ahu3 maps to zone-code format in Supabase
+            # Bridge telemetry ahu1/ahu2/ahu3 maps to zone-code format in Supabase.
+            # Also handles list format (site-005) with unit_id per AHU.
             ahu_data = data.get("ahu", {})
-            ahu_map = {
-                "ahu1": f"{self._site_prefix}-AHU-001",  # Basement AHU
-                "ahu2": f"{self._site_prefix}-AHU-002",  # Rooftop AHU
-                "ahu3": f"{self._site_prefix}-AHU-201",  # Level 2 AHU
-            }
             ahu_field_map = {
-                "supply_temp_c": "supply_air_temp",
-                "return_temp_c": "return_air_temp",
-                "fan_speed_hz": "fan_speed",
+                "supply_air_temp_c": "supply_air_temp",
+                "return_air_temp_c": "return_air_temp",
+                "fan_speed": "fan_speed",
                 "filter_dp_pa": "filter_dp",
+                "damper_position": "damper_position",
+                "run_state": "run_state",
             }
-            for ahu_prefix, equip_code in ahu_map.items():
-                ahu_readings: dict[str, float] = {}
-                for bridge_suffix, op_key in ahu_field_map.items():
-                    key = f"{ahu_prefix}_{bridge_suffix}"
-                    val = ahu_data.get(key)
-                    if val is not None:
-                        ahu_readings[op_key] = float(val)
-                if ahu_readings:
-                    agg_states[equip_code] = {
-                        "type": "ahu",
-                        "sensor_readings": ahu_readings,
-                    }
+            if isinstance(ahu_data, list):
+                # List format (site-005): [{unit_id, supply_air_temp_c, ...}, ...]
+                floor_seq: dict[str, int] = {}
+                for ahu in ahu_data:
+                    unit_id: str = ahu.get("unit_id", "")
+                    if not unit_id:
+                        continue
+                    # Extract floor from unit_id e.g. "UMH-AHU-B1-LAUN.fan" → "B1"
+                    parts = unit_id.split("-")
+                    floor = next((p for p in parts if re.match(r"^[BLR]\d*$", p)), "L0")
+                    seq = floor_seq.get(floor, 0) + 1
+                    floor_seq[floor] = seq
+                    # Generate floor code matching naming convention:
+                    # B1 → B01, B02 ; L2 → 201, 202 ; L3 → 301, 302 ; G → 001, 002
+                    floor_match = re.match(r"^B(\d+)$", floor)
+                    if floor_match:
+                        floor_code = f"B{int(floor_match.group(1)):02d}{seq:01d}"
+                    elif floor in ("G", "R"):
+                        floor_code = f"{seq:03d}"
+                    else:
+                        level = int(re.sub(r"[^0-9]", "", floor) or "0")
+                        floor_code = f"{level * 100 + seq:03d}"
+                    equip_code = f"{self._site_prefix}-AHU-{floor_code}"
+                    ahu_readings = {}
+                    for bridge_key, op_key in ahu_field_map.items():
+                        val = ahu.get(bridge_key)
+                        if val is not None:
+                            ahu_readings[op_key] = float(val)
+                    if ahu_readings:
+                        agg_states[equip_code] = {
+                            "type": "ahu",
+                            "sensor_readings": ahu_readings,
+                        }
+            else:
+                # Dict format (site-002 legacy): {"ahu1": {...aggregated readings...}}
+                ahu_map = {
+                    "ahu1": f"{self._site_prefix}-AHU-001",
+                    "ahu2": f"{self._site_prefix}-AHU-002",
+                    "ahu3": f"{self._site_prefix}-AHU-201",
+                }
+                for ahu_prefix, equip_code in ahu_map.items():
+                    ahu_readings = {}
+                    for bridge_suffix, op_key in ahu_field_map.items():
+                        key = f"{ahu_prefix}_{bridge_suffix}"
+                        val = ahu_data.get(key)
+                        if val is not None:
+                            ahu_readings[op_key] = float(val)
+                    if ahu_readings:
+                        agg_states[equip_code] = {
+                            "type": "ahu",
+                            "sensor_readings": ahu_readings,
+                        }
 
             zone_count = data.get("zone_count", 0)
             equip_online = equip_summary.get("online", 0)

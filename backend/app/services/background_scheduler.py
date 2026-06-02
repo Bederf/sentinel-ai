@@ -2108,9 +2108,20 @@ class BackgroundSchedulerService:
         metadata = rec.metadata or {}
         adjustments = metadata.get("all_adjustments", [])
         building_assessment = metadata.get("building_assessment", "")
+        # Resolve equipment name for title (live DB lookup if not in metadata)
+        title_eq_name = metadata.get("equipment_name")
+        if not title_eq_name and rec.target_equipment:
+            try:
+                from app.database.supabase_client import get_supabase_client
+                sb = get_supabase_client()
+                eq_resp = sb.table("equipment").select("name").eq("code", rec.target_equipment).limit(1).execute()
+                if eq_resp.data:
+                    title_eq_name = eq_resp.data[0].get("name")
+            except Exception:
+                pass
         title = metadata.get("title") or (
-            f"Adjustment for {metadata.get('equipment_name', rec.target_equipment)}"
-            if metadata.get("equipment_name")
+            f"Adjustment for {title_eq_name}"
+            if title_eq_name
             else f"Adjustment for {rec.target_equipment}"
         )
         saving = metadata.get("saving", "")
@@ -2138,14 +2149,28 @@ class BackgroundSchedulerService:
                 ]
 
         adj_lines = []
-        # Build equipment name cache from all_adjustments for display
+        # Build equipment name cache: try metadata first, then live DB lookup
         eq_name_cache = {}
         for adj in adjustments:
             eq_code = adj.get("equipment_id", "")
             if eq_code and eq_code not in eq_name_cache:
-                eq_name_cache[eq_code] = (
-                    metadata.get("equipment_name") if metadata.get("equipment_id") == eq_code else eq_code
-                )
+                # Check if stored in metadata
+                stored_name = None
+                if metadata.get("equipment_id") == eq_code:
+                    stored_name = metadata.get("equipment_name")
+                eq_name_cache[eq_code] = stored_name
+
+        # Live lookup for any missing names
+        try:
+            from app.database.supabase_client import get_supabase_client
+            sb = get_supabase_client()
+            for eq_code in eq_name_cache:
+                if eq_name_cache[eq_code] is None:
+                    eq_resp = sb.table("equipment").select("name").eq("code", eq_code).limit(1).execute()
+                    if eq_resp.data:
+                        eq_name_cache[eq_code] = eq_resp.data[0].get("name") or eq_code
+        except Exception:
+            pass
 
         for adj in adjustments[:5]:
             equip_code = adj.get("equipment_id", "")

@@ -751,10 +751,16 @@ async def handle_wo_update(
     # Extract WO number
     wo_match = _WO_RE.search(text or "")
     if not wo_match:
+        kb = InlineKeyboard(
+            rows=[
+                [InlineButton("Back to menu", "menu:start:wo_check")],
+            ]
+        )
         await _send_response(
             chat_id,
             "I couldn't find a work order number. Please include the WO reference (e.g. WO-2026-0045).",
             sender,
+            keyboard=kb,
         )
         return
 
@@ -806,15 +812,15 @@ async def handle_wo_update(
 
 
 async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> None:
-    """Create a work order from an advisory recommendation's UUID."""
+    """Create a work order from an advisory recommendation's UUID and notify technician."""
     from app.database.repositories.work_order_repository import WorkOrderRepository
+    from app.database.supabase_client import get_supabase_client
 
     sb = get_supabase_client()
     if not sb:
         await _send_response(chat_id, "Database unavailable. Please try again.", sender)
         return
 
-    # Load the recommendation record
     rec_result = sb.table("recommendations").select("*").eq("id", rec_uuid).execute()
     if not rec_result.data:
         await _send_response(chat_id, "Recommendation not found. It may have already been actioned.", sender)
@@ -828,7 +834,6 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
     reason = rec.get("reason", "") or rec.get("description", "")
     priority = rec.get("priority", "medium")
 
-    # Build description from recommendation
     description = (
         f"SENTINEL Advisory — AI Optimization Recommendation\n\n"
         f"Equipment: {target}\n"
@@ -843,21 +848,117 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         "priority": priority,
         "status": "scheduled",
         "created_by": "sentinel:telegram:advisory_wo",
-        "equipment_id": target,
+        "equipment_code": target,
         "recommendation_id": rec_uuid,
     }
 
     repo = WorkOrderRepository()
-    created = repo.create_work_order(wo_data)
+    created = await repo.create_work_order(wo_data)
     if not created:
         await _send_response(chat_id, "Failed to create work order. Please try again.", sender)
         return
 
     wo_code = created.get("code") or created.get("id", "unknown")
+    wo_uuid = created.get("id")
+    equipment_id = created.get("equipment_id", "")
+    site_id = created.get("site_id", "")
+
     await _send_response(
         chat_id,
         f"Work order <b>{wo_code}</b> created for {target}.\nA technician will be assigned shortly.",
         sender,
+    )
+
+    # Look up technician by equipment specialty
+    tech = None
+    try:
+        if sb:
+            if not site_id:
+                site_result = sb.table("sites").select("id").eq("code", "site-002").execute()
+                if site_result.data:
+                    site_id = site_result.data[0]["id"]
+
+            if site_id:
+                eq_type = target.split("-")[1] if len(target.split("-")) > 1 else ""
+                specialty_map = {
+                    "AHU": "hvac", "VAV": "hvac", "CHILLER": "hvac", "FCU": "hvac",
+                    "PUMP": "hvac", "CRAC": "hvac",
+                    "DALI": "dali", "LUM": "dali",
+                    "GEN": "electrical", "UPS": "electrical", "ATS": "electrical",
+                    "MSB": "electrical", "TX": "electrical", "DB": "electrical",
+                    "FIRE": "fire",
+                }
+                target_specialty = specialty_map.get(eq_type.upper(), "hvac")
+
+                try:
+                    tech_result = (
+                        sb.table("site_technicians")
+                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                        .eq("site_id", site_id)
+                        .eq("is_primary", True)
+                        .execute()
+                    )
+                    if tech_result.data:
+                        for st in tech_result.data:
+                            if st.get("specialty") == target_specialty:
+                                tech = st.get("technicians", {})
+                                break
+                        if not tech:
+                            for st in tech_result.data:
+                                if st.get("specialty") == "general":
+                                    tech = st.get("technicians", {})
+                                    break
+                except Exception:
+                    pass
+
+                if not tech:
+                    try:
+                        tech_result = (
+                            sb.table("technicians")
+                            .select("id, name, email, phone, telegram_id")
+                            .eq("active", True)
+                            .execute()
+                        )
+                        with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
+                        if with_telegram:
+                            tech = with_telegram[0]
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.warning("Advisory WO technician lookup failed: %s", e)
+
+    # Notify technician via Telegram + email
+    if tech and tech.get("telegram_id"):
+        try:
+            from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+            notifier = WorkOrderNotifier()
+            await notifier.notify_technician(
+                {
+                    "code": wo_code,
+                    "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
+                    "equipment_code": target,
+                    "equipment_id": equipment_id or target,
+                    "equipment_name": f"AI Optimization: {target}",
+                    "site_id": site_id or "site-002",
+                    "technician_id": tech.get("telegram_id"),
+                    "technician_name": tech.get("name", "Technician"),
+                    "service_type": "callout",
+                    "criticality": priority.upper(),
+                    "problem_description": description,
+                }
+            )
+        except Exception as e:
+            logger.warning("Advisory WO notification failed: %s", e)
+
+    # Email facilities desk
+    await _email_facilities_desk(
+        wo_code,
+        f"AI Optimization: {target} — {point}",
+        "optimization",
+        target,
+        priority,
+        description,
     )
 
 

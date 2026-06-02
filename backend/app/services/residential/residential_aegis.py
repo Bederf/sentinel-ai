@@ -137,7 +137,7 @@ def evaluate(
     # ── Home Assistant-specific rules ─────────────────────────────────────────
     # These rules require device-level visibility (geyser, EV charger) that
     # cloud-only platform APIs cannot provide. Only fires for HA gateway sites.
-  if snapshot.source_system == "home_assistant":
+    if snapshot.source_system == "home_assistant":
         # P1: Geyser ON during impending loadshedding — drain battery faster
         geyser_state = getattr(snapshot, "geyser_state", None)
         if geyser_state == "on" and area_schedule is not None:

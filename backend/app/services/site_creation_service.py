@@ -121,6 +121,7 @@ class SiteCreationService:
                         site_name,
                         building_type,
                     )
+                    self._seed_phase_promotion_gates(site_code)
                     return result.data[0]
 
                 raise RuntimeError(f"No data returned when creating site {site_code}")
@@ -149,3 +150,72 @@ class SiteCreationService:
         """Fetch a site by its code, or None if not found."""
         result = self.supabase.table("sites").select("*").eq("code", site_code).execute()
         return result.data[0] if result.data else None
+
+    def _seed_phase_promotion_gates(self, site_code: str) -> None:
+        """Seed standard phase promotion gates for a newly created site.
+
+        Mirrors the gates defined in the 20260509_001 migration for site-002.
+        Called automatically during SIMBIOT wizard onboarding so every new site
+        has a promotion path from shadow_live through to automatic.
+        """
+        gates = [
+            # shadow_live → advisory (6 gates)
+            (site_code, "shadow_live", "advisory", "ml_hours_ingested", "threshold", 72, ">=",
+             "ML training hours accumulated"),
+            (site_code, "shadow_live", "advisory", "bridge_connected", "boolean", None, "==true",
+             "Shadow Bridge connected and polling"),
+            (site_code, "shadow_live", "advisory", "freshness_hours_max", "threshold", 4.0, "<=",
+             "Data freshness (max age in hours)"),
+            (site_code, "shadow_live", "advisory", "anomaly_scores_writing", "count", 0, ">",
+             "Anomaly scores writing to equipment_analytics"),
+            (site_code, "shadow_live", "advisory", "match_coverage_min_pct", "threshold", 50.0, ">=",
+             "Equipment BACnet point match coverage %"),
+            (site_code, "shadow_live", "advisory", "error_rate_max_pct", "threshold", 10.0, "<=",
+             "Adapter error rate %"),
+            # advisory → supervised (5 gates)
+            (site_code, "advisory", "supervised", "ml_hours_ingested", "threshold", 500, ">=",
+             "ML training hours (extended learning period)"),
+            (site_code, "advisory", "supervised", "time_in_advisory_days", "threshold", 30, ">=",
+             "Days in advisory phase before supervised"),
+            (site_code, "advisory", "supervised", "recommendations_generated", "count", 50, ">=",
+             "Total recommendations generated"),
+            (site_code, "advisory", "supervised", "no_safety_violations_30d", "boolean", None, "==true",
+             "No safety violations in last 30 days"),
+            (site_code, "advisory", "supervised", "bridge_connected_uptime_pct", "threshold", 0.90, ">=",
+             "Bridge connected uptime >= 90%"),
+            # supervised → automatic (6 gates)
+            (site_code, "supervised", "automatic", "ml_hours_ingested", "threshold", 2000, ">=",
+             "ML training hours (mature deployment)"),
+            (site_code, "supervised", "automatic", "approval_accuracy", "threshold", 0.85, ">=",
+             "Recommendation approval accuracy >= 85%"),
+            (site_code, "supervised", "automatic", "false_positive_rate", "threshold", 0.10, "<=",
+             "False positive rate <= 10%"),
+            (site_code, "supervised", "automatic", "recommendations_approved", "count", 30, ">=",
+             "Recommendations approved by operators"),
+            (site_code, "supervised", "automatic", "no_safety_violations_7d", "boolean", None, "==true",
+             "No safety violations in last 7 days"),
+            (site_code, "supervised", "automatic", "human_approved_autonomous", "boolean", None, "==true",
+             "At least one human-approved autonomous action logged"),
+        ]
+
+        try:
+            data = [
+                {
+                    "site_id": g[0],
+                    "from_phase": g[1],
+                    "to_phase": g[2],
+                    "gate_name": g[3],
+                    "gate_type": g[4],
+                    "threshold_value": g[5],
+                    "operator": g[6],
+                    "description": g[7],
+                }
+                for g in gates
+            ]
+            self.supabase.table("phase_promotion_gates").upsert(
+                data,
+                on_conflict="site_id, from_phase, to_phase, gate_name",
+            ).execute()
+            logger.info("[SCS] Seeded %d phase promotion gates for %s", len(gates), site_code)
+        except Exception as e:
+            logger.warning("[SCS] Failed to seed phase promotion gates for %s: %s", site_code, e)

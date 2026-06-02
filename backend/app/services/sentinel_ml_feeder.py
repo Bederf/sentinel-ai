@@ -948,20 +948,23 @@ class SentinelMLFeeder:
         return results
 
     async def calculate_actual_ml_hours(self, site_id: str) -> float:
-        """Calculate actual ML training hours from telemetry timestamps.
+        """Calculate cumulative ML training hours, surviving restarts.
 
-        Queries equipment_sensor_readings for the wall-clock span of data,
-        NOT the in-memory poll counter. This is restart-proof and truthful.
-
-        Queries both canonical (site-002) and legacy (S002) formats to handle
-        the historical site_id format mismatch.
+        Reads the last persisted ml_hours_ingested from the sites table as the
+        cumulative base, then adds wall-clock time since this process started.
+        This compounds across restarts and is NOT capped by the 24h retention
+        on equipment_sensor_readings.
 
         Args:
             site_id: Site identifier (canonical format: 'site-002').
 
         Returns:
-            Hours of telemetry data span, or 0.0 if no data / error.
+            Cumulative hours of telemetry collection, or in-memory counter
+            as fallback if the DB query fails.
         """
+        if not hasattr(self, "_ml_session_start"):
+            self._ml_session_start = datetime.utcnow()
+
         try:
             import os
 
@@ -970,40 +973,37 @@ class SentinelMLFeeder:
             database_url = os.getenv("DATABASE_URL")
             if not database_url:
                 logger.warning("[ML FEEDER] DATABASE_URL not set — cannot calculate actual hours")
-                return 0.0
+                return self._hours_ingested / 12.0  # 5-min polls ÷ 12 = hours
 
-            # Build list of site_id variants to query (canonical + legacy)
-            site_ids = [site_id]
-            if site_id.startswith("site-"):
-                legacy = "S" + site_id[5:]  # site-002 → S002
-                site_ids.append(legacy)
-            elif site_id.startswith("S") and not site_id.startswith("site-"):
-                canonical = "site-" + site_id[1:]  # S002 → site-002
-                site_ids.append(canonical)
+            site_code = site_id
+            if site_id.startswith("S") and not site_id.startswith("site-"):
+                site_code = f"site-{site_id[1:]}"
 
             conn = psycopg2.connect(database_url)
             try:
                 cur = conn.cursor()
                 cur.execute(
-                    """
-                    SELECT EXTRACT(EPOCH FROM (MAX(recorded_at) - MIN(recorded_at))) / 3600.0
-                    FROM equipment_sensor_readings
-                    WHERE site_id = ANY(%s) AND recorded_at IS NOT NULL
-                    """,
-                    (site_ids,),
+                    "SELECT ml_hours_ingested FROM sites WHERE code = %s",
+                    (site_code,),
                 )
                 row = cur.fetchone()
                 cur.close()
                 if row and row[0] is not None:
-                    hours = float(row[0])
-                    logger.info("[ML FEEDER] Actual ML hours for %s: %.1fh (queried %s)", site_id, hours, site_ids)
-                    return hours
-                logger.info("[ML FEEDER] No telemetry found for %s", site_id)
+                    base_hours = float(row[0])
+                    session_delta = (datetime.utcnow() - self._ml_session_start).total_seconds() / 3600.0
+                    total = base_hours + session_delta
+                    logger.info(
+                        "[ML FEEDER] Cumulative ML hours for %s: %.1fh (base=%.1f + session=%.1f)",
+                        site_id, total, base_hours, session_delta,
+                    )
+                    return total
+                logger.info("[ML FEEDER] No persisted ml_hours_ingested for %s — using in-memory counter", site_id)
             finally:
                 conn.close()
         except Exception as e:
             logger.warning("[ML FEEDER] Could not calculate actual ML hours: %s", e)
-        return 0.0
+
+        return self._hours_ingested / 12.0
 
     def reset(self):
         """Clear all accumulated data."""

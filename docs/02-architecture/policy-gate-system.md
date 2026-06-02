@@ -64,7 +64,7 @@ GateEvaluationService.evaluate_promotion(site_id, from_phase, to_phase)
 ```
 
 **Supported Metrics:**
-- `ml_hours_ingested`: Total ML training hours
+- `ml_hours_ingested`: Total ML training hours (cumulative counter in `sites.ml_hours_ingested`, computed from persisted base + wall-clock time since process start — NOT a query against `equipment_sensor_readings` which has 24h retention)
 - `bridge_connected`: BMS bridge connectivity boolean
 - `anomaly_scores_writing`: Count of recent anomaly writes
 - `freshness_hours_max`: Max data age in hours

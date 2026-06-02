@@ -259,6 +259,13 @@ async def telegram_webhook(request: Request):
             await _handle_create_wo_from_rec(chat_id, rec_uuid, sender)
             return {"ok": True}
 
+        # Handle menu navigation buttons from inline keyboards
+        if data.startswith("menu:start:"):
+            from app.services.telegram_flow_handlers import handle_unknown
+
+            await handle_unknown(chat_id, "", callback_data=data, message_id=cq.get("message", {}).get("message_id"))
+            return {"ok": True}
+
         return {"ok": True}
 
     # Handle regular message

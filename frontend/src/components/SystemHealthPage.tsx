@@ -78,7 +78,7 @@ export default function SystemHealthPage() {
 
   // Load sites list
   useEffect(() => {
-    fetch('/api/buildings')
+    authorizedFetch('/api/buildings')
       .then(r => r.json())
       .then(d => {
         const all = [...(d.active || []), ...(d.inactive || [])];

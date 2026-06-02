@@ -184,6 +184,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [equipmentCategories, setEquipmentCategories] = useState<Record<string, CategoryStatus>>({});
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [alertsTotal, setAlertsTotal] = useState<number>(0);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [totalRiskExposure, setTotalRiskExposure] = useState<number>(0);
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
@@ -361,8 +362,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         }
 
         // Fetch alerts for this site
-        const { alerts: allAlerts } = await api.getAlerts();
+        const { alerts: allAlerts, total: apiTotal } = await api.getAlerts();
         setAlerts(allAlerts.filter((a) => a.site_id === siteId));
+        setAlertsTotal(apiTotal);
 
         // Fetch predictions for this site
         const predictionsData = await api.getPredictions(siteId);
@@ -913,7 +915,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         {visibleKpiCards.includes('kpi-alerts') && (
           <KPICard
             title="Active Alerts"
-            value={sentinelEnabled ? alerts.length : "—"}
+            value={sentinelEnabled ? alertsTotal : "—"}
             icon={<AlertTriangle className="h-5 w-5" />}
             accentColor="orange"
           />
@@ -1066,7 +1068,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             gpsLon={site.longitude ?? null}
             orientationDegrees={site.orientation_degrees ?? null}
             onboardingPhase={sitePhase}
-            activeAlerts={alerts.length}
+            activeAlerts={alertsTotal}
             predictionsCount={predictions.length}
             equipmentCount={equipment.length}
             siteFloors={siteFloors ?? undefined}
@@ -1126,7 +1128,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         >
           {[
             { id: "equipment" as TabType, label: "Equipment", icon: Cpu, count: equipment.length },
-            { id: "alerts" as TabType, label: "Alerts", icon: AlertTriangle, count: alerts.length },
+            { id: "alerts" as TabType, label: "Alerts", icon: AlertTriangle, count: alertsTotal },
             { id: "energy" as TabType, label: "Energy", icon: Zap },
             { id: "predictions" as TabType, label: "Predictions", icon: TrendingUp, count: predictions.length },
           ].map((tab) => {

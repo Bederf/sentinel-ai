@@ -4,7 +4,7 @@
 
 CREATE TABLE residential_recommendations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    site_id VARCHAR NOT NULL REFERENCES residential_sites(site_id),
+    site_id UUID NOT NULL REFERENCES residential_sites(id),
     chat_id BIGINT,
     platform VARCHAR DEFAULT 'solarman',
 
