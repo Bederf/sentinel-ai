@@ -115,10 +115,10 @@ ML_TRAINING_SCHEDULES: list[RetentionSchedule] = [
     ),
     RetentionSchedule(
         table_name="equipment_sensor_readings",
-        retention_days=7,
+        retention_days=90,
         tier="ML_TRAINING",
         date_column="recorded_at",
-        description="Raw sensor telemetry — delete after aggregation (POPIA S14(1))",
+        description="Raw sensor telemetry — delete after 90-day aggregation window (tiered retention)",
     ),
     RetentionSchedule(
         table_name="alerts",
@@ -143,6 +143,20 @@ SNAPSHOT_SCHEDULES: list[RetentionSchedule] = [
         tier="SNAPSHOT",
         date_column="timestamp",
         description="Operational snapshots — stale after 30 days (POPIA S14(1))",
+    ),
+    RetentionSchedule(
+        table_name="telemetry_hourly",
+        retention_days=365 * 3,
+        tier="SNAPSHOT",
+        date_column="hour_bucket",
+        description="Hourly telemetry aggregates — delete after 3 years (FSR/SANS 204)",
+    ),
+    RetentionSchedule(
+        table_name="telemetry_daily",
+        retention_days=365 * 10,
+        tier="SNAPSHOT",
+        date_column="day_bucket",
+        description="Daily telemetry aggregates — delete after 10 years (capex/compliance)",
     ),
 ]
 

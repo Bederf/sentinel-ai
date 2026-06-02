@@ -363,11 +363,13 @@ async def startup_event(app: FastAPI) -> None:
     scheduler_service.add_rag_doc_sync_job(interval_hours=12)
 
     # Optional ESP32 MQTT listener for room-presence nodes
-    from app.services.space_mqtt_listener import get_space_mqtt_listener
+    # PHASE 220: Temporarily disabled — MQTT reconnect loop saturates event loop
+    if False:
+        from app.services.space_mqtt_listener import get_space_mqtt_listener
 
-    _logger.warning("SHADOW_DEBUG: about to start Space MQTT listener")
-    await get_space_mqtt_listener().start()
-    _logger.warning("SHADOW_DEBUG: Space MQTT listener started")
+        _logger.warning("SHADOW_DEBUG: about to start Space MQTT listener")
+        await get_space_mqtt_listener().start()
+        _logger.warning("SHADOW_DEBUG: Space MQTT listener started")
 
     # Optional: Fuel tank MQTT listener
     try:
@@ -579,6 +581,19 @@ async def startup_event(app: FastAPI) -> None:
             _logger.info("✅ Supabase SQL retention enforcement job initialized")
         except Exception as e:
             _logger.warning(f"⚠️ Supabase retention job initialization failed: {e}")
+
+    # Telemetry tiered aggregation (tier1->tier2 nightly, tier2->tier3 weekly)
+    try:
+        scheduler_service.add_tier1_tier2_aggregation_job()
+        _logger.info("✅ Tier1->Tier2 telemetry aggregation job initialized (daily 00:00 UTC)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Tier1->Tier2 aggregation job initialization failed: {e}")
+
+    try:
+        scheduler_service.add_tier2_tier3_aggregation_job()
+        _logger.info("✅ Tier2->Tier3 telemetry aggregation job initialized (weekly Sun 01:00 UTC)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Tier2->Tier3 aggregation job initialization failed: {e}")
 
     # Daily AI cost report email (23:55 every day)
     try:

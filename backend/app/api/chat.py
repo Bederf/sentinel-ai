@@ -1,6 +1,7 @@
 """Chat API endpoint with Server-Sent Events streaming."""
 
 import contextlib
+import json
 import logging
 from collections.abc import AsyncGenerator
 from datetime import UTC
@@ -14,6 +15,7 @@ from pydantic import BaseModel, Field
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app.agents_kernel.graph_runner import run_smoke_graph
 from app.config.settings import SENTINEL_BOT_DEFAULT_CLASS, settings
 from app.middleware.auth_middleware import get_current_auth, optional_auth
 from app.models.auth import AuthContext
@@ -42,6 +44,23 @@ limiter = Limiter(key_func=get_remote_address)
 
 logger = logging.getLogger(__name__)
 
+
+def _extract_kernel_observability(trace: dict[str, Any]) -> dict[str, Any]:
+    """Extract observability metadata from the last node_end event in a kernel trace.
+
+    Args:
+        trace: A trace dict containing a ``node_trace`` list of event dicts.
+
+    Returns:
+        The ``metadata`` dict of the last ``node_end`` event, or an empty dict.
+    """
+    node_trace = trace.get("node_trace", [])
+    for event in reversed(node_trace):
+        if event.get("event") == "node_end":
+            return event.get("metadata", {})
+    return {}
+
+
 router = APIRouter()
 
 
@@ -56,10 +75,133 @@ class ChatRequest(BaseModel):
     )
     search_docs: bool = False  # Deprecated: doc search is now a tool, not a mode
     site_id: str | None = Field(None, pattern=r"^site-\d{3}$")  # Selected building/site
+    mode: str = "general"
+    equipment_id: str | None = None
+    time_range: dict[str, str] | None = None
     include_system_docs: bool = Field(
         False,
         description="Include SENTINEL platform documentation in RAG retrieval. "
         "Off by default to avoid polluting operational answers.",
+    )
+
+
+def is_advisory_kernel_request(request: ChatRequest) -> bool:
+    return settings.sentinel_advisory_kernel_enabled
+
+
+async def run_advisory_kernel_chat(
+    chat_request: ChatRequest,
+    guarded_message: str,
+) -> tuple[dict[str, Any], str]:
+    graph_output = await run_smoke_graph(
+        message=guarded_message,
+        conversation_id=chat_request.conversation_id,
+        mode=chat_request.mode,
+        site_id=chat_request.site_id,
+        equipment_id=chat_request.equipment_id,
+        time_range=chat_request.time_range,
+    )
+    payload = build_advisory_kernel_response_payload(chat_request, graph_output)
+    body = format_advisory_kernel_message(payload)
+    return payload, body
+
+
+def build_advisory_kernel_response_payload(
+    chat_request: ChatRequest,
+    graph_output: dict[str, Any],
+) -> dict[str, Any]:
+    domain_context = graph_output.get("domain_context", {})
+    evidence_bundle = graph_output.get("evidence_bundle", {})
+    node_trace = graph_output.get("node_trace", [])
+    messages = graph_output.get("messages", [])
+    output_state = graph_output.get("output_state", {})
+
+    evidence_counts = {
+        "hybrid": len(evidence_bundle.get("hybrid", [])),
+        "brick": len(evidence_bundle.get("brick", [])),
+        "docs": len(evidence_bundle.get("docs", [])),
+        "memory": len(evidence_bundle.get("memory", [])),
+    }
+
+    return {
+        "mode": chat_request.mode,
+        "status": output_state.get("status", "completed"),
+        "thread_id": domain_context.get("conversation_id", chat_request.conversation_id),
+        "domain_context": {
+            "site_id": domain_context.get("site_id") or chat_request.site_id,
+            "equipment_id": domain_context.get("equipment_id") or chat_request.equipment_id,
+            "zone": domain_context.get("zone"),
+            "time_range": domain_context.get("time_range") or chat_request.time_range,
+        },
+        "summary": output_state.get("summary", ""),
+        "next_step": output_state.get("next_step", ""),
+        "confidence_score": output_state.get("confidence_score", 0.0),
+        "request_id": output_state.get("request_id", ""),
+        "evidence_counts": evidence_counts,
+        "evidence_notes": evidence_bundle.get("notes", []),
+        "trace_count": len(node_trace),
+        "message_count": len(messages),
+        "observability": _extract_kernel_observability({"node_trace": node_trace}),
+    }
+
+
+def build_advisory_kernel_headers(payload: dict[str, Any]) -> dict[str, str]:
+    dc = payload.get("domain_context", {})
+    obs = payload.get("observability", {})
+    evidence = payload.get("evidence_counts", {})
+
+    return {
+        "X-Response-Type": "advisory_kernel",
+        "X-Kernel-Thread-Id": str(payload.get("thread_id", "")),
+        "X-Kernel-Status": str(payload.get("status", "")),
+        "X-Kernel-Confidence": str(payload.get("confidence_score", "")),
+        "X-Kernel-Evidence-Counts": ", ".join(f"{k}={v}" for k, v in evidence.items()),
+        "X-Kernel-Message-Count": str(payload.get("message_count", "")),
+        "X-Kernel-Router": str(obs.get("router_name", "")),
+        "X-Kernel-Selected-Model": str(obs.get("selected_model", "")),
+        "X-Kernel-Selected-Provider": str(obs.get("selected_provider", "")),
+        "X-Kernel-Site-Id": str(dc.get("site_id", "")),
+        "X-Kernel-Equipment-Id": str(dc.get("equipment_id", "")),
+    }
+
+
+async def generate_advisory_kernel_sse(
+    payload: dict[str, Any],
+    body: str,
+) -> AsyncGenerator[str, None]:
+    yield f"event: advisory_kernel_metadata\ndata: {json.dumps(payload, default=str)}\n\n"
+    yield f"event: advisory_kernel_output\ndata: {body}\n\n"
+    yield "data: [DONE]\n\n"
+
+
+def format_advisory_kernel_message(payload: dict[str, Any]) -> str:
+    dc = payload.get("domain_context", {})
+    evidence = payload.get("evidence_counts", {})
+
+    return (
+        f"Mode: {payload.get('mode', 'investigation')}\n"
+        f"Status: {payload.get('status', 'completed')}\n"
+        f"Thread ID: {payload.get('thread_id', '')}\n"
+        f"Context: site_id={dc.get('site_id')}, equipment_id={dc.get('equipment_id')}\n"
+        f"Evidence: {', '.join(f'{k}={v}' for k, v in evidence.items())}\n"
+        f"Message count: {payload.get('message_count', 0)}\n\n"
+        f"{payload.get('summary', '')}\n"
+        f"Next step: {payload.get('next_step', '')}\n"
+        f"Confidence: {payload.get('confidence_score', 0)}\n"
+        f"Request ID: {payload.get('request_id', '')}"
+    )
+
+
+def log_advisory_kernel_response(payload: dict[str, Any]) -> None:
+    dc = payload.get("domain_context", {})
+    obs = payload.get("observability", {})
+    logger.info(
+        "Advisory kernel response: thread_id=%s, site_id=%s, equipment_id=%s, model=%s, router=%s",
+        payload.get("thread_id"),
+        dc.get("site_id"),
+        dc.get("equipment_id"),
+        obs.get("selected_model"),
+        obs.get("router_name"),
     )
 
 
@@ -741,6 +883,21 @@ async def chat(
             },
         )
 
+    # --- Advisory kernel routing (investigation mode with feature flag) ---
+    if is_advisory_kernel_request(chat_request):
+        kernel_payload, kernel_body = await run_advisory_kernel_chat(chat_request, user_message)
+        log_advisory_kernel_response(kernel_payload)
+        return StreamingResponse(
+            generate_advisory_kernel_sse(kernel_payload, kernel_body),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+                **build_advisory_kernel_headers(kernel_payload),
+            },
+        )
+
     logger.info(
         f"Chat request: conversation_id={chat_request.conversation_id}, "
         f"search_docs={chat_request.search_docs}, site_id={chat_request.site_id}, "
@@ -1008,23 +1165,26 @@ async def chat_tts_stream(
 
     async def stream_audio():
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client, client.stream(
-                "POST",
-                f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
-                headers={
-                    "xi-api-key": settings.elevenlabs_api_key,
-                    "Content-Type": "application/json",
-                    "Accept": "audio/mpeg",
-                },
-                json={
-                    "text": text,
-                    "model_id": stt_request.model,
-                    "voice_settings": {
-                        "stability": 0.5,
-                        "similarity_boost": 0.75,
+            async with (
+                httpx.AsyncClient(timeout=120.0) as client,
+                client.stream(
+                    "POST",
+                    f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}/stream",
+                    headers={
+                        "xi-api-key": settings.elevenlabs_api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "audio/mpeg",
                     },
-                },
-            ) as response:
+                    json={
+                        "text": text,
+                        "model_id": stt_request.model,
+                        "voice_settings": {
+                            "stability": 0.5,
+                            "similarity_boost": 0.75,
+                        },
+                    },
+                ) as response,
+            ):
                 response.raise_for_status()
                 async for chunk in response.aiter_bytes(chunk_size=8192):
                     if chunk:

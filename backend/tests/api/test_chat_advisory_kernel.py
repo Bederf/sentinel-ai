@@ -6,6 +6,7 @@ import logging
 from unittest.mock import AsyncMock
 
 import pytest
+from starlette.background import BackgroundTasks
 from starlette.requests import Request
 
 from app.agents_kernel.graph_runner import reset_runtime_graph
@@ -364,6 +365,7 @@ async def test_feature_flag_off_preserves_legacy_chat_path(monkeypatch):
         chat_request=ChatRequest(message="Investigate AHU-3", mode="investigation"),
         auth=_build_request().state.auth,
         guarded_message="Investigate AHU-3",
+        background_tasks=BackgroundTasks(),
     )
     body = await _read_sse_body(response)
 
@@ -419,6 +421,7 @@ async def test_feature_flag_on_investigation_mode_routes_to_kernel(monkeypatch):
         chat_request=ChatRequest(message="Investigate AHU-3", mode="investigation", conversation_id="conv-123"),
         auth=request.state.auth,
         guarded_message="Investigate AHU-3",
+        background_tasks=BackgroundTasks(),
     )
     body = await _read_sse_body(response)
 
@@ -483,6 +486,7 @@ async def test_feature_flag_on_investigation_mode_preserves_domain_context_in_me
         ),
         auth=request.state.auth,
         guarded_message="Investigate S002-AHU-L2-003 over the last 24 hours",
+        background_tasks=BackgroundTasks(),
     )
     body = await _read_sse_body(response)
 
@@ -541,6 +545,7 @@ async def test_feature_flag_on_repeated_conversation_id_preserves_thread_identit
         ),
         auth=request_one.state.auth,
         guarded_message="Investigate S002-AHU-L2-003",
+        background_tasks=BackgroundTasks(),
     )
     _ = await _read_sse_body(response_one)
 
@@ -556,6 +561,7 @@ async def test_feature_flag_on_repeated_conversation_id_preserves_thread_identit
         ),
         auth=request_two.state.auth,
         guarded_message="Investigate S002-AHU-L2-003 again",
+        background_tasks=BackgroundTasks(),
     )
     _ = await _read_sse_body(response_two)
 

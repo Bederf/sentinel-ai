@@ -403,6 +403,9 @@ class Settings(BaseSettings):
 
     # Advisory kernel routing switch for chat investigation mode
     sentinel_advisory_kernel_enabled: bool = Field(default=False, validation_alias="SENTINEL_ADVISORY_KERNEL_ENABLED")
+    sentinel_advisory_model_router: str = Field(
+        default="ByConfidenceModelRouter", validation_alias="SENTINEL_ADVISORY_MODEL_ROUTER"
+    )
 
     # ML Background Training (retraining, drift detection, feedback retraining)
     # Disable on resource-constrained VPS — models are pre-trained and stable

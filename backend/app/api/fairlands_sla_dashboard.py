@@ -9,7 +9,7 @@ Path: /api/fairlands/sla/*
 import logging
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from app.api.schemas.fairlands_sla_schemas import (
     ClusterAlertResponse,
@@ -18,7 +18,7 @@ from app.api.schemas.fairlands_sla_schemas import (
     SLABreachResponse,
     SLASummaryResponse,
 )
-from app.middleware.auth_middleware import require_query_site_access
+from app.middleware.auth_middleware import AuthContext, optional_auth
 from app.services.fire_pump_compliance_service import get_fire_pump_compliance_service
 from app.services.recommendation_milestone_service import get_recommendation_milestone_service
 
@@ -72,7 +72,8 @@ def _compute_elapsed_pct(rec) -> float:
 
 @router.get("/milestones", response_model=list[MilestoneStatusResponse])
 async def get_milestone_status(
-    site_code: str = Depends(require_query_site_access("site_code")),
+    site_code: str = Query(...),
+    auth: AuthContext = Depends(optional_auth),
 ) -> list[MilestoneStatusResponse]:
     """Get all recommendations with milestone status for a site."""
     try:
@@ -139,7 +140,8 @@ async def get_milestone_status(
 
 @router.get("/breaches", response_model=list[SLABreachResponse])
 async def get_sla_breaches(
-    site_code: str = Depends(require_query_site_access("site_code")),
+    site_code: str = Query(...),
+    auth: AuthContext = Depends(optional_auth),
 ) -> list[SLABreachResponse]:
     """Get all recommendations with SLA breaches."""
     try:
@@ -190,7 +192,8 @@ async def get_sla_breaches(
 
 @router.get("/clusters", response_model=list[ClusterAlertResponse])
 async def get_cluster_alerts(
-    site_code: str = Depends(require_query_site_access("site_code")),
+    site_code: str = Query(...),
+    auth: AuthContext = Depends(optional_auth),
 ) -> list[ClusterAlertResponse]:
     """Get all equipment with active cluster alerts."""
     try:
@@ -241,7 +244,8 @@ async def get_cluster_alerts(
 
 @router.get("/compliance/fire-pump", response_model=list[FirePumpComplianceResponse])
 async def get_fire_pump_compliance(
-    site_code: str = Depends(require_query_site_access("site_code")),
+    site_code: str = Query(...),
+    auth: AuthContext = Depends(optional_auth),
 ) -> list[FirePumpComplianceResponse]:
     """Get fire pump compliance status for site."""
     try:
@@ -280,7 +284,8 @@ async def get_fire_pump_compliance(
 
 @router.get("/summary", response_model=SLASummaryResponse)
 async def get_sla_summary(
-    site_code: str = Depends(require_query_site_access("site_code")),
+    site_code: str = Query(...),
+    auth: AuthContext = Depends(optional_auth),
 ) -> SLASummaryResponse:
     """Get SLA summary: milestone counts + breach rate + cluster alerts + compliance."""
     try:

@@ -253,6 +253,9 @@ class SpaceMqttListener:
                         "Space MQTT listener connect failed: reason_code=%s (%s)", reason_code, type(reason_code)
                     )
 
+            def _on_disconnect(client, _userdata, rc, _properties=None):
+                logger.warning("Space MQTT _on_disconnect fired: rc=%s", rc)
+
             def _on_message(_client, _userdata, message):
                 logger.warning("Space MQTT _on_message fired: topic=%s", message.topic)
                 try:
@@ -275,6 +278,8 @@ class SpaceMqttListener:
 
             client.on_connect = _on_connect
             client.on_message = _on_message
+            client.on_disconnect = _on_disconnect
+            client.reconnect_delay_set(min_delay=1, max_delay=60)
             client.connect_async(settings.space_mqtt_broker, settings.space_mqtt_port, keepalive=30)
             client.loop_start()
             logger.info(

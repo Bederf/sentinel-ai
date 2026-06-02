@@ -99,6 +99,29 @@ def calculate_age_based_health(
     return health_score, "low"
 
 
+def _check_sensor_quality(point_name: str, value: float) -> str:
+    """Inline quality gate for sensor readings before persistence.
+
+    Returns 'ok' or 'rejected' based on range validation.
+    Rejected readings are still written (with quality_flag='rejected')
+    so they can be audited.
+    """
+    import math
+
+    if math.isnan(value):
+        return "rejected"
+    name_lower = point_name.lower()
+    if "temp" in name_lower and (value < -50.0 or value > 100.0):
+        return "rejected"
+    if "pressure" in name_lower and (value < 0.0 or value > 5000.0):
+        return "rejected"
+    if "co2" in name_lower and (value < 0.0 or value > 5000.0):
+        return "rejected"
+    if "humidity" in name_lower and (value < 0.0 or value > 100.0):
+        return "rejected"
+    return "ok"
+
+
 class SentinelDataSync:
     """SENTINEL Supabase sync + ML pipeline feeder."""
 
@@ -166,7 +189,6 @@ class SentinelDataSync:
                 site_uuid = sites_resp.data[0]["id"]
                 sources_resp = client.table("log_sources").select("last_sync_at").eq("site_id", site_uuid).execute()
                 if sources_resp.data and sources_resp.data[0].get("last_sync_at"):
-
                     now = datetime.now(tz=UTC)
                     sync_at = sources_resp.data[0]["last_sync_at"]
                     sync_time = datetime.fromisoformat(sync_at.replace("Z", "+00:00"))
@@ -574,7 +596,6 @@ class SentinelDataSync:
         all_equipment = eq_repo.get_all(site_id=site_uuid)
 
         telemetry_codes = set(equipment_states.keys())
-        today = simulated_time.date()
 
         updates: list[tuple[str, int, str, str, str]] = []
         for eq in all_equipment:
@@ -758,6 +779,7 @@ class SentinelDataSync:
         }
 
         rows = []
+        rejected_count = 0
         ts = simulated_time
         for code, state in equipment_states.items():
             readings = state.get("sensor_readings", {})
@@ -767,6 +789,9 @@ class SentinelDataSync:
             for point_name, value in readings.items():
                 if not isinstance(value, (int, float)):
                     continue
+                quality_flag = _check_sensor_quality(point_name, float(value))
+                if quality_flag == "rejected":
+                    rejected_count += 1
                 rows.append(
                     (
                         code,  # equipment_id (text = code)
@@ -776,11 +801,15 @@ class SentinelDataSync:
                         ts,  # recorded_at
                         self.site_id,  # site_id
                         json.dumps({"equipment_type": equip_type}),  # metadata
+                        quality_flag,  # quality_flag
                     )
                 )
 
         if not rows:
             return 0
+
+        if rejected_count > 0:
+            logger.info("[SENTINEL SYNC] Quality gate rejected %d sensor readings", rejected_count)
 
         try:
             conn = psycopg2.connect(database_url)
@@ -789,7 +818,7 @@ class SentinelDataSync:
 
             values_sql = ",".join(
                 cur.mogrify(
-                    "(%s, %s, %s::double precision, %s, %s::timestamptz, %s, %s::jsonb)",
+                    "(%s, %s, %s::double precision, %s, %s::timestamptz, %s, %s::jsonb, %s)",
                     row,
                 ).decode()
                 for row in rows
@@ -798,28 +827,13 @@ class SentinelDataSync:
             cur.execute(
                 f"""
                 INSERT INTO equipment_sensor_readings
-                    (equipment_id, sensor_type, value, unit, recorded_at, site_id, metadata)
+                    (equipment_id, sensor_type, value, unit, recorded_at, site_id, metadata, quality_flag)
                 VALUES {values_sql}
                 ON CONFLICT DO NOTHING
                 """
             )
 
             written = cur.rowcount
-
-            # Enforce 24h retention: delete rows older than 24h for this site
-            site_ids = list({r[5] for r in rows if r[5]})
-            if site_ids:
-                cur.execute(
-                    """
-                    DELETE FROM equipment_sensor_readings
-                    WHERE site_id = ANY(%s)
-                    AND recorded_at < NOW() - INTERVAL '24 hours'
-                    """,
-                    (site_ids,),
-                )
-                purged = cur.rowcount
-                if purged > 0:
-                    logger.debug("[SENTINEL SYNC] Purged %d stale sensor rows (>24h)", purged)
 
             cur.close()
             conn.close()

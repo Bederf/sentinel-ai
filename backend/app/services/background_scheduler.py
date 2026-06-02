@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.services.ai_optimizer import get_ai_optimizer
@@ -535,9 +536,7 @@ class BackgroundSchedulerService:
                         pass
 
                     try:
-                        optimization_result = asyncio.run(
-                            get_ai_optimizer().analyze_building(site_id)
-                        )
+                        optimization_result = asyncio.run(get_ai_optimizer().analyze_building(site_id))
                     except Exception:
                         logger.exception(f"[AI-OPT] analyze_building failed for {site_id}")
                         continue
@@ -552,9 +551,7 @@ class BackgroundSchedulerService:
                         urgent_wos = asyncio.run_coroutine_threadsafe(
                             wo_repo.get_open_urgent_work_orders(site_id), self._main_loop
                         ).result(timeout=30)
-                        urgent_equipment = {
-                            wo.get("equipment_code") for wo in urgent_wos if wo.get("equipment_code")
-                        }
+                        urgent_equipment = {wo.get("equipment_code") for wo in urgent_wos if wo.get("equipment_code")}
                         if urgent_equipment:
                             logger.warning(
                                 f"[GATE] Active urgent/critical work orders for {site_id}: "
@@ -677,9 +674,9 @@ class BackgroundSchedulerService:
                             status=RecommendationStatus.PENDING,
                             requires_approval=False,
                         )
-                        asyncio.run_coroutine_threadsafe(
-                            recommendation_repo.create(rec), self._main_loop
-                        ).result(timeout=30)
+                        asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
+                            timeout=30
+                        )
                         created_count += 1
 
                     if not control_recs:
@@ -888,7 +885,14 @@ class BackgroundSchedulerService:
                                 "affected_equipment": affected,
                                 # Best-effort name for grouped recommendations; pick first affected item with a name
                                 "equipment_name": (
-                                    affected[0].get("name") if (is_grouped and isinstance(affected, list) and affected and isinstance(affected[0], dict)) else None
+                                    affected[0].get("name")
+                                    if (
+                                        is_grouped
+                                        and isinstance(affected, list)
+                                        and affected
+                                        and isinstance(affected[0], dict)
+                                    )
+                                    else None
                                 )
                                 if is_grouped
                                 else rec_dict.get("metadata", {}).get("equipment_name"),
@@ -896,9 +900,9 @@ class BackgroundSchedulerService:
                             if is_grouped
                             else {"equipment_name": rec_dict.get("metadata", {}).get("equipment_name")},
                         )
-                        asyncio.run_coroutine_threadsafe(
-                            recommendation_repo.create(rec), self._main_loop
-                        ).result(timeout=30)
+                        asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
+                            timeout=30
+                        )
                         created_count += 1
                         if current_stage == "shadow_live":
                             logger.info(
@@ -968,9 +972,9 @@ class BackgroundSchedulerService:
                                                 message=_msg,
                                                 reference_id=rec.target_equipment,
                                             )
-                                        asyncio.run_coroutine_threadsafe(
-                                            send_result, self._main_loop
-                                        ).result(timeout=30)
+                                        asyncio.run_coroutine_threadsafe(send_result, self._main_loop).result(
+                                            timeout=30
+                                        )
                                         logger.info(f"[NOTIFY] Advisory notification sent for {rec.target_equipment}")
                             except Exception as notify_err:
                                 logger.warning(f"Failed to send Telegram notification: {notify_err}")
@@ -1360,9 +1364,9 @@ class BackgroundSchedulerService:
                 process_pending_verifications,
             )
 
-            results = asyncio.run_coroutine_threadsafe(
-                process_pending_verifications(), self._main_loop
-            ).result(timeout=60)
+            results = asyncio.run_coroutine_threadsafe(process_pending_verifications(), self._main_loop).result(
+                timeout=60
+            )
             if results:
                 logger.info(
                     "[OUTCOME] Verified %d recommendation outcomes",
@@ -1527,9 +1531,9 @@ class BackgroundSchedulerService:
                     breach["elapsed_pct"] * 100,
                 )
                 # Fire escalation (Sentry → Telegram)
-                asyncio.run_coroutine_threadsafe(
-                    svc.escalate_breach(rec.id, breach), self._main_loop
-                ).result(timeout=30)
+                asyncio.run_coroutine_threadsafe(svc.escalate_breach(rec.id, breach), self._main_loop).result(
+                    timeout=30
+                )
         except Exception as e:
             logger.error("Milestone deadline check failed: %s", e)
 
@@ -1711,9 +1715,9 @@ class BackgroundSchedulerService:
 
                 for sid in get_registered_site_ids():
                     try:
-                        current_stage = asyncio.run_coroutine_threadsafe(
-                            effective_phase(sid), self._main_loop
-                        ).result(timeout=30)
+                        current_stage = asyncio.run_coroutine_threadsafe(effective_phase(sid), self._main_loop).result(
+                            timeout=30
+                        )
                     except Exception:
                         current_stage = "commissioning"
 
@@ -2508,9 +2512,9 @@ class BackgroundSchedulerService:
 
             mv_service = get_mv_verification_service()
 
-            verified = asyncio.run_coroutine_threadsafe(
-                mv_service.run_pending_verifications(), self._main_loop
-            ).result(timeout=60)
+            verified = asyncio.run_coroutine_threadsafe(mv_service.run_pending_verifications(), self._main_loop).result(
+                timeout=60
+            )
 
             if verified:
                 logger.info(
@@ -3222,7 +3226,7 @@ class BackgroundSchedulerService:
                 ("adapter_health_current", "updated_at", 7),
                 ("adapter_health_alerts", "created_at", 7),
                 ("space_occupancy_events", "timestamp", 7),
-                ("equipment_sensor_readings", "recorded_at", 7),
+                ("equipment_sensor_readings", "recorded_at", 90),
                 ("asset_health_snapshots", "created_at", 30),
                 ("system_health_snapshots", "created_at", 30),
             ]:
@@ -3278,6 +3282,70 @@ class BackgroundSchedulerService:
                 logger.warning("Failed to write retention enforcement audit event: %s", exc)
         except Exception as e:
             logger.error(f"Failed to run Supabase retention enforcement: {e}", exc_info=True)
+
+    def add_tier1_tier2_aggregation_job(self) -> None:
+        """Add nightly tier1->tier2 telemetry aggregation job (00:00 UTC)."""
+        job_id = "tier1_to_tier2_aggregation"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing tier1->tier2 aggregation job")
+
+        self.scheduler.add_job(
+            func=self._run_tier1_to_tier2_aggregation,
+            trigger=CronTrigger(hour=0, minute=0),
+            id=job_id,
+            name="Tier1->Tier2 Telemetry Aggregation",
+            replace_existing=True,
+        )
+        logger.info("Added tier1->tier2 aggregation job (daily 00:00 UTC)")
+
+    def _run_tier1_to_tier2_aggregation(self) -> None:
+        """Execute tier1->tier2 raw-to-hourly telemetry aggregation."""
+        try:
+            from app.services.telemetry_aggregation_service import get_telemetry_aggregation_service
+
+            service = get_telemetry_aggregation_service()
+            result = service.aggregate_tier1_to_tier2()
+            logger.info(
+                "[AGGREGATION] Tier1->Tier2: processed=%s written=%s errors=%s",
+                result["rows_processed"],
+                result["rows_written"],
+                len(result["errors"]),
+            )
+        except Exception as e:
+            logger.error(f"[AGGREGATION] Tier1->Tier2 failed: {e}", exc_info=True)
+
+    def add_tier2_tier3_aggregation_job(self) -> None:
+        """Add weekly tier2->tier3 telemetry aggregation job (Sunday 01:00 UTC)."""
+        job_id = "tier2_to_tier3_aggregation"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing tier2->tier3 aggregation job")
+
+        self.scheduler.add_job(
+            func=self._run_tier2_to_tier3_aggregation,
+            trigger=CronTrigger(day_of_week="sun", hour=1, minute=0),
+            id=job_id,
+            name="Tier2->Tier3 Telemetry Aggregation",
+            replace_existing=True,
+        )
+        logger.info("Added tier2->tier3 aggregation job (weekly Sun 01:00 UTC)")
+
+    def _run_tier2_to_tier3_aggregation(self) -> None:
+        """Execute tier2->tier3 hourly-to-daily telemetry aggregation."""
+        try:
+            from app.services.telemetry_aggregation_service import get_telemetry_aggregation_service
+
+            service = get_telemetry_aggregation_service()
+            result = service.aggregate_tier2_to_tier3()
+            logger.info(
+                "[AGGREGATION] Tier2->Tier3: processed=%s written=%s errors=%s",
+                result["rows_processed"],
+                result["rows_written"],
+                len(result["errors"]),
+            )
+        except Exception as e:
+            logger.error(f"[AGGREGATION] Tier2->Tier3 failed: {e}", exc_info=True)
 
     def add_mip_dispatch_optimize_job(self, interval_seconds: int = 900):
         """Add a job to run MIP dispatch optimization every 15 minutes.
