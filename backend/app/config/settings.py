@@ -174,6 +174,9 @@ class Settings(BaseSettings):
     # Sentry webhook secret (required for Telegram bot integration)
     sentry_webhook_secret: str = ""
 
+    # Home bot webhook secret (Phase 220 — Telegram sends this in X-Telegram-Bot-Api-Secret-Token)
+    home_bot_webhook_secret: str = ""
+
     # Sentry operator password — required in request body for sensitive operations
     # (equipment resets, work order creation, inspection results, call log escalation)
     sentinel_operator_password: str = Field(default="", validation_alias="SENTINEL_OPERATOR_PASSWORD")

@@ -28,11 +28,13 @@ import ChillerControlPanel from "./ChillerControlPanel";
 import { ThermalOptimizationPanelGated } from "./ThermalOptimizationPanelGated";
 import ComfortAssistant from "./ComfortAssistant";
 import HealthConfigEditor from "./HealthConfigEditor";
+import { AdvisoryLockedOverlay } from "../AdvisoryLockedOverlay";
 
 interface HVACDashboardProps {
   siteId: string;
   onAIRecommendation?: (recommendation: AIRecommendation) => void;
   enabledModules?: string[];
+  onboardingPhase?: string;
 }
 
 interface AIRecommendation {
@@ -116,11 +118,14 @@ export function HVACDashboard({
   siteId,
   onAIRecommendation,
   enabledModules = ["hvac"],
+  onboardingPhase,
 }: HVACDashboardProps) {
   const [overview, setOverview] = useState<HVACOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const [comparison, setComparison] = useState<ComparisonSummary | null>(null);
+
+  const isAdvisory = onboardingPhase === "advisory";
 
   // Use ref to track if component is mounted
   const mountedRef = useRef(true);
@@ -416,9 +421,11 @@ export function HVACDashboard({
           <div className="space-y-4">
             <ZoneOverviewPanel siteId={siteId} compact />
           </div>
-          <div className="space-y-4">
-            <ChillerControlPanel siteId={siteId} compact />
-            <ThermalOptimizationPanelGated siteId={siteId} compact />
+           <div className="space-y-4">
+            <AdvisoryLockedOverlay isAdvisory={isAdvisory} featureName="Chiller & Thermal Optimization">
+              <ChillerControlPanel siteId={siteId} compact />
+              <ThermalOptimizationPanelGated siteId={siteId} compact />
+            </AdvisoryLockedOverlay>
             <ComfortAssistant compact />
           </div>
         </div>
@@ -428,10 +435,14 @@ export function HVACDashboard({
       </div>;
       case 2: return <div className="space-y-6">
         <EquipmentStatusPanel siteId={siteId} />
-        <ChillerControlPanel siteId={siteId} />
+        <AdvisoryLockedOverlay isAdvisory={isAdvisory} featureName="Chiller Control">
+          <ChillerControlPanel siteId={siteId} />
+        </AdvisoryLockedOverlay>
       </div>;
       case 3: return <div className="space-y-4">
-        <ThermalOptimizationPanelGated siteId={siteId} />
+        <AdvisoryLockedOverlay isAdvisory={isAdvisory} featureName="Thermal Optimization">
+          <ThermalOptimizationPanelGated siteId={siteId} />
+        </AdvisoryLockedOverlay>
       </div>;
       case 4: return <div className="space-y-4">
         <HealthConfigEditor />

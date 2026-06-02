@@ -102,6 +102,7 @@ export function ModularDashboard({
           <HVACDashboard
             siteId={siteId}
             enabledModules={activeModules.map(m => m.module_type)}
+            onboardingPhase={sitePhase}
             onAIRecommendation={(rec) => {
               addRecommendation({
                 source_module: 'hvac' as ModuleType,

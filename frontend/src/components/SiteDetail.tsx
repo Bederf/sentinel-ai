@@ -1810,7 +1810,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           {activeMainTab === "hvac" && (
             <>
               <div className="mb-4"><HVACIntelligenceCard siteId={siteId} /></div>
-              <HVACDashboard siteId={siteId} />
+              <HVACDashboard siteId={siteId} onboardingPhase={sitePhase} />
             </>
           )}
 
