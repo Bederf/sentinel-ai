@@ -40,8 +40,8 @@ class MultiSitePollingCoordinator:
     def poll_all(self) -> dict[str, Any]:
         """Poll all sites that have an enabled bridge adapter.
 
-        Called by APScheduler sync job. Runs each site's poll() on a fresh
-        event loop (matches existing _run_shadow_mode_polling behaviour).
+        Called by APScheduler sync job. Dispatches each site's poll() to
+        the main event loop via run_coroutine_threadsafe.
 
         Returns:
             {site_id: poll_result_dict} for every site attempted.
@@ -57,30 +57,33 @@ class MultiSitePollingCoordinator:
 
         logger.info("[COORDINATOR] Polling %d site(s): %s", len(configs), list(configs))
 
+        from app.services.background_scheduler import scheduler_service
+        _main = scheduler_service._main_loop
+        if not _main or not _main.is_running():
+            logger.error("[COORDINATOR] Main event loop not available — cannot poll")
+            return results
+
         for site_id, connection_config in configs.items():
             try:
                 svc = self._get_or_create_service(site_id, connection_config)
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                try:
-                    result = loop.run_until_complete(svc.poll())
-                    results[site_id] = result
-                    errors = result.get("errors", [])
-                    all_failed = bool(errors) and result.get("equipment_states", 0) == 0
-                    site_name = _site_names.get(site_id)
-                    record_poll_result(site_id, has_errors=all_failed, site_name=site_name)
-                    check_and_alert(site_id, site_name=site_name)
-                    if errors:
-                        logger.warning("[COORDINATOR] %s poll errors: %s", site_id, errors)
-                    else:
-                        logger.info(
-                            "[COORDINATOR] %s: %d states, ml_hours=%s",
-                            site_id,
-                            result.get("equipment_states", 0),
-                            result.get("ml_hours_ingested", "?"),
-                        )
-                finally:
-                    loop.close()
+                result = asyncio.run_coroutine_threadsafe(
+                    svc.poll(), _main
+                ).result(timeout=120)
+                results[site_id] = result
+                errors = result.get("errors", [])
+                all_failed = bool(errors) and result.get("equipment_states", 0) == 0
+                site_name = _site_names.get(site_id)
+                record_poll_result(site_id, has_errors=all_failed, site_name=site_name)
+                check_and_alert(site_id, site_name=site_name)
+                if errors:
+                    logger.warning("[COORDINATOR] %s poll errors: %s", site_id, errors)
+                else:
+                    logger.info(
+                        "[COORDINATOR] %s: %d states, ml_hours=%s",
+                        site_id,
+                        result.get("equipment_states", 0),
+                        result.get("ml_hours_ingested", "?"),
+                    )
             except Exception as exc:
                 logger.error("[COORDINATOR] %s poll failed: %s", site_id, exc, exc_info=True)
                 results[site_id] = {"errors": [str(exc)]}

@@ -4236,15 +4236,20 @@ def _run_single_verification_sync(recommendation_id: str) -> None:
     """Synchronous wrapper for APScheduler — runs outcome verification for a single recommendation."""
     import asyncio
 
+    from app.database.supabase_client import get_supabase_client
+    from app.services.background_scheduler import scheduler_service
     from app.services.recommendation_outcome_service import process_single_verification
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    try:
-        loop.run_until_complete(process_single_verification(recommendation_id))
-    except Exception as e:
-        logging.getLogger(__name__).warning(f"[OUTCOME] Verification failed for {recommendation_id}: {e}")
-    finally:
+    _main = scheduler_service._main_loop
+    if _main and _main.is_running():
+        asyncio.run_coroutine_threadsafe(
+            process_single_verification(recommendation_id), _main
+        ).result(timeout=60)
+    else:
+        logging.getLogger(__name__).warning(
+            "[OUTCOME] Main event loop not available — skipping verification for %s",
+            recommendation_id,
+        )
         loop.close()
 
 
@@ -4312,7 +4317,8 @@ async def close_work_order_chat(
 
                     verify_at = datetime.utcnow() + timedelta(minutes=30)
                     scheduler_service.scheduler.add_job(
-                        func=lambda rid=recommendation_id: asyncio.run(_run_single_verification_sync(rid)),
+                        func=_run_single_verification_sync,
+                        args=[recommendation_id],
                         trigger="date",
                         run_date=verify_at,
                         id=f"outcome_verify_{recommendation_id}",
