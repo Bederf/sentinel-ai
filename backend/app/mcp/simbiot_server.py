@@ -2918,6 +2918,9 @@ async def import_point_list_tool(
         "meter": re.compile(r"(meter|kwh|energy)", re.I),
         "boiler": re.compile(r"(boiler|blr)", re.I),
         "hws": re.compile(r"(hws|hot.?water)", re.I),
+        "lighting_driver": re.compile(r"(lca|driver|led.?driver|dali|ballast)", re.I),
+        "scene_controller": re.compile(r"(scene|scencom|evo.?ctrl|scene.?ctrl|room.?ctrl)", re.I),
+        "luminaire": re.compile(r"(luminaire|lum|light.?fixture)", re.I),
     }
 
     # Parse points and group by device
@@ -2937,6 +2940,13 @@ async def import_point_list_tool(
             if pattern.search(device_name):
                 device_type = dtype
                 break
+
+        if device_type == "unknown":
+            logger.warning(
+                "Could not classify device type for '%s' — no matching pattern in device_patterns. "
+                "Equipment will be created with type='unknown' and require manual classification.",
+                device_name,
+            )
 
         # Extract floor from device name (e.g., L12, L11, Floor12, etc.)
         floor_match = re.search(r"[_\-]?(L\d+|B\d+|G|GF|Floor\d+|[0-9]{1,2}F)[_\-]?", device_name, re.I)
@@ -3067,12 +3077,18 @@ async def import_point_list_tool(
     }
 
     # Count by device type
+    unclassified = 0
     for d in generated_devices:
         result["analysis"]["device_types"][d["device_type"]] = (
             result["analysis"]["device_types"].get(d["device_type"], 0) + 1
         )
+        if d["device_type"] == "unknown":
+            unclassified += 1
 
-    logger.info(f"Imported point list for {site_id}: {len(point_list)} points -> {len(generated_devices)} devices")
+    result["analysis"]["unclassified_devices"] = unclassified
+
+    logger.info(f"Imported point list for {site_id}: {len(point_list)} points -> {len(generated_devices)} devices"
+                f"{f' ({unclassified} unclassified)' if unclassified else ''}")
 
     return result
 

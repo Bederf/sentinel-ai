@@ -1678,6 +1678,24 @@ export function BMSConnectionWizard({
             </div>
           )}
 
+          {/* Unclassified equipment banner */}
+          {state.mappings.equipment.filter((eq) => eq.equipment_type === "unknown").length > 0 && (
+            <div
+              className="flex items-center gap-2 p-3 rounded text-sm"
+              style={{
+                background: "var(--color-sentinel-red)11",
+                border: "1px solid var(--color-sentinel-red)",
+                color: "var(--color-sentinel-red)",
+              }}
+            >
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>
+                {state.mappings.equipment.filter((eq) => eq.equipment_type === "unknown").length} equipment
+                have unclassified types — manual classification required before approval
+              </span>
+            </div>
+          )}
+
           {/* Confidence breakdown */}
           {state.mappings.confidence_breakdown && (
             <div className="flex flex-wrap gap-3">
@@ -1756,6 +1774,19 @@ export function BMSConnectionWizard({
                             {eq.equipment_name || eq.equipment_id || "Unknown Equipment"}
                           </span>
                           <ConfidenceBadge confidence={eq.confidence || "unknown"} />
+                          {eq.equipment_type === "unknown" && (
+                            <span
+                              className="text-xs px-2 py-0.5 rounded font-medium"
+                              style={{
+                                background: "var(--color-sentinel-amber)22",
+                                color: "var(--color-sentinel-amber)",
+                                border: "1px solid var(--color-sentinel-amber)44",
+                              }}
+                            >
+                              <AlertTriangle className="w-3 h-3 inline mr-1" />
+                              Unclassified type
+                            </span>
+                          )}
                           {/* Zone badge from metadata if available */}
                           {(eq as any).metadata?.zone && (
                             <span
@@ -2012,10 +2043,30 @@ export function BMSConnectionWizard({
                 ) : (
                   <>
                 <div className="flex items-center gap-2">
-                  <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
-                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    All equipment types correctly identified
-                  </span>
+                  {(() => {
+                    const unclassifiedCount = state.mappings?.equipment?.filter(
+                      (eq) => eq.equipment_type === "unknown"
+                    ).length ?? 0;
+                    const allClassified = unclassifiedCount === 0;
+                    return (
+                      <>
+                        <span
+                          style={{
+                            color: allClassified
+                              ? "var(--color-sentinel-green)"
+                              : "var(--color-sentinel-red)",
+                          }}
+                        >
+                          {allClassified ? "✓" : "⚠️"}
+                        </span>
+                        <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {allClassified
+                            ? "All equipment types correctly identified"
+                            : `${unclassifiedCount} equipment type${unclassifiedCount !== 1 ? "s" : ""} unclassified — fix before approving`}
+                        </span>
+                      </>
+                    );
+                  })()}
                 </div>
                 <div className="flex items-center gap-2">
                   <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
