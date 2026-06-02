@@ -427,12 +427,9 @@ class BackgroundSchedulerService:
                     try:
                         from app.models.onboarding_phase import effective_phase
 
-                        _loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(_loop)
-                        try:
-                            current_stage = _loop.run_until_complete(effective_phase(site_id))
-                        finally:
-                            _loop.close()
+                        current_stage = asyncio.run_coroutine_threadsafe(
+                            effective_phase(site_id), self._main_loop
+                        ).result(timeout=30)
                     except Exception:
                         current_stage = "commissioning"
 
@@ -453,9 +450,6 @@ class BackgroundSchedulerService:
                             f"(optimization_enabled=False in site settings)"
                         )
                         continue
-
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
 
                     # Condition-change gate: skip if nothing material changed since last cycle
                     try:
@@ -541,9 +535,12 @@ class BackgroundSchedulerService:
                         pass
 
                     try:
-                        optimization_result = loop.run_until_complete(get_ai_optimizer().analyze_building(site_id))
-                    finally:
-                        loop.close()
+                        optimization_result = asyncio.run_coroutine_threadsafe(
+                            get_ai_optimizer().analyze_building(site_id), self._main_loop
+                        ).result(timeout=120)
+                    except Exception:
+                        logger.exception(f"[AI-OPT] analyze_building failed for {site_id}")
+                        continue
 
                     # Gate: load active urgent/critical work orders before persisting any recs
                     # Prevents SENTINEL from recommending on equipment with active faults
@@ -552,20 +549,17 @@ class BackgroundSchedulerService:
                         from app.database.repositories.work_order_repository import WorkOrderRepository
 
                         wo_repo = WorkOrderRepository()
-                        _wo_loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(_wo_loop)
-                        try:
-                            urgent_wos = _wo_loop.run_until_complete(wo_repo.get_open_urgent_work_orders(site_id))
-                            urgent_equipment = {
-                                wo.get("equipment_code") for wo in urgent_wos if wo.get("equipment_code")
-                            }
-                            if urgent_equipment:
-                                logger.warning(
-                                    f"[GATE] Active urgent/critical work orders for {site_id}: "
-                                    f"{len(urgent_equipment)} equipment — {urgent_equipment}"
-                                )
-                        finally:
-                            _wo_loop.close()
+                        urgent_wos = asyncio.run_coroutine_threadsafe(
+                            wo_repo.get_open_urgent_work_orders(site_id), self._main_loop
+                        ).result(timeout=30)
+                        urgent_equipment = {
+                            wo.get("equipment_code") for wo in urgent_wos if wo.get("equipment_code")
+                        }
+                        if urgent_equipment:
+                            logger.warning(
+                                f"[GATE] Active urgent/critical work orders for {site_id}: "
+                                f"{len(urgent_equipment)} equipment — {urgent_equipment}"
+                            )
                     except Exception as _wo_err:
                         logger.warning(f"[GATE] Could not load urgent work orders: {_wo_err}")
 
@@ -579,14 +573,14 @@ class BackgroundSchedulerService:
                         continue
 
                     # Validate recommendations
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
                     try:
-                        validation = loop.run_until_complete(
-                            get_ai_optimizer().validate_recommendation(site_id, optimization_result)
-                        )
-                    finally:
-                        loop.close()
+                        validation = asyncio.run_coroutine_threadsafe(
+                            get_ai_optimizer().validate_recommendation(site_id, optimization_result),
+                            self._main_loop,
+                        ).result(timeout=60)
+                    except Exception:
+                        logger.exception(f"[AI-OPT] validate_recommendation failed for {site_id}")
+                        continue
 
                     # === FIX 1: Filter maintenance BEFORE validate_recommendation ===
                     # Maintenance recs don't need device_manager validation — write directly.
@@ -607,9 +601,10 @@ class BackgroundSchedulerService:
                     # Build existing-key set for dedup: (target_equipment, action_type) within 48h
                     existing_maint_keys: set[tuple[str, str]] = set()
                     try:
-                        existing_pending = loop.run_until_complete(
-                            recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500)
-                        )
+                        existing_pending = asyncio.run_coroutine_threadsafe(
+                            recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500),
+                            self._main_loop,
+                        ).result(timeout=30)
                         maint_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
                         for existing in existing_pending:
                             ts = existing.timestamp
@@ -656,42 +651,36 @@ class BackgroundSchedulerService:
                             rec_action_type,
                             equipment_id,
                         )
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
-                        try:
-                            rec = Recommendation(
-                                site_id=site_id,
-                                timestamp=datetime.utcnow(),
-                                action_type=rec_action_type or "health_maintenance",
-                                risk_level=ActionRiskLevel.LOW,
-                                target_equipment=equipment_id,
-                                action={
-                                    "point": rec_dict.get("point_name", ""),
-                                    "value": rec_dict.get("recommended_value"),
-                                },
-                                reason=rec_dict.get("reason", ""),
-                                expected_impact={
-                                    "current_value": rec_dict.get("current_value"),
-                                    "recommended_value": rec_dict.get("recommended_value"),
-                                    "unit": rec_dict.get("unit", ""),
-                                    "energy_savings_percent": rec_dict.get("savings_kwh", 5),
-                                    "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
-                                },
-                                confidence="0.7",
-                                confidence_score=0.7,
-                                profile=optimization_result.profile or "",
-                                source="health_engine",
-                                source_type="rule_based",
-                                status=RecommendationStatus.PENDING,
-                                requires_approval=False,
-                            )
-                            loop.run_until_complete(recommendation_repo.create(rec))
-                            created_count += 1
-                        except Exception as e:
-                            logger.warning(f"[AI-OPT] Failed to persist maintenance rec for {equipment_id}: {e}")
-                            error_count += 1
-                        finally:
-                            loop.close()
+                        rec = Recommendation(
+                            site_id=site_id,
+                            timestamp=datetime.utcnow(),
+                            action_type=rec_action_type or "health_maintenance",
+                            risk_level=ActionRiskLevel.LOW,
+                            target_equipment=equipment_id,
+                            action={
+                                "point": rec_dict.get("point_name", ""),
+                                "value": rec_dict.get("recommended_value"),
+                            },
+                            reason=rec_dict.get("reason", ""),
+                            expected_impact={
+                                "current_value": rec_dict.get("current_value"),
+                                "recommended_value": rec_dict.get("recommended_value"),
+                                "unit": rec_dict.get("unit", ""),
+                                "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+                                "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
+                            },
+                            confidence="0.7",
+                            confidence_score=0.7,
+                            profile=optimization_result.profile or "",
+                            source="health_engine",
+                            source_type="rule_based",
+                            status=RecommendationStatus.PENDING,
+                            requires_approval=False,
+                        )
+                        asyncio.run_coroutine_threadsafe(
+                            recommendation_repo.create(rec), self._main_loop
+                        ).result(timeout=30)
+                        created_count += 1
 
                     if not control_recs:
                         logger.info(f"[AI-OPT] {site_id}: all recs were maintenance, skipping validation")
@@ -709,14 +698,14 @@ class BackgroundSchedulerService:
                     )
 
                     # Validate only control/setpoint recs
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
                     try:
-                        validation = loop.run_until_complete(
-                            get_ai_optimizer().validate_recommendation(site_id, filtered_recommendation)
-                        )
-                    finally:
-                        loop.close()
+                        validation = asyncio.run_coroutine_threadsafe(
+                            get_ai_optimizer().validate_recommendation(site_id, filtered_recommendation),
+                            self._main_loop,
+                        ).result(timeout=60)
+                    except Exception:
+                        logger.exception(f"[AI-OPT] control validate_recommendation failed for {site_id}")
+                        continue
 
                     allowed_count = sum(
                         1 for vr in validation.get("validation_results", []) if vr.get("allowed", False)
@@ -736,14 +725,14 @@ class BackgroundSchedulerService:
                         continue
 
                     # Fetch existing PENDING recs for dedup — 24h window, higher limit
-                    loop = asyncio.new_event_loop()
-                    asyncio.set_event_loop(loop)
                     try:
-                        existing_pending = loop.run_until_complete(
-                            recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500)
-                        )
-                    finally:
-                        loop.close()
+                        existing_pending = asyncio.run_coroutine_threadsafe(
+                            recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500),
+                            self._main_loop,
+                        ).result(timeout=30)
+                    except Exception:
+                        logger.exception(f"[AI-OPT] Failed to fetch existing PENDING recs for {site_id}")
+                        continue
 
                     # Build value-aware dedup set: (equipment, point, value) for recs < 48 sim-hours old
                     # Use effective time so dedup window matches simulated day boundaries
@@ -907,37 +896,36 @@ class BackgroundSchedulerService:
                             if is_grouped
                             else {"equipment_name": rec_dict.get("metadata", {}).get("equipment_name")},
                         )
-
-                        loop = asyncio.new_event_loop()
-                        asyncio.set_event_loop(loop)
+                        asyncio.run_coroutine_threadsafe(
+                            recommendation_repo.create(rec), self._main_loop
+                        ).result(timeout=30)
+                        created_count += 1
+                        if current_stage == "shadow_live":
+                            logger.info(
+                                "[AI-OPT] Stored shadow recommendation evidence for %s; "
+                                "no UI event or Telegram notification emitted",
+                                rec.target_equipment,
+                            )
+                            continue
+                        # Emit SSE toast event for new AI recommendation
                         try:
-                            loop.run_until_complete(recommendation_repo.create(rec))
-                            created_count += 1
-                            if current_stage == "shadow_live":
-                                logger.info(
-                                    "[AI-OPT] Stored shadow recommendation evidence for %s; "
-                                    "no UI event or Telegram notification emitted",
-                                    rec.target_equipment,
-                                )
-                                continue
-                            # Emit SSE toast event for new AI recommendation
-                            try:
-                                from app.services.event_emitter import get_event_emitter
+                            from app.services.event_emitter import get_event_emitter
 
-                                emitter = get_event_emitter()
-                                loop.run_until_complete(
-                                    emitter.emit_recommendation_created(
-                                        recommendation_id=rec.id,
-                                        site_id=rec.site_id,
-                                        action_type=rec.action_type,
-                                        reason=rec.reason or "",
-                                        confidence=rec.confidence or "medium",
-                                        risk_level=rec.risk_level.value if rec.risk_level else "medium",
-                                        target_equipment=rec.target_equipment,
-                                    )
-                                )
-                            except Exception as emit_err:
-                                logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
+                            emitter = get_event_emitter()
+                            asyncio.run_coroutine_threadsafe(
+                                emitter.emit_recommendation_created(
+                                    recommendation_id=rec.id,
+                                    site_id=rec.site_id,
+                                    action_type=rec.action_type,
+                                    reason=rec.reason or "",
+                                    confidence=rec.confidence or "medium",
+                                    risk_level=rec.risk_level.value if rec.risk_level else "medium",
+                                    target_equipment=rec.target_equipment,
+                                ),
+                                self._main_loop,
+                            ).result(timeout=10)
+                        except Exception as emit_err:
+                            logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
 
                             # Send Telegram notification for AI optimization recs.
                             # Work-order creation remains gated by the maintenance module;
@@ -980,15 +968,15 @@ class BackgroundSchedulerService:
                                                 message=_msg,
                                                 reference_id=rec.target_equipment,
                                             )
-                                        loop.run_until_complete(send_result)
+                                        asyncio.run_coroutine_threadsafe(
+                                            send_result, self._main_loop
+                                        ).result(timeout=30)
                                         logger.info(f"[NOTIFY] Advisory notification sent for {rec.target_equipment}")
                             except Exception as notify_err:
                                 logger.warning(f"Failed to send Telegram notification: {notify_err}")
                         except Exception as e:
                             logger.warning(f"Failed to persist recommendation for {equipment_id}: {e}")
                             error_count += 1
-                        finally:
-                            loop.close()
 
                 except Exception as e:
                     logger.error(f"Error analyzing site {site_id}: {e}")
@@ -1186,22 +1174,18 @@ class BackgroundSchedulerService:
                             from app.services.event_emitter import get_event_emitter
 
                             emitter = get_event_emitter()
-                            loop = asyncio.new_event_loop()
-                            asyncio.set_event_loop(loop)
-                            try:
-                                loop.run_until_complete(
-                                    emitter.emit_recommendation_created(
-                                        recommendation_id="",
-                                        site_id=site_id,
-                                        action_type="health_maintenance",
-                                        reason=recommended_action,
-                                        confidence="high",
-                                        risk_level=severity,
-                                        target_equipment=code,
-                                    )
-                                )
-                            finally:
-                                loop.close()
+                            asyncio.run_coroutine_threadsafe(
+                                emitter.emit_recommendation_created(
+                                    recommendation_id="",
+                                    site_id=site_id,
+                                    action_type="health_maintenance",
+                                    reason=recommended_action,
+                                    confidence="high",
+                                    risk_level=severity,
+                                    target_equipment=code,
+                                ),
+                                self._main_loop,
+                            ).result(timeout=10)
                         except Exception as emit_err:
                             logger.warning(f"Failed to emit SSE event: {emit_err}")
                     except Exception as e:
@@ -1290,19 +1274,14 @@ class BackgroundSchedulerService:
 
             generator = get_prediction_generator()
 
-            # Run async function in new event loop
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-
-            try:
-                result = loop.run_until_complete(generator.generate_predictions_for_all_sites())
-                logger.info(
-                    f"Prediction generation complete: {result['generated']} generated, "
-                    f"{result['skipped_duplicate']} skipped (duplicate), "
-                    f"{result['resolved']} resolved"
-                )
-            finally:
-                loop.close()
+            result = asyncio.run_coroutine_threadsafe(
+                generator.generate_predictions_for_all_sites(), self._main_loop
+            ).result(timeout=120)
+            logger.info(
+                f"Prediction generation complete: {result['generated']} generated, "
+                f"{result['skipped_duplicate']} skipped (duplicate), "
+                f"{result['resolved']} resolved"
+            )
 
         except Exception as e:
             logger.error(f"Failed to run prediction generation: {e}")
@@ -1381,17 +1360,14 @@ class BackgroundSchedulerService:
                 process_pending_verifications,
             )
 
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                results = loop.run_until_complete(process_pending_verifications())
-                if results:
-                    logger.info(
-                        "[OUTCOME] Verified %d recommendation outcomes",
-                        len(results),
-                    )
-            finally:
-                loop.close()
+            results = asyncio.run_coroutine_threadsafe(
+                process_pending_verifications(), self._main_loop
+            ).result(timeout=60)
+            if results:
+                logger.info(
+                    "[OUTCOME] Verified %d recommendation outcomes",
+                    len(results),
+                )
         except Exception as e:
             logger.error("Outcome verification job failed: %s", e)
 
@@ -1439,16 +1415,11 @@ class BackgroundSchedulerService:
     def _run_recommendation_processing(self):
         """Process pending recommendations through the recommendation graph."""
         try:
-            import asyncio
-
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                processed = loop.run_until_complete(self._run_recommendation_processing_async())
-                if processed:
-                    logger.warning("[REC-PROC] Processed %d recommendation batches", processed)
-            finally:
-                loop.close()
+            processed = asyncio.run_coroutine_threadsafe(
+                self._run_recommendation_processing_async(), self._main_loop
+            ).result(timeout=300)
+            if processed:
+                logger.warning("[REC-PROC] Processed %d recommendation batches", processed)
         except Exception as e:
             logger.error("Recommendation processing job failed: %s", e)
 
@@ -1556,9 +1527,9 @@ class BackgroundSchedulerService:
                     breach["elapsed_pct"] * 100,
                 )
                 # Fire escalation (Sentry → Telegram)
-                import asyncio
-
-                asyncio.get_event_loop().run_until_complete(svc.escalate_breach(rec.id, breach))
+                asyncio.run_coroutine_threadsafe(
+                    svc.escalate_breach(rec.id, breach), self._main_loop
+                ).result(timeout=30)
         except Exception as e:
             logger.error("Milestone deadline check failed: %s", e)
 
@@ -1597,20 +1568,15 @@ class BackgroundSchedulerService:
     def _run_recommendation_expiry(self):
         """Sync wrapper for async recommendation expiry."""
         try:
-            import asyncio
-
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                expired_count, dedup_count = loop.run_until_complete(self._run_recommendation_expiry_async())
-                if expired_count or dedup_count:
-                    logger.info(
-                        "[REC-EXPIRY] expired=%d, dedup=%d",
-                        expired_count,
-                        dedup_count,
-                    )
-            finally:
-                loop.close()
+            expired_count, dedup_count = asyncio.run_coroutine_threadsafe(
+                self._run_recommendation_expiry_async(), self._main_loop
+            ).result(timeout=120)
+            if expired_count or dedup_count:
+                logger.info(
+                    "[REC-EXPIRY] expired=%d, dedup=%d",
+                    expired_count,
+                    dedup_count,
+                )
         except Exception as e:
             logger.error("Recommendation expiry job failed: %s", e)
 
@@ -1745,12 +1711,9 @@ class BackgroundSchedulerService:
 
                 for sid in get_registered_site_ids():
                     try:
-                        _loop2 = asyncio.new_event_loop()
-                        asyncio.set_event_loop(_loop2)
-                        try:
-                            current_stage = _loop2.run_until_complete(effective_phase(sid))
-                        finally:
-                            _loop2.close()
+                        current_stage = asyncio.run_coroutine_threadsafe(
+                            effective_phase(sid), self._main_loop
+                        ).result(timeout=30)
                     except Exception:
                         current_stage = "commissioning"
 
@@ -2338,7 +2301,9 @@ class BackgroundSchedulerService:
                     continue
 
                 try:
-                    recommendation = asyncio.run(coordinator.evaluate_current_state(site_id))
+                    recommendation = asyncio.run_coroutine_threadsafe(
+                        coordinator.evaluate_current_state(site_id), self._main_loop
+                    ).result(timeout=120)
 
                     if recommendation:
                         logger.info(
@@ -2579,12 +2544,9 @@ class BackgroundSchedulerService:
 
             mv_service = get_mv_verification_service()
 
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                verified = loop.run_until_complete(mv_service.run_pending_verifications())
-            finally:
-                loop.close()
+            verified = asyncio.run_coroutine_threadsafe(
+                mv_service.run_pending_verifications(), self._main_loop
+            ).result(timeout=60)
 
             if verified:
                 logger.info(
@@ -2800,7 +2762,8 @@ class BackgroundSchedulerService:
                 future = asyncio.run_coroutine_threadsafe(_check_pending(), self._main_loop)
                 pending = future.result(timeout=10)
             else:
-                pending = asyncio.run(_check_pending())
+                logger.warning("Main event loop not available, skipping pending service check")
+                pending = []
 
             if pending:
                 pending_codes = [sr.get("code") for sr in pending if sr.get("code")]
@@ -2877,7 +2840,7 @@ class BackgroundSchedulerService:
                 future = asyncio.run_coroutine_threadsafe(_check(), self._main_loop)
                 future.result(timeout=30)
             else:
-                asyncio.run(_check())
+                logger.warning("Main event loop not available, skipping fire pump compliance check")
 
         except Exception as e:
             logger.error(f"Failed to check fire pump compliance: {e}")
@@ -5608,8 +5571,8 @@ def _run_daily_health_sweep_sync():
             except Exception as tf_err:
                 logger.warning(f"[HEALTH-SWEEP] Telegram notification failed: {tf_err}")
 
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(_sweep())
     finally:
