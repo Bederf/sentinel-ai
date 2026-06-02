@@ -2735,4 +2735,3 @@ async def handle_telegram_message(
     service = ResidentialOnboardService()
     handled = service.handle_message(chat_id, text, user_id)
     return {"handled": handled}
-
