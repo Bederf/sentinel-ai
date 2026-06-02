@@ -2650,6 +2650,16 @@ async def add_site_devices_tool(
     for device in devices:
         device_type = device.get("device_type", "unknown")
 
+        # Fallback: extract type from device_id code when device_type not provided.
+        # Equipment codes follow {site}-{type}-{zone_id} convention.
+        if device_type == "unknown" and device.get("device_id"):
+            code_parts = device["device_id"].split("-")
+            if len(code_parts) >= 2:
+                from app.services.shadow_mode_polling import _parse_equipment_code
+                extracted_type, _ = _parse_equipment_code(device["device_id"])
+                if extracted_type != "unknown":
+                    device_type = extracted_type
+
         # Auto-generate device_id if not provided
         if not device.get("device_id"):
             type_counts[device_type] += 1
