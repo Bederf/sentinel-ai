@@ -172,14 +172,28 @@ class SafetyRulesRepository:
         device_type: str,
         device_id: str | None = None,
         point_name: str | None = None,
+        site_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Get rules applicable to a device."""
+        """Get rules applicable to a device.
+
+        Args:
+            device_type: Type of device (e.g., 'hvac', 'lighting')
+            device_id: Specific device ID to match (optional)
+            point_name: Specific point name to match (optional)
+            site_id: Site ID to filter rules (optional). Rules with matching
+                site_id OR null site_id (global fallback) are returned.
+        """
         all_rules = self.get_all(enabled_only=True)
 
         applicable = []
         for rule in all_rules:
             # Check device type match
             if rule.get("device_type") and rule["device_type"] != device_type:
+                continue
+
+            # Check site_id match — include rules scoped to this site OR global (null) rules
+            rule_site = rule.get("site_id")
+            if site_id is not None and rule_site is not None and rule_site != site_id:
                 continue
 
             # Check device ID match (if rule specifies one)

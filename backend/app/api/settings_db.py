@@ -21,6 +21,15 @@ class HealthThresholdsUpdate(BaseModel):
     site_id: str | None = None
 
 
+class SafetyThresholdsUpdate(BaseModel):
+    """Safety temperature thresholds update model."""
+
+    min_temp: float
+    max_temp: float
+    unit: str = "°C"
+    site_id: str
+
+
 class RiskThresholdsUpdate(BaseModel):
     """Risk threshold update model."""
 
@@ -230,6 +239,133 @@ async def get_risk_thresholds(site_id: str | None = None) -> dict[str, int]:
     except Exception as e:
         logger.error(f"Error loading risk thresholds: {e}")
         return {"medium": 31, "high": 61, "critical": 81}
+
+
+@router.get("/settings/safety-thresholds")
+async def get_safety_thresholds(site_id: str) -> dict[str, Any]:
+    """Get safety temperature thresholds from database.
+
+    Returns per-site min/max temperature setpoints for HVAC safety validation.
+    Defaults: min_temp=16.0, max_temp=28.0°C
+    """
+    try:
+        supabase = get_supabase_client()
+
+        result = (
+            supabase.table("system_settings")
+            .select("value")
+            .eq("key", "safety_thresholds")
+            .eq("site_id", site_id)
+            .execute()
+        )
+
+        if result.data:
+            return result.data[0]["value"]
+
+        # Fallback: check safety_rules table for site-specific rule
+        from app.database.repositories.safety_rules_repository import SafetyRulesRepository
+
+        repo = SafetyRulesRepository()
+        rules = repo.get_for_device("hvac", point_name="cooling_setpoint", site_id=site_id)
+        for rule in rules:
+            if rule.get("rule_type") == "temperature_range" and rule.get("site_id") == site_id:
+                return {
+                    "min_temp": rule.get("min_temp", 16.0),
+                    "max_temp": rule.get("max_temp", 28.0),
+                    "unit": rule.get("unit", "°C"),
+                }
+
+        return {"min_temp": 16.0, "max_temp": 28.0, "unit": "°C"}
+
+    except Exception as e:
+        logger.error(f"Error loading safety thresholds: {e}")
+        return {"min_temp": 16.0, "max_temp": 28.0, "unit": "°C"}
+
+
+@router.put("/settings/safety-thresholds")
+async def update_safety_thresholds(thresholds: SafetyThresholdsUpdate) -> dict[str, Any]:
+    """Update safety temperature thresholds in database.
+
+    These thresholds control the HVAC setpoint safety validation for a specific site.
+    Both min and max must be positive and min < max.
+    """
+    if thresholds.min_temp <= 0 or thresholds.max_temp <= 0:
+        raise HTTPException(status_code=400, detail="Temperature values must be positive")
+    if thresholds.min_temp >= thresholds.max_temp:
+        raise HTTPException(
+            status_code=400,
+            detail=f"min_temp ({thresholds.min_temp}) must be less than max_temp ({thresholds.max_temp})",
+        )
+
+    try:
+        supabase = get_supabase_client()
+
+        payload = {
+            "key": "safety_thresholds",
+            "value": {
+                "min_temp": thresholds.min_temp,
+                "max_temp": thresholds.max_temp,
+                "unit": thresholds.unit,
+            },
+            "category": "safety",
+            "description": "Safety temperature thresholds for HVAC setpoint validation (per-site)",
+            "data_type": "object",
+            "is_public": True,
+            "site_id": thresholds.site_id,
+        }
+
+        (supabase.table("system_settings").upsert(payload, on_conflict="key,site_id").execute())
+
+        # Also update the corresponding safety_rule in safety_rules table
+        from app.database.repositories.safety_rules_repository import SafetyRulesRepository
+
+        repo = SafetyRulesRepository()
+        rule_code = f"{thresholds.site_id}_zone_setpoint_range"
+        existing = repo.get_by_id(rule_code)
+        if existing:
+            repo.update(
+                rule_code,
+                {
+                    "min_temp": thresholds.min_temp,
+                    "max_temp": thresholds.max_temp,
+                    "unit": thresholds.unit,
+                },
+            )
+        else:
+            repo.create(
+                {
+                    "id": rule_code,
+                    "name": f"{thresholds.site_id} Zone Temperature Safe Range",
+                    "rule_type": "temperature_range",
+                    "severity": "block",
+                    "description": f"Zone temperature setpoints must be within {thresholds.min_temp}-{thresholds.max_temp}°C for occupant comfort and equipment safety",
+                    "device_type": "hvac",
+                    "site_id": thresholds.site_id,
+                    "point_name": "cooling_setpoint",
+                    "enabled": True,
+                    "parameters": {
+                        "min_temp": thresholds.min_temp,
+                        "max_temp": thresholds.max_temp,
+                        "unit": thresholds.unit,
+                    },
+                }
+            )
+
+        logger.info(
+            f"Updated safety thresholds: site_id={thresholds.site_id}, "
+            f"min={thresholds.min_temp}, max={thresholds.max_temp}{thresholds.unit}"
+        )
+
+        return {
+            "min_temp": thresholds.min_temp,
+            "max_temp": thresholds.max_temp,
+            "unit": thresholds.unit,
+            "site_id": thresholds.site_id,
+        }
+
+    except Exception as e:
+        logger.error(f"Error updating safety thresholds: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to update safety thresholds: {e!s}")
 
 
 @router.put("/settings/risk-thresholds")

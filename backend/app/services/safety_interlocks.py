@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from app.models.device import Device, DeviceType
+from app.models.device import Device
 from app.models.safety_rules import RuleSeverity, SafetyRule, TemperatureRangeRule
 
 logger = logging.getLogger(__name__)
@@ -255,18 +255,32 @@ class SafetyEngine:
 
         return rules
 
-    async def get_rules_for_device(self, device: Device, point_name: str | None = None) -> list[SafetyRule]:
+    async def get_rules_for_device(
+        self,
+        device: Device,
+        point_name: str | None = None,
+        site_id: str | None = None,
+    ) -> list[SafetyRule]:
         """Get safety rules applicable to a specific device (and optionally point).
+
+        Site scoping: rules are filtered by the device's site_id. Rules with no
+        site_id (global fallback rules) apply to all sites. This prevents a rule
+        from one site bleeding into another.
 
         When a specific rule exists for a point (rule.point_name matches point_name),
         generic rules of the same type (rule.point_name is None) are excluded to
         prevent conflicts (e.g., chiller chw_setpoint 5-12°C vs generic HVAC 16-28°C).
         """
+        # Use device.site_id as default if not provided
+        if site_id is None:
+            site_id = getattr(device, "site_id", None)
+
         applicable_rules = []
         specific_rule_types = set()  # Track rule types that have specific point rules
 
         logger.debug(
-            f"get_rules_for_device called: device={device.id}, device_type={device.device_type}, point={point_name}"
+            f"get_rules_for_device called: device={device.id}, device_type={device.device_type}, "
+            f"point={point_name}, site_id={site_id}"
         )
         logger.debug(f"Total rules in engine: {len(self.rules)}")
 
@@ -274,7 +288,7 @@ class SafetyEngine:
         for rule in self.rules.values():
             logger.debug(
                 f"Checking rule {rule.id}: enabled={rule.enabled}, "
-                f"rule_device_type={rule.device_type}, rule_point={rule.point_name}"
+                f"rule_device_type={rule.device_type}, rule_point={rule.point_name}, rule_site={getattr(rule, 'site_id', None)}"
             )
 
             if not rule.enabled:
@@ -284,6 +298,12 @@ class SafetyEngine:
             # Check device type match
             if rule.device_type and rule.device_type != device.device_type.value:
                 logger.debug(f"  -> Skipped: device_type mismatch ({rule.device_type} != {device.device_type.value})")
+                continue
+
+            # Check site_id match — include rules scoped to this site OR global (null-site) fallbacks
+            rule_site = getattr(rule, "site_id", None)
+            if site_id is not None and rule_site is not None and rule_site != site_id:
+                logger.debug(f"  -> Skipped: site_id mismatch ({rule_site} != {site_id})")
                 continue
 
             # Check device ID match (if specified)
@@ -339,84 +359,19 @@ class SafetyEngine:
                 - warnings: List of warning messages
                 - rule_results: Detailed results from each rule check
         """
-        # Always enforce a safe HVAC setpoint range, regardless of rule state.
-        if device.device_type == DeviceType.HVAC and point_name in {"setpoint", "temperature_setpoint"}:
-            point = device.get_point(point_name)
-            min_allowed = 16.0
-            max_allowed = 28.0
-            if point and point.min_value is not None and point.max_value is not None:
-                min_allowed = float(point.min_value)
-                max_allowed = float(point.max_value)
-            try:
-                temp = float(value)
-                if temp < min_allowed or temp > max_allowed:
-                    return {
-                        "allowed": False,
-                        "reasons": [f"Temperature {temp}°C is outside safe range ({min_allowed}-{max_allowed}°C)"],
-                        "warnings": [],
-                        "alarms": [],
-                        "rule_results": [],
-                        "message": "Safety validation complete",
-                        "device_id": device.id,
-                        "point_name": point_name,
-                        "value": value,
-                        "timestamp": datetime.now().isoformat(),
-                    }
-            except (TypeError, ValueError):
-                return {
-                    "allowed": False,
-                    "reasons": [f"Invalid temperature value: {value}"],
-                    "warnings": [],
-                    "alarms": [],
-                    "rule_results": [],
-                    "message": "Safety validation complete",
-                    "device_id": device.id,
-                    "point_name": point_name,
-                    "value": value,
-                    "timestamp": datetime.now().isoformat(),
-                }
-
-        # Get applicable rules
+        # Get applicable rules (site-scoped via device.site_id)
         applicable_rules = await self.get_rules_for_device(device, point_name)
 
         if not applicable_rules:
-            # Fallback guard for HVAC setpoint when no rules are loaded
-            if device.device_type == DeviceType.HVAC and point_name in {"setpoint", "temperature_setpoint"}:
-                try:
-                    temp = float(value)
-                    if temp < 16.0 or temp > 28.0:
-                        return {
-                            "allowed": False,
-                            "reasons": [f"Temperature {temp}°C is outside safe range (16-28°C)"],
-                            "warnings": [],
-                            "alarms": [],
-                            "rule_results": [],
-                            "message": "Safety validation complete",
-                            "device_id": device.id,
-                            "point_name": point_name,
-                            "value": value,
-                            "timestamp": datetime.now().isoformat(),
-                        }
-                except (TypeError, ValueError):
-                    return {
-                        "allowed": False,
-                        "reasons": [f"Invalid temperature value: {value}"],
-                        "warnings": [],
-                        "alarms": [],
-                        "rule_results": [],
-                        "message": "Safety validation complete",
-                        "device_id": device.id,
-                        "point_name": point_name,
-                        "value": value,
-                        "timestamp": datetime.now().isoformat(),
-                    }
+            # No rules for this device/point/scope — allow by default.
+            # Safety thresholds are fully defined in Supabase via safety_rules table.
             return {
                 "allowed": True,
                 "reasons": [],
                 "warnings": [],
                 "alarms": [],
                 "rule_results": [],
-                "message": "No safety rules apply to this control action",
+                "message": "No safety rules apply to this device/point — allow by default",
             }
 
         # Evaluate each rule
