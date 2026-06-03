@@ -191,6 +191,9 @@ class Settings(BaseSettings):
 
     # SIMBIOT Concept Evolution (FSI Public API) credentials
     simbiot_api_key: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_KEY", "BRIDGE_API_TOKEN"))
+
+    # OpenAI MCP endpoint API key (protects the read-only BMS intelligence endpoint)
+    mcp_api_key: str = Field(default="", validation_alias="MCP_API_KEY")
     simbiot_api_url: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_URL", "BRIDGE_BASE_URL"))
     simbiot_username: str = ""
     simbiot_password: str = ""

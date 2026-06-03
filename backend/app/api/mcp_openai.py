@@ -183,9 +183,16 @@ def get_mcp_handler() -> MCPStreamableHTTPHandler:
 
 
 @router.post("/mcp")
-async def mcp_streamable_http_endpoint(request: Request, accept: str | None = Header(default="application/json")):
+async def mcp_streamable_http_endpoint(
+    request: Request,
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    accept: str | None = Header(default="application/json"),
+):
     """
     Streamable HTTP MCP endpoint.
+
+    Requires X-API-Key header for authentication.
+    Returns 401 if key is missing or invalid.
 
     This is the PRIMARY endpoint for:
     - ChatGPT Deep Research connectors
@@ -196,13 +203,44 @@ async def mcp_streamable_http_endpoint(request: Request, accept: str | None = He
     Accepts:
     - Content-Type: application/json
     - Accept: application/json, text/event-stream
+    - X-API-Key: <configured-api-key>
 
     Test with:
         curl -X POST https://your-domain.com/api/mcp/openai/mcp \\
           -H "Content-Type: application/json" \\
           -H "Accept: application/json, text/event-stream" \\
+          -H "X-API-Key: <your-api-key>" \\
           -d '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}'
     """
+    # Auth check
+    from app.config.settings import settings
+
+    expected_key = getattr(settings, "sentinel_mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
+    if not expected_key:
+        logger.error("MCP API key not configured — endpoint is open (auth disabled)")
+    elif not x_api_key:
+        logger.warning("MCP request missing X-API-Key header")
+        return JSONResponse(
+            status_code=401,
+            content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32001, "message": "Missing X-API-Key header — authentication required"},
+            },
+            headers=CORS_HEADERS,
+        )
+    elif x_api_key != expected_key:
+        logger.warning(f"MCP request with invalid API key: {x_api_key[:8]}...")
+        return JSONResponse(
+            status_code=401,
+            content={
+                "jsonrpc": "2.0",
+                "id": None,
+                "error": {"code": -32001, "message": "Invalid API key"},
+            },
+            headers=CORS_HEADERS,
+        )
+
     try:
         body = await request.json()
     except Exception as e:
@@ -479,7 +517,7 @@ async def well_known_openapi():
             "info": {
                 "title": "SENTINEL BMS MCP",
                 "version": "1.0.0",
-                "description": "SENTINEL Building Management Intelligence — live operational data for S002 (Sandton City Office Tower). S001 (FNB Fairlands) is in commissioning.",
+                "description": "SENTINEL Building Management Intelligence — live operational data for S002 (Sandton City Office Tower). S001 (Fairlands) is in commissioning.",
             },
             "servers": [{"url": "https://bms.sentinel-ai.co.za/api/mcp/openai"}],
             "paths": paths,
@@ -518,7 +556,6 @@ async def openapi_json():
     tools = server.list_tools()
 
     paths: dict[str, Any] = {}
-    components: dict[str, Any] = {"schemas": {}}
 
     for tool in tools:
         name = tool.get("name", "")
