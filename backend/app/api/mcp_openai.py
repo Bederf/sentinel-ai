@@ -185,13 +185,13 @@ def get_mcp_handler() -> MCPStreamableHTTPHandler:
 @router.post("/mcp")
 async def mcp_streamable_http_endpoint(
     request: Request,
-    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     accept: str | None = Header(default="application/json"),
 ):
     """
     Streamable HTTP MCP endpoint.
 
-    Requires X-API-Key header for authentication.
+    Requires Authorization: Bearer header for authentication.
     Returns 401 if key is missing or invalid.
 
     This is the PRIMARY endpoint for:
@@ -203,7 +203,7 @@ async def mcp_streamable_http_endpoint(
     Accepts:
     - Content-Type: application/json
     - Accept: application/json, text/event-stream
-    - X-API-Key: <configured-api-key>
+    - Authorization: Bearer <api-key>
 
     Test with:
         curl -X POST https://your-domain.com/api/mcp/openai/mcp \\
@@ -215,31 +215,44 @@ async def mcp_streamable_http_endpoint(
     # Auth check
     from app.config.settings import settings
 
-    expected_key = getattr(settings, "sentinel_mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
+    expected_key = getattr(settings, "mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
     if not expected_key:
         logger.error("MCP API key not configured — endpoint is open (auth disabled)")
-    elif not x_api_key:
-        logger.warning("MCP request missing X-API-Key header")
+    elif not authorization:
+        logger.warning("MCP request missing Authorization header")
         return JSONResponse(
             status_code=401,
             content={
                 "jsonrpc": "2.0",
                 "id": None,
-                "error": {"code": -32001, "message": "Missing X-API-Key header — authentication required"},
+                "error": {"code": -32001, "message": "Missing Authorization: Bearer header — authentication required"},
             },
             headers=CORS_HEADERS,
         )
-    elif x_api_key != expected_key:
-        logger.warning(f"MCP request with invalid API key: {x_api_key[:8]}...")
-        return JSONResponse(
-            status_code=401,
-            content={
-                "jsonrpc": "2.0",
-                "id": None,
-                "error": {"code": -32001, "message": "Invalid API key"},
-            },
-            headers=CORS_HEADERS,
-        )
+    else:
+        scheme, _, token = authorization.partition(" ")
+        if scheme.lower() != "bearer" or not token:
+            logger.warning(f"MCP request with invalid auth scheme: {scheme}")
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32001, "message": "Authorization must be: Bearer <api-key>"},
+                },
+                headers=CORS_HEADERS,
+            )
+        if token != expected_key:
+            logger.warning(f"MCP request with invalid API key: {token[:8]}...")
+            return JSONResponse(
+                status_code=401,
+                content={
+                    "jsonrpc": "2.0",
+                    "id": None,
+                    "error": {"code": -32001, "message": "Invalid API key"},
+                },
+                headers=CORS_HEADERS,
+            )
 
     try:
         body = await request.json()
