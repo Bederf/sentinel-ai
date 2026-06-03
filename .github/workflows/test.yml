@@ -85,8 +85,9 @@ jobs:
         run: pytest tests/ -v --cov=app --cov-report=xml --cov-report=html
         env:
           TESTING: "true"
-          DEMO_MODE: "true"
+          DEMO_MODE: "false"
           JWT_SECRET_KEY: "test-only-jwt-secret-for-ci-at-least-32-chars"
+          MODBUS_BESS_IP: ""
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
