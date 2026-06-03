@@ -11,7 +11,11 @@ from app.adapters.residential import SUPPORTED_PLATFORMS, build_adapter
 from app.config.settings import settings
 from app.database.supabase_client import get_supabase_client
 from app.services.encryption_service import get_encryption_service
-from app.services.residential.bridge_scheduler import add_residential_polling_job
+from app.services.residential.bridge_scheduler import (
+    add_residential_polling_job,
+    schedule_morning_summary,
+    schedule_residential_recommendations,
+)
 from app.services.residential.mqtt_provisioner import get_mqtt_provisioner
 from app.services.residential.wireguard_peer_manager import WireGuardPeerManager
 from app.services.sentry.conversation_state import ConversationStateManager
@@ -64,11 +68,13 @@ def _reset_rate_limit(chat_id: int) -> None:
 
 
 def _send(
-    chat_id: int, text: str, reply_markup: dict | None = None, reply_to_message_id: int | None = None
+    chat_id: int, text: str, reply_markup: dict | None = None, _reply_to_message_id: int | None = None
 ) -> dict | None:
     """Send text via ResidentialTelegramSender. Returns result dict on success."""
     try:
-        import asyncio, os, requests
+        import os
+
+        import requests
 
         token = os.environ.get("SENTINEL_HOME_BOT_TOKEN") or settings.sentinel_home_bot_token
         if not token:
@@ -186,6 +192,11 @@ class ResidentialOnboardService:
             return self._handle_ha_tunnel_ready_text(chat_id, text, state)
         elif step == AWAITING_HA_PUBLIC_KEY:
             return self._handle_ha_public_key_text(chat_id, text, state)
+        elif step == DISCOVERING:
+            # Password just submitted — trigger DB write + MQTT provisioning
+            result = self.handle_discover_and_onboard(chat_id)
+            _send(chat_id, result)
+            return True
         else:
             # Unknown step — clear and let LLM handle
             self._state.clear(chat_id)
@@ -211,8 +222,29 @@ class ResidentialOnboardService:
             return True
         platform = state.data.get("platform", "solarman")
         email = state.data.get("email", "")
-        result = self._discover_and_register(chat_id, platform, email, password, state)
-        _send(chat_id, result)
+
+        # Store credentials for the background task
+        state.data["email"] = email
+        state.data["password"] = password  # will be cleared by background task
+        state.step = DISCOVERING
+        self._state.set(chat_id, state)
+
+        # Notify user immediately — auth runs in background
+        _send(chat_id, "🔐 Connecting to your account...\n\n(This takes up to a few minutes)")
+
+        # Fire background task to complete onboarding without blocking the webhook
+        import asyncio
+
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(self._background_discover_and_onboard(chat_id, platform, email, password))  # noqa: RUF006
+            else:
+                asyncio.run(
+                    asyncio.create_task(self._background_discover_and_onboard(chat_id, platform, email, password))
+                )
+        except Exception as exc:
+            logger.warning("Could not schedule background onboarding for chat_id=%s: %s", chat_id, exc)
         return True
 
     def _handle_ha_tunnel_ready_text(self, chat_id: int, text: str, state) -> bool:
@@ -293,7 +325,7 @@ class ResidentialOnboardService:
                 "It will call the /api/residential/addon-register endpoint automatically.\n\n"
                 "If you need the endpoint details:\n"
                 "POST /api/residential/addon-register\n"
-                "Body: {chat_id, entities:[{entity_id, metric_type}], platform:\"home_assistant\"}"
+                'Body: {chat_id, entities:[{entity_id, metric_type}], platform:"home_assistant"}',
             )
             return
 
@@ -841,19 +873,40 @@ class ResidentialOnboardService:
         except Exception as exc:
             logger.warning("Failed to schedule residential polling for %s: %s", site_id, exc)
 
+        # Schedule AI recommendation job
+        try:
+            schedule_residential_recommendations(site_id)
+        except Exception as exc:
+            logger.warning("Failed to schedule recommendations for %s: %s", site_id, exc)
+
+        # Schedule morning summary (fires at 07:00 SAST next day)
+        try:
+            schedule_morning_summary(site_id)
+        except Exception as exc:
+            logger.warning("Failed to schedule morning summary for %s: %s", site_id, exc)
+
         # Clear state — onboarding complete. Email remains, encrypted config removed.
         self._state.clear(chat_id)
 
         device_count = len(manifest_dicts)
         plant_name = manifest_dicts[0].get("device_name", "your system") if manifest_dicts else "your system"
 
-        base_message = (
-            f"✅ Connected: {plant_name}\n"
-            f"[{device_count}] devices found.\n\n"
-            "You'll receive alerts here when your system\n"
-            "needs attention. All adjustments are made\n"
-            "through your SOLARMAN app."
-        )
+        if device_count == 0:
+            base_message = (
+                f"✅ Account connected: {plant_name}\n"
+                "No inverters found on this account.\n\n"
+                "To get alerts, add your inverters in the\n"
+                "SOLARMAN Smart app first, then send /connect\n"
+                "again to re-register."
+            )
+        else:
+            base_message = (
+                f"✅ Connected: {plant_name}\n"
+                f"[{device_count}] devices found.\n\n"
+                "You'll receive alerts here when your system\n"
+                "needs attention. All adjustments are made\n"
+                "through your SOLARMAN app."
+            )
 
         if not has_existing_area:
             area_prompt = (
@@ -866,3 +919,114 @@ class ResidentialOnboardService:
             area_prompt = ""
 
         return base_message + area_prompt + "\n\nTo disconnect: /disconnect"
+
+    # ── Background onboarding (prevents webhook timeout on slow SOLARMAN auth) ──
+
+    def _background_discover_and_onboard(self, chat_id: int, platform: str, email: str, password: str) -> None:
+        """
+        Background task: authenticate with SOLARMAN/Victron, discover devices,
+        write to DB, schedule all jobs, then send the result to the user.
+        Runs in a daemon thread so it can take minutes without blocking the webhook.
+        """
+        import threading
+
+        def _run():
+            try:
+                result = self._discover_and_register_sync(chat_id, platform, email, password)
+                _send(chat_id, result)
+                state = self._state.get(chat_id)
+                if state and state.step == DISCOVERING:
+                    self._schedule_onboarding_jobs(chat_id, platform)
+            except Exception as exc:
+                logger.warning("Background onboarding failed for chat_id=%s: %s", chat_id, exc)
+                _send(chat_id, "Connection failed.\n\nSend /connect to try again.")
+
+        thread = threading.Thread(target=_run, daemon=True)
+        thread.start()
+
+    def _discover_and_register_sync(self, chat_id: int, platform: str, email: str, password: str) -> str:
+        """Synchronous auth + discover + DB write. Called from background thread."""
+        state = self._state.get(chat_id)
+        if state is None:
+            return "Session expired. Send /connect to start again."
+
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+
+        try:
+            extra = {}
+            if platform == "solarman":
+                extra = {"app_id": settings.solarman_app_id, "app_secret": settings.solarman_app_secret}
+            adapter = build_adapter(platform, {"email": email, "password": password, "site_id": site_id}, **extra)
+        except Exception as exc:
+            logger.warning("build_adapter failed for chat_id=%s: %s", chat_id, exc)
+            return "Authentication failed. Check your credentials and try again."
+
+        ok = False
+        try:
+            ok = asyncio.run(adapter.authenticate())
+        except Exception as exc:
+            logger.warning("authenticate failed for chat_id=%s: %s", chat_id, exc)
+
+        if not ok:
+            return "Authentication failed. Check your credentials and try again."
+
+        manifests = []
+        try:
+            manifests = asyncio.run(
+                asyncio.wait_for(
+                    build_adapter(
+                        platform, {"email": email, "password": password, "site_id": site_id}
+                    ).discover_devices(),
+                    timeout=30,
+                )
+            )
+        except Exception as exc:
+            logger.warning("device discovery failed for chat_id=%s: %s", chat_id, exc)
+            return "Could not discover your devices. Please try again later."
+
+        site_config = {"email": email, "password": password, "site_id": site_id, "chat_id": chat_id}
+        encrypted_config = get_encryption_service().encrypt(json.dumps(site_config))
+
+        state.data["email"] = email
+        state.data["site_id"] = site_id
+        state.data["chat_id"] = chat_id
+        state.data["encrypted_site_config"] = encrypted_config
+        state.data["manifests"] = [
+            {
+                "device_id": m.device_id,
+                "device_name": m.device_name,
+                "device_type": m.device_type,
+                "capabilities": m.capabilities,
+            }
+            for m in manifests
+        ]
+        state.step = DISCOVERING
+        self._state.set(chat_id, state)
+
+        return self.handle_discover_and_onboard(chat_id)
+
+    def _schedule_onboarding_jobs(self, chat_id: int, platform: str) -> None:
+        """Schedule polling, recommendations, and morning summary for a newly activated site."""
+        state = self._state.get(chat_id)
+        if state is None:
+            return
+
+        site_id = state.data.get("site_id", f"res-{chat_id}")
+        email = state.data.get("email", "")
+
+        try:
+            polling_config = {"email": email, "password": "", "site_id": site_id}
+            adapter = build_adapter(platform, polling_config)
+            add_residential_polling_job(site_id=site_id, adapter=adapter, interval_seconds=300)
+        except Exception as exc:
+            logger.warning("Failed to schedule residential polling for %s: %s", site_id, exc)
+
+        try:
+            schedule_residential_recommendations(site_id)
+        except Exception as exc:
+            logger.warning("Failed to schedule recommendations for %s: %s", site_id, exc)
+
+        try:
+            schedule_morning_summary(site_id)
+        except Exception as exc:
+            logger.warning("Failed to schedule morning summary for %s: %s", site_id, exc)

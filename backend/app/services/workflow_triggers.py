@@ -793,7 +793,7 @@ class WorkflowTriggerEngine:
                 work_order_code=work_order_code,
                 equipment_id=equipment_id,
                 equipment_code=equipment_code,
-                site_id=created_wo.get("site_id") or getattr(self, '_site_id', None),
+                site_id=created_wo.get("site_id") or getattr(self, "_site_id", None),
                 priority=priority,
                 description=description,
             )
@@ -1326,6 +1326,7 @@ class WorkflowTriggerEngine:
             if not resolved_site_id and equipment_code:
                 try:
                     from app.database.repositories.equipment_repository import get_equipment_repository
+
                     eq_repo = get_equipment_repository()
                     # get_by_id handles both UUID and code — tries UUID first, then code fallback
                     eq = eq_repo.get_by_id(equipment_code)

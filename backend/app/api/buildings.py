@@ -437,6 +437,7 @@ async def list_sites(request: Request) -> dict:
         # rather than causing errors downstream (404 on /optimization/status/site-003, etc.)
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             site_check = client.table("sites").select("code").eq("code", site_id).limit(1).execute()
             if not site_check.data:
@@ -1154,7 +1155,26 @@ async def get_equipment_summary(site_id: str, auth: AuthContext = Depends(requir
             "site_id": site_id,
             "site_name": site_id,
             "total_assets": 0,
-            "categories": dict.fromkeys(["equipment", "hvac_zones", "generators", "generator_groups", "diesel_tanks", "energy_centres", "mv_incomers", "transformers", "lv_switchboards", "ats_units", "power_meters", "pfc_banks", "ups_systems", "feeders", "dali_controllers"], 0),
+            "categories": dict.fromkeys(
+                [
+                    "equipment",
+                    "hvac_zones",
+                    "generators",
+                    "generator_groups",
+                    "diesel_tanks",
+                    "energy_centres",
+                    "mv_incomers",
+                    "transformers",
+                    "lv_switchboards",
+                    "ats_units",
+                    "power_meters",
+                    "pfc_banks",
+                    "ups_systems",
+                    "feeders",
+                    "dali_controllers",
+                ],
+                0,
+            ),
             "supplementary": {"desks": 0, "luminaires": 0, "dali_sensors": 0},
             "source": "supabase",
         }
@@ -1471,7 +1491,6 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     status = "critical"
                 elif health < 80:
                     status = "warning"
-
 
             synced_controllable = None
             inferred_controllable = _is_device_controllable(eq.get("code", eq.get("id", "")), {})

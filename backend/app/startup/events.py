@@ -363,13 +363,11 @@ async def startup_event(app: FastAPI) -> None:
     scheduler_service.add_rag_doc_sync_job(interval_hours=12)
 
     # Optional ESP32 MQTT listener for room-presence nodes
-    # PHASE 220: Temporarily disabled — MQTT reconnect loop saturates event loop
-    if False:
-        from app.services.space_mqtt_listener import get_space_mqtt_listener
+    from app.services.space_mqtt_listener import get_space_mqtt_listener
 
-        _logger.warning("SHADOW_DEBUG: about to start Space MQTT listener")
-        await get_space_mqtt_listener().start()
-        _logger.warning("SHADOW_DEBUG: Space MQTT listener started")
+    _logger.warning("SHADOW_DEBUG: about to start Space MQTT listener")
+    await get_space_mqtt_listener().start()
+    _logger.warning("SHADOW_DEBUG: Space MQTT listener started")
 
     # Optional: Fuel tank MQTT listener
     try:

@@ -32,11 +32,11 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
         password_hash = hashlib.sha256(self._site_config["password"].encode()).hexdigest()
         with httpx.Client(timeout=15) as client:
             resp = client.post(
-                f"{self.BASE_URL}/v1.0/token/generate",
+                f"{self.BASE_URL}/account/v1.0/token",
+                params={"appId": self._app_id, "language": "en"},
                 json={
-                    "appId": self._app_id,
-                    "appSecret": self._app_secret,
                     "email": email,
+                    "appSecret": self._app_secret,
                     "password": password_hash,
                 },
             )

@@ -13,7 +13,6 @@ import asyncio
 import logging
 import socket
 import xml.etree.ElementTree as ET
-from dataclasses import dataclass
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -41,21 +40,42 @@ async def discover_gateways(timeout_s: float = 5.0) -> list[dict[str, Any]]:
 
         # Build search request header (KNXnet/IP header + SEARCH_REQUEST)
         # Search Request: header + HPAI (control endpoint) + search endpoint
-        header = bytes([
-            0x06,        # header length = 6
-            0x10,        # protocol version 1.0
-            0x02, 0x01,  # search request (0x0201)
-            0x00, 0x00,  # total length (filled below)
-        ])
+        header = bytes(
+            [
+                0x06,  # header length = 6
+                0x10,  # protocol version 1.0
+                0x02,
+                0x01,  # search request (0x0201)
+                0x00,
+                0x00,  # total length (filled below)
+            ]
+        )
 
         # HPAI for discovery response destination
-        hpai = bytes([0x00, 0x00,  # family = IP, port = 0 (auto)
-                      0x00, 0x00, 0x00, 0x00])  # IP = 0.0.0.0
+        hpai = bytes(
+            [
+                0x00,
+                0x00,  # family = IP, port = 0 (auto)
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        )  # IP = 0.0.0.0
 
         # Search endpoint
-        search_ep = bytes([0x00, 0x00,  # family = IP
-                           0x0E, 0x9C,  # port = 3676 (control port)
-                           0x00, 0x00, 0x00, 0x00])  # IP = 0.0.0.0
+        search_ep = bytes(
+            [
+                0x00,
+                0x00,  # family = IP
+                0x0E,
+                0x9C,  # port = 3676 (control port)
+                0x00,
+                0x00,
+                0x00,
+                0x00,
+            ]
+        )  # IP = 0.0.0.0
 
         packet = header + hpai + search_ep
         packet = packet[:6] + bytes([(len(packet) >> 8) & 0xFF, len(packet) & 0xFF]) + packet[8:]
@@ -67,19 +87,21 @@ async def discover_gateways(timeout_s: float = 5.0) -> list[dict[str, Any]]:
             try:
                 data, addr = sock.recvfrom(1024)
                 responses.append((data, addr))
-            except socket.timeout:
+            except TimeoutError:
                 break
 
         for data, addr in responses:
             if len(data) < 16:
                 continue
             # Parse response — we only need the gateway address
-            gateways.append({
-                "host": addr[0],
-                "port": KNXNET_IP_PORT,
-                "name": f"KNX Gateway {addr[0]}",
-                "discovered_at": asyncio.get_event_loop().time(),
-            })
+            gateways.append(
+                {
+                    "host": addr[0],
+                    "port": KNXNET_IP_PORT,
+                    "name": f"KNX Gateway {addr[0]}",
+                    "discovered_at": asyncio.get_event_loop().time(),
+                }
+            )
 
         sock.close()
 
@@ -112,7 +134,7 @@ async def test_gateway_connectivity(host: str, port: int = 3671, timeout_s: floa
 
         return {"status": "error", "host": host, "port": port, "error": "Empty response"}
 
-    except socket.timeout:
+    except TimeoutError:
         return {"status": "timeout", "host": host, "port": port, "error": "Gateway not responding"}
     except Exception as e:
         return {"status": "error", "host": host, "port": port, "error": str(e)}
@@ -170,18 +192,20 @@ def import_ets_group_addresses(xml_content: str) -> list[dict[str, Any]]:
                         dpt = _normalize_dpt(child.text or "9.001")
 
                 if address:
-                    group_addresses.append({
-                        "address": address,
-                        "name": name,
-                        "dpt": dpt,
-                        "description": description,
-                    })
+                    group_addresses.append(
+                        {
+                            "address": address,
+                            "name": name,
+                            "dpt": dpt,
+                            "description": description,
+                        }
+                    )
 
         logger.info("ETS import: parsed %d group addresses", len(group_addresses))
 
     except ET.ParseError as e:
         logger.error("ETS XML parse error: %s", e)
-        raise ValueError(f"Invalid ETS XML: {e}")
+        raise ValueError(f"Invalid ETS XML: {e}") from e
 
     return group_addresses
 
@@ -199,6 +223,7 @@ def _normalize_dpt(dpt_str: str) -> str:
 # ---------------------------------------------------------------------------
 # Group address scanning
 # ---------------------------------------------------------------------------
+
 
 async def scan_group_addresses(
     gateway_host: str,
@@ -225,8 +250,6 @@ async def scan_group_addresses(
     if not connected:
         return []
 
-    results = []
-
     # Parse address range
     start_main, start_mid, start_sub = map(int, start_address.split("/"))
     end_main, end_mid, end_sub = map(int, end_address.split("/"))
@@ -244,13 +267,15 @@ async def scan_group_addresses(
                             client.read_group_address(addr_str, "9.001"),
                             timeout=timeout_s,
                         )
-                        responsive.append({
-                            "address": addr_str,
-                            "value": value,
-                            "main": main,
-                            "mid": mid,
-                            "sub": sub,
-                        })
+                        responsive.append(
+                            {
+                                "address": addr_str,
+                                "value": value,
+                                "main": main,
+                                "mid": mid,
+                                "sub": sub,
+                            }
+                        )
                     except Exception:
                         # Non-responsive address — expected for passive scan
                         pass
@@ -260,8 +285,7 @@ async def scan_group_addresses(
     except asyncio.CancelledError:
         pass
 
-    logger.info("Group address scan: %d responsive out of range %s–%s",
-                len(responsive), start_address, end_address)
+    logger.info("Group address scan: %d responsive out of range %s–%s", len(responsive), start_address, end_address)
 
     return responsive
 
@@ -269,6 +293,7 @@ async def scan_group_addresses(
 # ---------------------------------------------------------------------------
 # Build SENTINEL Device from ETS import
 # ---------------------------------------------------------------------------
+
 
 def build_device_from_ets(
     site_id: str,
@@ -290,7 +315,6 @@ def build_device_from_ets(
     Returns:
         Device config dict ready for DeviceManager.add_device()
     """
-    import uuid
 
     # Group by main group number
     by_main: dict[int, list[dict]] = {}

@@ -9,18 +9,18 @@ from __future__ import annotations
 import logging
 from typing import Annotated, Any
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Body
+from fastapi import APIRouter, Body, File, HTTPException, UploadFile
 
 from app.core.auth import require_site_access
-from app.services.knx.knx_client import get_knx_client, SUPPORTED_DPT_TYPES
-from app.services.knx.knx_discovery_service import (
-    discover_gateways,
-    test_gateway_connectivity,
-    import_ets_group_addresses,
-    build_device_from_ets,
-    scan_group_addresses,
-)
 from app.services.device_abstraction import device_manager
+from app.services.knx.knx_client import SUPPORTED_DPT_TYPES
+from app.services.knx.knx_discovery_service import (
+    build_device_from_ets,
+    discover_gateways,
+    import_ets_group_addresses,
+    scan_group_addresses,
+    test_gateway_connectivity,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/knx", tags=["KNX"])
 # ---------------------------------------------------------------------------
 # Gateway discovery
 # ---------------------------------------------------------------------------
+
 
 @router.get("/gateways")
 async def list_knx_gateways():
@@ -71,6 +72,7 @@ async def test_knx_gateway(
 # DPT types
 # ---------------------------------------------------------------------------
 
+
 @router.get("/dpt/types")
 async def list_dpt_types():
     """List all supported KNX Data Point Types (DPT) with encoding info."""
@@ -80,6 +82,7 @@ async def list_dpt_types():
 # ---------------------------------------------------------------------------
 # Site devices
 # ---------------------------------------------------------------------------
+
 
 @router.get("/sites/{site_id}/devices")
 @require_site_access
@@ -150,6 +153,7 @@ async def register_knx_device(site_id: str, device_data: dict[str, Any]):
 # Device points
 # ---------------------------------------------------------------------------
 
+
 @router.get("/devices/{device_id}/points")
 async def list_knx_device_points(device_id: str):
     """List all group addresses for a KNX device as DevicePoints."""
@@ -218,9 +222,7 @@ async def write_knx_point(
     """
     # Safety: emergency writes are blocked at the adapter level
     try:
-        success = await device_manager.write_device_value(
-            device_id, point, value, priority, user="api"
-        )
+        success = await device_manager.write_device_value(device_id, point, value, priority, user="api")
         if success:
             return {"status": "written", "device_id": device_id, "point": point, "value": value}
         else:
@@ -238,6 +240,7 @@ async def write_knx_point(
 # ---------------------------------------------------------------------------
 # Device health
 # ---------------------------------------------------------------------------
+
 
 @router.get("/devices/{device_id}/health")
 async def get_knx_device_health(device_id: str):
@@ -264,6 +267,7 @@ async def get_knx_device_health(device_id: str):
 # ---------------------------------------------------------------------------
 # ETS XML import
 # ---------------------------------------------------------------------------
+
 
 @router.post("/import/ets")
 @require_site_access
@@ -321,6 +325,7 @@ async def import_ets_xml(
 # ---------------------------------------------------------------------------
 # Group address scan
 # ---------------------------------------------------------------------------
+
 
 @router.post("/scan/group-addresses")
 @require_site_access

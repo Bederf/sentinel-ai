@@ -5,6 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -160,7 +162,7 @@ def parse_mqtt_presence_message(topic: str, payload: bytes | str | dict[str, Any
 def _distance_in_valid_range(event: MqttPresenceEvent) -> bool:
     """Server-side distance filtering per LD2410C radar config.
 
-    Valid range: 0.2 m – configured max (default 3.0 m).
+    Valid range: 0.2 m - configured max (default 3.0 m).
     Readings outside this range are hallway bleed or noise — ignore them.
     Only filters when the payload includes distance data AND event claims occupied.
     """
@@ -255,22 +257,35 @@ class SpaceMqttListener:
 
             def _on_disconnect(client, _userdata, rc, _properties=None):
                 logger.warning("Space MQTT _on_disconnect fired: rc=%s", rc)
+                if rc != 0 and self._enabled:
+
+                    def _scheduled_reconnect():
+                        logger.warning("Space MQTT scheduling reconnect in 5s...")
+                        time.sleep(5)
+                        try:
+                            client.reconnect()
+                            client.loop_start()
+                        except Exception as exc:
+                            logger.error("Space MQTT reconnect failed: %s", exc)
+
+                    threading.Thread(target=_scheduled_reconnect, daemon=True).start()
 
             def _on_message(_client, _userdata, message):
-                logger.warning("Space MQTT _on_message fired: topic=%s", message.topic)
+                logger.debug("Space MQTT _on_message fired: topic=%s", message.topic)
                 try:
                     if self._loop and self._loop.is_running():
                         future = asyncio.run_coroutine_threadsafe(
                             process_mqtt_presence_message(message.topic, message.payload),
                             self._loop,
                         )
-                        future.add_done_callback(
-                            lambda completed: (
-                                logger.warning("Space MQTT message rejected: %s", completed.exception())
-                                if completed.exception()
-                                else None
-                            )
-                        )
+
+                        # Log thread-safely via loop.call_soon_threadsafe to avoid event-loop deadlock
+                        def _log_result(completed):
+                            exc = completed.exception()
+                            if exc:
+                                logger.warning("Space MQTT message rejected: %s", exc)
+
+                        future.add_done_callback(_log_result)
                     else:
                         logger.warning("Space MQTT message dropped: listener loop unavailable")
                 except Exception as exc:

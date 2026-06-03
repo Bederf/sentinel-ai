@@ -21,6 +21,7 @@ import {
   Link,
   Sparkles,
   Cpu,
+  FileText,
 } from "lucide-react";
 import { useModules } from "../contexts/ModuleHooks";
 import { modulesApi, type ModuleDefinition } from "../lib/api/modules";

@@ -258,14 +258,10 @@ class DemandResponseService:
         """Get current site temperature from sensor readings."""
         try:
             client = get_supabase_client()
-            # Normalize to Supabase format: site-002 → S002
-            from app.core.site_resolver import normalize_site_id
-
-            supabase_site_id = normalize_site_id(site_id, to_supabase=True)
             response = (
                 client.table("equipment_sensor_readings")
                 .select("value, recorded_at")
-                .eq("site_id", supabase_site_id)
+                .eq("site_id", site_id)
                 .ilike("metric_name", "%temp%")
                 .order("recorded_at", desc=True)
                 .limit(1)
@@ -446,14 +442,10 @@ class DemandResponseService:
         """Get seconds since last sensor reading."""
         try:
             client = get_supabase_client()
-            # Normalize to Supabase format: site-002 → S002
-            from app.core.site_resolver import normalize_site_id
-
-            supabase_site_id = normalize_site_id(site_id, to_supabase=True)
             response = (
                 client.table("equipment_sensor_readings")
                 .select("recorded_at")
-                .eq("site_id", supabase_site_id)
+                .eq("site_id", site_id)
                 .order("recorded_at", desc=True)
                 .limit(1)
                 .execute()

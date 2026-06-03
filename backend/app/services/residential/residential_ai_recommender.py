@@ -186,27 +186,14 @@ HISTORICAL PATTERNS (last 7 days):
 Generate recommendations for current conditions only."""
 
     async def _call_haiku(self, prompt: str) -> str:
-        """Call HAIKU model via model_gateway."""
-        # Try simulation_llm_model first (background role)
-        model = getattr(
-            __import__("app.config.settings", fromlist=["settings"]).settings,
-            "simulation_llm_model",
-            None,
-        )
-        if not model:
-            # Fall back to claude_model (sentinel default)
-            model = getattr(
-                __import__("app.config.settings", fromlist=["settings"]).settings,
-                "claude_model",
-                "claude-haiku-4-5-20251001",
-            )
-
+        """Call LLM via model_gateway using 'light' task_class → MiniMax-M2.5 (no Anthropic cost)."""
         from app.services.model_gateway import model_gateway
 
         response = await model_gateway.call(
-            prompt=prompt,
+            task_class="light",
+            messages=[{"role": "user", "content": prompt}],
             system=RESIDENTIAL_SYSTEM_PROMPT,
-            model=model,
+            max_tokens=1536,
         )
         return response
 

@@ -252,7 +252,12 @@ async def deactivate_residential_site(site_id: str) -> dict:
     supabase = get_supabase_client()
 
     # Check current state
-    existing = supabase.table("residential_sites").select("id,is_active,platform,ha_deployment_type").eq("site_id", site_id).execute()
+    existing = (
+        supabase.table("residential_sites")
+        .select("id,is_active,platform,ha_deployment_type")
+        .eq("site_id", site_id)
+        .execute()
+    )
     if not existing.data:
         raise HTTPException(status_code=404, detail=f"Residential site not found: {site_id}")
 
@@ -385,6 +390,7 @@ async def list_pending_wireguard_peers() -> dict:
 
 class EntityMapping(BaseModel):
     """Single HA entity to metric mapping."""
+
     entity_id: str
     metric_type: str
 
@@ -400,6 +406,7 @@ class EntityMapping(BaseModel):
 
 class AddonRegisterRequest(BaseModel):
     """Payload for POST /api/residential/addon-register."""
+
     chat_id: str
     entities: list[EntityMapping]
     platform: Literal["home_assistant"]
@@ -471,7 +478,9 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     try:
         from app.config.settings import settings as _settings
 
-        creds = get_mqtt_provisioner().provision_vps_client(site_id, int(request.chat_id) if request.chat_id.isdigit() else 0)
+        creds = get_mqtt_provisioner().provision_vps_client(
+            site_id, int(request.chat_id) if request.chat_id.isdigit() else 0
+        )
     except Exception as exc:
         logger.error("MQTT provisioning failed for %s: %s", site_id, exc)
         raise HTTPException(status_code=500, detail="Failed to provision MQTT credentials") from exc
@@ -556,11 +565,18 @@ async def residential_telegram_webhook(request: Request):
             cb_id = callback.get("id", "")
             cb_msg = callback.get("message", {})
             cb_chat_id = cb_msg.get("chat", {}).get("id")
+            service = ResidentialOnboardService()
+
             if cb_chat_id and data.startswith("platform:"):
                 platform = data.split(":", 1)[1]
-                service = ResidentialOnboardService()
                 service.handle_platform_callback(int(cb_chat_id), cb_id, platform)
                 return JSONResponse(content={"status": "platform", "platform": platform})
+
+            if cb_chat_id and data.startswith("ha:deploy:"):
+                deployment = data.split(":", 2)[-1]  # "ha:deploy:local" or "ha:deploy:vps"
+                service.handle_ha_deployment_callback(int(cb_chat_id), cb_id, deployment)
+                return JSONResponse(content={"status": "deployment", "deployment": deployment})
+
             return JSONResponse(content={"status": "unknown_callback"})
 
         if not message:
@@ -579,17 +595,26 @@ async def residential_telegram_webhook(request: Request):
             service.handle_connect(chat_id)
             return JSONResponse(content={"status": "connect"})
 
+        if text == "/hapeer_ready":
+            service.handle_hapeer_ready(chat_id)
+            return JSONResponse(content={"status": "hapeer_ready"})
+
+        if text == "/ha_ready":
+            result = service.handle_ha_ready(chat_id)
+            from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
+
+            sender = ResidentialTelegramSender()
+            await sender.send_text(chat_id, result)
+            return JSONResponse(content={"status": "ha_ready"})
+
         if text == "/start":
             from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
+
             sender = ResidentialTelegramSender()
-            await sender.send_text(chat_id,
-                "Welcome to SENTINEL Home!\n\n"
-                "Send /connect to link your solar system."
-            )
+            await sender.send_text(chat_id, "Welcome to SENTINEL Home!\n\nSend /connect to link your solar system.")
             return JSONResponse(content={"status": "start"})
 
         if text == "/connect":
-            service = ResidentialOnboardService()
             service.handle_connect(chat_id)
             return JSONResponse(content={"status": "connect"})
 

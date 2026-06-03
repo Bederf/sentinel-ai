@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,41 +15,44 @@ from app.models.device import (
     DeviceType,
     PointType,
     ProtocolType,
-    create_device_from_dict,
 )
+from app.services.device_abstraction import DeviceManager
 from app.services.knx.knx_adapter import KNXAdapter, _is_emergency_group
 from app.services.knx.knx_client import (
     DPT_1_TYPES,
-    DPT_14_TYPES,
     DPT_5_TYPES,
     DPT_9_TYPES,
+    DPT_14_TYPES,
     decode_dpt,
     encode_dpt,
 )
-from app.services.device_abstraction import DeviceManager
 
 # ---------------------------------------------------------------------------
 # DPT encoding/decoding round-trip tests
 # ---------------------------------------------------------------------------
 
+
 class TestDPTEncoding:
     """Round-trip: encode → decode must return original value (within tolerance)."""
 
-    @pytest.mark.parametrize("dpt,value,expected_type", [
-        ("1.001", True, bool),
-        ("1.001", False, bool),
-        ("5.001", 50.0, float),
-        ("5.001", 100.0, float),
-        ("5.010", 128, int),
-        ("5.010", 255, int),
-        ("9.001", 21.5, float),
-        ("9.001", -5.0, float),
-        ("9.007", 65.0, float),
-        ("9.020", 230.0, float),
-        ("14.019", 5.2, float),
-        ("14.056", 1500.0, float),
-        ("14.068", 2500.0, float),
-    ])
+    @pytest.mark.parametrize(
+        "dpt,value,expected_type",
+        [
+            ("1.001", True, bool),
+            ("1.001", False, bool),
+            ("5.001", 50.0, float),
+            ("5.001", 100.0, float),
+            ("5.010", 128, int),
+            ("5.010", 255, int),
+            ("9.001", 21.5, float),
+            ("9.001", -5.0, float),
+            ("9.007", 65.0, float),
+            ("9.020", 230.0, float),
+            ("14.019", 5.2, float),
+            ("14.056", 1500.0, float),
+            ("14.068", 2500.0, float),
+        ],
+    )
     def test_dpt_round_trip(self, dpt, value, expected_type):
         encoded = encode_dpt(value, dpt)
         assert encoded is not None
@@ -83,15 +86,18 @@ class TestDPTEncoding:
 class TestEmergencyGroupDetection:
     """Emergency/fire group addresses must be detected and blocked."""
 
-    @pytest.mark.parametrize("description,is_emergency", [
-        ("Zone 1 Temperature", False),
-        ("Emergency Lighting", True),
-        ("Fire Alarm Zone A", True),
-        ("Evacuation Route Lighting", True),
-        ("HVAC Normal Mode", False),
-        ("Panic Button Status", True),
-        ("Main Door Lock", False),
-    ])
+    @pytest.mark.parametrize(
+        "description,is_emergency",
+        [
+            ("Zone 1 Temperature", False),
+            ("Emergency Lighting", True),
+            ("Fire Alarm Zone A", True),
+            ("Evacuation Route Lighting", True),
+            ("HVAC Normal Mode", False),
+            ("Panic Button Status", True),
+            ("Main Door Lock", False),
+        ],
+    )
     def test_emergency_pattern_detection(self, description, is_emergency):
         meta = {"description": description}
         assert _is_emergency_group(meta) == is_emergency
@@ -100,6 +106,7 @@ class TestEmergencyGroupDetection:
 # ---------------------------------------------------------------------------
 # KNXAdapter unit tests
 # ---------------------------------------------------------------------------
+
 
 def _make_knx_device(gateway_host="192.168.1.100", with_emergency=False):
     """Create a KNX Device for testing."""
@@ -242,10 +249,10 @@ class TestDeviceManagerKNXRegistration:
     def test_knx_protocol_in_device_manager(self):
         """Verify KNXAdapter is in DeviceManager adapter_map at import time."""
         # This tests that the import chain works without hitting the real xknx lib
-        from app.services.device_abstraction import DeviceManager
 
         # We can verify the adapter_map has the knx key by checking the source
         import inspect
+
         source = inspect.getsource(DeviceManager._create_adapter)
 
         # The source should mention "knx" in the adapter_map

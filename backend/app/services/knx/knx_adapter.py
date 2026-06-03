@@ -20,7 +20,7 @@ import logging
 from datetime import datetime
 from typing import Any
 
-from app.models.device import Device, DevicePoint, DeviceStatus, DeviceValue, PointType
+from app.models.device import Device, DevicePoint, DeviceStatus, DeviceValue
 from app.services.device_abstraction import DeviceAdapter
 from app.services.knx.knx_client import KNXClient, get_knx_client
 
@@ -115,9 +115,7 @@ class KNXAdapter(DeviceAdapter):
         ga_meta = point.metadata.get("group_addresses", {}).get(point_name, {})
         read_addr = ga_meta.get("read_address")
         if not read_addr:
-            raise ValueError(
-                f"Point {point_name} has no read_address in group_addresses metadata"
-            )
+            raise ValueError(f"Point {point_name} has no read_address in group_addresses metadata")
 
         dpt = ga_meta.get("dpt", "9.001")
         value = await self.client.read_group_address(read_addr, dpt)
@@ -139,15 +137,11 @@ class KNXAdapter(DeviceAdapter):
         ga_meta = point.metadata.get("group_addresses", {}).get(point_name, {})
         write_addr = ga_meta.get("write_address") or ga_meta.get("read_address")
         if not write_addr:
-            raise ValueError(
-                f"Point {point_name} has no write_address or read_address in metadata"
-            )
+            raise ValueError(f"Point {point_name} has no write_address or read_address in metadata")
 
         # Safety: block writes to emergency/fire group addresses
         if _is_emergency_group(ga_meta):
-            raise ValueError(
-                f"Emergency/fire group address ({write_addr}) is read-only — write blocked"
-            )
+            raise ValueError(f"Emergency/fire group address ({write_addr}) is read-only — write blocked")
 
         dpt = ga_meta.get("dpt", "9.001")
         return await self.client.write_group_address(write_addr, value, dpt, priority)

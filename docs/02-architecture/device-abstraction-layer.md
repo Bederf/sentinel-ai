@@ -68,6 +68,14 @@ classDiagram
         +write_value(point, value) bool
     }
 
+    class KNXAdapter {
+        +knx_client: KNXClient
+        +gateway_host: str
+        +connect() bool
+        +read_value(point) DeviceValue
+        +write_value(point, value) bool
+    }
+
     class MockAdapter {
         +latency: int
         +error_rate: float
@@ -80,6 +88,7 @@ classDiagram
     DeviceAdapter <|-- BACnetAdapter
     DeviceAdapter <|-- ModbusTCPAdapter
     DeviceAdapter <|-- ModbusRTUAdapter
+    DeviceAdapter <|-- KNXAdapter
     DeviceAdapter <|-- MockAdapter
 ```
 
@@ -265,6 +274,54 @@ class ModbusTCPAdapter(DeviceAdapter):
 - Discrete Inputs: Read-only bits (0x0000-0xFFFF)
 - Holding Registers: Read/write words (0x0000-0xFFFF)
 - Input Registers: Read-only words (0x0000-0xFFFF)
+
+#### KNXAdapter
+
+**Protocol:** KNXnet/IP (UDP 3671) — via xknx library
+
+**Transport:** KNXnet/IP tunnelling over Ethernet. Requires KNXnet/IP gateway at client site (e.g., MDT SCN-IP100.03, Weinzierl 730, ABB IPS/S 3.1).
+
+**Key Features:**
+- Group address read/write via xknx async stack
+- DPT (Data Point Type) encoding/decoding: DPT 1.001, 5.001, 5.010, 9.001, 9.007, 9.020, 14.019, 14.056, 14.068
+- Per-gateway singleton (no duplicate tunnel connections)
+- Rate limiting: 20ms minimum between writes to same group address
+- Emergency/fire group addresses blocked on write (read-only)
+
+**Point metadata schema:**
+```json
+{
+  "read_address": "1/1/1",
+  "write_address": "1/1/1",
+  "dpt": "9.001",
+  "description": "Zone 1 temperature",
+  "unit": "°C"
+}
+```
+
+**Example:**
+
+```python
+class KNXAdapter(DeviceAdapter):
+    """KNX/IP adapter via KNXnet/IP tunnelling."""
+
+    async def _protocol_connect(self) -> bool:
+        self._client = get_knx_client(
+            self.device.metadata["gateway_host"]
+        )
+        return await self._client.connect()
+
+    async def _protocol_read(self, point_name: str) -> DeviceValue:
+        ga = self.device.points[point_name].metadata["group_addresses"][point_name]
+        value = await self._client.read_group_address(
+            ga["read_address"], ga["dpt"]
+        )
+        return DeviceValue(point_name=point_name, value=value, unit=ga.get("unit", ""))
+```
+
+**API endpoints:** `GET/POST /api/knx/gateways`, `GET/POST /api/knx/sites/{site_id}/devices`, `GET/POST /api/knx/devices/{device_id}/points/{point}/value`, `POST /api/knx/import/ets`, `POST /api/knx/scan/group-addresses`
+
+**Discovery:** ETS5/ETS6 XML group address export import via `/api/knx/import/ets`. Passive group address scan via `/api/knx/scan/group-addresses`.
 
 #### MockAdapter
 
@@ -491,10 +548,14 @@ def _create_adapter(self, device: Device) -> DeviceInterface:
 **Step 3: Update Device Model**
 
 ```python
-# In Device model
-class Device(BaseModel):
-    protocol: Literal["bacnet", "modbus_tcp", "modbus_rtu", "mock", "my_protocol"]
-    # ...
+# In app/models/device.py — ProtocolType enum
+class ProtocolType(Enum):
+    BACNET = "bacnet"
+    KNX = "knx"      # <-- added for KNX/IP
+    MODBUS = "modbus"
+    MOCK = "mock"
+    HTTP = "http"
+    MQTT = "mqtt"
 ```
 
 ## Anti-Patterns
@@ -650,3 +711,4 @@ device = await device_manager.get_device(device_id)
 - [Naming Conventions](NAMING_CONVENTIONS.md) - Device ID format
 - [BACnet Integration](../07-integrations/bacnet-integration.md) - BACnet protocol details
 - [Safety Interlocks Engine](../06-safety-compliance/safety-interlocks-engine.md) - Safety validation
+- **KNX/IP Integration** — `backend/app/api/knx.py`, `backend/app/services/knx/` — API endpoints: `/api/knx/*`
