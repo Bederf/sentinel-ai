@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SIMBIOT Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-platform { background: rgba(16,185,129,0.15); color: #10b981; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>SIMBIOT Module</h1>
+  <p class="subtitle">Universal Protocol Adapter — Zero-Code Equipment Integration</p>
+  <span class="tag tag-platform">Platform</span>
+
+  <h2>Overview</h2>
+  <p>SIMBIOT (SENTINEL Message Bus Interface for Building Automation) is the universal adapter layer that allows SENTINEL to communicate with any building system — regardless of the underlying protocol (BACnet/IP, MQTT, Modbus, DALI-2, KNX). It provides a unified data model so all equipment can be managed, controlled, and queried through a single interface — without writing protocol-specific code for each integration.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Protocol translation — BACnet/IP ↔ SENTINEL native format, MQTT ↔ BACnet, Modbus ↔ MQTT</li>
+    <li>Auto-discovery — probes connected devices and auto-populates the equipment registry</li>
+    <li>Equipment registry sync — discovered equipment is created and maintained in SENTINEL's asset DB</li>
+    <li>Write-back support — send setpoint commands through the SIMBIOT adapter to BACnet devices</li>
+    <li>Data normalization — raw BACnet/DALI/Modbus values normalized to SENTINEL units (°C, %, kW)</li>
+    <li>Connection policy — configurable retry, timeout, and fallback behavior per site</li>
+    <li>SIMBIOT Bridge agent — runs on the edge SBC; handles protocol negotiation locally</li>
+  </ul>
+
+  <h2>Supported Protocols</h2>
+  <table>
+    <thead><tr><th>Protocol</th><th>Role</th><th>Points Supported</th></tr></thead>
+    <tbody>
+      <tr><td>BACnet/IP</td><td>Read + Write</td><td>Analog, Binary, Multi-state objects</td></tr>
+      <tr><td>MQTT</td><td>Read + Write</td><td>JSON payload, topic subscription</td></tr>
+      <tr><td>Modbus TCP</td><td>Read + Write</td><td>Holding registers, input registers, coils</td></tr>
+      <tr><td>DALI-2</td><td>Read + Write</td><td>Ballast status, scene, brightness</td></tr>
+      <tr><td>SNMP</td><td>Read</td><td>MIB v1/v2c traps and polling</td></tr>
+    </tbody>
+  </table>
+
+  <h2>SIMBIOT Bridge</h2>
+  <p>The SIMBIOT Bridge is a lightweight edge agent (runs on Raspberry Pi or similar SBC) that connects to the building network and translates protocols to MQTT for SENTINEL cloud ingestion. One Bridge handles all equipment at a site — no per-equipment configuration needed.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | SIMBIOT Module | Platform | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

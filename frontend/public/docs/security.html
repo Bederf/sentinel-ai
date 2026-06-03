@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Security Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-building { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Security Module</h1>
+  <p class="subtitle">Access Control, CCTV & Intruder Detection Monitoring</p>
+  <span class="tag tag-building">Building System</span>
+
+  <h2>Overview</h2>
+  <p>The Security Module integrates with building access control systems (iCCure, Bosch, Axis), CCTV cameras, and intruder alarms to provide a unified security monitoring dashboard. It correlates access events with occupancy and HVAC activity to detect anomalies (e.g., after-hours access to areas with no corresponding HVAC activity). Security alerts are routed through the Notifications Module with high priority.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Access event monitoring — card reader activations, door open/close, alarm events</li>
+    <li>CCTV camera status — online/offline, recording status per camera</li>
+    <li>Intruder alarm zone status — armed/disarmed, active alarm zones</li>
+    <li>Security patrol route monitoring — guard checkpoint compliance tracking</li>
+    <li>Tailgating detection — alerts when two card reads occur in rapid succession at one door</li>
+    <li>After-hours access correlation — flags access events outside normal operating hours</li>
+    <li>Security incident log with video clip link where camera integration exists</li>
+    <li>Access card suspension workflow — immediate deactivation on security incident</li>
+  </ul>
+
+  <h2>Supported Systems</h2>
+  <table>
+    <thead><tr><th>OEM</th><th>System Type</th><th>Integration Method</th></tr></thead>
+    <tbody>
+      <tr><td>iCCure 9000</td><td>Access Control</td><td>SENTINEL MQTT adapter / BACnet</td></tr>
+      <tr><td>Bosch BIS</td><td>Access Control + Intruder</td><td>OPC-UA / Modbus</td></tr>
+      <tr><td>Axis Camera</td><td>CCTV / Video Analytics</td><td>VAPI / MQTT events</td></tr>
+      <tr><td>Inner Range</td><td>Access + Intruder</td><td>Modbus TCP</td></tr>
+      <tr><td>Generic接触</td><td>Wiegand / RS-485</td><td>SENTINEL edge adapter</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Behavioral anomaly detection</td><td>Flags access patterns that deviate from established baselines (new location, unusual time)</td></tr>
+      <tr><td>Tailgating detection</td><td>Correlates card reader and turnstile sensor data to detect unauthorized following</td></tr>
+      <tr><td>Occupancy correlation</td><td>Cross-checks access events against HVAC occupancy to identify credential sharing or misuse</td></tr>
+      <tr><td>Camera health monitoring</td><td>Detects CCTV camera offline events and alerts security operations</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Security reads from <strong>iCCure</strong>, <strong>Bosch BIS</strong>, or <strong>OPC-UA</strong> access control systems. Requires <strong>Security Control</strong> add-on for active actions (door lock/unlock, alarm arm/disarm). Feeds <strong>Notifications</strong> and <strong>Occupancy Analytics</strong>.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Security Module | Building System | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

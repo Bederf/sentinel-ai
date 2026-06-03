@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Logging Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-platform { background: rgba(16,185,129,0.15); color: #10b981; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Logging Module</h1>
+  <p class="subtitle">Audit Trail, Event Logs & Compliance Logging</p>
+  <span class="tag tag-platform">Platform</span>
+
+  <h2>Overview</h2>
+  <p>The Logging Module captures every significant event, action, and state change in SENTINEL — providing a complete, tamper-evident audit trail required for regulatory compliance (POPIA, ISO 27001), operational accountability, and incident investigation. All logs are immutable and timestamped with millisecond precision.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Immutable audit log — all operator actions, system events, and AI recommendations logged</li>
+    <li>Log retention policy enforcement — configurable retention (30d, 90d, 1y, 7y) per log category</li>
+    <li>Full-text search across all log entries with timestamp and equipment filtering</li>
+    <li>Automated compliance reports: POPIA data access reports, access frequency reports</li>
+    <li>Gateway log forwarding — centralizes logs from remote site Bridge agents</li>
+    <li>Export logs as CSV or JSON for external SIEM integration (Splunk, Elastic, Microsoft Sentinel)</li>
+    <li>Log compression and archival to object storage for long-term retention</li>
+    <li>Operator session tracking — login/logout events, role changes, permission escalations</li>
+  </ul>
+
+  <h2>Log Categories</h2>
+  <table>
+    <thead><tr><th>Category</th><th>Events</th><th>Retention</th></tr></thead>
+    <tbody>
+      <tr><td>Control Actions</td><td>Setpoint changes, override events, AI recommendations executed</td><td>1 year</td></tr>
+      <tr><td>System Events</td><td>Gateway online/offline, module activations, service restarts</td><td>1 year</td></tr>
+      <tr><td>Access Logs</td><td>Login, logout, role changes, permission grants</td><td>7 years</td></tr>
+      <tr><td>Data Access (POPIA)</td><td>Who accessed which tenant's data and when</td><td>7 years</td></tr>
+      <tr><td>AI Recommendations</td><td>Recommendation generated, reviewed, accepted/rejected</td><td>3 years</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Logging Module | Platform | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

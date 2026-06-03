@@ -1472,7 +1472,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                 elif health < 80:
                     status = "warning"
 
-            
+
             synced_controllable = None
             inferred_controllable = _is_device_controllable(eq.get("code", eq.get("id", "")), {})
             is_simulated_sync = False

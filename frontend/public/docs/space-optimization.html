@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Optimization Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-addon { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Space Optimization Module</h1>
+  <p class="subtitle">Desk Utilization, Room Right-Sizing & Space Analytics</p>
+  <span class="tag tag-addon">Add-on</span>
+
+  <h2>Overview</h2>
+  <p>The Space Optimization Module provides visibility into how the building's floor space is actually used versus how it was designed. Using occupancy sensors on desks, in meeting rooms, and at entry points, it generates heatmaps, utilization trends, and right-sizing recommendations — helping facilities managers make informed decisions about lease optimization, focus room conversion, and desking capacity.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Desk utilization heatmaps — live and historical occupancy color-coded per floor zone</li>
+    <li>Meeting room utilization tracking — actual vs. capacity usage per room per time slot</li>
+    <li>Entry/exit flow analysis — peak entry times, floor distribution, queueing detection</li>
+    <li>Right-sizing recommendations — flags over-sized or under-used rooms that could be converted</li>
+    <li>Hot-desk management — real-time availability map for unassigned seating areas</li>
+    <li>Focus room utilization — tracks quiet rooms, phone booths, and collaboration zones separately</li>
+    <li>Space occupancy reporting — daily/weekly/monthly utilization reports per floor and per zone</li>
+    <li>Tenant density reporting — m² per person vs. lease commitment for tenant charge-back</li>
+  </ul>
+
+  <h2>Utilization Benchmarks</h2>
+  <table>
+    <thead><tr><th>Space Type</th><th>Target Utilization</th><th>Under-Utilized Threshold</th></tr></thead>
+    <tbody>
+      <tr><td>Open-plan desks</td><td>&gt; 60% average</td><td>&lt; 40% for 30+ days</td></tr>
+      <tr><td>Meeting rooms &lt; 8 people</td><td>&gt; 50% booking利用率</td><td>&lt; 25% for 30+ days</td></tr>
+      <tr><td>Meeting rooms &gt; 8 people</td><td>&gt; 40%</td><td>&lt; 20% for 30+ days</td></tr>
+      <tr><td>Focus rooms</td><td>&gt; 70% peak</td><td>&lt; 40% peak for 30+ days</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Ghost desk detection</td><td>Identifies permanently empty desks vs. temporarily unoccupied — flags desks that could be decommissioned</td></tr>
+      <tr><td>Demand forecasting</td><td>Predicts desk demand curves for hybrid work days (Tue/Wed/Thu peak)</td></tr>
+      <tr><td>Room conversion recommendations</td><td>Suggests under-used meeting rooms for conversion to focus pods or collaboration zones</td></tr>
+      <tr><td>Anomaly detection</td><td>Sudden utilization drop in a zone may indicate a broken occupancy sensor or HVAC issue</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Space Optimization reads occupancy data from <strong>HVAC</strong> zone sensors and standalone desk sensors. Feeds into <strong>Block Booking</strong> for ghost desk detection. Uses <strong>Lighting</strong> occupancy signals as a secondary source for validation. Feeds utilization reports to <strong>Financial</strong> and <strong>Fleet ML</strong>.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Space Optimization Module | Add-on | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Digital Twin Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-building { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Digital Twin Module</h1>
+  <p class="subtitle">3D Building Visualization, Asset Relationships & Spatial Intelligence</p>
+  <span class="tag tag-building">Building System</span>
+
+  <h2>Overview</h2>
+  <p>The Digital Twin Module provides a 3D visual representation of the building, mapping every monitored asset to its physical location and linking it to its equipment hierarchy and live telemetry. It creates a living digital replica that operators and AI systems can navigate spatially to understand conditions at a glance, investigate anomalies in context, and simulate the impact of control actions before they are applied.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>3D floor plan viewer with equipment icons positioned by zone/room</li>
+    <li>Live telemetry overlay — color-coded equipment status on the floor plan</li>
+    <li>Equipment hierarchy browser — drill from building → floor → zone → equipment → point</li>
+    <li>Brick schema ontology — all assets tagged with Brick classes for standardized queries</li>
+    <li>DXF floor plan import — converts architect CAD files to interactive floor plan views</li>
+    <li>Equipment detail panel — click any asset to see live readings, recent events, and history</li>
+    <li>What-if simulation — preview the effect of setpoint changes before applying them</li>
+    <li>Maintenance overlay — highlights assets due for inspection with work order links</li>
+    <li>Fire zone overlay — visualizes fire zone boundaries and detector locations</li>
+  </ul>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Anomaly spatial view</td><td>Highlights the floor zone containing the most active anomaly on the digital twin</td></tr>
+      <tr><td>Equipment degradation map</td><td>Color-codes equipment icons by ML health score — see problem areas at a glance</td></tr>
+      <tr><td>Energy flow visualization</td><td>Animated path of energy from grid → transformer → distribution → HVAC/Lighting loads</td></tr>
+      <tr><td>IAQ hotspot mapping</td><td>Overlays indoor air quality index (IAQ) per zone as a heatmap on the floor plan</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Digital Twin consumes live data from all building system modules. It is the primary visualization layer for <strong>HVAC</strong>, <strong>Energy</strong>, <strong>Lighting</strong>, <strong>Fire</strong>, and <strong>Water</strong>. Requires <strong>DXF upload</strong> to initialize the floor plan. Feeds into <strong>AI Recommendations</strong> by providing spatial context for anomalies.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Digital Twin Module | Building System | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

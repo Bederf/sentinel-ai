@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ML Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    h3 { font-size: 11px; margin: 12px 0 4px; color: #333; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-platform { background: rgba(16,185,129,0.15); color: #10b981; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>ML Module</h1>
+  <p class="subtitle">Machine Learning — Predictive Analytics & Model Training</p>
+  <span class="tag tag-platform">Platform</span>
+
+  <h2>Overview</h2>
+  <p>The ML Module is the intelligence engine of SENTINEL. It runs continuous model training in the background, generates predictive alerts, and provides anomaly detection across all building systems. Models are trained per equipment type (AHU, Chiller, FCU, VAV, etc.) using historical telemetry, and are continuously retrained as fresh data arrives.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Background model training pipeline — runs on a configurable schedule without impacting BMS performance</li>
+    <li>Per-equipment-type models: AHU, Chiller, FCU, VAV, Lighting circuits, Solar inverters</li>
+    <li>Predictive maintenance — forecasts equipment degradation before failure occurs</li>
+    <li>Anomaly detection with contextual enrichment (weather, occupancy, time-of-day)</li>
+    <li>Drift detection — alerts when live data deviates from model predictions</li>
+    <li>Fleet-wide benchmarking — compares site performance against portfolio averages</li>
+    <li>Model retraining triggers based on prediction confidence decay or manual override events</li>
+  </ul>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Failure forecasting</td><td>Predicts equipment failures 24–72 hours in advance using trend analysis</td></tr>
+      <tr><td>Thermal comfort prediction</td><td>Forecasts room temperature drift and proactively adjusts setpoints</td></tr>
+      <tr><td>Energy optimization suggestions</td><td>ML-generated recommendations for setpoint schedules and load shifting</td></tr>
+      <tr><td>Cross-site pattern recognition</td><td>Identifies fleet-wide efficiency patterns and propagates best practices</td></tr>
+      <tr><td>Feedback loop from work orders</td><td>Outcomes from maintenance work orders update model accuracy</td></tr>
+      <tr><td>Model explainability</td><td>SHAP-based explanations for each prediction — shows which factors drove the forecast</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Model Health & Monitoring</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Training hours</td><td>ML hours ingested since last retraining event</td></tr>
+      <tr><td>Prediction confidence</td><td>0–100% score per model; below 70% triggers retrain alert</td></tr>
+      <tr><td>Drift score</td><td>Measures divergence between training distribution and live data</td></tr>
+      <tr><td>F1 score (post-hoc)</td><td>Historical accuracy of failure predictions against actual events</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration Points</h2>
+  <p>ML Module consumes telemetry from all building system modules. Its outputs feed into <strong>AI Recommendations</strong>, <strong>KPI</strong>, <strong>Fleet ML</strong>, and <strong>Digital Twin</strong>. It receives feedback from <strong>Maintenance</strong> (work order outcomes) and <strong>Aegis</strong> (operator overrides) to improve model accuracy.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | ML Module | Platform | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

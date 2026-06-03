@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fleet ML Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-addon { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Fleet ML Module</h1>
+  <p class="subtitle">Cross-Site Analytics, Portfolio Benchmarking & Fleet Intelligence</p>
+  <span class="tag tag-addon">Add-on</span>
+
+  <h2>Overview</h2>
+  <p>The Fleet ML Module aggregates performance data across all buildings in the portfolio and uses cross-site ML models to identify efficiency opportunities that are only visible when comparing buildings to each other. It ranks sites by performance, surfaces best practices from top performers to the portfolio, and generates portfolio-level ESG reports.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Portfolio dashboard — KPI heatmap across all sites (energy intensity, water intensity, uptime)</li>
+    <li>Site ranking — ranked comparison of all buildings by efficiency, uptime, and AI adoption</li>
+    <li>Best practice transfer — identifies what top-performing sites do differently and recommends to laggers</li>
+    <li>Cross-site anomaly detection — flags a site behaving unusually relative to its peer group</li>
+    <li>Portfolio ESG reporting — aggregated carbon, energy, and water metrics for group-level disclosure</li>
+    <li>Multi-site energy baselining — each site's consumption normalized for weather and occupancy</li>
+    <li>Fleet-wide maintenance trending — tracks fault frequency and maintenance cost per equipment type across sites</li>
+    <li>Investment prioritization — ranks capital projects across the portfolio by projected ROI</li>
+  </ul>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Peer benchmarking</td><td>ML-adjusted comparison that accounts for building size, climate zone, and occupancy type</td></tr>
+      <tr><td>Best practice propagation</td><td>Identifies operational patterns at high-performing sites and suggests them to underperformers</td></tr>
+      <tr><td>Site deterioration early warning</td><td>Detects gradual performance decline across a site before it becomes a critical issue</td></tr>
+      <tr><td>Fleet-wide failure correlation</td><td>Identifies if the same equipment model is failing across multiple sites → warranty/replacement alert</td></tr>
+      <tr><td>Project ROI ranking</td><td>Scores all capital projects across the fleet and recommends implementation sequence</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Fleet ML reads data from all sites' <strong>Energy</strong>, <strong>HVAC</strong>, <strong>Solar</strong>, and <strong>Maintenance</strong> modules. Aggregated data is used for <strong>Compliance</strong> ESG reporting and <strong>Financial</strong> ROI analysis. Does not control any equipment — purely analytical.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Fleet ML Module | Add-on | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

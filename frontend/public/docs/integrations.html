@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Integrations Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-platform { background: rgba(16,185,129,0.15); color: #10b981; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Integrations Module</h1>
+  <p class="subtitle">External System Connectivity & Health Monitoring</p>
+  <span class="tag tag-platform">Platform</span>
+
+  <h2>Overview</h2>
+  <p>The Integrations Module provides a unified view of all external system connections that SENTINEL depends on — BACnet gateways, DALI lighting bridges, Desigo CC servers, MQTT brokers, and third-party APIs. It continuously monitors the health of each connection and alerts operators when a data source goes offline or degrades.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Real-time connection health for all integrations (BACnet, DALI, Niagara, MQTT, Modbus)</li>
+    <li>Automated reconnection attempts on connection loss with exponential backoff</li>
+    <li>Data freshness monitoring — alerts when expected telemetry stops arriving</li>
+    <li>Latency and throughput metrics per integration channel</li>
+    <li>SIMBIOT universal adapter — bridges any BACnet/IP or MQTT device without custom code</li>
+    <li>Integration configuration UI in Settings — add/remove/reset connections per site</li>
+    <li>Audit log of all connection state changes and reconnection events</li>
+  </ul>
+
+  <h2>Supported Integrations</h2>
+  <table>
+    <thead><tr><th>Protocol</th><th>Systems</th><th>Status Check</th></tr></thead>
+    <tbody>
+      <tr><td>BACnet/IP</td><td>Siemens Desigo CC, JCI Metasys, Honeywell Niagara</td><td>Poll / Subscribe</td></tr>
+      <tr><td>DALI-2</td><td>Tridonic Scenecom, Helvar, Osram</td><td>Gateway heartbeat</td></tr>
+      <tr><td>MQTT</td><td>SIMBIOT bridge, custom IoT sensors</td><td>Broker ping</td></tr>
+      <tr><td>Modbus TCP</td><td>Power meters, fire panels</td><td>Register polling</td></tr>
+      <tr><td>SENTINEL Bridge</td><td>Remote site data ingestion (site-002, site-005)</td><td>/health endpoint</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Health Indicators</h2>
+  <table>
+    <thead><tr><th>State</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td style="color:#10b981;font-weight:bold">● Healthy</td><td>Telemetry flowing within expected latency</td></tr>
+      <tr><td style="color:#f59e0b;font-weight:bold">● Degraded</td><td>Latency elevated or intermittent — investigate</td></tr>
+      <tr><td style="color:#ef4444;font-weight:bold">● Unavailable</td><td>Connection lost — fallback mode active</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Integrations Module | Platform | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

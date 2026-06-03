@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financial Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-addon { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Financial Module</h1>
+  <p class="subtitle">Contracts, Billing, Cost Allocation & ROI Tracking</p>
+  <span class="tag tag-addon">Add-on</span>
+
+  <h2>Overview</h2>
+  <p>The Financial Module tracks operational expenditure linked to energy, water, and maintenance contracts. It manages supplier contracts (energy supply, maintenance contracts, warranty agreements), allocates costs to tenants based on submeter data, and provides ROI analysis for energy efficiency projects and maintenance investments.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Supplier contract management — energy supply, maintenance, warranty agreements with expiry alerts</li>
+    <li>Energy cost budgeting — set annual/monthly energy spend targets per building or tenant</li>
+    <li>Tenant charge-back calculation — allocate energy, water, and HVAC costs to tenant billing periods</li>
+    <li>Municipal bill verification — cross-check utility bills against SENTINEL metered consumption</li>
+    <li>ROI tracking for capital projects — energy savings, maintenance cost avoidance, downtime reduction</li>
+    <li>Invoice matching — automated matching of supplier invoices against contracted rates</li>
+    <li>Contract escalation management — fixed-price vs. variable-rate tracking and anomaly alerts</li>
+  </ul>
+
+  <h2>ROI Analysis</h2>
+  <table>
+    <thead><tr><th>Investment</th><th>Measured Outcome</th><th>Tracking Method</th></tr></thead>
+    <tbody>
+      <tr><td>Solar installation</td><td>Grid import reduction, export revenue</td><td>Energy module vs. pre-installation baseline</td></tr>
+      <tr><td>BESS installation</td><td>Peak demand reduction, demand charge avoidance</td><td>Demand metrics before vs. after</td></tr>
+      <tr><td>LED lighting upgrade</td><td>Lighting kWh reduction</td><td>Lighting module consumption baseline</td></tr>
+      <tr><td>Maintenance contract</td><td>Downtime hours, emergency callout frequency</td><td>Work order and fault frequency data</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Anomaly billing detection</td><td>Flags utility invoices that deviate significantly from consumption-based estimates</td></tr>
+      <tr><td>Contract recommendation</td><td>ML-based suggestion on tariff switching or contract renegotiation timing</td></tr>
+      <tr><td>Demand forecasting</td><td>Predicts next month energy spend for budget planning</td></tr>
+      <tr><td>Tenant fairness scoring</td><td>Cross-checks tenant submeter vs. building main meter for billing integrity</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Financial Module reads consumption data from <strong>Energy</strong>, <strong>Water</strong>, and <strong>Solar</strong>. Links maintenance costs from <strong>Maintenance</strong> module. Tenant data comes from <strong>Contracts</strong> add-on. Feeds reports to <strong>KPI</strong> and executive dashboards.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Financial Module | Add-on | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

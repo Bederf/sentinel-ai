@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Water Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-building { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Water Module</h1>
+  <p class="subtitle">Water Consumption Monitoring, Leak Detection & Conservation</p>
+  <span class="tag tag-building">Building System</span>
+
+  <h2>Overview</h2>
+  <p>The Water Module monitors municipal water consumption across all building zones using pulse-output or Modbus water meters. It tracks consumption in kL, detects abnormal flow patterns that indicate leaks, and provides trend analysis to identify water waste. This is especially critical for large multi-tenant buildings where tenant charge-backs require accurate submetering.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Zone-level water metering — main riser, floor, and key equipment water circuits</li>
+    <li>Real-time flow rate (L/min) and cumulative consumption (kL) tracking</li>
+    <li>Leak detection via continuous flow analysis — alerts on 24/7 flow when building is unoccupied</li>
+    <li>Submeter integration for tenant billing and charge-back calculation</li>
+    <li>Rainwater harvesting and greywater reuse system monitoring (if installed)</li>
+    <li>Consumption benchmarking against historical baseline and peer buildings</li>
+    <li>Automated daily/weekly consumption reports by zone</li>
+  </ul>
+
+  <h2>Monitored Points</h2>
+  <table>
+    <thead><tr><th>Meter Type</th><th>Protocol</th><th>Points</th></tr></thead>
+    <tbody>
+      <tr><td>Electromagnetic flow meter (pulse)</td><td>Digital pulse / Modbus TCP</td><td>Flow rate, cumulative volume, meter health</td></tr>
+      <tr><td>Ultrasonic clamp-on meter</td><td>Modbus RTU/TCP</td><td>Flow velocity, volume, alarm status</td></tr>
+      <tr><td>Pressure transmitter</td><td>4–20 mA / Modbus</td><td>Static pressure, pressure events</td></tr>
+      <tr><td>Rainwater tank level sensor</td><td>4–20 mA / Modbus</td><td>Tank level (%), pump status</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Leak detection</td><td>Continuous flow monitoring during unoccupied hours — alerts on any flow &gt; threshold</td></tr>
+      <tr><td>Consumption anomaly</td><td>Flags sudden increases not explained by weather or occupancy changes</td></tr>
+      <tr><td>Baseline comparison</td><td>Compares current consumption vs. same day last week/month — flags significant deviation</td></tr>
+      <tr><td>Tenant fairness audit</td><td>Cross-checks submeter vs. main meter for billing integrity</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Water reads from <strong>Modbus</strong> or <strong>4–20 mA</strong> transmitters. Control requires <strong>Water Control</strong> add-on (valve shutoff). Feeds <strong>KPI</strong> and <strong>Sustainability Reports</strong>. Works with <strong>Maintenance</strong> for work order generation on leak detection.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Water Module | Building System | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

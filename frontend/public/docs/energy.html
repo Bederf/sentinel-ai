@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Energy Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-building { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Energy Module</h1>
+  <p class="subtitle">Electrical Power Monitoring, Cost Tracking & Optimization</p>
+  <span class="tag tag-building">Building System</span>
+
+  <h2>Overview</h2>
+  <p>The Energy Module monitors electrical consumption across all circuits, tracks energy costs against tariff structures, and identifies waste or inefficiency. It ingests data from power meters (Schneider PM8000, Eaton 93PM, ABB M4M) and correlates consumption with HVAC, lighting, and solar generation to produce accurate per-circuit and per-zone energy balances.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Real-time kW and kWh metering per circuit via Modbus TCP power meters</li>
+    <li>Time-of-use (TOU) tariff tracking — separates peak, standard, and off-peak consumption</li>
+    <li>Demand charge management — tracks kVA demand peaks, forecasts demand spikes</li>
+    <li>Power factor monitoring — alerts when PF drops below 0.95 (utility penalty threshold)</li>
+    <li>Energy balance verification — solar generation + grid import = building consumption ± 2%</li>
+    <li>Load disaggregation — separates base building load from tenant load</li>
+    <li>Automated energy report generation with per-circuit and per-zone breakdowns</li>
+    <li>Carbon intensity tracking — converts kWh to kgCO₂ using municipal grid factor</li>
+  </ul>
+
+  <h2>Tariff Support</h2>
+  <table>
+    <thead><tr><th>Tariff Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Eskom Megaflex</td><td>Large industrial time-of-use with demand charges</td></tr>
+      <tr><td>City Power (Johannesburg)</td><td>Network access charge + kWh + demand charge</td></tr>
+      <tr><td>Eskom Landrate</td><td>Rural/residential flat rate</td></tr>
+      <tr><td>Custom Municipal</td><td>User-configured fixed energy + demand charges</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Load forecasting</td><td>Predicts next-day consumption curves for demand planning</td></tr>
+      <tr><td>Anomaly detection</td><td>Flags unusual consumption spikes that don't correlate with occupancy or weather</td></tr>
+      <tr><td>Solar self-consumption optimization</td><td>Maximizes use of solar generation before exporting to grid</td></tr>
+      <tr><td>Peak shaving recommendations</td><td>Suggests load reduction actions during high-tariff windows</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Energy reads from <strong>Modbus TCP</strong> power meters and <strong>BACnet</strong> grid meters. Feeds <strong>KPI</strong>, <strong>Solar</strong>, <strong>BESS</strong>, and <strong>AI Optimization</strong>. Requires <strong>Energy Control</strong> add-on for active load management (demand response, peak shaving).</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Energy Module | Building System | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

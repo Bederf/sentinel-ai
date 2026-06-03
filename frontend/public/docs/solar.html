@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Solar & BESS Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-building { background: rgba(59,130,246,0.15); color: #3b82f6; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Solar & BESS Module</h1>
+  <p class="subtitle">Solar Generation & Battery Energy Storage System Monitoring</p>
+  <span class="tag tag-building">Building System</span>
+
+  <h2>Overview</h2>
+  <p>The Solar & BESS Module monitors photovoltaic (PV) generation and battery energy storage systems, tracks self-consumption versus export, and manages battery charge/discharge cycles to maximize solar utilization and reduce grid dependence. It integrates with Huawei and Sungrow inverters and supports BESS systems from multiple OEMs.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Real-time solar generation monitoring per string/inverter (kW, kWh)</li>
+    <li>Battery state-of-charge (SoC) tracking, charge/discharge power (kW), cycle count</li>
+    <li>Self-consumption optimization — prioritizes on-site solar use over grid export</li>
+    <li>BESS discharge scheduling — draws from battery during peak tariff windows</li>
+    <li>Grid import/export tracking per 5-minute interval with cumulative kWh</li>
+    <li>Inverter efficiency monitoring — flags underperforming strings or inverters</li>
+    <li>Annual performance ratio (PR) calculation for solar fleet benchmarking</li>
+    <li>Weather-adjusted generation forecasts for next-day energy planning</li>
+  </ul>
+
+  <h2>Supported Equipment</h2>
+  <table>
+    <thead><tr><th>OEM</th><th>Model</th><th>Protocol</th></tr></thead>
+    <tbody>
+      <tr><td>Huawei</td><td>Sun2000 string inverters, Luna BESS</td><td>Modbus TCP</td></tr>
+      <tr><td>Sungrow</td><td>SG125HV, SG5.0RT</td><td>Modbus TCP</td></tr>
+      <tr><td>Fronius</td><td>Symo, Prato inverters</td><td>Modbus TCP</td></tr>
+      <tr><td>Generic</td><td>Any Modbus-compliant inverter or BMS</td><td>Modbus TCP</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Generation forecasting</td><td>ML-based next-day solar yield prediction using weather data and historical performance</td></tr>
+      <tr><td>BESS cycle optimization</td><td>Schedules charge/discharge to minimize electricity cost while preserving battery longevity</td></tr>
+      <tr><td>Inverter fault prediction</td><td>Detects string underperformance before it causes significant generation loss</td></tr>
+      <tr><td>Export limiting</td><td>Auto-adjusts BESS discharge to avoid grid export penalties during high-tariff periods</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Solar & BESS reads from <strong>Modbus TCP</strong> inverters and BMS. Control requires <strong>Solar Control</strong> add-on. Feeds <strong>Energy</strong>, <strong>KPI</strong>, and <strong>AI Optimization</strong>. Works with <strong>Battery Arbitrage Engine</strong> for automated discharge scheduling.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Solar & BESS Module | Building System | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>

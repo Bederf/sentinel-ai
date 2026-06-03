@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sustainability Module - SENTINEL</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; font-size: 11px; line-height: 1.5; color: #1a1a2e; padding: 20px; max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 18px; margin-bottom: 4px; color: #0f4c81; }
+    h2 { font-size: 13px; margin: 16px 0 8px; color: #0f4c81; border-bottom: 2px solid #0f4c81; padding-bottom: 4px; }
+    .subtitle { font-size: 12px; color: #666; margin-bottom: 4px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 10px; font-weight: 600; }
+    .tag-addon { background: rgba(245,158,11,0.15); color: #f59e0b; }
+    table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 10px; }
+    th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+    th { background: #f5f5f5; font-weight: 600; }
+    .feature-list { list-style: none; }
+    .feature-list li { padding: 4px 0; border-bottom: 1px solid #f0f0f0; display: flex; gap: 8px; }
+    .feature-list li::before { content: '✓'; color: #10b981; font-weight: bold; flex-shrink: 0; }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #ddd; font-size: 9px; color: #888; text-align: center; }
+    @media print { body { padding: 10px; font-size: 10px; } }
+  </style>
+</head>
+<body>
+  <h1>Sustainability Module</h1>
+  <p class="subtitle">ESG Metrics, Carbon Tracking & Sustainability Reporting</p>
+  <span class="tag tag-addon">Add-on</span>
+
+  <h2>Overview</h2>
+  <p>The Sustainability Module calculates and tracks environmental impact metrics across energy, water, waste, and transport — providing the data foundation for Green Star, BREEAM, and CSRD (Corporate Sustainability Reporting Directive) submissions. It replaces manual spreadsheet-based ESG tracking with automated, audit-ready sustainability reporting.</p>
+
+  <h2>Capabilities</h2>
+  <ul class="feature-list">
+    <li>Carbon footprint tracking — Scope 1 (gas boilers), Scope 2 (electricity), Scope 3 (tenant travel, water, waste)</li>
+    <li>Energy intensity (kWh/m²/year), water intensity (kL/m²/year), waste intensity (kg/m²/year) reporting</li>
+    <li>Green Star submission data — energy, water, transport, indoor environment category evidence</li>
+    <li>Renewable energy fraction — % of total consumption met by solar generation</li>
+    <li>Water recycling tracking — rainwater harvesting and greywater reuse volumes</li>
+    <li>Embodied carbon estimation for major equipment replacements</li>
+    <li>Net Zero pathway tracking — gap analysis against science-based targets</li>
+    <li>Tenant sustainability scorecards — shared data for tenant ESG reporting requirements</li>
+  </ul>
+
+  <h2>Carbon Scope Coverage</h2>
+  <table>
+    <thead><tr><th>Scope</th><th>Emission Source</th><th>Calculation Method</th></tr></thead>
+    <tbody>
+      <tr><td>Scope 1</td><td>Natural gas (boilers, kitchens), diesel (generators)</td><td>Direct metering (m³ or litres) × emission factor</td></tr>
+      <tr><td>Scope 2</td><td>Grid electricity, district heating/cooling</td><td>kWh × Eskom/sunicipal grid emission factor (kgCO₂/kWh)</td></tr>
+      <tr><td>Scope 3</td><td>Water supply (embodied), wastewater treatment, waste to landfill, business travel</td><td>kL × water factor, kg waste × landfill factor, km × vehicle factor</td></tr>
+    </tbody>
+  </table>
+
+  <h2>AI Features</h2>
+  <table>
+    <thead><tr><th>Feature</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td>Carbon forecasting</td><td>ML model predicts monthly carbon emissions vs. net-zero target trajectory</td></tr>
+      <tr><td>Anomaly detection</td><td>Flags sudden spikes in energy or water consumption that inflate carbon figures</td></tr>
+      <tr><td>Renewable gap analysis</td><td>Calculates additional solar/battery capacity needed to meet stated net-zero target</td></tr>
+      <tr><td>Recommendation generation</td><td>AI identifies high-ROI decarbonization opportunities ranked by cost per kgCO₂ avoided</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Integration</h2>
+  <p>Sustainability reads from <strong>Energy</strong> (electricity, gas), <strong>Water</strong> (municipal consumption), <strong>Solar</strong> (renewable generation), and <strong>Fleet ML</strong> (cross-site aggregation). Outputs to <strong>Compliance</strong> (ESG reports) and <strong>Financial</strong> (carbon tax exposure). Requires <strong>Compliance</strong> add-on for regulatory reporting.</p>
+
+  <div class="footer">
+    <strong>SENTINEL BMS Intelligence</strong> | Sustainability Module | Add-on | v1.0 | Print: Ctrl+P
+  </div>
+</body>
+</html>
