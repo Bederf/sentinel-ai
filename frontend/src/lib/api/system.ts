@@ -87,6 +87,7 @@ export interface HealthHistoryData {
 }
 
 export interface CommissioningSnapshot {
+  ingestion_mode: string;
   all_gates_passed: boolean;
   blocking_gates: string[];
   gates_passed: number;

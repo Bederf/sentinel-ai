@@ -121,7 +121,7 @@ export default function SystemHealthPage() {
       const [healthRes, historyRes, integration] = await Promise.all([
         authorizedFetch('/api/system/health'),
         authorizedFetch('/api/system/health/history?range=24h'),
-        monitoringApi.getIntegrationHealth(),
+        monitoringApi.getIntegrationHealth(selectedSiteId),
       ]);
 
       if (!healthRes.ok) throw new Error('Failed to fetch health');
@@ -451,7 +451,7 @@ export default function SystemHealthPage() {
               </div>
 
               <PhaseProgressCard
-                currentPhase={selectedSiteId === 'site-005' ? 'commissioning' : selectedSiteId === 'site-002' ? 'advisory' : 'commissioning'}
+                currentPhase={commissioning?.ingestion_mode ?? null}
                 isLoading={loading}
               />
               <CommissioningGatePanel

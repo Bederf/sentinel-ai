@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import hmac
 import json
 import logging
 import re
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
 
 from app.adapters.residential import build_adapter
@@ -543,11 +541,6 @@ async def residential_telegram_webhook(request: Request):
     from app.config.settings import settings
     from app.services.sentry.residential_onboard_service import ResidentialOnboardService
 
-    import hmac
-    from fastapi.responses import JSONResponse
-    from app.config.settings import settings
-    from app.services.sentry.residential_onboard_service import ResidentialOnboardService
-
     try:
         token = request.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
         expected = settings.home_bot_webhook_secret
@@ -555,7 +548,21 @@ async def residential_telegram_webhook(request: Request):
             return JSONResponse(status_code=401, content={"detail": "Authentication required"})
 
         body = await request.json()
+        callback = body.get("callback_query")
         message = body.get("message") or body.get("edited_message")
+
+        if callback:
+            data = callback.get("data", "")
+            cb_id = callback.get("id", "")
+            cb_msg = callback.get("message", {})
+            cb_chat_id = cb_msg.get("chat", {}).get("id")
+            if cb_chat_id and data.startswith("platform:"):
+                platform = data.split(":", 1)[1]
+                service = ResidentialOnboardService()
+                service.handle_platform_callback(int(cb_chat_id), cb_id, platform)
+                return JSONResponse(content={"status": "platform", "platform": platform})
+            return JSONResponse(content={"status": "unknown_callback"})
+
         if not message:
             return JSONResponse(content={"status": "ignored"})
 
@@ -581,10 +588,20 @@ async def residential_telegram_webhook(request: Request):
             )
             return JSONResponse(content={"status": "start"})
 
+        if text == "/connect":
+            service = ResidentialOnboardService()
+            service.handle_connect(chat_id)
+            return JSONResponse(content={"status": "connect"})
+
         state = service._state.get(chat_id)
         if state is not None:
-            service.handle_message(chat_id, text, str(user_id))
-            return JSONResponse(content={"status": "flow", "step": state.step})
+            logger.warning("WEBHOOK state step=%s text=%s", state.step, text)
+            handled = service.handle_message(chat_id, text, str(user_id))
+            logger.warning("WEBHOOK handle_message returned=%s", handled)
+            next_state = service._state.get(chat_id)
+            step = next_state.step if next_state else None
+            logger.warning("WEBHOOK next state=%s", step)
+            return JSONResponse(content={"status": "flow", "step": step})
 
         return JSONResponse(content={"status": "ok"})
 

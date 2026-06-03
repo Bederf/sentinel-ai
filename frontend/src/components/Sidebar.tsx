@@ -18,22 +18,11 @@ import {
   Brain,
   Bell,
   Plug,
-  Cpu,
-  FileText,
-  Wrench,
-  Thermometer,
-  Zap,
-  Lightbulb,
-  Sun,
-  Droplets,
-  Flame,
-  Shield,
-  Box,
-  Gauge,
-  DollarSign,
-  Leaf,
+  Link,
+  Sparkles,
 } from "lucide-react";
 import { useModules } from "../contexts/ModuleHooks";
+import { modulesApi, type ModuleDefinition } from "../lib/api/modules";
 import {
   type View,
   BASE_NAV_ITEMS,
@@ -42,6 +31,11 @@ import {
 } from "../lib/navigation";
 import type { NavItem } from "../lib/navigation";
 import { getAllowedViews, isRestrictedDemoUser } from "../lib/access-control";
+import {
+  getPlatformStatusCards,
+  getBuildingSystemCards,
+  getAddonToggleCards,
+} from "./settings/settingsCatalog";
 
 export type { View } from "../lib/navigation";
 
@@ -59,7 +53,9 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
   const [isCollapsed, setIsCollapsed] = useState(true); // Start minimized
   const [isMobile, setIsMobile] = useState(false);
 
-  const { activeModules } = useModules();
+  const { activeModules, availableModules, isModuleActive } = useModules();
+  const [expandedModule, setExpandedModule] = useState<string | null>(null);
+  const [moduleDefinitions, setModuleDefinitions] = useState<ModuleDefinition[]>([]);
   const aboutBtnRef = useRef<HTMLDivElement>(null);
 
   // Detect mobile screen size
@@ -69,6 +65,15 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
     window.addEventListener('resize', checkMobile);
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
+
+  // Fetch full module definitions with capabilities/AI features on mount
+  useEffect(() => {
+    modulesApi.getAvailableModules().then(setModuleDefinitions).catch(() => {});
+  }, []);
+
+  const handleModuleClick = (moduleType: string) => {
+    setExpandedModule(prev => prev === moduleType ? null : moduleType);
+  };
 
   const isAdmin = userRole === 'admin';
   const isDemoUser = userEmail ? isRestrictedDemoUser(userEmail) : false;
@@ -189,7 +194,8 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
   };
 
   // Module icon mapping for About section \u2014 Lucide icons with aria-label text equivalents
-  const moduleIcons: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string }> = {
+  // (kept for future use when icons are added back to pills)
+  const _moduleIcons: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string }> = {
     kpi:               { icon: Activity,    label: "KPI" },
     ml:                { icon: Brain,       label: "ML" },
     notifications:     { icon: Bell,        label: "Notifications" },
@@ -390,43 +396,204 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
                     </p>
                   </div>
 
-                  <div>
+                  {/* Platform modules — always active */}
+                  <div className="mb-3">
                     <div
-                      className="font-medium mb-1"
-                      style={{ color: "var(--color-sentinel-text-primary)" }}
+                      className="text-[10px] font-medium uppercase tracking-wider mb-1"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
                     >
-                      Active Modules
+                      Platform
                     </div>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeModules.length > 0 ? (
-                        activeModules
-                          .filter((m) => m.status === "active")
-                          .map((mod) => (
-                            <span
-                              key={mod.module_type}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium"
-                              style={{
-                                background: 'color-mix(in oklch, var(--color-sentinel-amber) 12%, transparent)',
-                                border: '1px solid color-mix(in oklch, var(--color-sentinel-amber) 30%, transparent)',
-                                color: 'var(--color-sentinel-amber)',
-                              }}
-                              aria-label={moduleIcons[mod.module_type]?.label ?? mod.module_type}
-                            >
-                              {(() => {
-                                const entry = moduleIcons[mod.module_type] ?? { icon: Gauge, label: mod.module_type };
-                                const Icon = entry.icon;
-                                return <Icon className="w-3 h-3" aria-hidden="true" />;
-                              })()}
-                              {mod.module_type.toUpperCase()}
-                            </span>
-                          ))
-                      ) : (
-                        <span style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                          No modules active
-                        </span>
-                      )}
+                    <div className="flex flex-wrap gap-1">
+                      {getPlatformStatusCards(availableModules).map((card) => {
+                        const active = isModuleActive(card.moduleType);
+                        const expanded = expandedModule === card.moduleType;
+                        return (
+                          <button
+                            key={card.id}
+                            onClick={() => handleModuleClick(card.moduleType)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-opacity hover:opacity-80"
+                            style={{
+                              background: active
+                                ? 'color-mix(in oklch, var(--color-sentinel-green) 15%, transparent)'
+                                : 'color-mix(in oklch, var(--color-sentinel-text-disabled) 10%, transparent)',
+                              border: `1px solid ${active ? 'color-mix(in oklch, var(--color-sentinel-green) 40%, transparent)' : '1px solid var(--glass-border)'}`,
+                              color: active ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-text-disabled)',
+                              cursor: 'pointer',
+                            }}
+                            title={card.description}
+                            aria-expanded={expanded}
+                          >
+                            {card.label}
+                            {active && <span className="text-[8px]">✓</span>}
+                            {expanded && <ChevronDown className="h-3 w-3" />}
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
+
+                  {/* Building systems — monitoring always on, control toggleable */}
+                  <div className="mb-3">
+                    <div
+                      className="text-[10px] font-medium uppercase tracking-wider mb-1"
+                      style={{ color: "var(--color-sentinel-text-disabled)" }}
+                    >
+                      Building Systems
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {getBuildingSystemCards(availableModules).map((card) => {
+                        const active = isModuleActive(card.baseModule);
+                        const controlActive = card.controlModule ? isModuleActive(card.controlModule) : false;
+                        const expanded = expandedModule === card.baseModule;
+                        return (
+                          <button
+                            key={card.id}
+                            onClick={() => handleModuleClick(card.baseModule)}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-opacity hover:opacity-80"
+                            style={{
+                              background: active
+                                ? 'color-mix(in oklch, var(--color-sentinel-amber) 12%, transparent)'
+                                : 'color-mix(in oklch, var(--color-sentinel-text-disabled) 10%, transparent)',
+                              border: `1px solid ${active ? 'color-mix(in oklch, var(--color-sentinel-amber) 30%, transparent)' : '1px solid var(--glass-border)'}`,
+                              color: active ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-text-disabled)',
+                              cursor: 'pointer',
+                            }}
+                            title={`${card.description}${controlActive ? ' • Control ON' : ''}`}
+                            aria-expanded={expanded}
+                          >
+                            {card.label}
+                            {controlActive && <span className="text-[8px]" title="Control active">◉</span>}
+                            {!active && <span className="text-[8px]">○</span>}
+                            {expanded && <ChevronDown className="h-3 w-3" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Add-ons — optional, user-toggled */}
+                  {getAddonToggleCards(availableModules).length > 0 && (
+                    <div className="mb-1">
+                      <div
+                        className="text-[10px] font-medium uppercase tracking-wider mb-1"
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
+                      >
+                        Add-ons
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {getAddonToggleCards(availableModules).map((card) => {
+                          const active = isModuleActive(card.moduleType);
+                          const expanded = expandedModule === card.moduleType;
+                          return (
+                            <button
+                              key={card.id}
+                              onClick={() => handleModuleClick(card.moduleType)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium transition-opacity hover:opacity-80"
+                              style={{
+                                background: active
+                                  ? 'color-mix(in oklch, rgb(168, 85, 247) 15%, transparent)'
+                                  : 'color-mix(in oklch, var(--color-sentinel-text-disabled) 10%, transparent)',
+                                border: `1px solid ${active ? 'color-mix(in oklch, rgb(168, 85, 247) 40%, transparent)' : '1px solid var(--glass-border)'}`,
+                                color: active ? 'rgb(168, 85, 247)' : 'var(--color-sentinel-text-disabled)',
+                                cursor: 'pointer',
+                              }}
+                              title={card.description}
+                              aria-expanded={expanded}
+                            >
+                              {card.label}
+                              {!active && <span className="text-[8px]">○</span>}
+                              {expanded && <ChevronDown className="h-3 w-3" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Expanded module detail panel */}
+                  {expandedModule && (() => {
+                    const mod = moduleDefinitions.find(m => m.module_type === expandedModule);
+                    if (!mod) return null;
+                    const hasDetails = (mod.capabilities?.length ?? 0) > 0 ||
+                      (mod.ai_features?.length ?? 0) > 0 ||
+                      (mod.integrates_with?.length ?? 0) > 0;
+                    if (!hasDetails) return null;
+                    return (
+                      <div
+                        className="mt-2 p-3 rounded-lg"
+                        style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--glass-border)' }}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-xs font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                            {mod.name}
+                          </h4>
+                          <button
+                            onClick={() => setExpandedModule(null)}
+                            className="text-[10px] px-2 py-0.5 rounded"
+                            style={{ color: 'var(--color-sentinel-text-secondary)', background: 'transparent' }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <p className="text-[10px] mb-2" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                          {mod.description}
+                        </p>
+                        {mod.capabilities && mod.capabilities.length > 0 && (
+                          <div className="mb-2">
+                            <h5 className="text-[10px] font-semibold mb-1" style={{ color: 'var(--color-sentinel-text-primary)' }}>Capabilities</h5>
+                            <div className="space-y-0.5">
+                              {mod.capabilities.map(cap => (
+                                <div key={cap.id} className="flex items-start gap-1.5">
+                                  <div className="h-1 w-1 rounded-full mt-1.5 flex-shrink-0" style={{ background: 'var(--color-sentinel-green)' }} />
+                                  <span className="text-[10px]" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+                                    <span style={{ color: 'var(--color-sentinel-text-primary)', fontWeight: 500 }}>{cap.name}</span>
+                                    {' — '}{cap.description}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {mod.ai_features && mod.ai_features.length > 0 && (
+                          <div className="mb-2">
+                            <h5 className="text-[10px] font-semibold mb-1 flex items-center gap-1" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                              <Sparkles className="h-3 w-3" style={{ color: 'rgb(168, 85, 247)' }} /> AI Features
+                            </h5>
+                            <div className="flex flex-wrap gap-1">
+                              {mod.ai_features.map(feat => (
+                                <span
+                                  key={feat}
+                                  className="text-[9px] px-1.5 py-0.5 rounded-full"
+                                  style={{ background: 'rgba(168, 85, 247, 0.15)', color: 'rgb(168, 85, 247)' }}
+                                >
+                                  {feat.replace(/_/g, ' ')}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {mod.integrates_with && mod.integrates_with.length > 0 && (
+                          <div>
+                            <h5 className="text-[10px] font-semibold mb-1 flex items-center gap-1" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                              <Link className="h-3 w-3" style={{ color: 'var(--color-sentinel-blue)' }} /> Integrates With
+                            </h5>
+                            <div className="flex flex-wrap gap-1">
+                              {mod.integrates_with.map(intMod => (
+                                <span
+                                  key={intMod}
+                                  className="text-[9px] px-1.5 py-0.5 rounded-full"
+                                  style={{ background: 'rgba(59, 130, 246, 0.1)', color: 'var(--color-sentinel-blue)' }}
+                                >
+                                  {intMod.replace(/_/g, ' ')}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div>
                     <div
@@ -467,25 +634,55 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
                       className="font-medium mb-2"
                       style={{ color: "var(--color-sentinel-text-primary)" }}
                     >
-                      Quick Links
+                      Module Docs
                     </div>
-                    <a
-                      href="/docs/sentinel-equipment-reference.html"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 py-1 px-2 rounded transition-colors hover:bg-opacity-50"
-                      style={{
-                        color: "var(--color-sentinel-text-secondary)",
-                        background: "transparent",
-                      }}
-                      onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-sentinel-bg-panel)"}
-                      onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
-                    >
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                      </svg>
-                      <span>Equipment Reference</span>
-                    </a>
+                    {[
+                      // Platform
+                      { label: "Equipment Reference", href: "/docs/sentinel-equipment-reference.html" },
+                      { label: "KPI", href: "/docs/kpi.html" },
+                      { label: "ML", href: "/docs/ml.html" },
+                      { label: "Notifications", href: "/docs/notifications.html" },
+                      { label: "Integrations", href: "/docs/integrations.html" },
+                      { label: "SIMBIOT", href: "/docs/simbiot.html" },
+                      { label: "Logging", href: "/docs/logging.html" },
+                      { label: "Assets", href: "/docs/assets.html" },
+                      // Building Systems
+                      { label: "HVAC", href: "/docs/hvac.html" },
+                      { label: "Energy", href: "/docs/energy.html" },
+                      { label: "Lighting", href: "/docs/lighting.html" },
+                      { label: "Solar & BESS", href: "/docs/solar.html" },
+                      { label: "Water", href: "/docs/water.html" },
+                      { label: "Fire", href: "/docs/fire.html" },
+                      { label: "Security", href: "/docs/security.html" },
+                      { label: "Digital Twin", href: "/docs/digital-twin.html" },
+                      // Add-ons
+                      { label: "Maintenance", href: "/docs/maintenance.html" },
+                      { label: "Financial", href: "/docs/financial.html" },
+                      { label: "Compliance", href: "/docs/compliance.html" },
+                      { label: "Fleet ML", href: "/docs/fleet-ml.html" },
+                      { label: "Block Booking", href: "/docs/block-booking.html" },
+                      { label: "Space Optimization", href: "/docs/space-optimization.html" },
+                      { label: "Sustainability", href: "/docs/sustainability.html" },
+                    ].map((link) => (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 py-0.5 px-2 rounded transition-colors hover:bg-opacity-50"
+                        style={{
+                          color: "var(--color-sentinel-text-secondary)",
+                          background: "transparent",
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = "var(--color-sentinel-bg-panel)"}
+                        onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}
+                      >
+                        <svg className="h-3 w-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span style={{ fontSize: "10px" }}>{link.label}</span>
+                      </a>
+                    ))}
                   </div>
 
                   <div

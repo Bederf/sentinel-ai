@@ -625,7 +625,7 @@ class NotificationService:
                 technician = await tech_repo.get_technician_for_equipment_code(equipment_code)
                 if technician:
                     tech_name = technician.get("name", "Unassigned")
-                    tech_telegram_id = technician.get("telegram_chat_id") or technician.get("telegram_id")
+                    tech_telegram_id = technician.get("telegram_id") or technician.get("telegram_chat_id")
                     tech_email = technician.get("email")
                     assigned_to = tech_name
                     assigned_team = technician.get("specialty")
@@ -788,17 +788,6 @@ class NotificationService:
                     "prediction_id": prediction_id,
                     "site_id": site_id,
                 }
-
-            # Build prediction dict for trigger engine
-            prediction_dict = {
-                "id": prediction.get("id"),
-                "code": prediction.get("code"),
-                "prediction_type": prediction.get("prediction_type"),
-                "probability_percent": prediction.get("probability_percent", 0),
-                "severity": prediction.get("severity"),
-                "recommended_action": prediction.get("recommended_action", ""),
-                "site_id": site_id,
-            }
 
             # Use the workflow trigger engine (same path as auto-trigger for critical predictions)
             engine = get_trigger_engine()
@@ -997,8 +986,6 @@ class NotificationService:
         Mirrors slash_command_router._notify_technician for work orders created
         from AI advisory button presses.
         """
-        code_underscored = equipment_code.replace("-", "_")
-
         # --- Telegram via sentry CLI ---
         if tech_telegram_id:
             from app.services.telegram_message_sender import get_telegram_sender

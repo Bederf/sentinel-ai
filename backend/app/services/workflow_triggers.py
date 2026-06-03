@@ -11,6 +11,7 @@ Automated triggers that connect the workflow systems:
 Phase 53-02: Automated Triggers & Workflow Automation
 """
 
+import asyncio
 import logging
 from datetime import datetime, timedelta
 from enum import StrEnum
@@ -786,6 +787,17 @@ class WorkflowTriggerEngine:
                 f"Work order {work_order_code} created automatically."
             )
 
+            # 7. Notify the assigned technician (if work order was created)
+            await self._notify_technician_for_work_order(
+                work_order_id=work_order_id,
+                work_order_code=work_order_code,
+                equipment_id=equipment_id,
+                equipment_code=equipment_code,
+                site_id=created_wo.get("site_id") or getattr(self, '_site_id', None),
+                priority=priority,
+                description=description,
+            )
+
             result = TriggerResult(
                 success=True,
                 trigger_type=TriggerType.PREDICTION_CRITICAL,
@@ -1289,6 +1301,86 @@ class WorkflowTriggerEngine:
         """Send alert notification."""
         # Log locally until notification service integration is wired in
         logger.info(f"ALERT: {message}")
+
+    async def _notify_technician_for_work_order(
+        self,
+        work_order_id: str,
+        work_order_code: str,
+        equipment_id: str,
+        equipment_code: str | None,
+        site_id: str | None,
+        priority: str,
+        description: str,
+    ):
+        """Notify the assigned technician when a work order is created.
+
+        Looks up the technician by equipment code (which includes site context),
+        then sends Telegram + email notifications via WorkOrderNotifier.
+        """
+        try:
+            from app.database.repositories.technician_repository import TechnicianRepository
+            from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+            # Resolve site_id from equipment if not provided
+            resolved_site_id = site_id
+            if not resolved_site_id and equipment_code:
+                try:
+                    from app.database.repositories.equipment_repository import get_equipment_repository
+                    eq_repo = get_equipment_repository()
+                    # get_by_id handles both UUID and code — tries UUID first, then code fallback
+                    eq = eq_repo.get_by_id(equipment_code)
+                    if eq:
+                        resolved_site_id = eq.get("site_id")
+                except Exception:
+                    pass
+
+            # Get the assigned technician for this equipment/site
+            tech_repo = TechnicianRepository()
+            technician = None
+            if equipment_code:
+                technician = await tech_repo.get_technician_for_equipment_code(equipment_code)
+
+            # Fallback: try by equipment_id if technician not found by code
+            if not technician and equipment_id:
+                try:
+                    technician = await tech_repo.get_technician_for_equipment(equipment_id)
+                except Exception:
+                    pass
+
+            if not technician:
+                logger.warning(
+                    f"[_notify_technician] No technician found for WO {work_order_code} "
+                    f"(equipment={equipment_code}, equipment_id={equipment_id})"
+                )
+                return
+
+            tech_name = technician.get("name", "Technician")
+            tech_telegram_id = technician.get("telegram_id") or technician.get("telegram_chat_id")
+            tech_email = technician.get("email")
+
+            notifier = WorkOrderNotifier()
+            wo_notify_data = {
+                "work_order_id": work_order_id,
+                "code": work_order_code,
+                "site_id": resolved_site_id,
+                "equipment_id": equipment_id,
+                "equipment_code": equipment_code,
+                "equipment_name": equipment_code or equipment_id,
+                "criticality": priority.upper(),
+                "service_type": "callout",
+                "technician_id": tech_telegram_id,
+                "technician_name": tech_name,
+                "description": description,
+                "technician_email": tech_email,
+                "create_service_record": True,
+            }
+            asyncio.create_task(notifier.notify_technician(wo_notify_data))
+            logger.info(
+                f"[_notify_technician] Notification dispatched for WO {work_order_code} "
+                f"to {tech_name} ({tech_telegram_id})"
+            )
+        except Exception as e:
+            logger.warning(f"[_notify_technician] Failed to notify technician for WO {work_order_code}: {e}")
 
     async def _record_event(
         self,

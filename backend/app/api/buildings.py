@@ -432,6 +432,19 @@ async def list_sites(request: Request) -> dict:
     inactive = []
 
     for site_id in loader.get_active_site_ids():
+        # Verify site exists in Supabase before including it.
+        # A site in the registry but missing from Supabase should be excluded
+        # rather than causing errors downstream (404 on /optimization/status/site-003, etc.)
+        try:
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            site_check = client.table("sites").select("code").eq("code", site_id).limit(1).execute()
+            if not site_check.data:
+                logger.debug(f"Skipping {site_id} — in registry but not in Supabase")
+                continue
+        except Exception:
+            pass
+
         building = loader.get_site(site_id)
         if building:
             # Check if user has access to this building
@@ -610,7 +623,11 @@ async def update_building_config(
     changes: dict = {}
     updates: dict = {}
 
-    # Direct column fields
+    # Direct column fields — all map to real sites table columns
+    # Sites table columns: code, name, address, region, type, sqm, floors (int), year_built,
+    #   operating_hours, latitude, longitude, contact_phone, contact_email, display_name,
+    #   occupancy_capacity, total_desks, parking_bays, features (JSONB), floor_labels (TEXT[]),
+    #   optimization_enabled, optimization_settings (JSONB), onboarding_phase, etc.
     if config.name is not None:
         changes["name"] = {"old": current.get("name"), "new": config.name}
         updates["name"] = config.name
@@ -623,12 +640,12 @@ async def update_building_config(
     if config.building_type is not None:
         changes["type"] = {"old": current.get("type"), "new": config.building_type}
         updates["type"] = config.building_type
-    if config.floors is not None:
-        changes["floor_labels"] = {"old": current.get("floor_labels"), "new": config.floors}
-        updates["floor_labels"] = config.floors
     if config.sqm is not None:
         changes["sqm"] = {"old": current.get("sqm"), "new": config.sqm}
         updates["sqm"] = config.sqm
+    if config.floors is not None:
+        changes["floor_labels"] = {"old": current.get("floor_labels"), "new": config.floors}
+        updates["floor_labels"] = config.floors
     if config.occupancy_capacity is not None:
         changes["occupancy_capacity"] = {"old": current.get("occupancy_capacity"), "new": config.occupancy_capacity}
         updates["occupancy_capacity"] = config.occupancy_capacity
@@ -641,8 +658,7 @@ async def update_building_config(
     if config.features is not None:
         changes["features"] = {"old": current.get("features"), "new": config.features}
         updates["features"] = config.features
-
-    # Contacts
+    # contacts: facility_manager -> metadata.contacts, email -> contact_email, emergency -> contact_phone
     if config.contacts is not None:
         fm = config.contacts.get("facility_manager")
         email = config.contacts.get("email")
@@ -653,14 +669,10 @@ async def update_building_config(
         if emergency is not None:
             updates["contact_phone"] = emergency
             changes["contact_phone"] = {"old": current.get("contact_phone"), "new": emergency}
-        # Store facility_manager and other contacts as JSON in metadata
+        # Store facility_manager as JSON in metadata
         contacts_meta = {}
         if fm is not None:
             contacts_meta["facility_manager"] = fm
-        if email is not None:
-            contacts_meta["email"] = email
-        if emergency is not None:
-            contacts_meta["emergency"] = emergency
         if contacts_meta:
             existing_meta = current.get("metadata") or {}
             if isinstance(existing_meta, str):
@@ -668,20 +680,11 @@ async def update_building_config(
 
                 try:
                     existing_meta = _json.loads(existing_meta)
-                except:
+                except Exception:
                     existing_meta = {}
             existing_meta["contacts"] = contacts_meta
             updates["metadata"] = existing_meta
             changes["metadata.contacts"] = {"old": None, "new": contacts_meta}
-        if config.contacts.get("email") is not None:
-            updates["contact_email"] = config.contacts["email"]
-            changes["contact_email"] = {"old": current.get("contact_email"), "new": config.contacts["email"]}
-        if config.contacts.get("emergency") is not None:
-            updates["contact_phone"] = config.contacts["emergency"]
-            changes["contact_phone"] = {
-                "old": current.get("contact_phone"),
-                "new": config.contacts["emergency"],
-            }
 
     # Optimization settings stored in optimization_settings JSONB
     current_opt = current.get("optimization_settings") or {}
@@ -1469,8 +1472,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                 elif health < 80:
                     status = "warning"
 
-            operating_data = {}
-            capability_sync = {}
+            
             synced_controllable = None
             inferred_controllable = _is_device_controllable(eq.get("code", eq.get("id", "")), {})
             is_simulated_sync = False
