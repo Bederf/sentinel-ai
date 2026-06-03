@@ -339,6 +339,12 @@ class DeviceManager:
         from app.config.settings import settings
         from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
 
+        # Lazy import KNX adapter
+        try:
+            from app.services.knx.knx_adapter import KNXAdapter
+        except ImportError:
+            KNXAdapter = None
+
         production_island = False
 
         # Lazy-load SimulatedDeviceAdapter (removable with bms_simulator/)
@@ -353,6 +359,7 @@ class DeviceManager:
             pass
         adapter_map: dict = {
             "bacnet": NiagaraBACnetAdapter,
+            "knx": KNXAdapter,
             # Future: "modbus": ModbusDeviceAdapter,
         }
         if SimulatedDeviceAdapter is not None:

@@ -47,9 +47,10 @@ class ProtocolType(Enum):
     """Communication protocols supported."""
 
     BACNET = "bacnet"
+    HTTP = "http"
+    KNX = "knx"
     MODBUS = "modbus"
     MOCK = "mock"
-    HTTP = "http"
     MQTT = "mqtt"
 
 
