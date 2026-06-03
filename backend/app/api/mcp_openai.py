@@ -358,9 +358,12 @@ async def openai_connector_stats():
     return JSONResponse(content=server.get_stats(), headers=CORS_HEADERS)
 
 
-@router.post("/refresh")
-async def openai_connector_refresh():
-    """Force refresh the document index."""
+@router.post("/refresh", include_in_schema=False)
+async def openai_connector_refresh(authorization: str | None = Header(default=None, alias="Authorization")):
+    """Force refresh the document index. Requires Bearer auth."""
+    ok, err = _require_bearer_auth(authorization)
+    if not ok:
+        return err
     server = get_openai_connector_server()
     server.refresh_index()
     return JSONResponse(content={"status": "refreshed", "stats": server.get_stats()}, headers=CORS_HEADERS)
@@ -649,8 +652,40 @@ async def openapi_json():
 # =============================================================================
 
 
-async def _tool_endpoint(tool_name: str, request_data: dict | None) -> JSONResponse:
-    """Generic handler for all OpenAPI tool endpoints."""
+def _require_bearer_auth(authorization: str | None) -> tuple[bool, JSONResponse | None]:
+    """Check Bearer auth. Returns (ok, error_response). If ok=True, caller proceeds."""
+    from app.config.settings import settings
+    expected_key = getattr(settings, "mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
+    if not expected_key:
+        logger.error("MCP API key not configured — auth disabled")
+        return True, None  # Allow when key not configured
+    if not authorization:
+        return False, JSONResponse(
+            status_code=401,
+            content={"error": "Missing Authorization: Bearer header"},
+            headers=CORS_HEADERS,
+        )
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        return False, JSONResponse(
+            status_code=401,
+            content={"error": "Authorization must be: Bearer <api-key>"},
+            headers=CORS_HEADERS,
+        )
+    if token != expected_key:
+        return False, JSONResponse(
+            status_code=401,
+            content={"error": "Invalid API key"},
+            headers=CORS_HEADERS,
+        )
+    return True, None
+
+
+async def _tool_endpoint(tool_name: str, request_data: dict | None, authorization: str | None = None) -> JSONResponse:
+    """Generic handler for all OpenAPI tool endpoints. Requires Bearer auth."""
+    ok, err = _require_bearer_auth(authorization)
+    if not ok:
+        return err
     server = get_openai_connector_server()
     try:
         result = await server.call_tool(tool_name, **(request_data or {}))
@@ -664,97 +699,110 @@ async def _tool_endpoint(tool_name: str, request_data: dict | None) -> JSONRespo
         )
 
 
+# =============================================================================
+# OpenAPI Tool Endpoints (GPT Actions / no-auth MCP clients — requires Bearer auth)
+# =============================================================================
+
+
+def _tool_endpoint_with_auth(tool_name: str):
+    """Decorator factory: creates auth-gated tool endpoint."""
+    async def wrapper(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+        body = await request.json() if request.body else {}
+        return await _tool_endpoint(tool_name, body, authorization)
+    return wrapper
+
+
 @router.post("/search", include_in_schema=False)
-async def tool_search(request: Request):
+async def tool_search(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("search", body)
+    return await _tool_endpoint("search", body, authorization)
 
 
 @router.post("/fetch", include_in_schema=False)
-async def tool_fetch(request: Request):
+async def tool_fetch(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("fetch", body)
+    return await _tool_endpoint("fetch", body, authorization)
 
 
 @router.post("/get_site_status", include_in_schema=False)
-async def tool_get_site_status(request: Request):
+async def tool_get_site_status(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_site_status", body)
+    return await _tool_endpoint("get_site_status", body, authorization)
 
 
 @router.post("/get_recommendations", include_in_schema=False)
-async def tool_get_recommendations(request: Request):
+async def tool_get_recommendations(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_recommendations", body)
+    return await _tool_endpoint("get_recommendations", body, authorization)
 
 
 @router.post("/trace_recommendation", include_in_schema=False)
-async def tool_trace_recommendation(request: Request):
+async def tool_trace_recommendation(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("trace_recommendation", body)
+    return await _tool_endpoint("trace_recommendation", body, authorization)
 
 
 @router.post("/inspect_equipment", include_in_schema=False)
-async def tool_inspect_equipment(request: Request):
+async def tool_inspect_equipment(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("inspect_equipment", body)
+    return await _tool_endpoint("inspect_equipment", body, authorization)
 
 
 @router.post("/get_roi_summary", include_in_schema=False)
-async def tool_get_roi_summary(request: Request):
+async def tool_get_roi_summary(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_roi_summary", body)
+    return await _tool_endpoint("get_roi_summary", body, authorization)
 
 
 @router.post("/analyze_impact", include_in_schema=False)
-async def tool_analyze_impact(request: Request):
+async def tool_analyze_impact(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("analyze_impact", body)
+    return await _tool_endpoint("analyze_impact", body, authorization)
 
 
 @router.post("/compare_sites", include_in_schema=False)
-async def tool_compare_sites(request: Request):
+async def tool_compare_sites(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("compare_sites", body)
+    return await _tool_endpoint("compare_sites", body, authorization)
 
 
 @router.post("/get_curtailable_load", include_in_schema=False)
-async def tool_get_curtailable_load(request: Request):
+async def tool_get_curtailable_load(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_curtailable_load", body)
+    return await _tool_endpoint("get_curtailable_load", body, authorization)
 
 
 @router.post("/get_odse_export", include_in_schema=False)
-async def tool_get_odse_export(request: Request):
+async def tool_get_odse_export(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_odse_export", body)
+    return await _tool_endpoint("get_odse_export", body, authorization)
 
 
 @router.post("/search_knowledge", include_in_schema=False)
-async def tool_search_knowledge(request: Request):
+async def tool_search_knowledge(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("search_knowledge", body)
+    return await _tool_endpoint("search_knowledge", body, authorization)
 
 
 @router.post("/get_knowledge_detail", include_in_schema=False)
-async def tool_get_knowledge_detail(request: Request):
+async def tool_get_knowledge_detail(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_knowledge_detail", body)
+    return await _tool_endpoint("get_knowledge_detail", body, authorization)
 
 
 @router.post("/get_work_orders", include_in_schema=False)
-async def tool_get_work_orders(request: Request):
+async def tool_get_work_orders(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_work_orders", body)
+    return await _tool_endpoint("get_work_orders", body, authorization)
 
 
 @router.post("/get_work_order", include_in_schema=False)
-async def tool_get_work_order(request: Request):
+async def tool_get_work_order(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json()
-    return await _tool_endpoint("get_work_order", body)
+    return await _tool_endpoint("get_work_order", body, authorization)
 
 
 @router.post("/ping", include_in_schema=False)
-async def tool_ping(request: Request):
+async def tool_ping(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
     body = await request.json() if request.body else {}
-    return await _tool_endpoint("ping", body)
+    return await _tool_endpoint("ping", body, authorization)
