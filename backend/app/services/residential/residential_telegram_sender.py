@@ -69,6 +69,7 @@ class ResidentialTelegramSender:
         chat_id: int,
         text: str,
         reply_markup: dict | None = None,
+        reply_to_message_id: int | None = None,
     ) -> bool:
         """Send a plain text message. Returns True on success, False on failure."""
         if not self._is_configured():
@@ -79,6 +80,8 @@ class ResidentialTelegramSender:
             "text": text,
             "parse_mode": "HTML",
         }
+        if reply_to_message_id is not None:
+            payload["reply_to_message_id"] = reply_to_message_id
         if reply_markup:
             payload["reply_markup"] = reply_markup
 

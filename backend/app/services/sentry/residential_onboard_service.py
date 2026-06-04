@@ -75,7 +75,7 @@ def _send(
 ) -> dict | None:
     """Send text via ResidentialTelegramSender. Runs async send_text synchronously."""
     try:
-        ok = asyncio.run(_sender.send_text(chat_id, text, reply_markup=reply_markup))
+        ok = asyncio.run(_sender.send_text(chat_id, text, reply_markup=reply_markup, reply_to_message_id=_reply_to_message_id))
         return {"ok": ok}
     except Exception as exc:
         logger.error("Telegram send failed: %s", exc)
@@ -175,6 +175,17 @@ class ResidentialOnboardService:
         elif step == AWAITING_HA_PUBLIC_KEY:
             return self._handle_ha_public_key_text(chat_id, text, state)
         elif step == DISCOVERING:
+            # Idempotency guard: if site is already active in DB, skip duplicate processing
+            site_id = state.data.get("site_id", f"res-{chat_id}")
+            try:
+                supabase = get_supabase_client()
+                existing = supabase.table("residential_sites").select("id").eq("site_id", site_id).eq("is_active", True).execute()
+                if existing.data:
+                    logger.info("DISCOVERING duplicate skipped for site_id=%s", site_id)
+                    self._state.clear(chat_id)
+                    return True
+            except Exception as exc:
+                logger.warning("Idempotency check failed for chat_id=%s: %s", chat_id, exc)
             # Password just submitted — trigger DB write + MQTT provisioning
             result = self.handle_discover_and_onboard(chat_id)
             _send(chat_id, result)
