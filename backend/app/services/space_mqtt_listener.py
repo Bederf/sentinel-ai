@@ -264,7 +264,6 @@ class SpaceMqttListener:
                         time.sleep(5)
                         try:
                             client.reconnect()
-                            client.loop_start()
                         except Exception as exc:
                             logger.error("Space MQTT reconnect failed: %s", exc)
 

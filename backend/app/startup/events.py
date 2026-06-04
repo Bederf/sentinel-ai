@@ -362,7 +362,7 @@ async def startup_event(app: FastAPI) -> None:
     # Phase 209: RAG documentation sync — every 12h, incrementally updates changed docs
     scheduler_service.add_rag_doc_sync_job(interval_hours=12)
 
-    # Optional ESP32 MQTT listener for room-presence nodes
+    # ESP32 MQTT listener for room-presence nodes (LD2410C radar)
     from app.services.space_mqtt_listener import get_space_mqtt_listener
 
     _logger.warning("SHADOW_DEBUG: about to start Space MQTT listener")

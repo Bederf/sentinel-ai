@@ -1959,7 +1959,7 @@ Use these patterns to anticipate conditions, not just react to them.
 If a pattern suggests a zone will empty soon, recommend action now.
 """
 
-    def _format_full_context(self, conditions: dict) -> str:
+    def _format_full_context(self, conditions: dict, energy_prices: dict | None = None) -> str:
         """Layer 2B — Full building telemetry context block."""
         blocks = []
 
@@ -1986,6 +1986,22 @@ Total site load: {elec.get("total_kw", "?")} kW
 HVAC load: {elec.get("hvac_kw", "?")} kW
 Lighting load: {elec.get("lighting_kw", "?")} kW
 Solar generating: {elec.get("solar_kw", "?")} kW""")
+
+        # Demand management context — NMD and demand charge from site contract
+        ep = energy_prices or {}
+        nmd_kva = ep.get("nmd_kva")
+        demand_rate = ep.get("demand_charge_per_kva", 155.50)
+        if nmd_kva:
+            current_kva = elec.get("demand_kva", "?") if elec else "?"
+            pct = f"{round(float(current_kva) / nmd_kva * 100, 1)}%" if isinstance(current_kva, (int, float)) else "?"
+            blocks.append(f"""DEMAND MANAGEMENT:
+NMD limit: {nmd_kva} kVA (contracted maximum demand)
+Demand charge: R{demand_rate}/kVA/month
+Current demand: {current_kva} kVA ({pct} of NMD)
+Warning threshold: 85% of NMD = {round(nmd_kva * 0.85)} kVA
+If demand exceeds NMD: demand ratchet triggers minimum billing at {nmd_kva} kVA
+for 12 consecutive months regardless of actual consumption.""")
+
         ipmvp = conditions.get("ipmvp")
         if ipmvp:
             blocks.append(f"""IPMVP BASELINE:
@@ -2206,7 +2222,7 @@ LAYER 2 — WASTE OPPORTUNITIES (pre-computed)
         layer2b = f"""=================================================================
 LAYER 2B — FULL BUILDING TELEMETRY
 =================================================================
-{self._format_full_context(current_conditions)}"""
+{self._format_full_context(current_conditions, energy_prices)}"""
 
         # LAYER 3 — LEARNED PATTERNS
         layer3 = f"""=================================================================
