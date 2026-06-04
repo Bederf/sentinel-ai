@@ -650,5 +650,7 @@ async def residential_telegram_webhook(request: Request):
         return JSONResponse(content={"status": "ok"})
 
     except Exception:
-        logger.exception("webhook error")
-        return JSONResponse(status_code=500, content={"status": "error"})
+        import traceback
+        tb = traceback.format_exc()
+        logger.exception("webhook error: %s", tb)
+        return JSONResponse(status_code=500, content={"status": "error", "detail": tb[:500]})
