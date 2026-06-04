@@ -616,7 +616,8 @@ async def residential_telegram_webhook(request: Request):
 
         if text == "/connect":
             result = service.handle_connect(chat_id)
-            _send(chat_id, result)
+            sender = ResidentialTelegramSender()
+            await sender.send_text(chat_id, result)
             return JSONResponse(content={"status": "connect"})
 
         if text == "/hapeer_ready":
@@ -632,16 +633,9 @@ async def residential_telegram_webhook(request: Request):
             return JSONResponse(content={"status": "ha_ready"})
 
         if text == "/start":
-            from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
-
             sender = ResidentialTelegramSender()
             await sender.send_text(chat_id, "Welcome to SENTINEL Home!\n\nSend /connect to link your solar system.")
             return JSONResponse(content={"status": "start"})
-
-        if text == "/connect":
-            result = service.handle_connect(chat_id)
-            _send(chat_id, result)
-            return JSONResponse(content={"status": "connect"})
 
         state = service._state.get(chat_id)
         if state is not None:
