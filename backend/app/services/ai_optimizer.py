@@ -1023,8 +1023,7 @@ class AIOptimizerService:
 
                 # Check whether any non-temperature sensor has real readings
                 has_real_iaq_sensors = any(
-                    comp.get("value") is not None
-                    and comp.get("component") not in ("temperature", "temp")
+                    comp.get("value") is not None and comp.get("component") not in ("temperature", "temp")
                     for zone in zones_raw
                     for comp in (zone.components or [])
                 )
@@ -1032,12 +1031,8 @@ class AIOptimizerService:
                 if has_real_iaq_sensors:
                     conditions["iaq"] = {
                         zone.zone_id: {
-                            "co2_ppm": next(
-                                (c.value for c in zone.components if c.component == "co2"), None
-                            ),
-                            "humidity_pct": next(
-                                (c.value for c in zone.components if c.component == "humidity"), None
-                            ),
+                            "co2_ppm": next((c.value for c in zone.components if c.component == "co2"), None),
+                            "humidity_pct": next((c.value for c in zone.components if c.component == "humidity"), None),
                             "iaq_score": zone.iaq_score,
                             "status": zone.status,
                             "zone_name": zone.zone_name,
@@ -1047,8 +1042,7 @@ class AIOptimizerService:
                         if zone.zone_id
                     }
                     logger.info(
-                        f"[IAQ] Real sensor data available — "
-                        f"loaded {len(conditions['iaq'])} zones for {site_id}"
+                        f"[IAQ] Real sensor data available — loaded {len(conditions['iaq'])} zones for {site_id}"
                     )
                 else:
                     conditions["iaq"] = {}
@@ -1747,8 +1741,6 @@ If no action needed, return empty recommendations array.
         band = energy_prices.get("band", "standard")
         schedule = energy_prices.get("schedule", [])
         next_change = "unknown"
-        demand_charge = energy_prices.get("demand_charge_per_kva")
-        nmd = energy_prices.get("nmd_kva")
         if isinstance(schedule, list) and schedule:
             next_entry = schedule[0]
             if isinstance(next_entry, dict):
@@ -2390,7 +2382,8 @@ Provide ONLY the JSON response, no additional text."""
             from app.database.repositories.equipment_repository import EquipmentRepository
 
             eq_repo = EquipmentRepository()
-            site_resp = self.sites().get(site_id)
+            site_code_for_eq = site.get("code") if isinstance(site, dict) else site
+            site_resp = self.sites().get(site_code_for_eq)
             if site_resp:
                 site_uuid = site_resp.get("id")
             else:
