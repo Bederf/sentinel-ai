@@ -615,7 +615,8 @@ async def residential_telegram_webhook(request: Request):
         service = ResidentialOnboardService()
 
         if text == "/connect":
-            service.handle_connect(chat_id)
+            result = service.handle_connect(chat_id)
+            _send(chat_id, result)
             return JSONResponse(content={"status": "connect"})
 
         if text == "/hapeer_ready":
@@ -638,7 +639,8 @@ async def residential_telegram_webhook(request: Request):
             return JSONResponse(content={"status": "start"})
 
         if text == "/connect":
-            service.handle_connect(chat_id)
+            result = service.handle_connect(chat_id)
+            _send(chat_id, result)
             return JSONResponse(content={"status": "connect"})
 
         state = service._state.get(chat_id)
