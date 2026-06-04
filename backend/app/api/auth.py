@@ -15,7 +15,7 @@ import time
 from datetime import datetime, timedelta
 
 import bcrypt
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, EmailStr, Field
 
 from app.config.settings import settings
@@ -26,10 +26,11 @@ from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import (
     _extract_ip_address,
     create_jwt_token,
+    require_role,
     validate_jwt_token,
 )
 from app.middleware.rate_limiter import limiter
-from app.models.auth import SentinelRole, generate_api_key
+from app.models.auth import AuthContext, SentinelRole, generate_api_key
 from app.models.module_registry import ModuleType
 from app.security.step_up import (
     _extract_device_id,
@@ -1224,20 +1225,16 @@ class InviteRequest(BaseModel):
 
 
 @router.post("/invite")
-async def create_invite(request: Request, body: InviteRequest):
+async def create_invite(
+    request: Request,
+    body: InviteRequest,
+    auth: AuthContext = Depends(require_role(SentinelRole.ADMIN)),
+):
     """Send an invite link to a new user (admin only).
 
     Creates a magic link token and emails it to the invitee.
     Rate-limited to 10 invites/hour per admin to prevent abuse.
     """
-    from fastapi import Depends
-
-    from app.middleware.auth_middleware import require_role
-    from app.models.auth import AuthContext, SentinelRole
-
-    # Admin-only gate
-    auth: AuthContext = Depends(require_role(SentinelRole.ADMIN))
-
     from app.services.magic_link_service import get_magic_link_service
 
     svc = get_magic_link_service()

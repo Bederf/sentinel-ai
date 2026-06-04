@@ -847,10 +847,12 @@ class SentinelDataSync:
         self,
         equipment_states: dict[str, dict[str, Any]],
     ) -> int:
-        """Update hvac_zones.current_temp from FCU/VAV room temperature readings.
+        """Update hvac_zones from FCU/VAV sensor readings.
 
-        Zone mapping is 1:1 after equipment code fix:
-        S002-FCU-{zone_num} → Zone-{zone_num}
+        Also syncs IAQ fields (co2_ppm, humidity_pct) when provided by bridge.
+        Zone mapping: S002-FCU-{zone_num} → Zone-{zone_num}
+
+        Multi-site aware: uses self.site_id to scope zone codes correctly.
         """
         import psycopg2
 
@@ -858,7 +860,9 @@ class SentinelDataSync:
         if not database_url:
             raise ValueError("DATABASE_URL not set")
 
-        zone_updates = []
+        # Collect all fields per zone — deduplication happens per field type
+        zone_data: dict[str, dict[str, Any]] = {}  # zone_id -> {temp, co2_ppm, humidity_pct}
+
         for code, state in equipment_states.items():
             equip_type = state.get("type", "").lower()
             readings = state.get("sensor_readings", {})
@@ -869,42 +873,54 @@ class SentinelDataSync:
                 continue
 
             zone_num = parts[2]
+            zone_id = f"Zone-{zone_num}"
 
-            # FCU room_temp takes priority, VAV zone_temp as fallback
-            temp = None
-            if equip_type == "fcu" and "room_temp" in readings:
-                temp = readings["room_temp"]
-            elif equip_type == "vav" and "zone_temp" in readings:
-                temp = readings["zone_temp"]
+            if zone_id not in zone_data:
+                zone_data[zone_id] = {"temp": None, "co2_ppm": None, "humidity_pct": None}
 
-            if temp is not None:
-                zone_id = f"Zone-{zone_num}"
-                zone_updates.append((zone_id, float(temp)))
+            # Temperature: FCU room_temp takes priority over VAV zone_temp
+            if equip_type == "fcu" and "room_temp" in readings and zone_data[zone_id]["temp"] is None:
+                zone_data[zone_id]["temp"] = float(readings["room_temp"])
+            elif equip_type == "vav" and "zone_temp" in readings and zone_data[zone_id]["temp"] is None:
+                zone_data[zone_id]["temp"] = float(readings["zone_temp"])
 
-        if not zone_updates:
+            # IAQ fields from FCU sensor_readings (bridge populates co2_ppm)
+            if "co2_ppm" in readings:
+                zone_data[zone_id]["co2_ppm"] = float(readings["co2_ppm"])
+            if "humidity_pct" in readings:
+                zone_data[zone_id]["humidity_pct"] = float(readings["humidity_pct"])
+
+        # Filter to zones that have at least one field to update
+        zones_to_update = {
+            zid: fields for zid, fields in zone_data.items() if any(v is not None for v in fields.values())
+        }
+        if not zones_to_update:
             return 0
-
-        # Deduplicate: FCU reading wins over VAV for same zone
-        seen = {}
-        for zone_id, temp in zone_updates:
-            if zone_id not in seen:
-                seen[zone_id] = temp
 
         try:
             conn = psycopg2.connect(database_url)
             conn.autocommit = True
             cur = conn.cursor()
 
-            values = list(seen.items())
-            values_sql = ",".join(cur.mogrify("(%s, %s::numeric)", (zid, temp)).decode() for zid, temp in values)
+            # Batch update using VALUES constructor + JOIN for efficiency
+            values_sql = ",".join(
+                cur.mogrify(
+                    "(%s, %s::numeric, %s::numeric, %s::numeric)",
+                    (zid, fields["temp"], fields["co2_ppm"], fields["humidity_pct"]),
+                ).decode()
+                for zid, fields in zones_to_update.items()
+            )
 
             cur.execute(
                 f"""
                 UPDATE hvac_zones AS z SET
-                    current_temp = v.temp,
+                    current_temp = COALESCE(v.temp, z.current_temp),
+                    co2_ppm = COALESCE(v.co2_ppm, z.co2_ppm),
+                    humidity_pct = COALESCE(v.humidity_pct, z.humidity_pct),
+                    iaq_last_updated = CASE WHEN v.co2_ppm IS NOT NULL OR v.humidity_pct IS NOT NULL THEN now() ELSE z.iaq_last_updated END,
                     last_updated = now()
                 FROM (VALUES {values_sql})
-                    AS v(zone_id, temp)
+                    AS v(zone_id, temp, co2_ppm, humidity_pct)
                 WHERE z.zone_id = v.zone_id
             """
             )
@@ -915,7 +931,7 @@ class SentinelDataSync:
             return updated
 
         except Exception as e:
-            logger.error(f"Zone temp sync failed: {e}")
+            logger.error(f"Zone temp/IAQ sync failed: {e}")
             raise
 
 
