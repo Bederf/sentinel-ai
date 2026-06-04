@@ -57,6 +57,9 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('gsap')) return 'vendor-animation'
           if (id.includes('framer-motion')) return 'vendor-motion'
 
+          // lucide-react icons — force into vendor-lucide chunk to prevent tree-shaking
+          if (id.includes('lucide-react')) return 'vendor-lucide'
+
           // Let rollup naturally chunk everything else by package
           // This avoids circular chunk dependencies that cause TDZ errors
           return undefined
@@ -67,7 +70,12 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query', 'lucide-react'],
-    exclude: ['@react-three/fiber', '@react-three/drei', 'three'],
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      '@tanstack/react-query',
+    ],
+    exclude: ['@react-three/fiber', '@react-three/drei', 'three', 'lucide-react'],
   },
 }))

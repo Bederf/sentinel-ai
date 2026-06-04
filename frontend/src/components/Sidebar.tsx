@@ -14,14 +14,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Info,
-  Activity,
-  Brain,
-  Bell,
-  Plug,
   Link,
   Sparkles,
-  Cpu,
-  FileText,
 } from "lucide-react";
 import { useModules } from "../contexts/ModuleHooks";
 import { modulesApi, type ModuleDefinition } from "../lib/api/modules";
@@ -197,34 +191,6 @@ export function Sidebar({ currentView, onViewChange, version = "13.0", userRole,
 
   // Module icon mapping for About section \u2014 Lucide icons with aria-label text equivalents
   // (kept for future use when icons are added back to pills)
-  const _moduleIcons: Record<string, { icon: React.ComponentType<{ className?: string }>; label: string }> = {
-    kpi:               { icon: Activity,    label: "KPI" },
-    ml:                { icon: Brain,       label: "ML" },
-    notifications:     { icon: Bell,        label: "Notifications" },
-    integrations:      { icon: Plug,        label: "Integrations" },
-    simbiot:           { icon: Cpu,         label: "SIMBIOT" },
-    logging:           { icon: FileText,    label: "Logging" },
-    assets:            { icon: Wrench,      label: "Assets" },
-    hvac:              { icon: Thermometer, label: "HVAC" },
-    energy:            { icon: Zap,         label: "Energy" },
-    lighting:          { icon: Lightbulb,   label: "Lighting" },
-    solar:             { icon: Sun,         label: "Solar" },
-    water:             { icon: Droplets,    label: "Water" },
-    fire:              { icon: Flame,       label: "Fire" },
-    security:          { icon: Shield,       label: "Security" },
-    digital_twin:      { icon: Box,         label: "Digital Twin" },
-    hvac_control:      { icon: Thermometer, label: "HVAC Control" },
-    energy_control:    { icon: Zap,         label: "Energy Control" },
-    lighting_control:  { icon: Lightbulb,   label: "Lighting Control" },
-    solar_control:     { icon: Sun,         label: "Solar Control" },
-    water_control:     { icon: Droplets,    label: "Water Control" },
-    security_control:  { icon: Shield,       label: "Security Control" },
-    digital_twin_control: { icon: Box,      label: "Digital Twin Control" },
-    maintenance:       { icon: Wrench,      label: "Maintenance" },
-    financial:         { icon: DollarSign,  label: "Financial" },
-    compliance:        { icon: Leaf,        label: "Compliance" },
-    fleet_ml:          { icon: Brain,       label: "Fleet ML" },
-  };
 
   return (
     <>

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import signal
+import socket
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-import socket
 from threading import Lock
 
 logger = logging.getLogger(__name__)
@@ -92,13 +93,6 @@ class MQTTProvisioner:
             logger.warning("Could not reload mosquitto: %s", exc)
 
 
-_provisioner = MQTTProvisioner()
-
-
-def get_mqtt_provisioner() -> MQTTProvisioner:
-    return _provisioner
-
-
 # ── VPS MQTT Provisioning (HA on VPS, no WireGuard) ───────────────────────────
 
 
@@ -149,11 +143,12 @@ mqtt:
         Idempotent: rewrites password and ensures ACL entry exists.
         Stores encrypted credentials in residential_sites.site_config.
         """
+        import json as _json
+        import secrets
+
         from app.config.settings import settings
         from app.database.supabase_client import get_supabase_client
         from app.services.encryption_service import get_encryption_service
-        import secrets
-        import json as _json
 
         client_id = f"ha-{site_id}"
         password = secrets.token_urlsafe(32)
@@ -166,11 +161,11 @@ mqtt:
 
         # Update encrypted site_config with MQTT creds
         sb = get_supabase_client()
-        row = sb.table("residential_sites").select("site_config").eq("site_id", site_id).maybe_execute()
+        row = sb.table("residential_sites").select("site_config").eq("site_id", site_id).maybe_single().execute()
         current_cfg = {}
         try:
-            if row.data:
-                enc_blob = row.data[0].get("site_config") or "{}"
+            if row:
+                enc_blob = row.get("site_config") or "{}"
                 # site_config may be encrypted via Fernet
                 try:
                     raw = get_encryption_service().decrypt(enc_blob)
@@ -208,6 +203,7 @@ mqtt:
         broker port if retained status is unavailable.
         """
         from app.config.settings import settings
+
         try:
             import paho.mqtt.client as mqtt
         except Exception:
@@ -216,7 +212,8 @@ mqtt:
         status_online = False
 
         if mqtt is not None and settings.mqtt_broker_public_host:
-            def _on_message(client, userdata, msg):
+
+            def _on_message(_client, _userdata, msg):
                 nonlocal status_online
                 try:
                     payload = msg.payload.decode("utf-8", errors="ignore").strip().lower()
@@ -225,13 +222,15 @@ mqtt:
                 except Exception:
                     pass
 
-            for attempt in range(3):
+            for _attempt in range(3):
                 try:
                     client = mqtt.Client(client_id=f"sentinel-verify-{site_id}")
                     # Use backend credentials (broker requires allow_anonymous false)
                     try:
                         if getattr(settings, "residential_mqtt_username", ""):
-                            client.username_pw_set(settings.residential_mqtt_username, settings.residential_mqtt_password)
+                            client.username_pw_set(
+                                settings.residential_mqtt_username, settings.residential_mqtt_password
+                            )
                     except Exception:
                         pass
                     client.on_message = _on_message
@@ -270,9 +269,10 @@ mqtt:
         Removes password from mosquitto passwd (best-effort) and clears
         mqtt credentials from encrypted site_config.
         """
+        import json as _json
+
         from app.database.supabase_client import get_supabase_client
         from app.services.encryption_service import get_encryption_service
-        import json as _json
 
         username = f"ha-{site_id}"
         # Remove user from passwd file
@@ -287,25 +287,30 @@ mqtt:
             logger.warning("mosquitto_passwd -D failed: %s", exc)
 
         # Remove ACL entry and reload
-        try:
+        with contextlib.suppress(Exception):
             self.revoke_site(site_id)
-        except Exception:
-            pass
 
         # Scrub credentials from site_config
+        sb = get_supabase_client()
+        row = sb.table("residential_sites").select("site_config").eq("site_id", site_id).maybe_single().execute()
         try:
-            sb = get_supabase_client()
-            row = sb.table("residential_sites").select("site_config").eq("site_id", site_id).maybe_execute()
-            if row.data:
-                enc_blob = row.data[0].get("site_config") or "{}"
-                try:
-                    raw = get_encryption_service().decrypt(enc_blob)
-                    cfg = _json.loads(raw)
-                except Exception:
-                    cfg = {}
-                for k in ("mqtt_client_id", "mqtt_password"):
-                    cfg.pop(k, None)
-                enc = get_encryption_service().encrypt(_json.dumps(cfg))
-                sb.table("residential_sites").update({"site_config": enc}).eq("site_id", site_id).execute()
+            if row:
+                enc_blob = row.get("site_config") or "{}"
+                raw = get_encryption_service().decrypt(enc_blob)
+                cfg = _json.loads(raw)
+        except Exception:
+            cfg = {}
+        try:
+            for k in ("mqtt_client_id", "mqtt_password"):
+                cfg.pop(k, None)
+            enc = get_encryption_service().encrypt(_json.dumps(cfg))
+            sb.table("residential_sites").update({"site_config": enc}).eq("site_id", site_id).execute()
         except Exception as exc:
             logger.warning("Failed to scrub MQTT credentials from site_config: %s", exc)
+
+
+_provisioner = MQTTProvisioner()
+
+
+def get_mqtt_provisioner() -> MQTTProvisioner:
+    return _provisioner
