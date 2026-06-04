@@ -9,6 +9,8 @@ from typing import Any, Literal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, field_validator
 
+from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
+
 from app.adapters.residential import build_adapter
 from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_role
@@ -626,8 +628,6 @@ async def residential_telegram_webhook(request: Request):
 
         if text == "/ha_ready":
             result = service.handle_ha_ready(chat_id)
-            from app.services.residential.residential_telegram_sender import ResidentialTelegramSender
-
             sender = ResidentialTelegramSender()
             await sender.send_text(chat_id, result)
             return JSONResponse(content={"status": "ha_ready"})
