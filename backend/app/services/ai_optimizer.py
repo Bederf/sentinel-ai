@@ -1005,6 +1005,62 @@ class AIOptimizerService:
             except Exception:
                 pass
 
+            # ── IAQ data quality gate ─────────────────────────────────────────
+            # IAQ service exists and field names are confirmed, but all zones show
+            # null for CO2/humidity/VOC/PM2.5 — only temperature is populated.
+            # Temperature-based IAQ scores are already captured via zone telemetry
+            # (occupancy, setpoints, deviation). Duplicating via IAQ service adds no
+            # value and would inject noise into AI recommendations.
+            # Wire activates automatically when real CO2/humidity sensors are
+            # installed on the bridge and bridge starts sending IAQ telemetry.
+            try:
+                from app.services.iaq_service import get_iaq_service
+
+                iaq_svc = get_iaq_service()
+                # get_site_iaq returns IAQSiteOverview with .zones list
+                iaq_overview = iaq_svc.get_site_iaq(site_id)
+                zones_raw = iaq_overview.zones if iaq_overview else []
+
+                # Check whether any non-temperature sensor has real readings
+                has_real_iaq_sensors = any(
+                    comp.get("value") is not None
+                    and comp.get("component") not in ("temperature", "temp")
+                    for zone in zones_raw
+                    for comp in (zone.components or [])
+                )
+
+                if has_real_iaq_sensors:
+                    conditions["iaq"] = {
+                        zone.zone_id: {
+                            "co2_ppm": next(
+                                (c.value for c in zone.components if c.component == "co2"), None
+                            ),
+                            "humidity_pct": next(
+                                (c.value for c in zone.components if c.component == "humidity"), None
+                            ),
+                            "iaq_score": zone.iaq_score,
+                            "status": zone.status,
+                            "zone_name": zone.zone_name,
+                            "occupancy": zone.occupancy,
+                        }
+                        for zone in zones_raw
+                        if zone.zone_id
+                    }
+                    logger.info(
+                        f"[IAQ] Real sensor data available — "
+                        f"loaded {len(conditions['iaq'])} zones for {site_id}"
+                    )
+                else:
+                    conditions["iaq"] = {}
+                    logger.info(
+                        f"[IAQ] No real IAQ sensors detected for {site_id} "
+                        f"(temperature only) — IAQ context suppressed. "
+                        f"Wire activates automatically when CO2/humidity sensors are installed."
+                    )
+            except Exception as e:
+                logger.warning(f"[IAQ] Service error: {e}", exc_info=True)
+                conditions["iaq"] = {}
+
             return conditions
 
         except Exception as e:

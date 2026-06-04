@@ -28,6 +28,9 @@ from app.services.residential.residential_telegram_sender import ResidentialTele
 
 _sender = ResidentialTelegramSender()
 
+# Shared Redis connection for rate limiting — created once, reused across all calls
+_rate_limit_redis = redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=2)
+
 # ── Rate limiting (3 attempts / hour / chat_id) ────────────────────────────────
 
 
@@ -37,7 +40,7 @@ def _check_rate_limit(chat_id: int) -> tuple[bool, int]:
     Uses Redis ZADD/ZCOUNT — same pattern as LoginAttemptTracker.
     """
     key = f"ratelimit:connect:{chat_id}"
-    r = redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=2)
+    r = _rate_limit_redis
     now = time.time()
     one_hour_ago = now - 3600
     r.zremrangebyscore(key, 0, one_hour_ago)  # cleanup old entries
@@ -53,14 +56,14 @@ def _check_rate_limit(chat_id: int) -> tuple[bool, int]:
 
 def _record_failure(chat_id: int) -> None:
     key = f"ratelimit:connect:{chat_id}"
-    r = redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=2)
+    r = _rate_limit_redis
     r.zadd(key, {str(time.time()): time.time()})
     r.expire(key, 3600)
 
 
 def _reset_rate_limit(chat_id: int) -> None:
     key = f"ratelimit:connect:{chat_id}"
-    r = redis.from_url(settings.redis_url, decode_responses=True, socket_timeout=2)
+    r = _rate_limit_redis
     r.delete(key)
 
 
@@ -70,31 +73,10 @@ def _reset_rate_limit(chat_id: int) -> None:
 def _send(
     chat_id: int, text: str, reply_markup: dict | None = None, _reply_to_message_id: int | None = None
 ) -> dict | None:
-    """Send text via ResidentialTelegramSender. Returns result dict on success."""
+    """Send text via ResidentialTelegramSender. Runs async send_text synchronously."""
     try:
-        import os
-
-        import requests
-
-        token = os.environ.get("SENTINEL_HOME_BOT_TOKEN") or settings.sentinel_home_bot_token
-        if not token:
-            logger.error("Telegram send failed: SENTINEL_HOME_BOT_TOKEN not set")
-            return None
-
-        payload: dict = {"chat_id": chat_id, "text": text, "parse_mode": "HTML"}
-        if reply_markup:
-            payload["reply_markup"] = reply_markup
-
-        resp = requests.post(
-            f"https://api.telegram.org/bot{token}/sendMessage",
-            json=payload,
-            timeout=15,
-        )
-        result = resp.json()
-        if not result.get("ok"):
-            logger.error("Telegram sendMessage failed: %s", result)
-            return None
-        return {"message_id": result["result"]["message_id"]}
+        ok = asyncio.run(_sender.send_text(chat_id, text, reply_markup=reply_markup))
+        return {"ok": ok}
     except Exception as exc:
         logger.error("Telegram send failed: %s", exc)
         return None
