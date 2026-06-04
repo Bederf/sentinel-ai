@@ -15,6 +15,7 @@ equipment combinations.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -835,25 +836,28 @@ class AIOptimizerService:
                             stale_count += 1
                             continue
                         for key, val in op.items():
-                            if any(
-                                sp in key.lower()
-                                for sp in [
-                                    "setpoint",
-                                    "_sp",
-                                    "cooling",
-                                    "heating",
-                                    "supply_temp",
-                                    "room_temp",
-                                    "flow",
-                                    "speed",
-                                ]
+                            if (
+                                any(
+                                    sp in key.lower()
+                                    for sp in [
+                                        "setpoint",
+                                        "_sp",
+                                        "cooling",
+                                        "heating",
+                                        "supply_temp",
+                                        "room_temp",
+                                        "flow",
+                                        "speed",
+                                    ]
+                                )
+                                and isinstance(val, dict)
+                                and val.get("value") is not None
                             ):
-                                if isinstance(val, dict) and val.get("value") is not None:
-                                    conditions.setdefault("setpoints", {})[f"{eq.get('code')}.{key}"] = {
-                                        "value": val["value"],
-                                        "unit": val.get("unit", ""),
-                                        "timestamp": val.get("timestamp", ""),
-                                    }
+                                conditions.setdefault("setpoints", {})[f"{eq.get('code')}.{key}"] = {
+                                    "value": val["value"],
+                                    "unit": val.get("unit", ""),
+                                    "timestamp": val.get("timestamp", ""),
+                                }
                     sp_count = len(conditions.get("setpoints", {}))
                     if sp_count > 0:
                         conditions["_data_sources"]["setpoints"] = "live"
@@ -939,7 +943,6 @@ class AIOptimizerService:
             try:
                 import httpx
 
-                bridge_site = site_id if site_id.startswith("site-") else site_id
                 token = (
                     os.environ.get("BRIDGE_API_TOKEN_SITE002")
                     or os.environ.get("BRIDGE_API_TOKEN")
@@ -947,7 +950,7 @@ class AIOptimizerService:
                 )
                 # Use sync client — async is flaky with WireGuard bridge
                 with httpx.Client(timeout=10) as client:
-                    url = f"http://10.99.0.1:8080/api/sites/{bridge_site}/telemetry"
+                    url = f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry"
                     resp = client.get(url, headers={"Authorization": f"Bearer {token}"})
                     if resp.is_success:
                         telemetry = resp.json()
@@ -1000,10 +1003,8 @@ class AIOptimizerService:
                 logger.warning(f"[AI-OPT] Could not fetch urgent work orders: {e}")
 
             # ── Carbon context (calculated from electrical telemetry) ──
-            try:
+            with contextlib.suppress(Exception):
                 conditions["carbon"] = await self._gather_carbon_context(site_id, conditions)
-            except Exception:
-                pass
 
             # ── IAQ data quality gate ─────────────────────────────────────────
             # IAQ service exists and field names are confirmed, but all zones show
@@ -1743,10 +1744,7 @@ If no action needed, return empty recommendations array.
         next_change = "unknown"
         if isinstance(schedule, list) and schedule:
             next_entry = schedule[0]
-            if isinstance(next_entry, dict):
-                next_change = next_entry.get("start", "unknown")
-            else:
-                next_change = str(next_entry)
+            next_change = next_entry.get("start", "unknown") if isinstance(next_entry, dict) else str(next_entry)
 
         PROFILE_INTENTS = {
             "cost_saving": """
@@ -2398,16 +2396,8 @@ Provide ONLY the JSON response, no additional text."""
             from app.database.repositories.equipment_repository import EquipmentRepository
 
             eq_repo = EquipmentRepository()
-            site_code_for_eq = site.get("code") if isinstance(site, dict) else site
-            site_resp = self.sites().get(site_code_for_eq)
-            if site_resp:
-                site_uuid = site_resp.get("id")
-            else:
-                site_uuid = None
-            if site_uuid:
-                valid_equipment = eq_repo.get_all(site_id=site_uuid)
-            else:
-                valid_equipment = eq_repo.get_all()
+            site_uuid = site.get("id")
+            valid_equipment = eq_repo.get_all(site_id=site_uuid) if site_uuid else eq_repo.get_all()
             if valid_equipment:
                 equipment_lines = []
                 for eq in valid_equipment[:50]:  # Limit to 50 to avoid token bloat
@@ -2552,7 +2542,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 logger.debug(
                     f"[ANALYZE] Returning OptimizationRecommendation: "
                     f"site={site_id}, rec_count={len(normalised_recommendations)}, "
-                    f"first_keys={[list(r.keys())[0] if r else 'empty' for r in normalised_recommendations[:2]]}"
+                    f"first_keys={[next(iter(r.keys())) if r else 'empty' for r in normalised_recommendations[:2]]}"
                 )
                 return OptimizationRecommendation(
                     site_id=site_id,
@@ -2796,10 +2786,8 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         if "action" in out and isinstance(out["action"], dict):
             raw_val = out["action"].get("value")
             if raw_val is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     out["action"]["value"] = float(raw_val)
-                except (TypeError, ValueError):
-                    pass
 
         # Normalise affected_equipment → metadata
         if "affected_equipment" in out:
@@ -2824,16 +2812,12 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         if "expected_impact" in out:
             comfort_src = raw.get("comfort_delta_c") or raw.get("comfort_delta") or raw.get("comfort_impact_c")
             if comfort_src is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     out["expected_impact"]["comfort_delta"] = round(float(comfort_src), 1)
-                except (TypeError, ValueError):
-                    pass
             energy_src = raw.get("energy_savings_percent") or raw.get("energy_saving_percent")
             if energy_src is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     out["expected_impact"]["energy_savings_percent"] = round(float(energy_src), 1)
-                except (TypeError, ValueError):
-                    pass
 
         return out
 
@@ -3338,10 +3322,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             site, equip_type, floor, letter = match.groups()
             letter_num = ord(letter.upper()) - ord("A") + 1
             numeric_floor = int(floor)
-            if numeric_floor == 0:
-                normalized_seq = f"{letter_num:03d}"
-            else:
-                normalized_seq = numeric_floor * 100 + letter_num
+            normalized_seq = f"{letter_num:03d}" if numeric_floor == 0 else numeric_floor * 100 + letter_num
             return f"{site}-{equip_type}-{normalized_seq}"
 
         # Pattern: S002-TYPE-L{floor}-{seq} → S002-TYPE-{floor*100 + seq}
@@ -3352,10 +3333,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         if match:
             site, equip_type, floor, seq = match.groups()
             numeric_floor = int(floor)
-            if numeric_floor == 0:
-                normalized_seq = f"{int(seq):03d}"  # Ground: 001 → "001", 005 → "005"
-            else:
-                normalized_seq = numeric_floor * 100 + int(seq)
+            normalized_seq = f"{int(seq):03d}" if numeric_floor == 0 else numeric_floor * 100 + int(seq)
             return f"{site}-{equip_type}-{normalized_seq}"
 
         # Pattern: S002-TYPE-B{num}-{seq} → S002-TYPE-B{num_basin} (basement with 2-digit pad)
@@ -3620,9 +3598,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         Server rooms and critical zones should not have cooling reduced.
         """
-        if zone_type == ZoneType.SERVER_ROOM:
-            return True  # Never reduce cooling in server rooms
-        return False
+        return zone_type == ZoneType.SERVER_ROOM
 
     def _get_zone_specific_setpoint_limits(self, device: Device, zone_type: ZoneType | None) -> tuple:
         """Get zone-specific setpoint min/max limits.

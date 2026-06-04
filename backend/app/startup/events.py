@@ -5,6 +5,7 @@ to improve maintainability and separation of concerns.
 """
 
 import asyncio
+import contextlib
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -28,14 +29,8 @@ async def app_lifespan(app: FastAPI):
     try:
         yield
     finally:
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await shutdown_event(app)
-        except asyncio.CancelledError:
-            # Suppress CancelledError during shutdown — suppress_exceptions=True
-            # prevents APScheduler jobs from propagating cancellation into the lifespan.
-            # The error log still shows the traceback from the old worker, which is
-            # harmless (it reflects the pre-fix state; the new code handles it cleanly).
-            pass
 
 
 def _parse_task_timestamp(value: object) -> datetime | None:
@@ -64,7 +59,7 @@ def _task_is_recoverable(task: dict) -> bool:
     return latest >= (datetime.now(UTC) - _SIMULATION_RECOVERY_WINDOW)
 
 
-async def startup_event(app: FastAPI) -> None:
+async def startup_event(_: FastAPI) -> None:
     """Initialize background services on startup.
 
     This function is called when the FastAPI application starts up.
@@ -1160,7 +1155,7 @@ async def startup_event(app: FastAPI) -> None:
         print("[SIMBIOT] CAFM credentials not configured — connector skipped (BMS bridge operates independently)")
 
 
-async def shutdown_event(app: FastAPI) -> None:
+async def shutdown_event(_: FastAPI) -> None:
     """Cleanup background services on shutdown.
 
     This function is called when the FastAPI application shuts down.
