@@ -5682,10 +5682,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 from app.database.supabase_client import get_supabase_client
 
                 sb = get_supabase_client()
-                # Resolve site UUID from resolver ID (site-002 -> UUID)
-                site_resp = (
-                    sb.table("sites").select("id").eq("code", site_id.upper().replace("SITE-", "S")).limit(1).execute()
-                )
+                # Resolve site UUID from resolver ID (site-002 format matches DB)
+                site_code = site_id.lower()  # site-002, site-005, etc.
+                site_resp = sb.table("sites").select("id").eq("code", site_code).limit(1).execute()
                 site_uuid = site_resp.data[0]["id"] if site_resp.data else None
                 if not site_uuid:
                     logger.warning(f"[DIGEST] Site not found: {site_id}")
@@ -5716,11 +5715,11 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 from app.database.repositories.alert_repository import AlertRepository
 
                 alert_repo = AlertRepository()
-                alerts = await alert_repo.get_all(status="active", site_id=site_uuid)
-                if alerts and alerts.data:
-                    alert_count = len(alerts.data)
+                all_alerts = await alert_repo.get_all(status="active", site_id=site_uuid)
+                if all_alerts:
+                    alert_count = len(all_alerts)
                     critical_alerts = [
-                        a for a in alerts.data if str(getattr(a, "severity", "") or "").lower() in ("critical", "high")
+                        a for a in all_alerts if str(a.get("severity", "") or "").lower() in ("critical", "high")
                     ][:5]
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch active alerts: {e}")
@@ -5730,9 +5729,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             try:
                 from app.services.csv_loader import WorkOrderData
 
-                all_wo = WorkOrderData.load()
+                site_wos = WorkOrderData.get_by_site(site_id) if site_id else WorkOrderData.load()
                 open_wo_count = sum(
-                    1 for wo in all_wo if str(wo.get("status", "")).lower() in ("open", "scheduled", "in_progress")
+                    1 for wo in site_wos if str(wo.get("status", "")).lower() in ("open", "scheduled", "in_progress")
                 )
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch work orders: {e}")
@@ -5741,9 +5740,8 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             ai_recs = []
             try:
                 svc = get_recommendation_service()
-                # Convert site-002 -> S002 for recommendation queries (column stores site code)
-                site_code = site_id.upper().replace("SITE-", "S") if site_id.startswith("site-") else site_id
-                pending = await svc.get_pending_recommendations(site_code, limit=20)
+                # Use site-002 format directly (matches DB column)
+                pending = await svc.get_pending_recommendations(site_id, limit=20)
                 ADVISORY_TYPES = {"ai_optimization"}
                 ai_recs = [r for r in pending if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES]
             except Exception as e:
