@@ -15,7 +15,6 @@ from fastapi import FastAPI
 
 from app.config.settings import apply_edge_mode_overrides, settings
 from app.services.background_scheduler import scheduler_service
-from app.services.health_simulation_service import health_simulation_service  # Supabase health simulation
 from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evolution connector
 
 _logger = logging.getLogger("sentinel.startup")
@@ -610,6 +609,13 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Daily health sweep job initialization failed: {e}")
 
+    # Orphan alert cleanup — purges stale fault alerts every 30 min to prevent alert-table pollution
+    try:
+        scheduler_service.add_orphan_alert_cleanup_job(interval_minutes=30)
+        _logger.info("✅ Orphan alert cleanup job initialized (every 30 min)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Orphan alert cleanup job initialization failed: {e}")
+
     # Morning recommendation digest — top 5 pending by severity, sent to FM Telegram at 07:45 SAST Mon-Fri
     try:
         scheduler_service.add_recommendation_digest_job()
@@ -779,138 +785,6 @@ async def startup_event(_: FastAPI) -> None:
 
     _validate_block_booking_config()
 
-    # Phase 083: Recover crashed simulations from JSON store
-    # Queries for any tasks marked as 'running' and resumes from checkpoint
-    async def recover_crashed_simulations():
-        """
-        Recover simulations that were running when server crashed/restarted.
-        Only the newest task with a valid checkpoint is re-queued per site.
-        All other crashed tasks are marked stopped.
-        """
-        try:
-            from app.services.simulation_store import get_simulation_store
-
-            for _sim_site_id in _get_site_ids():
-                store = get_simulation_store(_sim_site_id)
-                all_tasks = store.get_all_tasks()
-
-                # Find tasks with status='running' (crashed)
-                crashed = [(tid, tdata) for tid, tdata in all_tasks.items() if tdata.get("status") == "running"]
-
-                if not crashed:
-                    continue
-
-                _logger.info("Found %d crashed simulation(s) to recover for %s", len(crashed), _sim_site_id)
-
-                # Sort by created_at descending — newest first
-                crashed.sort(key=lambda x: x[1].get("created_at", ""), reverse=True)
-
-                resumed_one = False
-                for task_id, task in crashed:
-                    state_snapshot = task.get("state_snapshot")
-
-                    if not _task_is_recoverable(task):
-                        store.update_task_progress(task_id, {"status": "stopped"})
-                        _logger.info("Marked stale crashed task %s as stopped", task_id)
-                        continue
-
-                    if not resumed_one and state_snapshot:
-                        # Resume the newest task that has a checkpoint
-                        try:
-                            store.update_task_progress(task_id, {"status": "queued", "error_message": None})
-                            days_simulated = state_snapshot.get("days_simulated", 0)
-                            simulated_time = state_snapshot.get("simulated_time", "unknown")
-                            _logger.info(
-                                f"Queued recovery for task {task_id}: day {days_simulated}/365, time {simulated_time}"
-                            )
-                            resumed_one = True
-                        except Exception as e:
-                            _logger.error(f"Failed to queue recovery for task {task_id}: {e}")
-                    else:
-                        # Mark all others as stopped
-                        store.update_task_progress(task_id, {"status": "stopped"})
-                        _logger.info(f"Marked stale task {task_id} as stopped")
-
-            if not _get_site_ids():
-                _logger.info("No registered buildings — skipping crash recovery")
-
-        except Exception as e:
-            _logger.error(f"Crash recovery initialization failed: {e}")
-
-    # DEACTIVATE ALL SIMULATIONS ON STARTUP
-    # Ensures clean state: no simulations auto-running after restart
-    async def deactivate_all_simulations():
-        """
-        Deactivate all running and queued simulations on startup.
-        This ensures clean state and prevents auto-resuming of simulations.
-        """
-        try:
-            from datetime import datetime, timedelta
-
-            from app.services.simulation_store import get_simulation_store
-
-            for _sim_site_id in _get_site_ids():
-                store = get_simulation_store(_sim_site_id)
-                all_tasks = store.get_all_tasks()
-                cutoff_time = (datetime.utcnow() - timedelta(seconds=5)).isoformat()
-
-                stopped_count = 0
-                deactivated_count = 0
-
-                for task_id, task_data in all_tasks.items():
-                    status = task_data.get("status")
-
-                    if status == "running":
-                        store.update_task_progress(task_id, {"status": "stopped"})
-                        stopped_count += 1
-
-                    elif status == "queued":
-                        created_at = task_data.get("created_at", "")
-                        if created_at < cutoff_time:
-                            store.update_task_progress(task_id, {"status": "inactive"})
-                            deactivated_count += 1
-
-                if stopped_count:
-                    _logger.info("Stopped %d running simulation(s) for %s", stopped_count, _sim_site_id)
-                if deactivated_count:
-                    _logger.info(
-                        "Deactivated %d queued simulation(s) from before startup for %s",
-                        deactivated_count,
-                        _sim_site_id,
-                    )
-
-            if not _get_site_ids():
-                _logger.info("No registered buildings — skipping simulation deactivation")
-
-            # Re-queue the best in-progress task per site so the queue processor
-            # resumes from the checkpoint on next tick (crash recovery path).
-            for _sim_site_id in _get_site_ids():
-                store = get_simulation_store(_sim_site_id)
-                all_tasks = store.get_all_tasks()
-
-                best_task_id = None
-                best_days = 0
-                for task_id, task_data in all_tasks.items():
-                    if (
-                        task_data.get("status") == "stopped"
-                        and task_data.get("state_snapshot")
-                        and (task_data.get("days_completed") or 0) > best_days
-                    ):
-                        best_days = task_data["days_completed"]
-                        best_task_id = task_id
-
-                if best_task_id:
-                    store.update_task_progress(best_task_id, {"status": "queued"})
-                    _logger.info(
-                        "Re-queued simulation %s for %s (checkpoint day %d/365)",
-                        best_task_id,
-                        _sim_site_id,
-                        best_days,
-                    )
-
-        except Exception as e:
-            _logger.error(f"Failed to deactivate simulations on startup: {e}")
-
     # === Simulation Engine (gated by ENABLE_SITE002_SOURCE) ===
     # Check persistent "simulationStopped" flag — if admin stopped simulation via Settings,
     # do not auto-start on restart.
@@ -930,25 +804,12 @@ async def startup_event(_: FastAPI) -> None:
         _logger.info("Simulation stopped by admin (simulationStopped=true in settings.json) — skipping auto-start")
 
     if settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode:
-        # Keep the API responsive on restart by deactivating stale persisted
-        # simulation tasks instead of auto-resuming or auto-starting them.
-        if not testing_mode:
-            try:
-                await deactivate_all_simulations()
-            except Exception as e:
-                _logger.error(f"Error during startup simulation deactivation: {e}")
-
-        # Manual lifecycle start endpoints still rely on the queue processor.
-        try:
-            scheduler_service.add_simulation_queue_processor_job(interval_seconds=10)
-            _logger.info("Simulation queue processor initialized (10s interval, manual queue only)")
-        except Exception as e:
-            _logger.error(f"Simulation queue processor initialization failed: {e}", exc_info=True)
-
+        # Simulation services (bms_simulation_service, lifecycle_orchestrator) were removed.
+        # Lifecycle is now fully manual via API — no auto-start on restart.
         _logger.info("Lifecycle simulations are manual-start only on backend startup")
     else:
         if settings.edge_mode and settings.site002_source_enabled:
-            _logger.info("ℹ️ Simulation queue disabled (EDGE_MODE=true)")
+            _logger.info("Simulation queue disabled (EDGE_MODE=true)")
         else:
             _logger.info("Site 002 data source disabled — simulation engine inactive")
 
@@ -1168,23 +1029,6 @@ async def shutdown_event(_: FastAPI) -> None:
     if sentry_auth:
         await sentry_auth.stop_background_refresh()
 
-    # Save checkpoints for all active simulations before stopping
-    try:
-        from app.services.simulation_orchestrator import get_all_active_simulations
-
-        active_sims = get_all_active_simulations()
-        if active_sims:
-            _logger.info(f"Saving checkpoints for {len(active_sims)} active simulation(s)...")
-            for task_id, orchestrator in active_sims.items():
-                try:
-                    if orchestrator.running:
-                        await orchestrator.save_checkpoint()
-                        _logger.info(f"Checkpoint saved for task {task_id} (day {orchestrator.days_simulated})")
-                except Exception as cp_err:
-                    _logger.error(f"Failed to save checkpoint for {task_id}: {cp_err}")
-    except Exception as e:
-        _logger.error(f"Error saving simulation checkpoints on shutdown: {e}")
-
     # Notification tasks cleanup (Phase 140)
     from app.services.notification_tasks import stop_notification_tasks
 
@@ -1222,7 +1066,6 @@ async def shutdown_event(_: FastAPI) -> None:
     stop_mri_scheduler()
 
     scheduler_service.stop()
-    await health_simulation_service.stop()
     await simbiot_service.shutdown()
 
 

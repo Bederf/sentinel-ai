@@ -496,26 +496,32 @@ class AdapterHealthMonitor:
         if not rows_to_insert:
             return
 
-        # Check for existing recent alerts to avoid duplicates
-        # Uses equipment_id + code + type (the new dedupe key) instead of title/message
-        recent_cutoff = (now - timedelta(minutes=30)).isoformat()
+        # Deduplicate: skip if an identical (type, equipment_id, message_hash) alert
+        # already exists for this site, regardless of age.
+        # This prevents fault-alert storms where the same COV condition fires every minute.
         try:
             existing = (
                 supabase.table("alerts")
-                .select("title, message, equipment_id")
+                .select("equipment_id, type, message")
                 .eq("site_id", site_uuid)
                 .eq("status", "active")
-                .gte("created_at", recent_cutoff)
                 .execute()
             )
-            # Build dedupe keys from existing alerts using the new format
-            existing_keys = set()
-            for r in existing.data or []:
-                eq_id = r.get("equipment_id") or "UNKNOWN"
-                # Reconstruct key from title which contains the code used at insert time
-                existing_keys.add(f"{eq_id}")
-            # Filter rows that match existing equipment_id (skip if same equipment already alert active)
-            rows_to_insert = [r for r in rows_to_insert if r.get("equipment_id") not in existing_keys]
+
+            # Build dedupe key: (type, equipment_id, message_hash)
+            # For null equipment_id, use title as fallback identifier
+            def _alert_key(r: dict) -> str:
+                eq_id = r.get("equipment_id") or r.get("title", "UNKNOWN")
+                return f"{r.get('type', '')}:{eq_id}:{r.get('message', '')}"
+
+            existing_keys = {_alert_key(r) for r in (existing.data or [])}
+            # Filter: skip row if its (type, equipment_id, message) already has an active alert
+            rows_to_insert = [
+                r
+                for r in rows_to_insert
+                if f"{r.get('type', '')}:{r.get('equipment_id') or r.get('title', 'UNKNOWN')}:{r.get('message', '')}"
+                not in existing_keys
+            ]
         except Exception as e:
             logger.warning(f"[BRIDGE ALERTS] Dedup query failed, inserting anyway: {e}")
 

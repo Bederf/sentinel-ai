@@ -1584,6 +1584,74 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Recommendation expiry job failed: %s", e)
 
+    def _run_orphan_alert_cleanup_sync(self):
+        """Sync wrapper for orphan alert cleanup."""
+        try:
+            deleted = asyncio.run_coroutine_threadsafe(self._run_orphan_alert_cleanup_async(), self._main_loop).result(
+                timeout=60
+            )
+            if deleted:
+                logger.info("[ALERT-CLEANUP] Deleted %d orphan/stale alerts", deleted)
+        except Exception as e:
+            logger.error("Orphan alert cleanup job failed: %s", e)
+
+    async def _run_orphan_alert_cleanup_async() -> int:
+        """Delete orphaned fault alerts and stale active alerts with no equipment FK.
+
+        Removes:
+          1. fault alerts with null equipment_id older than 1 hour (COV monitoring artifacts)
+          2. Any alert (any type) with null site_id AND null equipment_id older than 7 days
+
+        Returns:
+            Total number of alerts deleted
+        """
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        deleted = 0
+
+        try:
+            # 1. Orphaned fault alerts (null equipment_id, >1h old)
+            cutoff_1h = datetime.now(UTC) - timedelta(hours=1)
+            result1 = await asyncio.to_thread(
+                lambda: (
+                    sb.table("alerts")
+                    .delete()
+                    .not_.eq("equipment_id", "00000000-0000-0000-0000-000000000000")  # not null in Postgres needs this
+                    .is_("equipment_id", None)
+                    .eq("type", "fault")
+                    .eq("status", "active")
+                    .lt("created_at", cutoff_1h.isoformat())
+                    .execute()
+                )
+            )
+            if result1.data:
+                deleted += len(result1.data)
+                logger.info("[ALERT-CLEANUP] Removed %d orphan fault alerts", len(result1.data))
+        except Exception as e:
+            logger.warning("[ALERT-CLEANUP] Orphan fault cleanup failed: %s", e)
+
+        try:
+            # 2. Very old alerts with no equipment and no site linkage (>7 days)
+            cutoff_7d = datetime.now(UTC) - timedelta(days=7)
+            result2 = await asyncio.to_thread(
+                lambda: (
+                    sb.table("alerts")
+                    .delete()
+                    .is_("equipment_id", None)
+                    .is_("site_id", None)
+                    .lt("created_at", cutoff_7d.isoformat())
+                    .execute()
+                )
+            )
+            if result2.data:
+                deleted += len(result2.data)
+                logger.info("[ALERT-CLEANUP] Removed %d ancient orphaned alerts", len(result2.data))
+        except Exception as e:
+            logger.warning("[ALERT-CLEANUP] Ancient orphan cleanup failed: %s", e)
+
+        return deleted
+
     async def _run_recommendation_expiry_async(self) -> tuple[int, int]:
         """Expire stale pending recommendations and dedup noisy duplicates.
 
@@ -2188,6 +2256,35 @@ class BackgroundSchedulerService:
             misfire_grace_time=3600,
         )
         logger.info("daily_health_sweep job registered — 06:00 UTC (08:00 SAST) Mon-Fri")
+
+    def add_orphan_alert_cleanup_job(self, interval_minutes: int = 30):
+        """Purge orphaned fault alerts (equipment_id=null) and stale active alerts.
+
+        Runs every 30 min to prevent alert-table pollution from COV monitoring spikes
+        and equipment with null FK that was present during the uniform-72 scorer era.
+
+        Deletes:
+          - fault alerts with null equipment_id and age > 1 hour (orphaned COV artifacts)
+          - any alert with no equipment FK and no site FK that is > 7 days old
+
+        Args:
+            interval_minutes: How often to run (default 30 min)
+        """
+        if self.scheduler.get_job("orphan_alert_cleanup"):
+            self.scheduler.remove_job("orphan_alert_cleanup")
+
+        first_run = datetime.now() + timedelta(minutes=5)
+        self.scheduler.add_job(
+            func=self._run_orphan_alert_cleanup_sync,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id="orphan_alert_cleanup",
+            name="Orphan Alert Cleanup (30min)",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("orphan_alert_cleanup job registered — every %d min", interval_minutes)
 
     def add_rag_doc_sync_job(self, interval_hours: int = 12):
         """
@@ -2812,269 +2909,6 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to check fire pump compliance: {e}")
-
-    def add_simulation_queue_processor_job(self, interval_seconds: int = 10) -> None:
-        """
-        Add background job to process queued lifecycle simulations.
-        Runs every N seconds to start next queued simulation.
-
-        Args:
-            interval_seconds: How often to check queue (default 10s)
-        """
-        self.scheduler.add_job(
-            func=self._process_simulation_queue,
-            trigger="interval",
-            seconds=interval_seconds,
-            id="process_simulation_queue",
-            name="Process Simulation Queue",
-            replace_existing=True,
-        )
-        logger.info(f"Added simulation queue processor (interval: {interval_seconds}s)")
-
-    def _process_simulation_queue(self) -> None:
-        """
-        Poll JSON store for queued simulations and start one.
-        Prevents multiple concurrent simulations (max 1 at a time).
-
-        Uses the main event loop so that background asyncio tasks
-        (like the simulation loop) survive after this function returns.
-        """
-        try:
-            if self._main_loop and self._main_loop.is_running():
-                future = asyncio.run_coroutine_threadsafe(self._process_simulation_queue_async(), self._main_loop)
-                future.result(timeout=300)
-            else:
-                asyncio.run(self._process_simulation_queue_async())
-        except Exception as e:
-            logger.error(f"Error processing simulation queue: {e}", exc_info=True)
-
-    async def _process_simulation_queue_async(self) -> None:
-        """Async implementation of queue processor.
-
-        Reads queued tasks from JSON simulation store (not Supabase).
-        The building simulation is independent of SENTINEL's database.
-        """
-        try:
-            # Check all registered building stores for queued tasks
-            from app.core.site_resolver import get_registered_site_ids
-            from app.services.simulation_orchestrator import (
-                create_orchestrator,
-                get_simulation_by_task_id,
-                register_simulation,
-            )
-            from app.services.simulation_store import get_simulation_store
-
-            site_ids = get_registered_site_ids()
-            if not site_ids:
-                return  # No registered buildings — silent return
-
-            queued_tasks = []
-            store = None
-            for _sid in site_ids:
-                store = get_simulation_store(_sid)
-                queued_tasks = store.find_queued_tasks(simulation_type="lifecycle")
-                if queued_tasks:
-                    break
-
-            if not queued_tasks:
-                return  # No queued tasks — silent return
-
-            task = queued_tasks[0]  # FIFO: oldest first
-            task_id = str(task["task_id"])
-            scenario = task.get("scenario", "sentinel_annual")
-            logger.info(f"Found queued simulation task: {task_id}, scenario: {scenario}")
-
-            # Validate task has required fields
-            if not scenario:
-                logger.warning(f"Task {task_id} missing scenario, marking as stopped")
-                store.update_task_progress(task_id, {"status": "stopped", "error_message": "Missing scenario"})
-                return
-
-            # Check if already running (prevent double-start)
-            if get_simulation_by_task_id(task_id):
-                logger.info(f"Task {task_id} already running, skipping")
-                return
-
-            # Mark as running in JSON store
-            store.update_task_progress(task_id, {"status": "running"})
-            logger.info(f"Starting lifecycle simulation task {task_id}")
-
-            # Create a dedicated orchestrator per task/site.
-            # The global lifecycle singleton is not safe for queued multi-site runs.
-            site_id = task.get("site_id", site_ids[0] if site_ids else "unknown")
-            orchestrator = create_orchestrator(task_id=task_id, site_id=site_id)
-            register_simulation(task_id, orchestrator)
-
-            # Start simulation
-            await self._run_simulation_task(
-                task_id,
-                orchestrator,
-                scenario=scenario,
-                duration_minutes=float(task.get("duration_minutes", 3650.0)),
-            )
-
-        except Exception as e:
-            logger.error(f"Error in simulation queue processor: {e}", exc_info=True)
-            # If we marked a task as "running" but failed to start it, revert to stopped
-            # to prevent stale "running" state that causes frontend looping
-            if queued_tasks:
-                failed_task_id = str(queued_tasks[0].get("task_id", ""))
-                if failed_task_id and store:
-                    try:
-                        task_data = store.get_task_progress(failed_task_id)
-                        if task_data.get("status") == "running":
-                            store.update_task_progress(
-                                failed_task_id,
-                                {"status": "stopped", "error_message": f"Queue processor error: {e}"},
-                            )
-                            logger.info(f"Reverted failed task {failed_task_id} to stopped")
-                    except Exception:
-                        pass
-
-    async def _run_simulation_task(self, task_id: str, orchestrator, scenario: str, duration_minutes: float) -> None:
-        """
-        Run a lifecycle simulation task and update JSON store on completion.
-        Supports crash recovery by loading state from checkpoint if available.
-
-        Args:
-            task_id: Task identifier
-            orchestrator: LifecycleOrchestrator instance
-            scenario: Scenario name (fault_day, sentinel_annual, etc)
-            duration_minutes: Simulation duration in real minutes
-        """
-        from datetime import datetime
-
-        from app.services.lifecycle_orchestrator import ALL_SCENARIOS
-        from app.services.simulation_orchestrator import unregister_simulation
-        from app.services.simulation_store import get_simulation_store
-
-        _fallback_site = "unknown"
-        try:
-            from app.core.site_resolver import get_registered_site_ids as _get_sids
-
-            _sids = _get_sids()
-            if _sids:
-                _fallback_site = _sids[0]
-        except Exception:
-            pass
-        _orch_site = orchestrator.site_id if hasattr(orchestrator, "site_id") else _fallback_site
-        store = get_simulation_store(_orch_site)
-        is_recovery = False
-
-        try:
-            # Check if this is a crash recovery (has state_snapshot in JSON store)
-            task_data = store.get_task_progress(task_id)
-            state_snapshot = task_data.get("state_snapshot")
-
-            if state_snapshot:
-                is_recovery = True
-                logger.info(f"Recovering simulation from checkpoint: task {task_id}")
-
-            if is_recovery and state_snapshot:
-                # CRASH RECOVERY PATH: Restore full orchestrator state from checkpoint
-                orchestrator.current_scenario = ALL_SCENARIOS.get(scenario, ALL_SCENARIOS["sentinel_annual"])
-
-                is_annual_scenario = "annual" in scenario.lower()
-                orchestrator.max_days = 365 if is_annual_scenario else 1
-                orchestrator.max_cycles = 1
-                orchestrator.speed_multiplier = max(
-                    0.1, min(10000, float(state_snapshot.get("speed_multiplier", 10.0)))
-                )
-
-                # Restore all state from checkpoint via deserialize_state
-                restored = orchestrator.deserialize_state(state_snapshot)
-                orchestrator.simulated_time = restored.simulated_time
-                orchestrator.days_simulated = restored.days_simulated
-                orchestrator.time_multiplier = restored.time_multiplier
-                orchestrator._occupancy_seed = restored._occupancy_seed
-                orchestrator.active_faults = restored.active_faults
-                orchestrator.pending_repairs = restored.pending_repairs
-                orchestrator.events = restored.events
-                # Energy accumulators
-                orchestrator.total_energy_kwh = restored.total_energy_kwh
-                orchestrator.current_hour_power_kw = restored.current_hour_power_kw
-                orchestrator._cumulative_baseline_kwh = restored._cumulative_baseline_kwh
-                orchestrator._cumulative_sentinel_kwh = restored._cumulative_sentinel_kwh
-                orchestrator._cumulative_solar_gen_kwh = restored._cumulative_solar_gen_kwh
-                orchestrator._cumulative_bess_discharge_kwh = restored._cumulative_bess_discharge_kwh
-                orchestrator._solar_hour_index = restored._solar_hour_index
-                # Proportional control actuator state
-                orchestrator._actuator_state = restored._actuator_state
-                if orchestrator._occupancy_seed:
-                    orchestrator._scenario_rng.seed(orchestrator._occupancy_seed)
-
-                if orchestrator.seasonal_modeler is None and orchestrator.days_simulated > 0:
-                    from app.services.seasonal_modeler import SeasonalModeler
-
-                    orchestrator.seasonal_modeler = SeasonalModeler(seed=orchestrator._occupancy_seed)
-
-                orchestrator.real_start_time = datetime.now()
-                orchestrator.running = True
-                orchestrator.paused = False
-
-                logger.info(
-                    f"Restored checkpoint: day {orchestrator.days_simulated}/365, "
-                    f"time {orchestrator.simulated_time.isoformat()}"
-                )
-
-                orchestrator._task = asyncio.create_task(orchestrator._run_simulation())
-
-            else:
-                # FRESH START PATH
-                await orchestrator.start(scenario=scenario, duration_minutes=duration_minutes)
-
-            # Attach completion watcher for persistent simulations
-            if orchestrator._task:
-                logger.info(f"Simulation task {task_id} started - running in background")
-                store.update_task_progress(
-                    task_id,
-                    {
-                        "status": "running",
-                        "progress_pct": 0,
-                        "days_completed": 0,
-                    },
-                )
-
-                async def _watch_completion(sim_task_id: str, sim_async_task: asyncio.Task, sim_store):
-                    try:
-                        await sim_async_task
-                        logger.info(f"Simulation task {sim_task_id} finished normally")
-                    except asyncio.CancelledError:
-                        logger.info(f"Simulation task {sim_task_id} was cancelled")
-                    except Exception as sim_err:
-                        logger.error(f"Simulation task {sim_task_id} failed: {sim_err}")
-                        try:
-                            from datetime import datetime as dt
-
-                            sim_store.update_task_progress(
-                                sim_task_id,
-                                {
-                                    "status": "failed",
-                                    "error_message": str(sim_err)[:500],
-                                    "completed_at": dt.now().isoformat(),
-                                },
-                            )
-                        except Exception as store_err:
-                            logger.error(f"Failed to write failure status: {store_err}")
-                    finally:
-                        unregister_simulation(sim_task_id)
-
-                _watch_task = asyncio.create_task(_watch_completion(task_id, orchestrator._task, store))  # noqa: RUF006
-                return
-
-        except Exception as e:
-            logger.error(f"Simulation task {task_id} failed during setup: {e}")
-
-            store.update_task_progress(
-                task_id,
-                {
-                    "status": "failed",
-                    "error_message": str(e)[:500],
-                    "completed_at": datetime.now().isoformat(),
-                },
-            )
-
-            unregister_simulation(task_id)
 
     def add_integration_sync_job(self, interval_seconds: int = 900):
         """
