@@ -535,6 +535,29 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     }
 
 
+@router.get("/status/{site_id}")
+async def residential_site_status(site_id: str) -> dict:
+    """
+    Return current polling health for a residential site.
+    Used by Telegram bot to show connection status (SOLARMAN: healthy / degraded / backoff).
+    """
+    from app.services.residential.cloud_mqtt_bridge import get_cloud_bridge
+
+    bridge = get_cloud_bridge()
+    status = bridge.get_site_status(site_id)
+    if status is None:
+        return {"site_id": site_id, "status": "not_registered"}
+
+    if status["is_healthy"]:
+        status["status"] = "healthy"
+    elif status["in_backoff"]:
+        status["status"] = "backoff"
+    else:
+        status["status"] = "degraded"
+
+    return status
+
+
 # paho imported at module level for deactivation's null-publish use
 try:
     import paho.mqtt.client as mqtt

@@ -764,12 +764,19 @@ class ResidentialOnboardService:
         # Auth succeeded — reset rate limit
         _reset_rate_limit(chat_id)
 
+        # Inject SOLARMAN app_id/app_secret
+        extra = {}
+        if platform == "solarman":
+            from app.config.settings import settings as _settings
+
+            extra = {"app_id": _settings.solarman_app_id, "app_secret": _settings.solarman_app_secret}
+
         # Discover devices while we still have the credentials in memory
         try:
             manifests = asyncio.run(
                 asyncio.wait_for(
                     build_adapter(
-                        platform, {"email": email, "password": password, "site_id": site_id}
+                        platform, {"email": email, "password": password, "site_id": site_id}, **extra
                     ).discover_devices(),
                     timeout=30,
                 )
@@ -777,6 +784,10 @@ class ResidentialOnboardService:
         except Exception as exc:
             logger.warning("device discovery failed for chat_id=%s: %s", chat_id, exc)
             return "Could not discover your devices. Please try again later."
+
+        if not manifests:
+            _reset_rate_limit(chat_id)
+            return "No inverters found on this SOLARMAN account.\n\nIf you have equipment linked, check that it's properly connected to the SOLARMAN app first."
 
         # Encrypt site_config BEFORE it enters Redis — password never in plaintext in Redis
         site_config = {"email": email, "password": password, "site_id": site_id, "chat_id": chat_id}
@@ -975,7 +986,7 @@ class ResidentialOnboardService:
             manifests = asyncio.run(
                 asyncio.wait_for(
                     build_adapter(
-                        platform, {"email": email, "password": password, "site_id": site_id}
+                        platform, {"email": email, "password": password, "site_id": site_id}, **extra
                     ).discover_devices(),
                     timeout=30,
                 )

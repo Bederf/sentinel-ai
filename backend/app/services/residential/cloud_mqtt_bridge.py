@@ -72,6 +72,27 @@ class CloudToMQTTBridge:
         self._sites.pop(site_id, None)
         logger.info("Unregistered residential site %s", site_id)
 
+    def get_site_status(self, site_id: str) -> dict | None:
+        """Return current polling health for a site, or None if not registered."""
+        state = self._sites.get(site_id)
+        if state is None:
+            return None
+
+        in_backoff = time.monotonic() < state.backoff_until
+        seconds_until_retry = max(0, int(state.backoff_until - time.monotonic())) if in_backoff else 0
+        is_healthy = state.auth_failures < _MAX_AUTH_FAILURES and not in_backoff
+
+        return {
+            "site_id": site_id,
+            "auth_failures": state.auth_failures,
+            "max_auth_failures": _MAX_AUTH_FAILURES,
+            "in_backoff": in_backoff,
+            "seconds_until_retry": seconds_until_retry,
+            "in_low_soc_mode": state.in_low_soc_mode,
+            "devices_count": len(state.devices),
+            "is_healthy": is_healthy,
+        }
+
     async def poll_site(self, site_id: str) -> None:
         state = self._sites.get(site_id)
         if state is None:
