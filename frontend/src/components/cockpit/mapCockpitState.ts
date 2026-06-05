@@ -769,21 +769,16 @@ export function mapCockpitState(
       impact: locationSummary(narrative),
       summary: isShadowPhase
         ? 'Observe telemetry flow and model calibration.'
-        : (narrative?.action
-            ?? (equipmentWarnings.length > 0
-              ? `Investigate ${equipmentWarnings.length} equipment with low health scores`
-              : 'No action needed.')),
-      tradeoff: equipmentWarnings.length > 0
-      ? `${equipmentWarnings.length} equipment at health warning: ${equipmentWarnings.map((e) => `${e.code} (${e.health_score}/100)`).join(', ')}`
-      : secondarySummary,
+        : (narrative?.action ?? 'No action needed.'),
+      tradeoff: narrative
+        ? secondarySummary
+        : secondarySummary,
       confidence: isShadowPhase ? 'Shadow training mode' : payload.operator_guidance.headline,
     },
     visualTwin: {
       headline: narrative
         ? narrative.message
-        : equipmentWarnings.length > 0
-          ? `${equipmentWarnings.length} equipment at health warning`
-          : 'Building calm. No active dominant narrative.',
+        : 'Building calm. No active dominant narrative.',
       activeLabel: narrative?.location.epicenter ?? summary.siteName,
       modeLabel: titleCase(payload.operator_guidance.mode),
       motionProfile: tone === 'critical' ? 'alert' : tone === 'warning' || tone === 'elevated' ? 'watch' : 'calm',

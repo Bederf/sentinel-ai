@@ -199,22 +199,7 @@ function heroHeadline(state: CockpitState) {
   if (isWaitingState(state)) return 'Awaiting building signal'
   const sys = systemLabel(state.systemFilter)
   const prefix = sys ? `${sys} · ` : ''
-
-  // Nominal: stable time value AND no dominant narrative
-  if (state.primaryMetric.value === 'Stable' && state.equipmentWarnings.length === 0) {
-    return `${prefix}All systems nominal`
-  }
-
-  // Has a real dominant narrative — show it
-  if (hasDominantNarrative(state)) {
-    const summary = state.activeCondition.summary
-    const maxLen = 200
-    if (summary.length > maxLen) {
-      const lastSpace = summary.lastIndexOf(' ', maxLen)
-      if (lastSpace === -1 || lastSpace < 10) return `${prefix}${summary.slice(0, maxLen - 1)}…`
-      return `${prefix}${summary.slice(0, lastSpace)}…`
-    }
-    return `${prefix}${summary}`
+  if (state.primaryMetric.value === 'Stable') return `${prefix}All systems nominal`
   }
 
   // No dominant narrative — show posture-based label, not equipment list
@@ -228,14 +213,8 @@ function heroSubheadline(state: CockpitState) {
   if (state.site.onboardingPhase === 'shadow') {
     return `${state.site.name} is in shadow training mode. Cockpit is rendering pure live telemetry flow with no SENTINEL intervention.`
   }
-  if (state.primaryMetric.value === 'Stable' && state.equipmentWarnings.length === 0) {
-    return `${state.site.name} remains within operating margin. SENTINEL is observing for cross-system drift.`
-  }
-  // Has a real dominant narrative — show its rationale
-  if (hasDominantNarrative(state)) return state.activeCondition.rationale
-
-  // No dominant narrative — show posture context, not equipment list
-  return `${state.site.name} remains within operating margin. SENTINEL is observing for cross-system drift.`
+  if (state.primaryMetric.value === 'Stable') return `${state.site.name} remains within operating margin. SENTINEL is observing for cross-system drift.`
+  return state.activeCondition.rationale
 }
 
 function siteSummary(state: CockpitState) {
@@ -290,12 +269,16 @@ function buildQueue(state: CockpitState): QueueItem[] {
     ]
   }
 
-  // Dominant narrative exists — use emerging risks / secondary tensions
-  if (hasDominantNarrative(state) && state.emergingRisks.length > 0) {
-    return state.emergingRisks.slice(0, 3).map((item, index) => ({
-      severity: queueSeverity(state, item, index),
-      title: item.title,
-      cause: item.detail,
+  // Equipment warnings from health thresholding — surface in signal queue only when
+  // an active operational narrative exists. When the building is Stable, equipment
+  // health is informational (visible in the equipment tab), not a queue-driver.
+  if (state.primaryMetric.value !== 'Stable' && state.equipmentWarnings.length > 0) {
+    return state.equipmentWarnings.slice(0, 3).map((eq, index) => ({
+      severity: eq.healthState === 'critical' ? 'Critical' : 'Escalating' as const,
+      title: `${eq.equipmentCode} · ${eq.equipmentType}`,
+      cause: eq.faultType
+        ? `${eq.faultType} · Health score ${eq.healthScore}/100`
+        : `Health score ${eq.healthScore}/100 · Floor ${eq.floorId}`,
       impact: index === 0
         ? state.decision.summary
         : state.primaryMetric.value === 'Stable'
@@ -346,10 +329,9 @@ function buildForecast(state: CockpitState) {
 
   const floorIds = state.visualTwin.floors.filter(f => f.isManaged).map(f => f.id).join(', ')
 
-  // Modules value: dominant narrative → emerging risk → stable label
-  // Never show raw equipment warning list here — that's the equipment tab's job
+  // Modules value: equipment warnings only under active narrative, else show risks or stable
   let modulesValue: string
-  if (hasDominantNarrative(state) && state.equipmentWarnings.length > 0) {
+  if (state.primaryMetric.value !== 'Stable' && state.equipmentWarnings.length > 0) {
     const top = state.equipmentWarnings[0]
     const others = state.equipmentWarnings.length - 1
     const equipLabel = `${top.equipmentCode} · ${top.equipmentType}`
