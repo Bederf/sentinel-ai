@@ -296,19 +296,8 @@ class ResidentialOnboardService:
         # Notify user immediately — auth runs in background
         _send(chat_id, "🔐 Connecting to your account...\n\n(This takes up to a few minutes)")
 
-        # Fire background task to complete onboarding without blocking the webhook
-        import asyncio
-
-        try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(self._background_discover_and_onboard(chat_id, platform, email, password))  # noqa: RUF006
-            else:
-                asyncio.run(
-                    asyncio.create_task(self._background_discover_and_onboard(chat_id, platform, email, password))
-                )
-        except Exception as exc:
-            logger.warning("Could not schedule background onboarding for chat_id=%s: %s", chat_id, exc)
+        # Fire background thread to complete onboarding without blocking the webhook
+        self._background_discover_and_onboard(chat_id, platform, email, password)
         return True
 
     def _handle_ha_tunnel_ready_text(self, chat_id: int, text: str, state) -> bool:
