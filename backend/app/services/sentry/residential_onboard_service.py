@@ -812,12 +812,9 @@ class ResidentialOnboardService:
         # Delete password message IMMEDIATELY — fire-and-forget
         _delete(chat_id, message_id)
 
-        # Inject platform-specific extras BEFORE building adapter
         extra = {}
         if platform == "solarman":
-            from app.config.settings import settings as _settings
-
-            extra = {"app_id": _settings.solarman_app_id, "app_secret": _settings.solarman_app_secret}
+            extra = {"app_id": settings.solarman_app_id, "app_secret": settings.solarman_app_secret}
 
         # Build adapter
         try:
@@ -1112,8 +1109,11 @@ class ResidentialOnboardService:
         email = state.data.get("email", "")
 
         try:
+            extra = {}
+            if platform == "solarman":
+                extra = {"app_id": settings.solarman_app_id, "app_secret": settings.solarman_app_secret}
             polling_config = {"email": email, "password": "", "site_id": site_id}
-            adapter = build_adapter(platform, polling_config)
+            adapter = build_adapter(platform, polling_config, **extra)
             add_residential_polling_job(site_id=site_id, adapter=adapter, interval_seconds=300)
         except Exception as exc:
             logger.warning("Failed to schedule residential polling for %s: %s", site_id, exc)
