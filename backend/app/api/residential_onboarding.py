@@ -4,6 +4,7 @@ import asyncio
 import json
 import logging
 import re
+from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -535,11 +536,9 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     tier = "free"
     if request.sentinel_api_key:
         try:
-            from app.middleware.auth_middleware import _validate_api_key
-
-            key_data = await _validate_api_key(request.sentinel_api_key)
-            if key_data:
-                tier = key_data.get("tier", "paid")
+            key_result = supabase.table("residential_api_keys").select("tier").eq("api_key", request.sentinel_api_key).eq("is_active", True).execute()
+            if key_result.data:
+                tier = key_result.data[0].get("tier", "paid")
         except Exception as exc:
             logger.warning("API key validation failed for %s: %s", site_id, exc)
 

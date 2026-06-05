@@ -200,7 +200,6 @@ function heroHeadline(state: CockpitState) {
   const sys = systemLabel(state.systemFilter)
   const prefix = sys ? `${sys} · ` : ''
   if (state.primaryMetric.value === 'Stable') return `${prefix}All systems nominal`
-  }
 
   // No dominant narrative — show posture-based label, not equipment list
   const posture = state.site.posture

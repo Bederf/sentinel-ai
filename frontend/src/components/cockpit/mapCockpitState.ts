@@ -582,6 +582,22 @@ export function mapCockpitState(
   const secondaryTensions = matchVoices.length > 0
     ? payload.secondary_tensions.filter((t) => matchVoices.includes(t.voice))
     : payload.secondary_tensions
+
+  // Filter equipment warnings by system tab — e.g. HVAC tab shows only hvac equipment
+  const SYSTEM_EQUIPMENT_FILTER: Record<string, string[]> = {
+    hvac: ['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler'],
+    energy: ['generator', 'ups', 'bess', 'meter', 'inverter', 'solar_panel', 'solar_inverter', 'transformer'],
+    lighting: ['dali', 'luminaire', 'lighting_panel', 'lighting_driver', 'scene_controller'],
+    water: ['water_meter', 'pump'],
+    fire: ['fire_alarm', 'sprinkler', 'fire_panel'],
+    security: ['access_control', 'access_control_server', 'cctv', 'gate', 'door'],
+    "solar-bess": ['solar_panel', 'inverter', 'bess', 'meter'],
+  }
+  const allowedTypes = systemFilter ? (SYSTEM_EQUIPMENT_FILTER[systemFilter] ?? []) : []
+  const filteredEquipmentWarnings = allowedTypes.length > 0
+    ? equipmentWarnings.filter((eq) => allowedTypes.includes(eq.equipment_type ?? eq.type ?? ''))
+    : equipmentWarnings
+
   const urgencyScore = payload.urgency_score ?? 0
   const bands = { low: 0.3, medium: 0.5, high: 0.7, critical: 0.9 }
   const timeToBreach = narrative?.time_to_breach_min ?? null
@@ -725,9 +741,9 @@ export function mapCockpitState(
     sitePulse: {
       tone,
       attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
-      activeConditionCount: narrative ? 1 : (secondaryTensions.length + equipmentWarnings.length),
-      emergingRiskCount: secondaryTensions.length + (equipmentWarnings?.length ?? 0),
-      equipmentWarningCount: equipmentWarnings.length,
+      activeConditionCount: narrative ? 1 : (secondaryTensions.length + filteredEquipmentWarnings.length),
+      emergingRiskCount: secondaryTensions.length + (filteredEquipmentWarnings?.length ?? 0),
+      equipmentWarningCount: filteredEquipmentWarnings.length,
       evidenceStrength: narrative ? 'moderate' : 'weak',
     },
     primaryMetric: {
@@ -747,8 +763,8 @@ export function mapCockpitState(
       summary: isShadowPhase
         ? shadowSummary
         : (narrative?.message
-            ?? (equipmentWarnings.length > 0
-              ? `${equipmentWarnings.length} equipment at health warning`
+            ?? (filteredEquipmentWarnings.length > 0
+              ? `${filteredEquipmentWarnings.length} equipment at health warning`
               : secondaryTensions.length > 0
                 ? `${secondaryTensions.length} emerging risk${secondaryTensions.length !== 1 ? 's' : ''} detected`
                 : 'Building is calm.')),
@@ -757,14 +773,14 @@ export function mapCockpitState(
         : (
           narrative
             ? `${formatVoiceLabel(narrative.voice)} centered on ${locationSummary(narrative)}.`
-              : equipmentWarnings.length > 0
+            : filteredEquipmentWarnings.length > 0
                 ? (() => {
-                    const crit = equipmentWarnings.filter((e) => (e.health_score ?? 100) < 40).length
-                    const warn = equipmentWarnings.length - crit
+                    const crit = filteredEquipmentWarnings.filter((e) => (e.health_score ?? 100) < 40).length
+                    const warn = filteredEquipmentWarnings.length - crit
                     const parts: string[] = []
                     if (crit > 0) parts.push(`${crit} critical`)
                     if (warn > 0) parts.push(`${warn} warning`)
-                    return `${equipmentWarnings.length} equipment affected — ${parts.join(', ')}.`
+                    return `${filteredEquipmentWarnings.length} equipment affected — ${parts.join(', ')}.`
                   })()
               : secondaryTensions.length > 0
                 ? secondaryTensions.map((t) => t.message).join(' ')
@@ -858,7 +874,7 @@ export function mapCockpitState(
       detail: tension.message,
     })),
     emailClusters,
-    equipmentWarnings: (equipmentWarnings ?? []).map((eq) => ({
+    equipmentWarnings: (filteredEquipmentWarnings ?? []).map((eq) => ({
       id: eq.id,
       equipmentId: eq.equipment_id,
       equipmentCode: eq.code,
