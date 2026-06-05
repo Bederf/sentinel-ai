@@ -704,7 +704,7 @@ class ResidentialOnboardService:
         supabase = get_supabase_client()
 
         # Check for existing site (re-connect scenario)
-        existing = supabase.table("residential_sites").select("eskom_area_code").eq("site_id", site_id).execute()
+        existing = supabase.table("residential_sites").select("id,eskom_area_code").eq("site_id", site_id).eq("is_active", True).execute()
         has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
 
         site_row = {
@@ -721,9 +721,12 @@ class ResidentialOnboardService:
             "onboarding_method": "telegram_bot",
         }
 
-        result = supabase.table("residential_sites").upsert(site_row, on_conflict="site_id").execute()
-        if not result.data:
-            return "Failed to save your site. Please try again later."
+        if existing.data:
+            supabase.table("residential_sites").update(site_row).eq("id", existing.data[0]["id"]).execute()
+        else:
+            result = supabase.table("residential_sites").insert(site_row).execute()
+            if not result.data:
+                return "Failed to save your site. Please try again later."
 
         # Clear state
         self._state.clear(chat_id)
@@ -897,10 +900,6 @@ class ResidentialOnboardService:
 
         supabase = get_supabase_client()
 
-        # Check if eskom_area_code already set (re-connect scenario)
-        existing = supabase.table("residential_sites").select("eskom_area_code").eq("site_id", site_id).execute()
-        has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
-
         site_row = {
             "site_id": site_id,
             "platform": platform,
@@ -915,11 +914,18 @@ class ResidentialOnboardService:
             "onboarding_method": "telegram_bot",
         }
 
-        result = supabase.table("residential_sites").upsert(site_row, on_conflict="site_id").execute()
-        if not result.data:
-            return "Failed to save your site. Please contact support."
+        # Check if already registered (re-connect scenario)
+        existing = supabase.table("residential_sites").select("id,eskom_area_code").eq("site_id", site_id).eq("is_active", True).execute()
+        has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
 
-        residential_site_id = result.data[0]["id"]
+        if existing.data:
+            residential_site_id = existing.data[0]["id"]
+            supabase.table("residential_sites").update(site_row).eq("id", residential_site_id).execute()
+        else:
+            result = supabase.table("residential_sites").insert(site_row).execute()
+            if not result.data:
+                return "Failed to save your site. Please contact support."
+            residential_site_id = result.data[0]["id"]
 
         # Save devices (manifest_dicts are already plain dicts from state)
         device_rows = [
