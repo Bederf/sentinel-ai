@@ -812,14 +812,12 @@ class WorkOrderNotifier:
     async def _send_telegram_notification(
         self, work_order_data: dict[str, Any], service_record: dict[str, Any]
     ) -> bool:
-        """Send Telegram notification to technician via Sentry bot CLI."""
-        import subprocess
+        """Send Telegram notification to technician via Telegram Bot API directly."""
+        import httpx
 
         try:
             technician_id = str(work_order_data.get("technician_id") or "").strip()
-            # Skip if no Telegram ID, or if it's clearly an email (not a numeric Telegram chat ID)
             if not technician_id or "@" in technician_id:
-                # No valid Telegram ID — skip (email fallback still works)
                 logger.info(
                     "No Telegram ID for %s (technician_id=%r) — skipping Telegram send",
                     work_order_data.get("technician_name"),
@@ -827,17 +825,20 @@ class WorkOrderNotifier:
                 )
                 return False
 
-            from app.services.sentry_integration.config import get_sentry_bot_cli
+            from app.config.settings import settings
 
-            # Prefer code from payload; fall back to DB lookup to avoid showing UUID in /done command
+            bot_token = settings.sentry_client_bot_token
+            if not bot_token:
+                logger.warning("SENTRY_CLIENT_BOT_TOKEN not configured")
+                return False
+
             wo_ref = (
                 work_order_data.get("code")
-                or work_order_data.get("work_order_code")  # sent by bms_desk_wo.py
+                or work_order_data.get("work_order_code")
                 or work_order_data.get("work_order_id", "WO-???")
             )
             pri = work_order_data.get("criticality", "MEDIUM").upper()
             equipment_code = work_order_data.get("equipment_code", "")
-            code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
             eq_line = f"\nEquipment: {equipment_code}" if equipment_code else ""
 
             reported_by = work_order_data.get("reported_by", "")
@@ -869,47 +870,38 @@ class WorkOrderNotifier:
                 lines.append(problem)
             msg = "\n".join(lines)
 
-            # Build inline buttons for the technician
-            import json
-
-            # For complaint WOs without specific equipment, use desk number for zone lookup
+            code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
             desk_number = work_order_data.get("desk_number", "")
             info_ref = code_dashed or (desk_number if desk_number.isdigit() else "")
             note_ref = code_dashed or ""
             info_value = f"/info-{info_ref}" if info_ref else ""
             note_value = f"/note-{note_ref}" if note_ref else ""
             done_value = f"done #{wo_ref}"
-            # Buttons as separate rows attached to the message
-            btn_rows = []
+            inline_keyboard = []
+            row = []
             if info_value:
-                btn_rows.append([{"label": "📋 Info", "value": info_value, "style": "primary"}])
+                row.append({"text": "📋 Info", "callback_data": info_value})
             if note_value:
-                btn_rows.append([{"label": "📝 Notes", "value": note_value, "style": "primary"}])
-            btn_rows.append([{"label": "✅ Done", "value": done_value, "style": "success"}])
-            presentation = {"blocks": [{"type": "buttons", "buttons": row} for row in btn_rows]}
+                row.append({"text": "📝 Notes", "callback_data": note_value})
+            if row:
+                inline_keyboard.append(row)
+            inline_keyboard.append([{"text": "✅ Done", "callback_data": done_value}])
 
-            cli = get_sentry_bot_cli()
-            result = await asyncio.to_thread(
-                subprocess.run,
-                [
-                    cli,
-                    "message",
-                    "send",
-                    "--channel",
-                    "telegram",
-                    "--account",
-                    "technician",
-                    "--target",
-                    technician_id,
-                    "--message",
-                    msg,
-                    "--presentation",
-                    json.dumps(presentation),
-                ],
-                timeout=15,
-                capture_output=True,
-            )
-            if result.returncode == 0:
+            payload = {
+                "chat_id": technician_id,
+                "text": msg,
+                "parse_mode": "HTML",
+                "reply_markup": {"inline_keyboard": inline_keyboard},
+            }
+
+            async with httpx.AsyncClient(timeout=15) as client:
+                resp = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json=payload,
+                )
+                result = resp.json()
+
+            if result.get("ok"):
                 logger.info("Telegram sent to %s for %s", technician_id, wo_ref)
                 await self._log_delivery(
                     work_order_data=work_order_data,
@@ -919,13 +911,13 @@ class WorkOrderNotifier:
                     recipient_identifier=technician_id,
                     title=f"Work Order {wo_ref}",
                     body=msg,
-                    provider="sentry",
-                    external_message_id=None,
+                    provider="telegram_direct",
+                    external_message_id=str(result.get("result", {}).get("message_id", "")),
                 )
                 return True
             else:
-                stderr = result.stderr.decode("utf-8", errors="replace") if result.stderr else ""
-                logger.warning("Telegram send failed for %s: %s", wo_ref, stderr)
+                err = result.get("description", "unknown error")
+                logger.warning("Telegram send failed for %s: %s", wo_ref, err)
                 await self._log_delivery(
                     work_order_data=work_order_data,
                     service_record=service_record,
@@ -934,9 +926,9 @@ class WorkOrderNotifier:
                     recipient_identifier=technician_id,
                     title=f"Work Order {wo_ref}",
                     body=msg,
-                    provider="sentry",
-                    error_code="non-zero-exit",
-                    error_message=stderr,
+                    provider="telegram_direct",
+                    error_code=result.get("error_code", "unknown"),
+                    error_message=err,
                 )
                 return False
         except Exception as e:
@@ -949,7 +941,7 @@ class WorkOrderNotifier:
                 recipient_identifier=str(work_order_data.get("technician_id") or ""),
                 title=f"Work Order {work_order_data.get('code', '?')}",
                 body="",
-                provider="sentry",
+                provider="telegram_direct",
                 error_code="exception",
                 error_message=str(e),
             )

@@ -283,4 +283,4 @@ class ResidentialRecommendationService:
 def _rec_hash(rec: ResidentialRecommendation) -> str:
     """Hash of site_id + title + severity — not just title."""
     data = f"{rec.title}:{rec.severity}"
-    return hashlib.sha1(data.encode()).hexdigest()[:12]
+    return hashlib.sha1(data.encode()).hexdigest()[:12]  # nosec - dedup hash, not security
