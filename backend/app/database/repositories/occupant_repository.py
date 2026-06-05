@@ -69,7 +69,6 @@ class SiteOccupantRepository:
             logger.warning("Supabase client not available")
             return None
         try:
-
             resolved = self._resolve_site_uuid(site_id)
             data = {
                 "site_id": resolved,

@@ -299,6 +299,7 @@ class HealthRatingCalculator:
         """
         # Gate: skip non-scoreable equipment types (lighting_panel, access_control, etc.)
         from app.config.health_config import get_scoreability
+
         score_cfg = get_scoreability(equipment.get("type", ""))
         if not score_cfg.get("scoreable", False):
             return HealthRating(

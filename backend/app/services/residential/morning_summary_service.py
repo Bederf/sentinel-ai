@@ -68,7 +68,9 @@ class MorningSummaryService:
         try:
             if settings.residential_mqtt_username:
                 client.username_pw_set(settings.residential_mqtt_username, settings.residential_mqtt_password)
-            client.connect(settings.residential_mqtt_broker or "127.0.0.1", settings.residential_mqtt_port, keepalive=10)
+            client.connect(
+                settings.residential_mqtt_broker or "127.0.0.1", settings.residential_mqtt_port, keepalive=10
+            )
             client.on_message = _on_message
             topics = [
                 f"sentinel/{site_id}/energy/battery_soc_pct",
@@ -174,7 +176,9 @@ class MorningSummaryService:
         """Async entry point for APScheduler to send the morning summary."""
         try:
             sb = get_supabase_client()
-            row = sb.table("residential_sites").select("chat_id, eskom_area_code").eq("site_id", site_id).maybe_execute()
+            row = (
+                sb.table("residential_sites").select("chat_id, eskom_area_code").eq("site_id", site_id).maybe_execute()
+            )
             if not row.data:
                 return
             chat_id = row.data[0].get("chat_id")

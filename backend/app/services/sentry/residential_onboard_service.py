@@ -706,14 +706,22 @@ class ResidentialOnboardService:
         # Ensure sites record exists (FK: residential_sites.site_id -> sites.code)
         site_check = supabase.table("sites").select("code").eq("code", site_id).execute()
         if not site_check.data:
-            supabase.table("sites").insert({
-                "code": site_id,
-                "name": site_id,
-                "onboarding_phase": "commissioning",
-            }).execute()
+            supabase.table("sites").insert(
+                {
+                    "code": site_id,
+                    "name": site_id,
+                    "onboarding_phase": "commissioning",
+                }
+            ).execute()
 
         # Check for existing site (re-connect scenario)
-        existing = supabase.table("residential_sites").select("id,eskom_area_code").eq("site_id", site_id).eq("is_active", True).execute()
+        existing = (
+            supabase.table("residential_sites")
+            .select("id,eskom_area_code")
+            .eq("site_id", site_id)
+            .eq("is_active", True)
+            .execute()
+        )
         has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
 
         site_row = {
@@ -909,11 +917,13 @@ class ResidentialOnboardService:
         # Ensure sites record exists (FK: residential_sites.site_id -> sites.code)
         site_check = supabase.table("sites").select("code").eq("code", site_id).execute()
         if not site_check.data:
-            supabase.table("sites").insert({
-                "code": site_id,
-                "name": site_id,
-                "onboarding_phase": "commissioning",
-            }).execute()
+            supabase.table("sites").insert(
+                {
+                    "code": site_id,
+                    "name": site_id,
+                    "onboarding_phase": "commissioning",
+                }
+            ).execute()
 
         site_row = {
             "site_id": site_id,
@@ -930,7 +940,13 @@ class ResidentialOnboardService:
         }
 
         # Check if already registered (re-connect scenario)
-        existing = supabase.table("residential_sites").select("id,eskom_area_code").eq("site_id", site_id).eq("is_active", True).execute()
+        existing = (
+            supabase.table("residential_sites")
+            .select("id,eskom_area_code")
+            .eq("site_id", site_id)
+            .eq("is_active", True)
+            .execute()
+        )
         has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
 
         if existing.data:

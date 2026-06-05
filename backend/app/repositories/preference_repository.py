@@ -40,9 +40,7 @@ class PreferenceRepository:
         )
         return [UserPreference(**row) for row in (result.data or [])]
 
-    async def fetch_by_type(
-        self, site_id: str, user_id: str, preference_type: PreferenceType
-    ) -> UserPreference | None:
+    async def fetch_by_type(self, site_id: str, user_id: str, preference_type: PreferenceType) -> UserPreference | None:
         """Fetch a single preference by type for a user."""
         client = get_supabase_client()
         result = (

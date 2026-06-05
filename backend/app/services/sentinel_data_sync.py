@@ -424,6 +424,7 @@ class SentinelDataSync:
 
             # Skip non-scoreable equipment types (lighting_panel, access_control, etc.)
             from app.config.health_config import get_scoreability
+
             eq_meta = equipment_meta.get(code, {})
             eq_type = eq_meta.get("type", "")
             score_cfg = get_scoreability(eq_type)
@@ -616,6 +617,7 @@ class SentinelDataSync:
 
             # Skip non-scoreable equipment types
             from app.config.health_config import get_scoreability
+
             score_cfg = get_scoreability(eq.get("type", ""))
             if not score_cfg.get("scoreable", False):
                 continue

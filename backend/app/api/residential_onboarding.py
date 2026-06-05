@@ -519,7 +519,9 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     }
 
     try:
-        existing = supabase.table("residential_sites").select("id").eq("site_id", site_id).eq("is_active", True).execute()
+        existing = (
+            supabase.table("residential_sites").select("id").eq("site_id", site_id).eq("is_active", True).execute()
+        )
         if existing.data:
             supabase.table("residential_sites").update(site_row).eq("id", existing.data[0]["id"]).execute()
         else:
@@ -536,7 +538,13 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     tier = "free"
     if request.sentinel_api_key:
         try:
-            key_result = supabase.table("residential_api_keys").select("tier").eq("api_key", request.sentinel_api_key).eq("is_active", True).execute()
+            key_result = (
+                supabase.table("residential_api_keys")
+                .select("tier")
+                .eq("api_key", request.sentinel_api_key)
+                .eq("is_active", True)
+                .execute()
+            )
             if key_result.data:
                 tier = key_result.data[0].get("tier", "paid")
         except Exception as exc:
@@ -549,6 +557,7 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
                 schedule_residential_recommendations,
                 schedule_morning_summary,
             )
+
             schedule_residential_recommendations(site_id)
             schedule_morning_summary(site_id)
         except Exception as exc:
@@ -717,7 +726,7 @@ async def residential_telegram_webhook(request: Request):
                     "3. Add: https://github.com/sentinel/ha-addon-repo\n"
                     "4. Browse store → SENTINEL Home → Install\n"
                     "5. Start the add-on → it will auto-register\n\n"
-                    "Once connected, I'll notify you here."
+                    "Once connected, I'll notify you here.",
                 )
                 return JSONResponse(content={"status": "ha_guide"})
 
@@ -768,7 +777,7 @@ async def residential_telegram_webhook(request: Request):
 
         if text.startswith("/control "):
             sender = ResidentialTelegramSender()
-            parts = text[len("/control "):].strip().split(None, 1)
+            parts = text[len("/control ") :].strip().split(None, 1)
             if len(parts) == 2:
                 result = await _ha_control_send(chat_id, parts[0], parts[1])
             else:
@@ -790,6 +799,7 @@ async def residential_telegram_webhook(request: Request):
 
     except Exception:
         import traceback
+
         tb = traceback.format_exc()
         logger.exception("webhook error: %s", tb)
         return JSONResponse(status_code=500, content={"status": "error", "detail": tb[:500]})

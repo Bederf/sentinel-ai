@@ -41,7 +41,13 @@ def main() -> int:
     print(f"SOLARMAN_APP_SECRET: {_bool_str(has_solarman_secret)}")
 
     # Aggregate status
-    ok = has_public_broker and has_backend_mqtt_user and has_backend_mqtt_pass and has_solarman_id and has_solarman_secret
+    ok = (
+        has_public_broker
+        and has_backend_mqtt_user
+        and has_backend_mqtt_pass
+        and has_solarman_id
+        and has_solarman_secret
+    )
 
     print("--------------------------------------")
     if ok:

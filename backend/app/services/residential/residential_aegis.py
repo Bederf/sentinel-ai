@@ -219,7 +219,7 @@ def evaluate(
                         f"use free solar instead of exporting."
                     ),
                     triggered=True,
-            )
+                )
             )
 
         # NEW (Phase 217): Multi-inverter mismatch (Deye/Sunsynk, PV arrays)

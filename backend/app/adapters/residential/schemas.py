@@ -23,7 +23,7 @@ class EnergySnapshot:
     ev_charger_power_w: float | None = None
     # Optional extensions for multi-inverter and Pylontech battery temp
     pv_powers: list[float] | None = None  # per-inverter PV power list when available
-    battery_temp_c: float | None = None   # battery temperature (C) when available
+    battery_temp_c: float | None = None  # battery temperature (C) when available
 
 
 @dataclass

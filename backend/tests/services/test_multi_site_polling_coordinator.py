@@ -113,7 +113,6 @@ class TestPollAll:
             mock_svc.poll = MagicMock(return_value=_mock_poll_result("site-002"))
             mock_svc_cls.return_value = mock_svc
 
-
             async def _async_result(*a, **kw):
                 return _mock_poll_result("site-002")
 
@@ -168,11 +167,14 @@ class TestPollAll:
         coordinator = MultiSitePollingCoordinator()
 
         # Simulate only site-002 returned (site-001 filtered out by DB query)
-        with patch.object(
-            coordinator,
-            "_fetch_enabled_bridge_configs",
-            return_value={"site-002": BRIDGE_CONFIG_S002},
-        ), patch("app.services.multi_site_polling_coordinator.ShadowModePollingService") as mock_svc_cls:
+        with (
+            patch.object(
+                coordinator,
+                "_fetch_enabled_bridge_configs",
+                return_value={"site-002": BRIDGE_CONFIG_S002},
+            ),
+            patch("app.services.multi_site_polling_coordinator.ShadowModePollingService") as mock_svc_cls,
+        ):
             mock_svc = MagicMock()
 
             async def _poll():

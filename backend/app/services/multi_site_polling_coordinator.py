@@ -58,6 +58,7 @@ class MultiSitePollingCoordinator:
         logger.info("[COORDINATOR] Polling %d site(s): %s", len(configs), list(configs))
 
         from app.services.background_scheduler import scheduler_service
+
         _main = scheduler_service._main_loop
         if not _main or not _main.is_running():
             logger.error("[COORDINATOR] Main event loop not available — cannot poll")
@@ -66,9 +67,7 @@ class MultiSitePollingCoordinator:
         for site_id, connection_config in configs.items():
             try:
                 svc = self._get_or_create_service(site_id, connection_config)
-                result = asyncio.run_coroutine_threadsafe(
-                    svc.poll(), _main
-                ).result(timeout=120)
+                result = asyncio.run_coroutine_threadsafe(svc.poll(), _main).result(timeout=120)
                 results[site_id] = result
                 errors = result.get("errors", [])
                 all_failed = bool(errors) and result.get("equipment_states", 0) == 0

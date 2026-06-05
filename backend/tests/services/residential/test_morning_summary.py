@@ -9,8 +9,8 @@ class TestMorningSummary:
     @patch("app.services.residential.morning_summary_service.get_supabase_client")
     @patch("app.services.residential.morning_summary_service.ResidentialTelegramSender")
     def test_send_summary_uses_sender(self, mock_sender_cls, mock_sb):
-        mock_sb.return_value.table.return_value.select.return_value.eq.return_value.maybe_execute.return_value = MagicMock(
-            data=[{"chat_id": 99999, "eskom_area_code": None}]
+        mock_sb.return_value.table.return_value.select.return_value.eq.return_value.maybe_execute.return_value = (
+            MagicMock(data=[{"chat_id": 99999, "eskom_area_code": None}])
         )
         sender = MagicMock()
         sender.send_text = AsyncMock(return_value=True)

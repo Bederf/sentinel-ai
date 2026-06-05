@@ -655,6 +655,7 @@ async def openapi_json():
 def _require_bearer_auth(authorization: str | None) -> tuple[bool, JSONResponse | None]:
     """Check Bearer auth. Returns (ok, error_response). If ok=True, caller proceeds."""
     from app.config.settings import settings
+
     expected_key = getattr(settings, "mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
     if not expected_key:
         logger.error("MCP API key not configured — auth disabled")
@@ -706,9 +707,11 @@ async def _tool_endpoint(tool_name: str, request_data: dict | None, authorizatio
 
 def _tool_endpoint_with_auth(tool_name: str):
     """Decorator factory: creates auth-gated tool endpoint."""
+
     async def wrapper(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
         body = await request.json() if request.body else {}
         return await _tool_endpoint(tool_name, body, authorization)
+
     return wrapper
 
 
@@ -725,37 +728,49 @@ async def tool_fetch(request: Request, authorization: str | None = Header(defaul
 
 
 @router.post("/get_site_status", include_in_schema=False)
-async def tool_get_site_status(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_site_status(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_site_status", body, authorization)
 
 
 @router.post("/get_recommendations", include_in_schema=False)
-async def tool_get_recommendations(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_recommendations(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_recommendations", body, authorization)
 
 
 @router.post("/trace_recommendation", include_in_schema=False)
-async def tool_trace_recommendation(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_trace_recommendation(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("trace_recommendation", body, authorization)
 
 
 @router.post("/inspect_equipment", include_in_schema=False)
-async def tool_inspect_equipment(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_inspect_equipment(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("inspect_equipment", body, authorization)
 
 
 @router.post("/get_roi_summary", include_in_schema=False)
-async def tool_get_roi_summary(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_roi_summary(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_roi_summary", body, authorization)
 
 
 @router.post("/analyze_impact", include_in_schema=False)
-async def tool_analyze_impact(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_analyze_impact(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("analyze_impact", body, authorization)
 
@@ -767,37 +782,49 @@ async def tool_compare_sites(request: Request, authorization: str | None = Heade
 
 
 @router.post("/get_curtailable_load", include_in_schema=False)
-async def tool_get_curtailable_load(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_curtailable_load(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_curtailable_load", body, authorization)
 
 
 @router.post("/get_odse_export", include_in_schema=False)
-async def tool_get_odse_export(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_odse_export(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_odse_export", body, authorization)
 
 
 @router.post("/search_knowledge", include_in_schema=False)
-async def tool_search_knowledge(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_search_knowledge(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("search_knowledge", body, authorization)
 
 
 @router.post("/get_knowledge_detail", include_in_schema=False)
-async def tool_get_knowledge_detail(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_knowledge_detail(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_knowledge_detail", body, authorization)
 
 
 @router.post("/get_work_orders", include_in_schema=False)
-async def tool_get_work_orders(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_work_orders(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_work_orders", body, authorization)
 
 
 @router.post("/get_work_order", include_in_schema=False)
-async def tool_get_work_order(request: Request, authorization: str | None = Header(default=None, alias="Authorization")):
+async def tool_get_work_order(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
     body = await request.json()
     return await _tool_endpoint("get_work_order", body, authorization)
 

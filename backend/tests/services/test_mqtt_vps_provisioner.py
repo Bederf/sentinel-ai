@@ -17,7 +17,9 @@ class TestMQTTVPSProvisioner:
             lambda: MagicMock(
                 table=lambda *_: MagicMock(
                     select=lambda *_: MagicMock(eq=lambda *_: MagicMock(maybe_execute=lambda: MagicMock(data=[]))),
-                    update=lambda *_: MagicMock(eq=lambda *_: MagicMock(execute=lambda: MagicMock(data=[{"ok": True}])))
+                    update=lambda *_: MagicMock(
+                        eq=lambda *_: MagicMock(execute=lambda: MagicMock(data=[{"ok": True}]))
+                    ),
                 )
             ),
         )
@@ -44,6 +46,7 @@ class TestMQTTVPSProvisioner:
             def connect(self, *a, **kw):
                 # Immediately simulate receipt of retained online
                 if self.on_message:
+
                     class Msg:
                         topic = "homeassistant/status"
                         payload = b"online"
@@ -82,7 +85,7 @@ class TestMQTTVPSProvisioner:
         def _sb():
             tbl = MagicMock()
             tbl.select.return_value.eq.return_value.maybe_execute.return_value = MagicMock(
-                data=[{"site_config": "{\"mqtt_client_id\":\"ha-res-123\",\"mqtt_password\":\"pw\"}"}]
+                data=[{"site_config": '{"mqtt_client_id":"ha-res-123","mqtt_password":"pw"}'}]
             )
 
             def _update(payload):

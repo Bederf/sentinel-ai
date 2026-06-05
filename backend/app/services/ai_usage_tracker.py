@@ -990,7 +990,6 @@ class AiUsageTracker:
         # Token budget section (Phase 185 Wave 2)
         import asyncio
 
-
         budget = settings.daily_token_budget_per_site
         budget_lines = ["", "--- Token Budget ---"]
         site_budget_found = False

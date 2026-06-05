@@ -104,6 +104,7 @@ class DeviceControlRequest(BaseModel):
 DATA_DIR = Path(__file__).parent.parent / "data"
 SITES_DIR = DATA_DIR / "sites"
 
+
 # Reference devices loader (formerly read from bms_simulator/data/reference_devices.json).
 # Removed: production AI/device code must not fall back to simulator exports.
 # Reference devices are now sourced from Supabase (equipment table) via

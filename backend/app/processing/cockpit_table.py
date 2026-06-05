@@ -43,6 +43,7 @@ SOURCE_THRESHOLDS: dict[str, dict[str, int]] = {
     "bms": {"healthy": 45, "degraded": 45, "stale": 90, "unavailable": 300},
     "intake": {"healthy": 180, "degraded": 180, "stale": 600, "unavailable": 1800},
     "tech": {"healthy": 300, "degraded": 300, "stale": 900, "unavailable": 3600},
+    "ai": {"healthy": 3600, "degraded": 3600, "stale": 7200, "unavailable": 14400},
 }
 
 SEVERITY_MAP: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
@@ -81,8 +82,9 @@ class CockpitTableProcessor:
         selected_issue_id: str | None,
         *,
         bridge_last_updated: datetime | None = None,
+        recommendations: list[dict[str, Any]] | None = None,
     ) -> tuple[list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
-        """Combine three issue sources into a deduplicated, ranked feed.
+        """Combine issue sources into a deduplicated, ranked feed.
 
         Args:
             alerts:            BMS alert rows (source = "bms", priority 0).
@@ -90,6 +92,7 @@ class CockpitTableProcessor:
             work_orders:       Work-order rows (source = "tech", priority 2).
             audit_logs:        Audit-trail rows (pre-merged by the caller).
             selected_issue_id: ID to keep selected; falls back to top issue.
+            recommendations:   AI recommendation rows (source = "ai", priority -1).
 
         Returns:
             (issues, source_statuses, audit_trail, selected_id)
@@ -98,6 +101,8 @@ class CockpitTableProcessor:
         normalized.extend(CockpitTableProcessor._to_normalized_issues(alerts, source="bms", priority=0))
         normalized.extend(CockpitTableProcessor._to_normalized_issues(intakes, source="intake", priority=1))
         normalized.extend(CockpitTableProcessor._to_normalized_issues(work_orders, source="tech", priority=2))
+        if recommendations:
+            normalized.extend(CockpitTableProcessor._to_normalized_issues(recommendations, source="ai", priority=-1))
 
         deduped = CockpitTableProcessor._dedupe(normalized)
 
@@ -128,7 +133,11 @@ class CockpitTableProcessor:
     ) -> list[_NormalizedIssue]:
         normalized = []
         for entry in entries:
-            issue = CockpitTableProcessor._entry_to_issue(entry, source)
+            issue = (
+                CockpitTableProcessor._recommendation_to_issue(entry)
+                if source == "ai"
+                else CockpitTableProcessor._entry_to_issue(entry, source)
+            )
             if not issue:
                 continue
             dedupe_key = CockpitTableProcessor._build_dedupe_key(entry, issue, source)
@@ -141,6 +150,48 @@ class CockpitTableProcessor:
                 )
             )
         return normalized
+
+    @staticmethod
+    def _recommendation_to_issue(entry: dict[str, Any]) -> CockpitIssue | None:
+        """Normalize an AI recommendation row into a CockpitIssue."""
+        now = datetime.now(UTC)
+        target = entry.get("target_equipment") or entry.get("equipment_code")
+        equipment_id = target[0] if isinstance(target, list) else (str(target) if target else None)
+        action = entry.get("action") or {}
+        risk = str(entry.get("risk_level", "medium")).lower()
+        severity = "critical" if risk in ("critical", "mission_critical") else "high" if risk == "high" else "medium"
+        recommended_action = action.get("point") if isinstance(action, dict) else str(action)
+        return CockpitIssue(
+            id=str(entry.get("id", uuid4())),
+            title=f"AI: {entry.get('action_type', 'optimization')} — {equipment_id}"
+            if equipment_id
+            else f"AI: {entry.get('action_type', 'optimization')}",
+            summary=entry.get("reason") or entry.get("description") or "",
+            severity=severity,
+            source="ai",
+            status="new",
+            opened_at=CockpitTableProcessor._parse_datetime(entry.get("timestamp")) or now,
+            updated_at=CockpitTableProcessor._parse_datetime(entry.get("timestamp")) or now,
+            sla_due_at=now + timedelta(hours=4),
+            stale=False,
+            impact_summary=str(entry.get("expected_impact", {})),
+            cause_hypothesis=(entry.get("reason") or "")[:200],
+            recommended_action=recommended_action,
+            confidence=float(entry.get("confidence_score") or 0.5),
+            confidence_label=f"{severity.capitalize()} confidence",
+            issue_category="energy",
+            subsystem=CockpitTableProcessor._infer_subsystem(equipment_id, "energy", "ai"),
+            constraint_type="energy",
+            location=CockpitIssueLocation(
+                zone_ids=[],
+                asset_ids=[equipment_id] if equipment_id else [],
+                floor_id=entry.get("floor_id"),
+            ),
+            evidence_refs=[
+                CockpitIssueEvidenceRef(id=str(entry.get("id", "")), kind="recommendation", label=risk, source="ai"),
+            ],
+            source_record_id=str(entry.get("id")),
+        )
 
     @staticmethod
     def _entry_to_issue(entry: dict[str, Any], source: IssueSource) -> CockpitIssue | None:
@@ -366,7 +417,7 @@ class CockpitTableProcessor:
         bridge_last_updated: datetime | None = None,
     ) -> list[CockpitSourceStatus]:
         now = datetime.now(UTC)
-        entries = {"bms": alerts, "intake": intakes, "tech": work_orders}
+        entries = {"bms": alerts, "intake": intakes, "tech": work_orders, "ai": []}
         statuses = []
         for source, items in entries.items():
             last_updated = max(

@@ -179,6 +179,7 @@ class FeatureEngineeringService:
         # Read from Supabase sustainability_metrics table
         try:
             from app.database.supabase_client import get_supabase_client
+
             client = get_supabase_client()
             result = (
                 client.table("sustainability_metrics")

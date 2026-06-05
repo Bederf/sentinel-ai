@@ -20,8 +20,10 @@ def test_deactivate_vps_revokes_credentials(mock_sb, mock_prov):
 
     # Act
     # Note: calling function directly bypasses auth deps
-    result = __import__("asyncio").get_event_loop().run_until_complete(
-        __import__("anyio").to_thread.run_sync(lambda: deactivate_residential_site("res-123"))
+    result = (
+        __import__("asyncio")
+        .get_event_loop()
+        .run_until_complete(__import__("anyio").to_thread.run_sync(lambda: deactivate_residential_site("res-123")))
     )
 
     # Assert

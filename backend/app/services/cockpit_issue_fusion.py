@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 import httpx
 
@@ -10,6 +13,7 @@ from app.config.settings import settings
 from app.database.repositories.alert_repository import AlertRepository, get_alert_repository
 from app.database.repositories.audit_repository import AuditRepository
 from app.database.repositories.email_intake_repository import EmailIntakeRepository, get_email_intake_repository
+from app.database.repositories.recommendation_repository import get_recommendation_repository
 from app.database.repositories.work_order_repository import WorkOrderRepository, get_work_order_repository
 from app.processing.cockpit_table import CockpitTableProcessor
 from app.schemas.cockpit import (
@@ -47,17 +51,22 @@ class CockpitIssueFusionService:
         alert_entries: list[dict[str, Any]] | None = None,
         intake_entries: list[dict[str, Any]] | None = None,
         work_order_entries: list[dict[str, Any]] | None = None,
+        recommendation_entries: list[dict[str, Any]] | None = None,
         audit_entries: list[dict[str, Any]] | None = None,
         local_audit_entries: list[dict[str, Any]] | None = None,
     ) -> tuple[list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
         """Fetch + fuse issue rows into a ranked, deduplicated feed.
 
+        Includes AI recommendations as a source for cockpit intelligence.
         Callers may pass pre-fetched entries via the keyword arguments to
         bypass the repository calls (useful for testing or server-side caching).
         """
         alerts = alert_entries if alert_entries is not None else self._fetch_alerts(site_id)
         intakes = intake_entries if intake_entries is not None else self._fetch_intakes(site_id)
         work_orders = work_order_entries if work_order_entries is not None else self._fetch_work_orders(site_id)
+        recommendations = (
+            recommendation_entries if recommendation_entries is not None else self._fetch_recommendations(site_id)
+        )
         audit_logs = audit_entries if audit_entries is not None else self._fetch_audit_logs(site_id)
         if local_audit_entries:
             audit_logs = local_audit_entries + audit_logs
@@ -70,6 +79,7 @@ class CockpitIssueFusionService:
             audit_logs,
             selected_issue_id,
             bridge_last_updated=bridge_last_updated,
+            recommendations=recommendations,
         )
 
     # ------------------------------------------------------------------
@@ -117,6 +127,26 @@ class CockpitIssueFusionService:
         except Exception:
             pass
         return []
+
+    def _fetch_recommendations(self, site_id: str) -> list[dict[str, Any]]:
+        """Fetch active AI recommendations for the site."""
+        try:
+            repo = get_recommendation_repository()
+            one_day_ago = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
+            rows = (
+                repo.client.table("recommendations")
+                .select("*")
+                .eq("site_id", site_id)
+                .neq("status", "expired")
+                .gte("timestamp", one_day_ago)
+                .order("timestamp", desc=True)
+                .limit(20)
+                .execute()
+            )
+            return rows.data or []
+        except Exception as e:
+            logger.warning("[COCKPIT] Failed to fetch AI recommendations: %s", e)
+            return []
 
     def _fetch_audit_logs(self, site_id: str) -> list[dict[str, Any]]:
         try:

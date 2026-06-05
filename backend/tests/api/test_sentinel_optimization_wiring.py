@@ -59,10 +59,10 @@ class TestProductionOptimizationWiring:
         from app.services.background_scheduler import BackgroundScheduler
 
         source = inspect.getsource(BackgroundScheduler)
-        assert "lifecycle" not in source.lower(), \
-            "BackgroundScheduler must not reference lifecycle_orchestrator"
-        assert "simulation_orchestrator" not in source.lower(), \
+        assert "lifecycle" not in source.lower(), "BackgroundScheduler must not reference lifecycle_orchestrator"
+        assert "simulation_orchestrator" not in source.lower(), (
             "BackgroundScheduler must not reference simulation_orchestrator"
+        )
 
     def test_no_lifecycle_orchestrator_in_ai_optimizer(self):
         """AIOptimizerService must not import lifecycle orchestrator."""
@@ -71,10 +71,10 @@ class TestProductionOptimizationWiring:
         from app.services.ai_optimizer import AIOptimizerService
 
         source = inspect.getsource(AIOptimizerService)
-        assert "lifecycle" not in source.lower(), \
-            "AIOptimizerService must not reference lifecycle_orchestrator"
-        assert "simulation" not in source.lower() or "simulation_store" not in source.lower(), \
+        assert "lifecycle" not in source.lower(), "AIOptimizerService must not reference lifecycle_orchestrator"
+        assert "simulation" not in source.lower() or "simulation_store" not in source.lower(), (
             "AIOptimizerService must not reference simulation_store"
+        )
 
     def test_cost_validation_engine_no_sim_store(self):
         """CostValidationEngine must not use simulation_store."""
@@ -83,10 +83,8 @@ class TestProductionOptimizationWiring:
         from app.services.cost_validation_engine import CostValidationEngine
 
         source = inspect.getsource(CostValidationEngine)
-        assert "sim_store" not in source, \
-            "CostValidationEngine must not use sim_store"
-        assert "get_simulation_store" not in source, \
-            "CostValidationEngine must not import simulation_store"
+        assert "sim_store" not in source, "CostValidationEngine must not use sim_store"
+        assert "get_simulation_store" not in source, "CostValidationEngine must not import simulation_store"
 
     def test_power_meter_validation_engine_no_sim_store(self):
         """PowerMeterValidationEngine must not use simulation_store."""
@@ -95,8 +93,7 @@ class TestProductionOptimizationWiring:
         from app.services.power_meter_validation_engine import PowerMeterValidationEngine
 
         source = inspect.getsource(PowerMeterValidationEngine)
-        assert "sim_store" not in source, \
-            "PowerMeterValidationEngine must not use sim_store"
+        assert "sim_store" not in source, "PowerMeterValidationEngine must not use sim_store"
 
     def test_feature_engineering_no_sim_store_branch(self):
         """FeatureEngineeringService must not read from simulation_store."""
@@ -105,8 +102,7 @@ class TestProductionOptimizationWiring:
         from app.services.feature_engineering_service import FeatureEngineeringService
 
         source = inspect.getsource(FeatureEngineeringService)
-        assert "simulation_store" not in source, \
-            "FeatureEngineeringService must not import simulation_store"
+        assert "simulation_store" not in source, "FeatureEngineeringService must not import simulation_store"
 
     def test_energy_api_no_simulated_endpoint(self):
         """Energy API /energy/simulated must return real data from Supabase."""
@@ -115,10 +111,8 @@ class TestProductionOptimizationWiring:
         from app.api.energy import get_energy_simulated
 
         source = inspect.getsource(get_energy_simulated)
-        assert "simulation_orchestrator" not in source, \
-            "/energy/simulated must not use simulation_orchestrator"
-        assert "_active_simulations" not in source, \
-            "/energy/simulated must not reference active simulations"
+        assert "simulation_orchestrator" not in source, "/energy/simulated must not use simulation_orchestrator"
+        assert "_active_simulations" not in source, "/energy/simulated must not reference active simulations"
 
     @pytest.mark.asyncio
     async def test_analyze_building_returns_optimization_recommendation(self, mock_supabase):
@@ -138,14 +132,16 @@ class TestProductionOptimizationWiring:
         with open(source) as f:
             content = f.read()
 
-        assert "from app.services.lifecycle_orchestrator" not in content, \
+        assert "from app.services.lifecycle_orchestrator" not in content, (
             "startup/events must not import lifecycle_orchestrator"
-        assert "from app.services.simulation_orchestrator" not in content, \
+        )
+        assert "from app.services.simulation_orchestrator" not in content, (
             "startup/events must not import simulation_orchestrator"
-        assert "from app.services.health_simulation_service" not in content, \
+        )
+        assert "from app.services.health_simulation_service" not in content, (
             "startup/events must not import health_simulation_service"
-        assert "from app.services.simulation_store" not in content, \
-            "startup/events must not import simulation_store"
+        )
+        assert "from app.services.simulation_store" not in content, "startup/events must not import simulation_store"
 
 
 class TestSimulationFilesDeleted:

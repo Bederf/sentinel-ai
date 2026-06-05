@@ -1,6 +1,5 @@
 """Chat context repository — stores conversation history for AI contextual memory."""
 
-
 from app.database.supabase_client import get_supabase_client
 
 # No cap — keep full conversation history per session

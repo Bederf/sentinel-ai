@@ -259,7 +259,11 @@ class HomeAssistantGateway(SIMBIOTGateway):
             result = self._mqtt_client.publish(topic, payload, qos=1, retain=False)
             logger.info(
                 "HA gateway %s: command %s -> %s on %s (rc=%s)",
-                self.site_id, field, payload, topic, result.rc,
+                self.site_id,
+                field,
+                payload,
+                topic,
+                result.rc,
             )
             return result.rc == mqtt.MQTT_ERR_SUCCESS
         except Exception as e:
@@ -273,12 +277,14 @@ class HomeAssistantGateway(SIMBIOTGateway):
             entity_id = self.entity_map.get(field)
             if entity_id:
                 friendly = field.replace("_state", "").replace("_", " ").title()
-                entities.append({
-                    "field": field,
-                    "entity_id": entity_id,
-                    "friendly_name": friendly,
-                    "current_state": self._state.get(field),
-                })
+                entities.append(
+                    {
+                        "field": field,
+                        "entity_id": entity_id,
+                        "friendly_name": friendly,
+                        "current_state": self._state.get(field),
+                    }
+                )
         return entities
 
     async def get_point_list(self) -> list[SIMBIOTPoint]:

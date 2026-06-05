@@ -52,6 +52,7 @@ class TestResidentialAegisDispatchUsesResidentialTelegramSender:
                 mock_cls.return_value = mock_instance
 
                 from app.services.residential.residential_aegis import dispatch_results
+
                 await dispatch_results([mock_result], site_id="res-123", platform="SOLARMAN")
 
                 mock_instance.send_alert.assert_called_once()
@@ -99,6 +100,7 @@ class TestResidentialAegisDispatchUsesResidentialTelegramSender:
 
             with patch("app.services.residential.residential_aegis.logger") as mock_logger:
                 from app.services.residential.residential_aegis import dispatch_results
+
                 result = await dispatch_results([mock_result], site_id="res-123", platform="SOLARMAN")
                 assert result is False
                 # Warning must be logged for wizard-onboarded site with no Telegram
@@ -131,6 +133,7 @@ class TestResidentialAegisDispatchUsesResidentialTelegramSender:
                 mock_cls.return_value = mock_instance
 
                 from app.services.residential.residential_aegis import dispatch_results
+
                 result = await dispatch_results([mock_result], site_id="res-123", platform="SOLARMAN")
                 assert result is False
 
@@ -159,6 +162,7 @@ class TestResidentialAegisDispatchUsesResidentialTelegramSender:
                 mock_cls.return_value = mock_instance
 
                 from app.services.residential.residential_aegis import dispatch_results
+
                 result = await dispatch_results([mock_result], site_id="res-123", platform="SOLARMAN")
                 assert result is True
                 mock_instance.send_alert.assert_called_once()

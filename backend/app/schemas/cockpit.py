@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 IssueSeverity = Literal["critical", "high", "medium", "low"]
-IssueSource = Literal["bms", "intake", "tech"]
+IssueSource = Literal["bms", "intake", "tech", "ai"]
 IssueStatus = Literal["new", "triaged", "in_progress", "resolved"]
 IssueCategory = Literal["thermal", "fault", "energy", "occupant", "stability", "security", "water", "general"]
 IssueSubsystem = Literal["hvac", "power", "lighting", "security", "water", "occupancy", "general"]

@@ -994,7 +994,10 @@ class SentinelMLFeeder:
                     total = base_hours + session_delta
                     logger.info(
                         "[ML FEEDER] Cumulative ML hours for %s: %.1fh (base=%.1f + session=%.1f)",
-                        site_id, total, base_hours, session_delta,
+                        site_id,
+                        total,
+                        base_hours,
+                        session_delta,
                     )
                     return total
                 logger.info("[ML FEEDER] No persisted ml_hours_ingested for %s — using in-memory counter", site_id)

@@ -842,6 +842,78 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         f"Recommendation ID: {rec_uuid}"
     )
 
+    # Resolve site_id first for technician lookup
+    site_id = rec.get("site_id", "")
+    if not site_id and sb:
+        try:
+            site_result = sb.table("sites").select("id").eq("code", "site-002").execute()
+            if site_result.data:
+                site_id = site_result.data[0]["id"]
+        except Exception:
+            pass
+
+    # Look up technician by equipment specialty BEFORE creating the WO
+    tech = None
+    eq_type = target.split("-")[1] if len(target.split("-")) > 1 else ""
+    specialty_map = {
+        "AHU": "hvac",
+        "VAV": "hvac",
+        "CHILLER": "hvac",
+        "FCU": "hvac",
+        "PUMP": "hvac",
+        "CRAC": "hvac",
+        "DALI": "dali",
+        "LUM": "dali",
+        "GEN": "electrical",
+        "UPS": "electrical",
+        "ATS": "electrical",
+        "MSB": "electrical",
+        "TX": "electrical",
+        "DB": "electrical",
+        "FIRE": "fire",
+    }
+    target_specialty = specialty_map.get(eq_type.upper(), "hvac")
+    try:
+        if sb and site_id:
+            try:
+                tech_result = (
+                    sb.table("site_technicians")
+                    .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                    .eq("site_id", site_id)
+                    .eq("is_primary", True)
+                    .execute()
+                )
+                if tech_result.data:
+                    for st in tech_result.data:
+                        if st.get("specialty") == target_specialty:
+                            tech = st.get("technicians", {})
+                            break
+                    if not tech:
+                        for st in tech_result.data:
+                            if st.get("specialty") == "general":
+                                tech = st.get("technicians", {})
+                                break
+            except Exception:
+                pass
+
+            if not tech:
+                try:
+                    tech_result = (
+                        sb.table("technicians")
+                        .select("id, name, email, phone, telegram_id")
+                        .eq("active", True)
+                        .execute()
+                    )
+                    with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
+                    if with_telegram:
+                        tech = with_telegram[0]
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.warning("Advisory WO technician lookup failed: %s", e)
+
+    tech_name = tech.get("name", "") if tech else ""
+
     wo_data = {
         "title": f"AI Optimization: {target} — {point}",
         "description": description,
@@ -850,7 +922,11 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         "created_by": "sentinel:telegram:advisory_wo",
         "equipment_code": target,
         "recommendation_id": rec_uuid,
+        "site_id": site_id or None,
     }
+    if tech_name:
+        wo_data["assigned_to"] = tech_name
+        wo_data["assigned_team"] = target_specialty if tech_name else None
 
     repo = WorkOrderRepository()
     created = await repo.create_work_order(wo_data)
@@ -861,71 +937,13 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
     wo_code = created.get("code") or created.get("id", "unknown")
     wo_uuid = created.get("id")
     equipment_id = created.get("equipment_id", "")
-    site_id = created.get("site_id", "")
 
+    assigned_text = f"Assigned: {tech_name}" if tech_name else "Pending assignment"
     await _send_response(
         chat_id,
-        f"Work order <b>{wo_code}</b> created for {target}.\nA technician will be assigned shortly.",
+        f"Work Order Created <b>{wo_code}</b>\n{assigned_text}",
         sender,
     )
-
-    # Look up technician by equipment specialty
-    tech = None
-    try:
-        if sb:
-            if not site_id:
-                site_result = sb.table("sites").select("id").eq("code", "site-002").execute()
-                if site_result.data:
-                    site_id = site_result.data[0]["id"]
-
-            if site_id:
-                eq_type = target.split("-")[1] if len(target.split("-")) > 1 else ""
-                specialty_map = {
-                    "AHU": "hvac", "VAV": "hvac", "CHILLER": "hvac", "FCU": "hvac",
-                    "PUMP": "hvac", "CRAC": "hvac",
-                    "DALI": "dali", "LUM": "dali",
-                    "GEN": "electrical", "UPS": "electrical", "ATS": "electrical",
-                    "MSB": "electrical", "TX": "electrical", "DB": "electrical",
-                    "FIRE": "fire",
-                }
-                target_specialty = specialty_map.get(eq_type.upper(), "hvac")
-
-                try:
-                    tech_result = (
-                        sb.table("site_technicians")
-                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                        .eq("site_id", site_id)
-                        .eq("is_primary", True)
-                        .execute()
-                    )
-                    if tech_result.data:
-                        for st in tech_result.data:
-                            if st.get("specialty") == target_specialty:
-                                tech = st.get("technicians", {})
-                                break
-                        if not tech:
-                            for st in tech_result.data:
-                                if st.get("specialty") == "general":
-                                    tech = st.get("technicians", {})
-                                    break
-                except Exception:
-                    pass
-
-                if not tech:
-                    try:
-                        tech_result = (
-                            sb.table("technicians")
-                            .select("id, name, email, phone, telegram_id")
-                            .eq("active", True)
-                            .execute()
-                        )
-                        with_telegram = [t for t in (tech_result.data or []) if t.get("telegram_id")]
-                        if with_telegram:
-                            tech = with_telegram[0]
-                    except Exception:
-                        pass
-    except Exception as e:
-        logger.warning("Advisory WO technician lookup failed: %s", e)
 
     # Notify technician via Telegram + email
     if tech and tech.get("telegram_id"):

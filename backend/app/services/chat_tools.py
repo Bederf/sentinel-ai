@@ -4242,9 +4242,7 @@ def _run_single_verification_sync(recommendation_id: str) -> None:
 
     _main = scheduler_service._main_loop
     if _main and _main.is_running():
-        asyncio.run_coroutine_threadsafe(
-            process_single_verification(recommendation_id), _main
-        ).result(timeout=60)
+        asyncio.run_coroutine_threadsafe(process_single_verification(recommendation_id), _main).result(timeout=60)
     else:
         logging.getLogger(__name__).warning(
             "[OUTCOME] Main event loop not available — skipping verification for %s",

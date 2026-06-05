@@ -314,7 +314,6 @@ class ShadowModePollingService:
         now = datetime.now(tz=UTC)
         result: dict[str, Any] = {"poll_count": self._poll_count, "errors": []}
 
-
         try:
             base, token = self._get_bridge_credentials()
         except Exception as e:
@@ -360,18 +359,20 @@ class ShadowModePollingService:
         async def _fetch_with_retry(path: str) -> dict | None:
             for attempt in range(2):
                 try:
-                    transport = httpx.AsyncHTTPTransport(limits=httpx.Limits(max_connections=1, max_keepalive_connections=0))
+                    transport = httpx.AsyncHTTPTransport(
+                        limits=httpx.Limits(max_connections=1, max_keepalive_connections=0)
+                    )
                     async with httpx.AsyncClient(timeout=5.0, transport=transport) as client:
                         resp = await client.get(f"{base}{path}", headers=headers)
                         resp.raise_for_status()
                         return resp.json()
                 except httpx.ConnectError:
-                    logger.warning(f"[SHADOW] {path} attempt {attempt+1}: ConnectError — retrying")
+                    logger.warning(f"[SHADOW] {path} attempt {attempt + 1}: ConnectError — retrying")
                     await asyncio.sleep(1.0)
                     continue
                 except Exception as e:
                     if attempt == 0:
-                        logger.warning(f"[SHADOW] {path} attempt {attempt+1}: {e!r} — retrying")
+                        logger.warning(f"[SHADOW] {path} attempt {attempt + 1}: {e!r} — retrying")
                         await asyncio.sleep(1.0)
                         continue
                     return None
@@ -719,9 +720,7 @@ class ShadowModePollingService:
 
             for eq_id in energy_equipment_ids[:5]:  # Limit to top 5 to avoid timeout
                 try:
-                    points_data = await _fetch_with_retry(
-                        f"/api/sites/{self.site_id}/points?equipment_id={eq_id}"
-                    )
+                    points_data = await _fetch_with_retry(f"/api/sites/{self.site_id}/points?equipment_id={eq_id}")
                     points = points_data.get("points", [])
 
                     readings: dict[str, float] = {}

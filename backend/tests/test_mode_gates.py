@@ -12,7 +12,6 @@ Stage names match site-002-mode-policy.json stage_order:
 Execution requires supervised or automatic.
 """
 
-
 import pytest
 
 

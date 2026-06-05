@@ -36,62 +36,45 @@ export function SustainabilityDashboard({
   siteId: _externalSiteId,
   enabledModules: _enabledModules = ['compliance'],
 }: SustainabilityDashboardProps) {
-  const [sites, setSites] = useState<Site[]>([]);
-  const [selectedSiteId, setSelectedSiteId] = useState<string>('');
+  const siteId = _externalSiteId || 'site-002';
   const [summary, setSummary] = useState<SustainabilitySummary | null>(null);
   const [history, setHistory] = useState<EmissionsHistory | null>(null);
   const [efficiency, setEfficiency] = useState<EfficiencyMetrics | null>(null);
   const [greenStar, setGreenStar] = useState<GreenStarAssessment | null>(null);
   const [esgMetrics, setEsgMetrics] = useState<ESGMetrics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [sitesLoading, setSitesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Load sustainability data for site (from parent page context)
   useEffect(() => {
-    api.getSites()
-      .then((fetchedSites) => {
-        setSites(fetchedSites);
-        if (fetchedSites.length > 0) {
-          const defaultSite =
-            fetchedSites.find((site) => site.id === "site-002")
-            ?? fetchedSites.find((site) => /sandton city office tower/i.test(site.name))
-            ?? fetchedSites[0];
-          const initialSite = _externalSiteId || defaultSite.id;
-          setSelectedSiteId(initialSite);
-        }
-      })
-      .catch(() => {
-        setSites([]);
-        setSelectedSiteId(_externalSiteId || '');
-      })
-      .finally(() => {
-        setSitesLoading(false);
-      });
-  }, [_externalSiteId]);
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const [s, h, e, g] = await Promise.all([
+          sustainabilityApi.fetchSummary(siteId),
+          sustainabilityApi.fetchEmissions(siteId, 12),
+          sustainabilityApi.fetchEfficiency(siteId),
+          sustainabilityApi.fetchGreenStar(siteId),
+        ]);
+        setSummary(s);
+        setHistory(h);
+        setEfficiency(e);
+        setGreenStar(g);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to load sustainability data');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [siteId]);
 
-  const loadData = useCallback(async () => {
-    if (!selectedSiteId) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-      const s = await sustainabilityApi.fetchSummary(selectedSiteId);
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      const h = await sustainabilityApi.fetchEmissions(selectedSiteId, 12);
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      const e = await sustainabilityApi.fetchEfficiency(selectedSiteId);
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      const g = await sustainabilityApi.fetchGreenStar(selectedSiteId);
-      setSummary(s);
-      setHistory(h);
-      setEfficiency(e);
-      setGreenStar(g);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load sustainability data');
-    } finally {
-      setLoading(false);
-    }
-  }, [selectedSiteId]);
+  // Load new ESG metrics
+  useEffect(() => {
+    sustainabilityV2Api.getESGMetrics(siteId)
+      .then(setEsgMetrics)
+      .catch(() => {});
+  }, [siteId]);
 
   useEffect(() => {
     loadData();
@@ -100,16 +83,10 @@ export function SustainabilityDashboard({
   }, [loadData]);
 
   useEffect(() => {
-    if (selectedSiteId) {
-      sustainabilityV2Api.getESGMetrics(selectedSiteId)
-        .then(setEsgMetrics)
-        .catch(() => setEsgMetrics(null));
-    }
-  }, [selectedSiteId]);
-
-  if (sitesLoading || !selectedSiteId) {
-    return <PageLoading message="Loading sustainability data..." />;
-  }
+    sustainabilityV2Api.getESGMetrics(siteId)
+      .then(setEsgMetrics)
+      .catch(() => setEsgMetrics(null));
+  }, [siteId]);
 
   if (loading && !summary) {
     return <PageLoading message="Loading sustainability data..." />;
@@ -238,38 +215,17 @@ export function SustainabilityDashboard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          {!sitesLoading && sites.length > 0 && (
-            <select
-              value={selectedSiteId}
-              onChange={(event) => setSelectedSiteId(event.target.value)}
-              className="w-56 rounded-md appearance-none cursor-pointer px-3 py-2 text-sm transition-colors focus:outline-none focus:ring-0"
-              style={{
-                background: "var(--color-grafana-bg-secondary)",
-                border: "1px solid var(--color-grafana-border)",
-                color: "var(--color-grafana-text-primary)",
-                boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
-                outline: "none",
-              }}
-              aria-label="Select site"
-            >
-              {sites.map((site) => (
-                <option key={site.id} value={site.id}>
-                  {site.name}
-                </option>
-              ))}
-            </select>
-          )}
           <button
             className="px-2.5 py-1.5 rounded text-xs font-medium transition-colors"
             style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)', cursor: 'pointer' }}
-            onClick={() => window.open(`/api/sustainability/${selectedSiteId}/report/export?format=csv&months=12`)}
+            onClick={() => window.open(`/api/sustainability/${siteId}/report/export?format=csv&months=12`)}
           >
             Export CSV
           </button>
           <button
             className="px-2.5 py-1.5 rounded text-xs font-medium transition-colors"
             style={{ background: 'var(--color-sentinel-bg-secondary)', border: '1px solid var(--color-sentinel-border)', color: 'var(--color-sentinel-text-primary)', cursor: 'pointer' }}
-            onClick={() => window.open(`/api/sustainability/${selectedSiteId}/report/export?format=html&months=12`)}
+            onClick={() => window.open(`/api/sustainability/${siteId}/report/export?format=html&months=12`)}
           >
             Export Report
           </button>

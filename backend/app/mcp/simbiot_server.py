@@ -2644,6 +2644,7 @@ async def add_site_devices_tool(
             code_parts = device["device_id"].split("-")
             if len(code_parts) >= 2:
                 from app.services.shadow_mode_polling import _parse_equipment_code
+
                 extracted_type, _ = _parse_equipment_code(device["device_id"])
                 if extracted_type != "unknown":
                     device_type = extracted_type
@@ -3075,8 +3076,10 @@ async def import_point_list_tool(
 
     result["analysis"]["unclassified_devices"] = unclassified
 
-    logger.info(f"Imported point list for {site_id}: {len(point_list)} points -> {len(generated_devices)} devices"
-                f"{f' ({unclassified} unclassified)' if unclassified else ''}")
+    logger.info(
+        f"Imported point list for {site_id}: {len(point_list)} points -> {len(generated_devices)} devices"
+        f"{f' ({unclassified} unclassified)' if unclassified else ''}"
+    )
 
     return result
 
@@ -5361,7 +5364,6 @@ MCP_TOOLS = [
                 },
                 "username": {"type": "string", "description": "Optional HTTP Basic Auth username for gateway API"},
                 "password": {"type": "string", "description": "Optional HTTP Basic Auth password for gateway API"},
-
             },
             "required": ["site_id", "gateway_ip"],
         },
