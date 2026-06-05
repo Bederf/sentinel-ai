@@ -861,7 +861,7 @@ export function mapCockpitState(
       equipmentId: eq.equipment_id,
       equipmentCode: eq.code,
       equipmentType: eq.equipment_type,
-      floorId: eq.floor_id,
+      floorId: eq.floor_id ?? extractFloorCode(eq.equipment_id ?? eq.code) ?? eq.zone_id ?? null,
       healthScore: eq.health_score,
       healthState: eq.health_state as CockpitHealthState,
       faultType: eq.fault_type,
