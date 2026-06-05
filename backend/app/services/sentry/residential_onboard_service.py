@@ -703,6 +703,14 @@ class ResidentialOnboardService:
 
         supabase = get_supabase_client()
 
+        # Ensure sites record exists (FK: residential_sites.site_id -> sites.code)
+        site_check = supabase.table("sites").select("code").eq("code", site_id).execute()
+        if not site_check.data:
+            supabase.table("sites").insert({
+                "code": site_id,
+                "name": site_id,
+            }).execute()
+
         # Check for existing site (re-connect scenario)
         existing = supabase.table("residential_sites").select("id,eskom_area_code").eq("site_id", site_id).eq("is_active", True).execute()
         has_existing_area = bool(existing.data and existing.data[0].get("eskom_area_code"))
@@ -899,6 +907,14 @@ class ResidentialOnboardService:
         manifest_dicts: list[dict] = state.data.get("manifests", [])
 
         supabase = get_supabase_client()
+
+        # Ensure sites record exists (FK: residential_sites.site_id -> sites.code)
+        site_check = supabase.table("sites").select("code").eq("code", site_id).execute()
+        if not site_check.data:
+            supabase.table("sites").insert({
+                "code": site_id,
+                "name": site_id,
+            }).execute()
 
         site_row = {
             "site_id": site_id,
