@@ -412,6 +412,7 @@ class AddonRegisterRequest(BaseModel):
     chat_id: str
     entities: list[EntityMapping]
     platform: Literal["home_assistant"]
+    sentinel_api_key: str | None = None
 
     @field_validator("entities")
     @classmethod
@@ -517,15 +518,44 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     }
 
     try:
-        result = supabase.table("residential_sites").upsert(site_row, on_conflict="site_id").execute()
+        existing = supabase.table("residential_sites").select("id").eq("site_id", site_id).eq("is_active", True).execute()
+        if existing.data:
+            supabase.table("residential_sites").update(site_row).eq("id", existing.data[0]["id"]).execute()
+        else:
+            result = supabase.table("residential_sites").insert(site_row).execute()
+            if not result.data:
+                raise HTTPException(status_code=500, detail="Failed to create residential site record")
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Failed to upsert residential site for %s: %s", site_id, exc)
         raise HTTPException(status_code=500, detail="Failed to save residential site") from exc
 
-    if not result.data:
-        raise HTTPException(status_code=500, detail="Failed to create residential site record")
+    # ── Step 5: Tier gate — validate sentinel_api_key ────────────────────────
+    tier = "free"
+    if request.sentinel_api_key:
+        try:
+            from app.middleware.auth_middleware import _validate_api_key
 
-    # ── Step 5: Return MQTT credentials ─────────────────────────────────────
+            key_data = await _validate_api_key(request.sentinel_api_key)
+            if key_data:
+                tier = key_data.get("tier", "paid")
+        except Exception as exc:
+            logger.warning("API key validation failed for %s: %s", site_id, exc)
+
+    # Schedule AI recommendations only for paid tier
+    if tier == "paid":
+        try:
+            from app.services.residential.bridge_scheduler import (
+                schedule_residential_recommendations,
+                schedule_morning_summary,
+            )
+            schedule_residential_recommendations(site_id)
+            schedule_morning_summary(site_id)
+        except Exception as exc:
+            logger.warning("Failed to schedule recommendations for %s: %s", site_id, exc)
+
+    # ── Step 6: Return MQTT credentials + tier ──────────────────────────────
     from app.config.settings import settings as _settings
 
     return {
@@ -534,6 +564,7 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
         "mqtt_port": _settings.mqtt_broker_port or 1883,
         "mqtt_username": creds.client_id,
         "mqtt_password": creds.password,
+        "tier": tier,
     }
 
 
