@@ -502,7 +502,7 @@ class AdapterHealthMonitor:
         try:
             existing = (
                 supabase.table("alerts")
-                .select("equipment_id, type, message")
+                .select("equipment_id, type, message, title")
                 .eq("site_id", site_uuid)
                 .eq("status", "active")
                 .execute()
