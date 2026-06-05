@@ -665,7 +665,7 @@ function ZoneMarkers({
     .filter((sig) => (sig.weight ?? 0) > 0.15)
     .slice(0, 5)
   const floors = state.visualTwin.floors
-  const totalFloors = Math.max(floors.length, 1)
+  const totalFloors = Math.min(Math.max(floors.length, 5), MAX_FLOORS)
 
   return (
     <group>
@@ -678,13 +678,13 @@ function ZoneMarkers({
         const reversedIndex = totalFloors - 1 - fi
         const y = reversedIndex * SLAB_HEIGHT + SLAB_HEIGHT / 2
 
-        // Deterministic hash-based position within floor footprint (70% of base)
+        // Deterministic hash-based position within floor footprint (50% of base — keeps zones well inside the envelope)
         const seedA = hashString(sig.zoneId)
         const seedB = hashString(sig.meshId || sig.zoneId + '-b')
         const xNorm = ((seedA % 1000) / 1000) * 2 - 1 // -1 to 1
         const zNorm = ((seedB % 1000) / 1000) * 2 - 1 // -1 to 1
-        const x = xNorm * (zoneSlabW * 0.35)
-        const z = zNorm * (zoneSlabD * 0.35)
+        const x = xNorm * (zoneSlabW * 0.25)
+        const z = zNorm * (zoneSlabD * 0.25)
 
         // Primary signal gets larger, brighter orb
         const isPrimary = sig.isPrimary === true
