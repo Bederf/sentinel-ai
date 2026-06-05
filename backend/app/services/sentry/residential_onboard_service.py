@@ -709,8 +709,7 @@ class ResidentialOnboardService:
             supabase.table("sites").insert({
                 "code": site_id,
                 "name": site_id,
-                "onboarding_phase": "shadow_live",
-                "type": "commercial_office",
+                "onboarding_phase": "commissioning",
             }).execute()
 
         # Check for existing site (re-connect scenario)
@@ -916,8 +915,7 @@ class ResidentialOnboardService:
             supabase.table("sites").insert({
                 "code": site_id,
                 "name": site_id,
-                "onboarding_phase": "shadow_live",
-                "type": "commercial_office",
+                "onboarding_phase": "commissioning",
             }).execute()
 
         site_row = {
