@@ -187,7 +187,7 @@ function heroHeadline(state: CockpitState) {
   if (isWaitingState(state)) return 'Awaiting building signal'
   const sys = systemLabel(state.systemFilter)
   const prefix = sys ? `${sys} · ` : ''
-  if (state.primaryMetric.value === 'Stable') return `${prefix}All systems nominal`
+  if (state.primaryMetric.value === 'Stable' && state.equipmentWarnings.length === 0) return `${prefix}All systems nominal`
   // Truncate only at 200 chars to prevent extreme cases — let the headline wrap naturally in the cockpit panel
   const summary = state.activeCondition.summary
   const maxLen = 200
@@ -206,7 +206,7 @@ function heroSubheadline(state: CockpitState) {
   if (state.site.onboardingPhase === 'shadow') {
     return `${state.site.name} is in shadow training mode. Cockpit is rendering pure live telemetry flow with no SENTINEL intervention.`
   }
-  if (state.primaryMetric.value === 'Stable') return `${state.site.name} remains within operating margin. SENTINEL is observing for cross-system drift.`
+  if (state.primaryMetric.value === 'Stable' && state.equipmentWarnings.length === 0) return `${state.site.name} remains within operating margin. SENTINEL is observing for cross-system drift.`
   return state.activeCondition.rationale
 }
 
