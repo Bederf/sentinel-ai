@@ -757,8 +757,15 @@ export function mapCockpitState(
         : (
           narrative
             ? `${formatVoiceLabel(narrative.voice)} centered on ${locationSummary(narrative)}.`
-            : equipmentWarnings.length > 0
-              ? `${equipmentWarnings.map((e) => `${e.code} (${e.health_score}/100)`).join(', ')}.`
+              : equipmentWarnings.length > 0
+                ? (() => {
+                    const crit = equipmentWarnings.filter((e) => (e.health_score ?? 100) < 40).length
+                    const warn = equipmentWarnings.length - crit
+                    const parts: string[] = []
+                    if (crit > 0) parts.push(`${crit} critical`)
+                    if (warn > 0) parts.push(`${warn} warning`)
+                    return `${equipmentWarnings.length} equipment affected — ${parts.join(', ')}.`
+                  })()
               : secondaryTensions.length > 0
                 ? secondaryTensions.map((t) => t.message).join(' ')
                 : 'No dominant narrative is active. The building is operating within margin.'

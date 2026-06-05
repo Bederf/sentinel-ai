@@ -342,7 +342,7 @@ class ShadowModePollingService:
                 "supervised": 0.0,
                 "automatic": 0.0,
             }.get(phase, 0.5)
-            if skip_pct > 0 and (self._poll_count % 100) / 100 < skip_pct:
+            if skip_pct > 0 and (hash(f"{self.site_id}:{self._poll_count}") % 100) / 100 < skip_pct:
                 logger.debug("[SHADOW] Phase %s — skipping poll %d", phase, self._poll_count)
                 result["gate"] = phase
                 result["skipped"] = True
