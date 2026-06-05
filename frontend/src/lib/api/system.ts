@@ -94,6 +94,7 @@ export interface CommissioningSnapshot {
   gates_total: number;
   consecutive_pass_days: number;
   can_promote: boolean;
+  stage_calendar_days?: number;
 }
 
 export interface QualityMetricDetail {

@@ -552,7 +552,10 @@ class ShadowModePollingService:
                     for bridge_key, op_key in ahu_field_map.items():
                         val = ahu.get(bridge_key)
                         if val is not None:
-                            ahu_readings[op_key] = float(val)
+                            try:
+                                ahu_readings[op_key] = float(val)
+                            except (ValueError, TypeError):
+                                pass
                     if ahu_readings:
                         agg_states[equip_code] = {
                             "type": "ahu",
@@ -571,7 +574,10 @@ class ShadowModePollingService:
                         key = f"{ahu_prefix}_{bridge_suffix}"
                         val = ahu_data.get(key)
                         if val is not None:
-                            ahu_readings[op_key] = float(val)
+                            try:
+                                ahu_readings[op_key] = float(val)
+                            except (ValueError, TypeError):
+                                pass
                     if ahu_readings:
                         agg_states[equip_code] = {
                             "type": "ahu",

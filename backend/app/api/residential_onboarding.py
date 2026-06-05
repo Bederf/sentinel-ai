@@ -653,6 +653,12 @@ async def residential_telegram_webhook(request: Request):
             await sender.send_text(chat_id, "Welcome to SENTINEL Home!\n\nSend /connect to link your solar system.")
             return JSONResponse(content={"status": "start"})
 
+        if text == "/status":
+            sender = ResidentialTelegramSender()
+            result = await _residential_status(chat_id)
+            await sender.send_text(chat_id, result)
+            return JSONResponse(content={"status": "status_sent"})
+
         state = service._state.get(chat_id)
         if state is not None:
             logger.warning("WEBHOOK state step=%s text=%s", state.step, text)

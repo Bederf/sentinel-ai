@@ -334,11 +334,14 @@ def db_to_site_dict(
         except (json.JSONDecodeError, TypeError):
             operating_hours = {"start": "08:00", "end": "18:00"}
     # Normalize Supabase format {"weekday": "07:00-18:00"} to API format {"start": "07:00", "end": "18:00"}
-    if "start" not in operating_hours and "weekday" in operating_hours:
-        weekday = operating_hours.get("weekday", "08:00-18:00")
-        if "-" in str(weekday):
-            parts = str(weekday).split("-", 1)
-            operating_hours = {"start": parts[0], "end": parts[1]}
+    if "start" not in operating_hours:
+        if "weekday" in operating_hours:
+            weekday = operating_hours.get("weekday", "08:00-18:00")
+            if "-" in str(weekday):
+                parts = str(weekday).split("-", 1)
+                operating_hours = {"start": parts[0], "end": parts[1]}
+            else:
+                operating_hours = {"start": "08:00", "end": "18:00"}
         else:
             operating_hours = {"start": "08:00", "end": "18:00"}
 

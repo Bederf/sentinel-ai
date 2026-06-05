@@ -72,6 +72,7 @@ class CommissioningScorecard(BaseModel):
     truth_check: TruthCheckResult | None = None
     gates_passed: int = 0
     gates_total: int = 0
+    stage_calendar_days: int = 0
     summary: dict[str, int]  # {passed, failed, total}
     all_gates_passed: bool
     consecutive_pass_days: int

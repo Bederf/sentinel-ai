@@ -2,9 +2,9 @@
 title: "Site-002 deterministic mode policy"
 type: "spec"
 status: "approved"
-version: "1.2.0"
+version: "1.3.0"
 created: "2026-02-21"
-updated: "2026-05-06"
+updated: "2026-06-05"
 author: "Sentinel Development Team"
 tags: ["site-002", "onboarding", "ingestion", "monitoring", "fail-closed", "scheduler"]
 related:
@@ -45,9 +45,22 @@ Out of scope:
 
 The `advisory` stage was added in policy `v1.1.0` and sits between `shadow_live` and `supervised`.
 
+## Calendar maturity gate (v1.3.0)
+
+Each mode transition has a `min_calendar_days` requirement based on the site's building type. The clock starts when the site enters the current mode (`stage_entered_at` timestamp in the policy state file). This ensures the system observes enough operational variation before allowing promotion.
+
+Building type → minimum calendar days per mode:
+
+| Mode Transition | Office | Hospital |
+|----------------|--------|----------|
+| `shadow_live -> advisory` | 30 days | 60 days |
+| `advisory -> supervised` | 30 days | 60 days |
+
+The `stage_entered_at` timestamp is set automatically whenever the site's `current_stage` changes (promotion, demotion, or sync from Supabase). Implemented in `SiteModePolicyService._load_state()` and all stage transition points in `evaluate_site()`.
+
 ## Threshold policy
 
-Policy file: `backend/app/data/policies/site-002-mode-policy.json`
+Policy files: `backend/app/data/policies/site-{id}-mode-policy.json` (per-site configuration)
 
 ### 1) `commissioning -> shadow_live`
 
@@ -65,6 +78,7 @@ Policy file: `backend/app/data/policies/site-002-mode-policy.json`
   - `file_manual_sources <= 0`
   - `commissioning_all_gates_passed = true`
   - `consecutive_pass_days >= 2`
+  - `min_calendar_days >= N` — calendar days in current stage (per building type)
   - `quality_gate_status in [pass, warn]`
 - Exit thresholds (demote to `shadow_live` after `>= 2h` sustained violation):
   - `freshness_hours <= 4.0`
@@ -83,6 +97,7 @@ Policy file: `backend/app/data/policies/site-002-mode-policy.json`
   - `conflict_events_24h = 0`
   - `commissioning_all_gates_passed = true`
   - `consecutive_pass_days >= 2`
+  - `min_calendar_days >= N` — calendar days in current stage (per building type)
   - `quality_gate_status in [pass, warn]`
 - Exit thresholds (demote to `shadow_live` after `>= 2h` sustained violation):
   - `freshness_hours <= 3.0`

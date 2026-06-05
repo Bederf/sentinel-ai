@@ -75,6 +75,7 @@ class SiteModePolicyService:
             "violation_since": None,
             "last_demoted_at": None,
             "last_evaluated_at": None,
+            "stage_entered_at": None,
         }
 
         if not path.exists():
@@ -115,7 +116,22 @@ class SiteModePolicyService:
         return max(0.0, (now - dt).total_seconds() / 3600.0)
 
     @staticmethod
-    def _extract_metrics(snapshot: Any) -> dict[str, Any]:
+    def _calendar_days_in_stage(state: dict[str, Any]) -> int:
+        """Return calendar days since stage_entered_at, or 0 if unknown."""
+        entered = state.get("stage_entered_at")
+        if not entered:
+            return 0
+        dt = _parse_iso(entered)
+        if not dt:
+            return 0
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        from datetime import timezone as _tz
+
+        return (datetime.now(tz=_tz.utc) - dt).days
+
+    @staticmethod
+    def _extract_metrics(snapshot: Any, state: dict[str, Any] | None = None) -> dict[str, Any]:
         """Map monitoring snapshot fields to policy metric keys."""
         quality_gate = snapshot.quality_gate or {}
         commissioning = snapshot.commissioning
@@ -131,6 +147,7 @@ class SiteModePolicyService:
             "truth_check_passed": bool(commissioning.can_promote) if commissioning else False,
             "quality_gate_status": str(quality_gate.get("overall_status", "unknown")),
             "quality_gate_failed_rules": list(quality_gate.get("failed_rules", [])),
+            "stage_calendar_days": self._calendar_days_in_stage(state) if state else 0,
         }
 
     @staticmethod
@@ -181,6 +198,10 @@ class SiteModePolicyService:
                 comparator = "in"
                 passed = actual in allowed
                 expected = allowed
+            elif key == "min_calendar_days":
+                actual = metrics.get("stage_calendar_days", 0)
+                comparator = ">="
+                passed = actual >= int(expected)
             else:
                 actual = "unknown_metric"
                 comparator = "unsupported"
@@ -216,12 +237,11 @@ class SiteModePolicyService:
             return {"site_id": site_id, "error": "policy_not_found", "gates_pass": None, "failed_gates": []}
 
         snapshot = await self._monitoring.get_snapshot(site_id=site_id)
-        metrics = self._extract_metrics(snapshot)
+        metrics = self._extract_metrics(snapshot, state)
 
         stages = policy.get("stages", {})
         current_stage = state.get("current_stage", policy.get("default_stage", "commissioning"))
         stage_cfg = stages.get(current_stage, {})
-        promotion_cfg = stage_cfg.get("promotion", {})
 
         if not promotion_cfg:
             return {
@@ -260,6 +280,7 @@ class SiteModePolicyService:
                 sb_phase = result.data[0]["onboarding_phase"]
                 if sb_phase in stages and sb_phase != state.get("current_stage"):
                     state["current_stage"] = sb_phase
+                    state["stage_entered_at"] = datetime.now(tz=UTC).isoformat()
                     state["candidate_stage"] = None
                     state["candidate_since"] = None
                     state["violation_stage"] = None
@@ -307,6 +328,7 @@ class SiteModePolicyService:
                 write_action = "stop_writes"
 
                 state["current_stage"] = target_stage
+                state["stage_entered_at"] = _iso(now)
                 state["candidate_stage"] = None
                 state["candidate_since"] = None
                 state["violation_stage"] = None
@@ -331,6 +353,7 @@ class SiteModePolicyService:
                         target_stage = exit_cfg.get("demote_to", stage_cfg.get("fallback_stage", current_stage))
                         reasons = [f"exit:{f['rule']}" for f in failed_exit]
                         state["current_stage"] = target_stage
+                        state["stage_entered_at"] = _iso(now)
                         state["candidate_stage"] = None
                         state["candidate_since"] = None
                         state["violation_stage"] = None
@@ -377,6 +400,7 @@ class SiteModePolicyService:
                             target_stage = next_stage
                             reasons = [f"promotion:{current_stage}->{next_stage}"]
                             state["current_stage"] = target_stage
+                            state["stage_entered_at"] = _iso(now)
                             state["candidate_stage"] = None
                             state["candidate_since"] = None
                             state["violation_stage"] = None

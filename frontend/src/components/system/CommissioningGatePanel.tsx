@@ -193,6 +193,9 @@ export function CommissioningGatePanel({ commissioning, qualityGate }: Commissio
             {commissioning?.gates_passed ?? 0}/{commissioning?.gates_total ?? 8} gates passed
             {' · '}
             {commissioning?.consecutive_pass_days ?? 0} consecutive day(s)
+            {commissioning?.stage_calendar_days != null && (
+              <> · {commissioning.stage_calendar_days}d in stage</>
+            )}
           </span>
           <span
             className="font-medium"

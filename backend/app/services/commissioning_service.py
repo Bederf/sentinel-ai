@@ -193,6 +193,16 @@ class CommissioningService:
             elif not truth_check.passed:
                 blocking.append(f"truth_check_failed ({truth_check.agreement_pct:.1f}%)")
 
+        from app.services.site_mode_policy_service import SiteModePolicyService
+
+        _policy_svc = SiteModePolicyService()
+        try:
+            _policy = _policy_svc.load_policy(site_id)
+            _state = _policy_svc._load_state(site_id, _policy)
+            _stage_days = SiteModePolicyService._calendar_days_in_stage(_state)
+        except Exception:
+            _stage_days = 0
+
         return CommissioningScorecard(
             site_id=site_id,
             ingestion_mode=ingestion_mode,
@@ -200,6 +210,7 @@ class CommissioningService:
             gates=gates,
             gates_passed=passed_count,
             gates_total=len(gates),
+            stage_calendar_days=_stage_days,
             truth_check=truth_check,
             summary={"passed": passed_count, "failed": failed_count, "total": len(gates)},
             all_gates_passed=all_gates_passed,
