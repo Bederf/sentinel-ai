@@ -836,12 +836,38 @@ class WorkOrderNotifier:
                 or work_order_data.get("work_order_id", "WO-???")
             )
             pri = work_order_data.get("criticality", "MEDIUM").upper()
-            tech_name = work_order_data.get("technician_name", "Technician")
             equipment_code = work_order_data.get("equipment_code", "")
             code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
             eq_line = f"\nEquipment: {equipment_code}" if equipment_code else ""
 
-            msg = f"Work Order Created #{wo_ref}\nAssigned: {tech_name}\nPriority: {pri}{eq_line}"
+            reported_by = work_order_data.get("reported_by", "")
+            reporter_phone = work_order_data.get("reporter_phone", "")
+            location = work_order_data.get("location", "")
+            if not location:
+                zone_id = work_order_data.get("zone_id", "")
+                desk_id = work_order_data.get("desk_id", "")
+                if desk_id and zone_id:
+                    location = f"Desk {desk_id}, {zone_id}"
+                elif desk_id:
+                    location = f"Desk {desk_id}"
+                elif zone_id:
+                    location = zone_id
+            problem = work_order_data.get("problem_description", "") or work_order_data.get("original_message", "")
+            problem = problem.strip()
+
+            lines = [f"Work Order Created #{wo_ref}", f"Priority: {pri}"]
+            if reported_by:
+                lines.append(f"From: {reported_by}")
+            if location:
+                lines.append(f"Location: {location}")
+            if reporter_phone:
+                lines.append(f"Contact: {reporter_phone}")
+            if eq_line:
+                lines.append(eq_line.strip())
+            if problem:
+                lines.append("")
+                lines.append(problem)
+            msg = "\n".join(lines)
 
             # Build inline buttons for the technician
             import json

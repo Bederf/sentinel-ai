@@ -1551,6 +1551,7 @@ async def sentry_call_log(
             "site_id": req.site_id,
             "zone_id": req.zone_id or "",
             "desk_id": req.desk_id or "",
+            "location": location,
             "technician_id": tech.get("telegram_id") if tech else None,
             "technician_name": tech.get("name") if tech else None,
             "technician_email": tech.get("email") if tech else None,
