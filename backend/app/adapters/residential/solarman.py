@@ -21,6 +21,7 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
         self._app_id = app_id
         self._app_secret = app_secret
         self._access_token: str | None = None
+        self._user_id: int | None = None
         self._token_needs_refresh = True
         self._token_lock = threading.Lock()
 
@@ -41,7 +42,9 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
                 },
             )
             resp.raise_for_status()
-            self._access_token = resp.json()["access_token"]
+            body = resp.json()
+            self._access_token = body["access_token"]
+            self._user_id = body.get("uid")
             self._token_needs_refresh = False
 
     def _get_token(self) -> str:
@@ -89,7 +92,11 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
             return False
 
     async def discover_devices(self) -> list[DeviceManifest]:
-        data = await self._request("POST", "/v1.0/plant/list", json={"page": 1, "size": 100})
+        data = await self._request(
+            "POST",
+            "/station/v1.0/list",
+            json={"page": 1, "size": 100, "userId": self._user_id},
+        )
         return [
             DeviceManifest(
                 device_id=str(plant["id"]),
@@ -98,7 +105,7 @@ class SolarmanAdapter(ResidentialEnergyAdapter):
                 source_system="solarman",
                 capabilities=["pv", "grid", "load"],
             )
-            for plant in data.get("plantList", [])
+            for plant in data.get("stationList", [])
         ]
 
     async def get_realtime(self, device_id: str) -> EnergySnapshot:

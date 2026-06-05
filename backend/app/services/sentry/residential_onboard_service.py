@@ -70,36 +70,89 @@ def _reset_rate_limit(chat_id: int) -> None:
 # ── Telegram helpers (home bot only — never commercial) ───────────────────────
 
 
-def _send(
+async def _send_async(
     chat_id: int, text: str, reply_markup: dict | None = None, _reply_to_message_id: int | None = None
 ) -> dict | None:
-    """Send text via ResidentialTelegramSender. Runs async send_text synchronously."""
+    """Send text via ResidentialTelegramSender (async version)."""
     try:
-        ok = asyncio.run(_sender.send_text(chat_id, text, reply_markup=reply_markup, reply_to_message_id=_reply_to_message_id))
+        ok = await _sender.send_text(chat_id, text, reply_markup=reply_markup, reply_to_message_id=_reply_to_message_id)
         return {"ok": ok}
     except Exception as exc:
         logger.error("Telegram send failed: %s", exc)
         return None
 
 
-def _delete(chat_id: int, message_id: int) -> None:
-    """Fire-and-forget — never blocks the flow."""
+def _send(
+    chat_id: int, text: str, reply_markup: dict | None = None, _reply_to_message_id: int | None = None
+) -> dict | None:
+    """Send text via ResidentialTelegramSender. Works from both sync and async contexts."""
     try:
-        import asyncio
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-        asyncio.get_event_loop().run_until_complete(_sender.delete_message(chat_id, message_id))
+    if loop and loop.is_running():
+        asyncio.create_task(
+            _send_async(chat_id, text, reply_markup=reply_markup, _reply_to_message_id=_reply_to_message_id)
+        )
+        return {"ok": True}
+    else:
+        try:
+            ok = asyncio.run(
+                _sender.send_text(chat_id, text, reply_markup=reply_markup, reply_to_message_id=_reply_to_message_id)
+            )
+            return {"ok": ok}
+        except Exception as exc:
+            logger.error("Telegram send failed: %s", exc)
+            return None
+
+
+async def _delete_async(chat_id: int, message_id: int) -> None:
+    """Delete a Telegram message (async version)."""
+    try:
+        await _sender.delete_message(chat_id, message_id)
     except Exception as exc:
         logger.warning("deleteMessage failed chat=%s msg=%s: %s", chat_id, message_id, exc)
 
 
-def _answer_callback(callback_query_id: str) -> None:
-    """Must be called FIRST on callback receipt to dismiss spinner."""
+def _delete(chat_id: int, message_id: int) -> None:
+    """Fire-and-forget — never blocks the flow. Works from both sync and async contexts."""
     try:
-        import asyncio
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
 
-        asyncio.get_event_loop().run_until_complete(_sender.answer_callback_query(callback_query_id))
+    if loop and loop.is_running():
+        asyncio.create_task(_delete_async(chat_id, message_id))
+    else:
+        try:
+            asyncio.run(_sender.delete_message(chat_id, message_id))
+        except Exception as exc:
+            logger.warning("deleteMessage failed chat=%s msg=%s: %s", chat_id, message_id, exc)
+
+
+async def _answer_callback_async(callback_query_id: str) -> None:
+    """Answer a Telegram callback query (async version)."""
+    try:
+        await _sender.answer_callback_query(callback_query_id)
     except Exception as exc:
         logger.warning("answerCallbackQuery failed: %s", exc)
+
+
+def _answer_callback(callback_query_id: str) -> None:
+    """Must be called FIRST on callback receipt to dismiss spinner. Works from both sync and async contexts."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = None
+
+    if loop and loop.is_running():
+        asyncio.create_task(_answer_callback_async(callback_query_id))
+    else:
+        try:
+            asyncio.run(_sender.answer_callback_query(callback_query_id))
+        except Exception as exc:
+            logger.warning("answerCallbackQuery failed: %s", exc)
 
 
 # ── Platform label ─────────────────────────────────────────────────────────────
@@ -166,7 +219,19 @@ class ResidentialOnboardService:
 
         step = state.step
 
-        if step == AWAITING_EMAIL:
+        if step == AWAITING_PLATFORM:
+            _send(chat_id, "Please tap a platform button above instead of typing.")
+            return True
+        elif step == AWAITING_HA_DEPLOYMENT:
+            _send(chat_id, "Please tap a deployment option button above instead of typing.")
+            return True
+        elif step == AWAITING_HA_READY:
+            _send(chat_id, "Please use /ha_ready when your Home Assistant add-on is configured.")
+            return True
+        elif step.startswith("mapping_ha_"):
+            _send(chat_id, "Please follow the Home Assistant entity assignment flow using the buttons above.")
+            return True
+        elif step == AWAITING_EMAIL:
             return self._handle_email(chat_id, text, state)
         elif step == AWAITING_PASSWORD:
             return self._handle_password(chat_id, text, state)
@@ -179,7 +244,13 @@ class ResidentialOnboardService:
             site_id = state.data.get("site_id", f"res-{chat_id}")
             try:
                 supabase = get_supabase_client()
-                existing = supabase.table("residential_sites").select("id").eq("site_id", site_id).eq("is_active", True).execute()
+                existing = (
+                    supabase.table("residential_sites")
+                    .select("id")
+                    .eq("site_id", site_id)
+                    .eq("is_active", True)
+                    .execute()
+                )
                 if existing.data:
                     logger.info("DISCOVERING duplicate skipped for site_id=%s", site_id)
                     self._state.clear(chat_id)
@@ -310,15 +381,24 @@ class ResidentialOnboardService:
         self._state.set(chat_id, state)
 
         if platform == "ha_addon":
-            # Direct user to the REST API endpoint
+            self._state.clear(chat_id)
+            keyboard = {
+                "inline_keyboard": [
+                    [
+                        {"text": "📋 View Add-on Install Guide", "callback_data": "ha:guide"},
+                        {"text": "↩️ Back to platforms", "callback_data": "back:platforms"},
+                    ],
+                ]
+            }
             _send(
                 chat_id,
                 "🏠 Home Assistant Add-on selected.\n\n"
-                "Use the SENTINEL Home Assistant Add-on to complete registration.\n"
-                "It will call the /api/residential/addon-register endpoint automatically.\n\n"
-                "If you need the endpoint details:\n"
-                "POST /api/residential/addon-register\n"
-                'Body: {chat_id, entities:[{entity_id, metric_type}], platform:"home_assistant"}',
+                "1. Install the SENTINEL Add-on in Home Assistant\n"
+                "   (Settings → Add-ons → Store → search SENTINEL → Install)\n\n"
+                "2. The add-on will automatically register your system.\n"
+                "   No further Telegram input needed.\n\n"
+                "3. You'll receive a confirmation here once connected.",
+                reply_markup=keyboard,
             )
             return
 
@@ -731,9 +811,16 @@ class ResidentialOnboardService:
         # Delete password message IMMEDIATELY — fire-and-forget
         _delete(chat_id, message_id)
 
+        # Inject platform-specific extras BEFORE building adapter
+        extra = {}
+        if platform == "solarman":
+            from app.config.settings import settings as _settings
+
+            extra = {"app_id": _settings.solarman_app_id, "app_secret": _settings.solarman_app_secret}
+
         # Build adapter
         try:
-            adapter = build_adapter(platform, {"email": email, "password": password, "site_id": site_id})
+            adapter = build_adapter(platform, {"email": email, "password": password, "site_id": site_id}, **extra)
         except Exception as exc:
             logger.warning("build_adapter failed for chat_id=%s: %s", chat_id, exc)
             _record_failure(chat_id)
@@ -756,13 +843,6 @@ class ResidentialOnboardService:
 
         # Auth succeeded — reset rate limit
         _reset_rate_limit(chat_id)
-
-        # Inject SOLARMAN app_id/app_secret
-        extra = {}
-        if platform == "solarman":
-            from app.config.settings import settings as _settings
-
-            extra = {"app_id": _settings.solarman_app_id, "app_secret": _settings.solarman_app_secret}
 
         # Discover devices while we still have the credentials in memory
         try:

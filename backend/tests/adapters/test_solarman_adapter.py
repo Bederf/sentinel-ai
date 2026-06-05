@@ -15,10 +15,10 @@ def _make_adapter() -> SolarmanAdapter:
     return SolarmanAdapter(site_config=_SITE_CONFIG, app_id=_APP_ID, app_secret=_APP_SECRET)
 
 
-def _mock_token_response() -> MagicMock:
+def _mock_token_response(uid: int = 6681) -> MagicMock:
     resp = MagicMock()
     resp.raise_for_status = MagicMock()
-    resp.json.return_value = {"access_token": "tok-abc123"}
+    resp.json.return_value = {"access_token": "tok-abc123", "uid": uid}
     return resp
 
 
@@ -62,6 +62,17 @@ def test_refresh_token_uses_sha256_password():
     expected_hash = hashlib.sha256(b"secret").hexdigest()
     assert body["password"] == expected_hash
     assert "secret" not in body["password"]
+
+
+def test_refresh_token_extracts_uid():
+    adapter = _make_adapter()
+    token_resp = _mock_token_response(uid=6681)
+    sync_client = _mock_sync_client(token_resp)
+
+    with patch("app.adapters.residential.solarman.httpx.Client", return_value=sync_client):
+        adapter._refresh_token()
+
+    assert adapter._user_id == 6681
 
 
 def test_token_refresh_on_401():
@@ -125,11 +136,13 @@ async def test_discover_devices_returns_manifests():
     adapter._access_token = "tok-abc123"
     adapter._token_needs_refresh = False
 
+    adapter._user_id = 6681
+
     plant_resp = MagicMock()
     plant_resp.status_code = 200
     plant_resp.raise_for_status = MagicMock()
     plant_resp.json.return_value = {
-        "plantList": [
+        "stationList": [
             {"id": 111, "name": "My Home"},
             {"id": 222, "name": "Garage"},
         ]
@@ -142,6 +155,9 @@ async def test_discover_devices_returns_manifests():
         mock_cls.return_value.__aexit__ = AsyncMock(return_value=None)
 
         manifests = await adapter.discover_devices()
+
+    call_body = instance.request.call_args.kwargs["json"]
+    assert call_body["userId"] == 6681
 
     assert len(manifests) == 2
     assert manifests[0].device_id == "111"
