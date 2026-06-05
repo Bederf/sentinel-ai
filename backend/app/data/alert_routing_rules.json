@@ -1,0 +1,49 @@
+[
+  {
+    "id": "default-critical",
+    "name": "Critical alerts to all channels",
+    "enabled": true,
+    "severity": [
+      "critical"
+    ],
+    "equipment_types": [],
+    "site_ids": [],
+    "channels": [
+      "telegram",
+      "whatsapp"
+    ],
+    "recipient_roles": [
+      "technician",
+      "supervisor"
+    ],
+    "recipient_ids": [],
+    "escalation_minutes": 15,
+    "escalation_to_roles": [
+      "manager",
+      "admin"
+    ],
+    "created_at": "2026-01-01T00:00:00Z"
+  },
+  {
+    "id": "default-warning",
+    "name": "Warning alerts to Telegram",
+    "enabled": false,
+    "severity": [
+      "warning"
+    ],
+    "equipment_types": [],
+    "site_ids": [],
+    "channels": [
+      "telegram"
+    ],
+    "recipient_roles": [
+      "technician"
+    ],
+    "recipient_ids": [],
+    "escalation_minutes": 60,
+    "escalation_to_roles": [
+      "supervisor"
+    ],
+    "created_at": "2026-01-01T00:00:00Z"
+  }
+]

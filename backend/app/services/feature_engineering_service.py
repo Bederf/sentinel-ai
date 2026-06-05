@@ -170,58 +170,30 @@ class FeatureEngineeringService:
         return max(0, min(100, score))
 
     async def _get_daily_telemetry(self, site_id: str) -> dict[str, Any]:
-        """Gather daily telemetry for feature computation.
+        """Gather daily telemetry for feature computation from Supabase.
 
-        Tries simulation store first, then Supabase sustainability metrics.
+        Production path — reads from sustainability_metrics table.
         """
         telemetry: dict[str, Any] = {}
 
-        # Try simulation store (in-memory data from running simulation)
+        # Read from Supabase sustainability_metrics table
         try:
-            from app.services.simulation_store import get_simulation_store
-
-            store = get_simulation_store(site_id)
-            state = store.get_latest_state() if store else None
-            if state:
-                # Extract daily energy from simulation state
-                energy = state.get("energy", {})
-                telemetry["total_daily_kwh"] = energy.get("total_kwh", 0)
-                telemetry["off_hours_kwh"] = energy.get("off_hours_kwh")
-
-                # Extract outdoor temps
-                weather = state.get("weather", {})
-                if weather.get("outdoor_temp"):
-                    telemetry["outdoor_temps_hourly"] = [weather["outdoor_temp"]]
-
-                # Extract zone deviations
-                zones = state.get("zones", {})
-                deviations = []
-                for zone_data in zones.values():
-                    actual = zone_data.get("temperature")
-                    setpoint = zone_data.get("setpoint")
-                    if actual is not None and setpoint is not None:
-                        deviations.append(abs(actual - setpoint))
-                if deviations:
-                    telemetry["zone_deviations"] = deviations
+            from app.database.supabase_client import get_supabase_client
+            client = get_supabase_client()
+            result = (
+                client.table("sustainability_metrics")
+                .select("total_kwh, outdoor_temp_c, zone_deviations")
+                .eq("site_id", site_id)
+                .order("date", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                latest = result.data[0]
+                telemetry["total_daily_kwh"] = latest.get("total_kwh", 0)
+                telemetry["outdoor_temp"] = latest.get("outdoor_temp_c")
+                telemetry["zone_deviations"] = latest.get("zone_deviations", [])
         except Exception as e:
-            logger.debug(f"Simulation store unavailable for telemetry: {e}")
-
-        # Try Supabase sustainability metrics as fallback
-        if not telemetry.get("total_daily_kwh"):
-            try:
-                import json
-                from pathlib import Path
-
-                metrics_path = (
-                    Path(__file__).parent.parent / "data" / "sustainability" / "daily_metrics" / f"{site_id}.json"
-                )
-                if metrics_path.exists():
-                    with open(metrics_path) as f:
-                        metrics = json.load(f)
-                    if isinstance(metrics, list) and metrics:
-                        latest = metrics[-1]
-                        telemetry.setdefault("total_daily_kwh", latest.get("total_kwh", 0))
-            except Exception as e:
-                logger.debug(f"Sustainability metrics unavailable: {e}")
+            logger.debug(f"Sustainability metrics unavailable: {e}")
 
         return telemetry

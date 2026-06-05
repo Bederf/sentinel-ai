@@ -43,6 +43,16 @@ EQUIPMENT_HEALTH_SCOREABILITY: dict[str, dict] = {
     "outdoor_air_sensor": {"scoreable": False, "method": None, "reason": "signal_quality_only"},
     "general": {"scoreable": False, "method": None, "reason": "not_a_device"},
     "weather": {"scoreable": False, "method": None, "reason": "external_data_source"},
+    # ── Static/non-mechanical: exempt from health engine ──
+    "lighting_panel": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "access_control": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "solar_panel": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "access_control_server": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "lighting_driver": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "scene_controller": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "weather_station": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "water_meter": {"scoreable": False, "method": None, "reason": "static_equipment"},
+    "security_camera": {"scoreable": False, "method": None, "reason": "static_equipment"},
 }
 
 

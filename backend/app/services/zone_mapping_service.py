@@ -190,6 +190,18 @@ class ZoneMappingService:
         hvac_zones = self.get_hvac_zones_for_dali(dali_zone_id)
         return len(hvac_zones) > 0
 
+    def _parse_combined_zone(self, zone_id: str) -> tuple[str, str]:
+        """Parse floor and zone from combined zone ID.
+
+        Zone format: {level}{zone_2digit}
+        204 → ("L2", "04"), 102 → ("L1", "02"), B01 → ("B1", "01")
+        """
+        if zone_id[0] in ("B", "R"):
+            return (f"{zone_id[0]}1", zone_id[1:].zfill(2))
+        level = zone_id[0]
+        zone = zone_id[1:].zfill(2)
+        return (f"L{level}", zone)
+
     def infer_zone_from_equipment_id(
         self,
         equipment_id: str,
@@ -216,18 +228,20 @@ class ZoneMappingService:
         """
         import re
 
-        # Parse v2.0 format: S###-TYPE-FLOOR-ZONE
-        # Supports floor codes: B# (basement), G/L0 (ground), L#/L## (levels), R (roof), etc.
-        match = re.match(r"S\d+-[A-Z]+-(B\d|G|L\d{1,2}|R|M|PH)-([A-Z0-9]{1,3})", equipment_id)
+        # Parse v2.0 format: S###-TYPE-ZONE_ID
+        # Zone ID is combined level+zone (e.g., 204 = level 2, zone 04)
+        match = re.match(r"S\d+-[A-Z]+-([A-Z0-9]{2,4})", equipment_id)
         if not match:
             logger.warning(f"Could not parse v2.0 equipment ID: {equipment_id}")
             return None
 
-        floor = match.group(1)
-        zone = match.group(2).upper()
+        zone_id = match.group(1).upper()
+
+        # Parse floor and zone from combined zone ID
+        floor, zone = self._parse_combined_zone(zone_id)
 
         # Determine zone type based on equipment type and floor
-        zone_type = "open_office"  # Default
+        zone_type = "open_office"
         if "DALI" in equipment_id or "LUM" in equipment_id:
             zone_type = "lighting"
         elif "MEETING" in equipment_id:

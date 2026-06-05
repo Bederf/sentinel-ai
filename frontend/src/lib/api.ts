@@ -1697,7 +1697,7 @@ export const api = {
    */
   async getAlerts(siteId?: string): Promise<{ alerts: Alert[]; total: number; pending_recommendations: number }> {
     try {
-      const response = await fetchApi<{ total: number; alerts: Alert[]; pending_recommendations: number }>("/api/alerts");
+      const response = await fetchApi<{ total: number; alerts: Alert[]; pending_recommendations: number }>("/api/alerts?limit=50");
       const alerts = response.alerts || [];
       return {
         alerts: siteId ? alerts.filter((a) => a.site_id === siteId) : alerts,

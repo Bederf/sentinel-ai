@@ -668,17 +668,7 @@ class ServiceOptimizer:
                                 equipment_ids.append(eq_id)
 
             if not equipment_ids:
-                # Fallback: try reference devices
-                devices_path = os.path.join(
-                    os.path.dirname(__file__), "bms_simulator", "data", "reference_devices.json"
-                )
-                if os.path.exists(devices_path):
-                    with open(devices_path) as f:
-                        devices = json.load(f)
-                    for device in devices.get("devices", []):
-                        d_id = device.get("device_id") or device.get("id")
-                        if d_id:
-                            equipment_ids.append(d_id)
+                logger.info("No equipment IDs discovered — reference_devices.json fallback removed (2026-06)")
 
         except Exception as e:
             logger.warning(f"Could not discover equipment: {e}")

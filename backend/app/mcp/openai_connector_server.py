@@ -33,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 # Data paths (fallback)
 DATA_DIR = Path(__file__).parent.parent / "data"
-DEVICES_FILE = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 EQUIPMENT_FILE = DATA_DIR / "equipment.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 SITES_DIR = DATA_DIR / "sites"
@@ -526,9 +525,7 @@ def _build_searchable_documents() -> list[dict[str, Any]]:
 
         # Load equipment from JSON
         devices = []
-        if DEVICES_FILE.exists():
-            devices = _load_json(DEVICES_FILE)
-        if not devices and EQUIPMENT_FILE.exists():
+        if EQUIPMENT_FILE.exists():
             devices = _load_json(EQUIPMENT_FILE)
 
         for device in devices:

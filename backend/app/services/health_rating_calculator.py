@@ -297,6 +297,26 @@ class HealthRatingCalculator:
         Returns:
             HealthRating with all fields populated.
         """
+        # Gate: skip non-scoreable equipment types (lighting_panel, access_control, etc.)
+        from app.config.health_config import get_scoreability
+        score_cfg = get_scoreability(equipment.get("type", ""))
+        if not score_cfg.get("scoreable", False):
+            return HealthRating(
+                health_score=100.0,
+                health_status="healthy",
+                baseline_alignment_score=100.0,
+                service_compliance_score=100.0,
+                runtime_age_score=100.0,
+                fault_burden_score=100.0,
+                trend_momentum_score=100.0,
+                deviation_percent=0.0,
+                days_since_service=0,
+                age_years=0.0,
+                critical_faults=0,
+                warning_faults=0,
+                trend_slope=0.0,
+            )
+
         # --- Gather component inputs ---
 
         # 1. Baseline alignment: deviation from baseline_comparisons

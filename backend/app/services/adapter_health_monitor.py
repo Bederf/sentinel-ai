@@ -599,15 +599,9 @@ class AdapterHealthMonitor:
     @staticmethod
     def _get_monitored_sites(settings: Any) -> list[str]:
         """Return list of site IDs that should be monitored."""
-        sites = []
-        # site-002 is always monitored when enabled
-        if getattr(settings, "ENABLE_SITE002_SOURCE", False):
-            sites.append("site-002")
+        sites = ["site-002"]
         if getattr(settings, "ENABLE_SITE001_SOURCE", False):
             sites.append("site-001")
-        # Always include site-002 if nothing configured (default active site)
-        if not sites:
-            sites.append("site-002")
         return sites
 
     @staticmethod

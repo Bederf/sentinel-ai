@@ -151,19 +151,12 @@ async def ensure_device_manager_initialized() -> None:
                 f"({len(devices_data) - added_count} from Supabase, {added_count} from files)"
             )
         except Exception as e:
-            logger.error(f"Failed to initialize device manager from Supabase: {e}")
-            # Fallback: try loading from archived reference file
-            try:
-                ref_devices_path = DATA_DIR / "_archive" / "bms_simulator_data" / "reference_devices.json"
-                if ref_devices_path.exists():
-                    with open(ref_devices_path) as f:
-                        devices_data = json.load(f)
-                    await device_manager.initialize(devices_data)
-                    logger.warning(f"Fell back to archived reference_devices.json ({len(devices_data)} devices)")
-                else:
-                    await device_manager.initialize([])
-            except Exception:
-                await device_manager.initialize([])
+            logger.error(
+                f"[AI-OPT] Failed to initialize device manager from Supabase: {e}. "
+                f"Starting with empty device list — will retry on next cycle.",
+                exc_info=True,
+            )
+            await device_manager.initialize([])
 
 
 def load_sites() -> list[dict[str, Any]]:

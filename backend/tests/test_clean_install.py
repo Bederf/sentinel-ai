@@ -49,21 +49,14 @@ class TestCleanInstallDeviceManager:
 
 @pytest.mark.unit
 class TestCleanInstallSimulation:
-    """Verify simulation auto-start is gated by site002_source_enabled."""
+    """Verify simulation auto-start behavior (deprecated — simulator removed)."""
 
-    def test_simulation_not_triggered_when_site002_disabled(self):
-        """Simulation auto-start does NOT trigger when site002 is disabled."""
+    def test_site002_source_always_disabled(self):
+        """site002_source_enabled always returns False — simulator removed."""
         from app.config.settings import Settings
 
-        test_settings = Settings(site002_source_enabled=False, demo_mode=True)
+        test_settings = Settings(demo_mode=True)
         assert test_settings.site002_source_enabled is False
-
-    def test_simulation_triggered_when_site002_enabled(self):
-        """Simulation auto-start triggers when site002 is enabled."""
-        from app.config.settings import Settings
-
-        test_settings = Settings(site002_source_enabled=True, demo_mode=True)
-        assert test_settings.site002_source_enabled is True
 
 
 @pytest.mark.unit
@@ -140,37 +133,14 @@ class TestCleanInstallAdapters:
 
 @pytest.mark.unit
 class TestIngestionModeDecoupling:
-    """Verify ingestion mode is driven by site002_source_enabled, not demo_mode."""
+    """Verify ingestion mode resolution (site002_source_enabled deprecated — simulator removed)."""
 
-    def test_demo_mode_alone_does_not_force_simulation(self):
-        """demo_mode=True without site002 does not force SIMULATION ingestion."""
-        from app.config.settings import Settings
-
-        s = Settings(demo_mode=True, site002_source_enabled=False, ingestion_mode="simulation")
-        # With site002 disabled, resolved mode comes from ingestion_mode env var
-        # (which defaults to "simulation" anyway — but the point is it's not
-        # forced by demo_mode)
-        assert s.demo_mode is True
-        assert s.site002_source_enabled is False
-
-    def test_site002_enabled_forces_simulation(self):
-        """site002_source_enabled=True forces SIMULATION ingestion mode."""
+    def test_ingestion_mode_resolves_from_env(self):
+        """Resolved ingestion mode comes from ingestion_mode field, not site002_source_enabled."""
         from app.config.settings import IngestionMode, Settings
 
         s = Settings(
             demo_mode=False,
-            site002_source_enabled=True,
-            ingestion_mode="shadow_live",
-        )
-        assert s.resolved_ingestion_mode == IngestionMode.SIMULATION
-
-    def test_site002_disabled_uses_env_ingestion_mode(self):
-        """site002_source_enabled=False uses the configured ingestion_mode."""
-        from app.config.settings import IngestionMode, Settings
-
-        s = Settings(
-            demo_mode=False,
-            site002_source_enabled=False,
             ingestion_mode="shadow_live",
         )
         assert s.resolved_ingestion_mode == IngestionMode.SHADOW_LIVE

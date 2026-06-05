@@ -21,7 +21,6 @@ from statistics import mean, stdev
 from typing import Any
 
 from app.database.supabase_client import get_supabase_client
-from app.services.simulation_store import get_simulation_store
 
 # Demo fixture path
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -52,7 +51,6 @@ class PowerMeterValidationEngine:
         """
         self.site_id = site_id
         self.client = get_supabase_client()
-        self.sim_store = get_simulation_store(site_id)
         self._baseline_cache = {}
 
     def _extract_power_series(self, readings: list[dict[str, Any]]) -> list[float]:
@@ -330,8 +328,8 @@ class PowerMeterValidationEngine:
                 "created_at": datetime.now().isoformat(),
             }
 
-            # Write to simulation store (JSON), not Supabase
-            self.sim_store.write_validation("power_meter", record)
+            # Write to Supabase power meter validations table
+            self.client.table("power_meter_validations").upsert(record, on_conflict="meter_id,period").execute()
 
         except Exception as e:
             logger.error(f"Error writing validation record: {e}")

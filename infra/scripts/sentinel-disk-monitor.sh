@@ -19,7 +19,7 @@ ANALYTICS_WARN_GB=5
 LOG_DIR="/var/log/sentinel"
 LOG_FILE="${LOG_DIR}/disk-monitor.log"
 GMAIL_HELPER="/home/bederf/.sentry/tools/gmail_helper.py"
-ALERT_EMAIL="bederf@gmail.com"
+ALERT_EMAIL="info@sentinel-ai.co.za"
 DB_CONTAINER="supabase_db_bms-intelligence"
 
 # --- Ensure log directory exists ---

@@ -23,7 +23,6 @@ from app.config.settings import settings
 from app.database.repositories.user_repository import get_user_repository
 from app.database.repositories.user_site_access_repository import get_user_site_access_repository
 from app.middleware.auth_middleware import create_jwt_token
-from app.services.session_service import get_session_service
 
 logger = logging.getLogger(__name__)
 
@@ -123,7 +122,9 @@ class MagicLinkService:
     def __init__(self) -> None:
         self._user_repo = get_user_repository()
         self._access_repo = get_user_site_access_repository()
-        self._session_svc = get_session_service()
+        from app.services.session_service import session_service as _sess_svc
+
+        self._session_svc = _sess_svc
         self._smtp_config = _smtp_config()
 
     def _client(self):

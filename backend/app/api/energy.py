@@ -1142,127 +1142,60 @@ async def get_energy_simulated(
     site_id: str = Query(..., description="Site ID"),
 ) -> dict:
     """
-    Get simulated energy consumption during an active simulation.
+    Get real energy consumption for a site from Supabase.
 
-    Returns real-time energy metrics based on the current simulated state.
-    If no simulation is running, returns empty/zero values.
-
-    This endpoint is called by the Dashboard every 5 seconds during Grant's
-    365-day simulation to show live energy accumulation.
+    Returns real-time energy metrics from bridge telemetry.
+    No simulation — S002 is a live site.
 
     Args:
         site_id: Site ID (e.g., "site-002")
 
     Returns:
-        EnergyMetrics with current simulated values, or zeros if no simulation
+        EnergyMetrics from bridge/supabase telemetry
     """
     try:
-        from app.services.simulation_orchestrator import _active_simulations
+        from app.database.supabase_client import get_supabase_client
 
-        # Look for any running simulation
-        orchestrator = None
-        for _task_id, orch in _active_simulations.items():
-            if orch.running:
-                orchestrator = orch
-                break
-
-        if not orchestrator or not orchestrator.running:
-            # No simulation running - return zero metrics
+        client = get_supabase_client()
+        result = (
+            client.table("energy_cost_summary")
+            .select("*")
+            .eq("site_id", site_id)
+            .order("date", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if result.data:
+            row = result.data[0]
             return {
-                "total_kwh": 0.0,
-                "total_cost_zar": 0.0,
-                "carbon_kg": 0.0,
-                "hvac_kwh": 0.0,
-                "hvac_percent": 0.0,
-                "lighting_kwh": 0.0,
-                "lighting_percent": 0.0,
-                "power_kwh": 0.0,
-                "power_percent": 0.0,
-                "timestamp": datetime.now().isoformat(),
+                "total_kwh": row.get("total_kwh", 0),
+                "total_cost_zar": row.get("total_cost_r", 0),
+                "carbon_kg": row.get("total_kwh", 0) * 0.35,
+                "hvac_kwh": row.get("hvac_kwh", 0),
+                "hvac_percent": row.get("hvac_pct", 0),
+                "lighting_kwh": row.get("lighting_kwh", 0),
+                "lighting_percent": row.get("lighting_pct", 0),
+                "power_kwh": row.get("power_kwh", 0),
+                "power_percent": row.get("power_pct", 0),
+                "timestamp": row.get("date", datetime.now().isoformat()),
                 "simulated": False,
-                "message": "No active simulation",
             }
-
-        # Get current simulated state from orchestrator
-        status = orchestrator.get_status()
-
-        # Extract simulated values from status (or use defaults)
-        occupancy_percent = status.get("occupancy_percent", 0)
-        is_raining = status.get("is_raining", False)
-        cloud_cover = status.get("cloud_cover", 0)
-        ambient_temp = status.get("ambient_temp", 22)
-
-        # Estimate daylight factor from cloud cover and hour
-        current_hour = orchestrator.simulated_time.hour if orchestrator.simulated_time else 12
-        if 6 <= current_hour < 18:  # Daytime
-            base_daylight = 800  # lux at peak
-            daylight_lux = base_daylight * (1.0 - (cloud_cover / 100.0 * 0.8))
-            if is_raining:
-                daylight_lux *= 0.3
-        else:
-            daylight_lux = 0  # Night
-
-        # Estimate chiller load from ambient temperature
-        if ambient_temp > 28:
-            chiller_load_percent = min(100, 30 + (ambient_temp - 28) * 5)
-        elif ambient_temp < 15:
-            chiller_load_percent = 20
-        else:
-            chiller_load_percent = 50 - (22 - ambient_temp) * 2
-
-        # Generate energy based on simulated state
-        # Base values (from building capacity at full occupancy)
-        base_hvac_kwh = 500.0  # Base HVAC per 24 hours
-        base_lighting_kwh = 200.0  # Base lighting per 24 hours
-        base_power_kwh = 100.0  # Base other power per 24 hours
-
-        # Scale by occupancy (HVAC most affected)
-        occupancy_factor = occupancy_percent / 100.0
-        hvac_kwh = base_hvac_kwh * occupancy_factor * (chiller_load_percent / 100.0)
-
-        # Lighting scales with occupancy and inverse of daylight
-        daylight_factor = max(0, 1.0 - (daylight_lux / 1000.0))  # More daylight = less artificial
-        lighting_kwh = base_lighting_kwh * occupancy_factor * daylight_factor
-
-        # Power (standby equipment) less affected by occupancy
-        power_kwh = base_power_kwh * 0.7  # 70% base load
-
-        # Total and percentages
-        total_kwh = hvac_kwh + lighting_kwh + power_kwh
-
-        if total_kwh > 0:
-            hvac_percent = (hvac_kwh / total_kwh) * 100
-            lighting_percent = (lighting_kwh / total_kwh) * 100
-            power_percent = (power_kwh / total_kwh) * 100
-        else:
-            hvac_percent = 0
-            lighting_percent = 0
-            power_percent = 0
-
-        # Carbon and cost
-        carbon_kg = total_kwh * 0.35  # SA grid: 0.35 kg CO₂/kWh
-        total_cost_zar = total_kwh * 5.0  # ~R5/kWh commercial rate
-
         return {
-            "total_kwh": round(total_kwh, 2),
-            "total_cost_zar": round(total_cost_zar, 2),
-            "carbon_kg": round(carbon_kg, 2),
-            "hvac_kwh": round(hvac_kwh, 2),
-            "hvac_percent": round(hvac_percent, 1),
-            "lighting_kwh": round(lighting_kwh, 2),
-            "lighting_percent": round(lighting_percent, 1),
-            "power_kwh": round(power_kwh, 2),
-            "power_percent": round(power_percent, 1),
+            "total_kwh": 0.0,
+            "total_cost_zar": 0.0,
+            "carbon_kg": 0.0,
+            "hvac_kwh": 0.0,
+            "hvac_percent": 0.0,
+            "lighting_kwh": 0.0,
+            "lighting_percent": 0.0,
+            "power_kwh": 0.0,
+            "power_percent": 0.0,
             "timestamp": datetime.now().isoformat(),
-            "simulated": True,
-            "occupancy_percent": round(occupancy_percent, 1),
-            "daylight_lux": round(daylight_lux, 1),
-            "chiller_load_percent": round(chiller_load_percent, 1),
+            "simulated": False,
+            "message": "No energy data available",
         }
-
     except Exception as e:
-        logger.error(f"Error getting simulated energy: {e}", exc_info=True)
-        # Return zero metrics on error
+        logger.debug(f"Energy metrics unavailable for {site_id}: {e}")
         return {
             "total_kwh": 0.0,
             "total_cost_zar": 0.0,

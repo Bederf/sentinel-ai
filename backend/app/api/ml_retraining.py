@@ -1,7 +1,7 @@
 """
 ML Retraining API
 
-Endpoints for model retraining, performance monitoring, and A/B testing.
+Endpoints for model retraining and A/B testing.
 Phase 45-01: Online Learning & Automated Retraining.
 """
 
@@ -101,54 +101,6 @@ async def get_retrain_history(request: Request):
 
     scheduler = get_retraining_scheduler()
     return {"history": scheduler.get_retrain_history()}
-
-
-@router.get("/performance")
-@limiter.limit("1000/minute")
-async def evaluate_performance(
-    request: Request,
-    days_back: int = Query(7, description="Number of days to evaluate"),
-    site_id: str = Query(None, description="Site to evaluate (omit for all sites)"),
-    site_code: str = Query(None, description="Deprecated: use site_id", include_in_schema=False),
-):
-    """Evaluate prediction accuracy against actual outcomes.
-
-    Rate limit: 1000 requests/minute
-    """
-    from ml.monitoring.performance_monitor import get_performance_monitor
-
-    code = site_code or site_id
-    monitor = get_performance_monitor()
-    return monitor.evaluate_predictions(days_back=days_back, site_code=code)
-
-
-@router.get("/performance/health")
-@limiter.limit("1000/minute")
-async def get_model_health(request: Request):
-    """Get health summary of all active models.
-
-    Rate limit: 1000 requests/minute (was hitting 429 with global 200/min)
-    """
-    from ml.monitoring.performance_monitor import get_performance_monitor
-
-    monitor = get_performance_monitor()
-    return monitor.get_model_health_summary()
-
-
-@router.get("/performance/trend")
-@limiter.limit("1000/minute")
-async def get_performance_trend(
-    request: Request,
-    limit: int = Query(10, description="Number of recent evaluations"),
-):
-    """Get recent performance evaluation history.
-
-    Rate limit: 1000 requests/minute
-    """
-    from ml.monitoring.performance_monitor import get_performance_monitor
-
-    monitor = get_performance_monitor()
-    return {"evaluations": monitor.get_performance_trend(limit=limit)}
 
 
 @router.post("/ab-test/create")

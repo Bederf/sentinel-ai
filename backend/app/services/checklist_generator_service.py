@@ -87,9 +87,7 @@ class ChecklistGeneratorService:
                 if oem_templates:
                     return oem_templates
 
-        # Local simulator mode: return pre-built templates
-        if settings.site002_source_enabled:
-            return self._generate_demo_templates(equipment_type, manufacturer, model, capacity)
+        # Local simulator mode was removed (2026-06). Always call Claude API.
 
         # Build and call Claude API
         prompt = self._build_prompt(equipment_type, manufacturer, model, capacity, additional_specs)

@@ -12,6 +12,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Mail, AlertCircle, Loader2, Info } from "lucide-react";
 import { authApi, type AuthUser, getAccessToken, setAccessToken, clearAccessToken } from '@/lib/api';
+import { setAccessToken as setClientAccessToken } from '@/lib/api/client';
 
 interface EmailEntryProps {
   onSuccess: (user: AuthUser, token: string) => void;
@@ -87,6 +88,7 @@ export function EmailEntry({ onSuccess }: EmailEntryProps) {
 
       // Store access token in memory, refresh token in localStorage
       setAccessToken(accessToken);
+      setClientAccessToken(accessToken);
       if (refreshToken) {
         localStorage.setItem("sentinel_refresh_token", refreshToken);
       } else {

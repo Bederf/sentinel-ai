@@ -49,7 +49,6 @@ def _live_mode_guard(tool_name: str) -> dict[str, Any] | None:
 # Data paths
 DATA_DIR = Path(__file__).parent.parent / "data"
 SITES_FILE = DATA_DIR / "sites.json"
-DEVICES_FILE = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 ALERTS_FILE = DATA_DIR / "alerts.json"
 
 
@@ -64,13 +63,8 @@ def _load_sites() -> list[dict[str, Any]]:
 
 
 def _load_devices() -> list[dict[str, Any]]:
-    """Load devices from JSON file."""
-    try:
-        with open(DEVICES_FILE) as f:
-            return json.load(f)
-    except Exception as e:
-        logger.error(f"Failed to load devices: {e}")
-        return []
+    """Devices are sourced from Supabase. Returns empty list — no JSON fallback."""
+    return []
 
 
 def _load_alerts() -> list[dict[str, Any]]:
@@ -2623,17 +2617,11 @@ async def add_site_devices_tool(
 
     If device_id is not provided, it will be auto-generated from site_code and device_type.
     """
-    import json
     from pathlib import Path
 
     data_path = Path(__file__).parent.parent / "data"
-    devices_file = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
 
-    # Load existing devices
-    existing_devices = []
-    if devices_file.exists():
-        with open(devices_file) as f:
-            existing_devices = json.load(f)
+    existing_devices: list[dict] = []
 
     # Track counts by type for auto-generating IDs
     type_counts = defaultdict(int)
@@ -3297,7 +3285,6 @@ async def discover_tridonic_gateway_tool(
     gateway_type: str = "tridonic",
     username: str | None = None,
     password: str | None = None,
-    use_simulated: bool = False,
 ) -> dict[str, Any]:
     """
     Discover Tridonic DALI gateway and enumerate all devices.
@@ -3317,7 +3304,6 @@ async def discover_tridonic_gateway_tool(
         gateway_type: Gateway type - "tridonic", "philips", "helvar", "generic"
         username: Optional HTTP Basic Auth username for gateway API
         password: Optional HTTP Basic Auth password for gateway API
-        use_simulated: Use simulated data if gateway unreachable (for testing)
 
     Returns:
         Dictionary with:
@@ -3369,42 +3355,12 @@ async def discover_tridonic_gateway_tool(
         gateway_info = await service.get_gateway_info()
 
         if not gateway_info or not gateway_info.online:
-            if use_simulated:
-                # Fall back to simulated data
-                result["gateway"] = {
-                    "ip_address": gateway_ip,
-                    "manufacturer": "Tridonic (Simulated)",
-                    "model": "Scenecom (Demo)",
-                    "firmware_version": "2.1.0",
-                    "dali_lines": 2,
-                    "total_devices": 24,
-                    "online": True,
-                    "simulated": True,
-                }
-                gateway_info = type(
-                    "obj", (object,), {"dali_lines": 2, "online": True, "manufacturer": "Tridonic", "model": "Scenecom"}
-                )()
-                # Generate simulated device list
-                simulated_devices = []
-                for line in range(1, 3):
-                    for addr in range(1, 13):  # 12 devices per line
-                        device_type = "led_panel" if addr <= 8 else "emergency"
-                        simulated_devices.append(
-                            {
-                                "line": line,
-                                "address": addr,
-                                "device_type": 6 if device_type == "led_panel" else 1,
-                                "device_type_name": "LED Module" if device_type == "led_panel" else "Emergency",
-                            }
-                        )
-            else:
-                result["error"] = f"DALI gateway at {gateway_ip} is offline or unreachable"
-                result["next_steps"] = [
-                    "Verify gateway IP address and network connectivity",
-                    "Check gateway power and Ethernet connection",
-                    "Try with use_simulated=true for testing",
-                ]
-                return result
+            result["error"] = f"DALI gateway at {gateway_ip} is offline or unreachable"
+            result["next_steps"] = [
+                "Verify gateway IP address and network connectivity",
+                "Check gateway power and Ethernet connection",
+            ]
+            return result
         else:
             result["gateway"] = gateway_info.to_dict()
 
@@ -3415,33 +3371,19 @@ async def discover_tridonic_gateway_tool(
         sensor_seq = 0
 
         for line in range(1, gateway_info.dali_lines + 1):
-            if use_simulated:
-                # Use pre-generated simulated list
-                line_devices = [d for d in simulated_devices if d["line"] == line]
-            else:
-                # Real discovery
-                line_devices = await service.discover_devices(dali_line=line)
+            line_devices = await service.discover_devices(dali_line=line)
 
             result["devices_by_line"][line] = len(line_devices)
 
             # Generate equipment codes for each device
             for device_data in line_devices:
-                if use_simulated:
-                    device_type = device_data["device_type"]
-                    device_type_name = device_data["device_type_name"]
-                    dali_address = device_data["address"]
-                    dali_line = device_data["line"]
-                    gtin = None
-                    serial_number = None
-                    manufacturer = None
-                else:
-                    device_type = device_data.device_type
-                    device_type_name = device_data.device_type_name
-                    dali_address = device_data.dali_address
-                    dali_line = line
-                    gtin = device_data.gtin
-                    serial_number = device_data.serial_number
-                    manufacturer = device_data.manufacturer
+                device_type = device_data.device_type
+                device_type_name = device_data.device_type_name
+                dali_address = device_data.dali_address
+                dali_line = line
+                gtin = device_data.gtin
+                serial_number = device_data.serial_number
+                manufacturer = device_data.manufacturer
 
                 # Classify device and generate equipment code
                 if "controller" in device_type_name.lower() or device_type == 0:
@@ -4435,20 +4377,6 @@ async def get_asset_metrics_template_tool(
                             elif "vav" in eq_id:
                                 equipment_types.add("vav")
 
-        # Check devices file
-        devices_file = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
-        if devices_file.exists():
-            with open(devices_file) as f:
-                devices = json.load(f)
-                for device in devices:
-                    if device.get("site_id") == site_id:
-                        device_type = device.get("device_type", "").lower()
-                        # Map device types to templates
-                        for template_type in ASSET_METRIC_TEMPLATES:
-                            if template_type in device_type:
-                                equipment_types.add(template_type)
-                                break
-
         equipment_types = list(equipment_types)
 
     # Generate templates for each equipment type
@@ -5433,11 +5361,7 @@ MCP_TOOLS = [
                 },
                 "username": {"type": "string", "description": "Optional HTTP Basic Auth username for gateway API"},
                 "password": {"type": "string", "description": "Optional HTTP Basic Auth password for gateway API"},
-                "use_simulated": {
-                    "type": "boolean",
-                    "description": "Use simulated data if gateway unreachable (for testing)",
-                    "default": False,
-                },
+
             },
             "required": ["site_id", "gateway_ip"],
         },

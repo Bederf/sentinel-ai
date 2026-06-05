@@ -422,6 +422,14 @@ class SentinelDataSync:
             if not sensor_readings and health_score is None:
                 continue
 
+            # Skip non-scoreable equipment types (lighting_panel, access_control, etc.)
+            from app.config.health_config import get_scoreability
+            eq_meta = equipment_meta.get(code, {})
+            eq_type = eq_meta.get("type", "")
+            score_cfg = get_scoreability(eq_type)
+            if not score_cfg.get("scoreable", False):
+                continue
+
             # FIXED: Calculate health from sensor readings when no pre-computed score
             if health_score is None and sensor_readings:
                 try:
@@ -468,9 +476,6 @@ class SentinelDataSync:
                     "source": "sentinel",
                 }
 
-            status = health_to_status(final_health_score)
-            h = round(final_health_score) if final_health_score is not None else None
-
             # Compute confidence and trend from available signals
             eq_meta = equipment_meta.get(code, {})
             existing_op = eq_meta.get("operating_data", {}) if isinstance(eq_meta.get("operating_data"), dict) else {}
@@ -500,6 +505,12 @@ class SentinelDataSync:
             confidence = health_calc.calculate_confidence(has_live, op_age, ml_hours)
 
             prev_score = eq_meta.get("health_score")
+            # Preserve previous health score when new calculation yields nothing
+            if final_health_score is None and prev_score is not None:
+                final_health_score = float(prev_score)
+
+            status = health_to_status(final_health_score)
+            h = round(final_health_score) if final_health_score is not None else None
             trend = health_calc.calculate_trend(final_health_score or 0, prev_score)
             data_freshness = op_age  # already computed above
 
@@ -601,6 +612,12 @@ class SentinelDataSync:
         for eq in all_equipment:
             code = eq.get("code", "")
             if code in telemetry_codes:
+                continue
+
+            # Skip non-scoreable equipment types
+            from app.config.health_config import get_scoreability
+            score_cfg = get_scoreability(eq.get("type", ""))
+            if not score_cfg.get("scoreable", False):
                 continue
 
             raw_install = eq.get("install_date")

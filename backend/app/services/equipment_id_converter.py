@@ -2,7 +2,7 @@
 
 Converts legacy BMS equipment IDs to SENTINEL v2.0 standard format:
   Legacy: CH-1, VAV-L1-05, 011-stc-ahu-001
-  v2.0:   S002-CHILLER-B1-001, S002-VAV-L1-E, S002-AHU-L0-01
+  v2.0:   S002-CHILLER-001, S002-VAV-E, S002-AHU-01
 
 This enables:
 - Consistent naming across all equipment
@@ -47,6 +47,7 @@ class EquipmentIDConverter:
         "lum": "LUM",
         "luminaire": "LUM",
         "lighting": "LUM",
+        "lighting_panel": "LTG",
         "zone": "DALI",  # Niagara zone controller → DALI lighting
         "zone_controller": "DALI",
         # Energy
@@ -137,17 +138,17 @@ class EquipmentIDConverter:
             zone_mapping: Optional site-specific zone number→letter mappings
 
         Returns:
-            v2.0 formatted equipment ID (e.g., "S002-CHILLER-B1-001")
+            v2.0 formatted equipment ID (e.g., "S002-CHILLER-001")
 
         Examples:
             convert_bms_to_v2("CH-1", "chiller", "site-002")
-            → "S002-CHILLER-B1-001"
+            → "S002-CHILLER-001"
 
             convert_bms_to_v2("VAV-L1-05", "vav", "site-002", zone_mapping={"05": "E"})
-            → "S002-VAV-L1-E"
+            → "S002-VAV-E"
 
             convert_bms_to_v2("011-stc-ahu-001", "ahu", "site-002")
-            → "S002-AHU-L0-01"
+            → "S002-AHU-01"
         """
         logger.debug(f"Converting BMS ID '{bms_id}' (type: {equipment_type}, site: {site_id})")
 
@@ -165,23 +166,31 @@ class EquipmentIDConverter:
 
         # If parsing fails, provide defaults
         if not floor_zone:
-            floor = "B1"  # Default to basement
-            zone_or_seq = "001"  # Default sequence
+            floor = "B1"
+            zone_or_seq = "001"
             logger.warning(f"Could not parse floor/zone from '{bms_id}', using defaults: {floor}/{zone_or_seq}")
         else:
             floor = floor_zone.get("floor", "B1")
             zone_value = floor_zone.get("zone", "001")
 
-            # Convert zone number to letter if needed
-            if zone_value.isdigit() and len(zone_value) <= 2:
-                zone_number = zone_value.zfill(2)
-                zone_mapping_dict = zone_mapping or self._get_zone_mappings_for_site(site_id)
-                zone_or_seq = zone_mapping_dict.get(zone_number, zone_number.lstrip("0") or "A")
-            else:
-                zone_or_seq = zone_value
+            # Build reverse zone mapping (letter → number)
+            zone_mapping_dict = zone_mapping or self._get_zone_mappings_for_site(site_id)
+            letter_to_zone = {v: k for k, v in zone_mapping_dict.items()}
 
-        # Build v2.0 format
-        v2_id = f"{site_prefix}-{normalized_type}-{floor}-{zone_or_seq}"
+            # Resolve zone to 2-digit number
+            if zone_value.isdigit():
+                zone_num = f"{int(zone_value):02d}"
+            elif zone_value in letter_to_zone:
+                zone_num = letter_to_zone[zone_value]
+            else:
+                zone_num = "001"
+
+            # Combine level number + zone: zone 204 = level 2, zone 04
+            level_num = self._extract_level_number(floor)
+            zone_or_seq = f"{level_num}{zone_num}"
+
+        # Build v2.0 format: {site}-{type}-{zone_id}
+        v2_id = f"{site_prefix}-{normalized_type}-{zone_or_seq}"
         logger.info(f"Converted '{bms_id}' → '{v2_id}' (type: {normalized_type}, floor: {floor}, zone: {zone_or_seq})")
 
         return v2_id
@@ -321,6 +330,24 @@ class EquipmentIDConverter:
         # Zero-pad to 3 digits
         site_prefix = f"S{site_num.zfill(3)}"
         return site_prefix
+
+    def _extract_level_number(self, floor: str) -> str:
+        """Extract level number from floor code for combined zone format.
+
+        Zone format: {level}{zone_2digit} (e.g., 204 = level 2, zone 04)
+
+        L2 → 2, G/L0 → 0, B1 → B, R → R
+        """
+        floor = floor.upper().strip()
+        if floor in ("G", "L0"):
+            return "0"
+        if floor.startswith("L"):
+            return floor[1:]
+        if floor.startswith("B"):
+            return "B"
+        if floor == "R":
+            return "R"
+        return "0"
 
     def _get_zone_mappings_for_site(self, site_id: str) -> dict[str, str]:
         """Get zone number→letter mappings for a specific site.

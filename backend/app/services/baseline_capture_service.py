@@ -326,21 +326,11 @@ class BaselineCaptureService:
             if equipment:
                 return True
         except Exception as e:
-            logger.debug(f"Could not fetch equipment from repository: {e}")
-
-        # Try JSON fallback (reference devices in bms_simulator/data/)
-        try:
-            import json as _json
-            from pathlib import Path as _Path
-
-            _ref_path = _Path(__file__).parent / "bms_simulator" / "data" / "reference_devices.json"
-            if _ref_path.exists():
-                devices = _json.loads(_ref_path.read_text())
-                for device in devices:
-                    if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
-                        return True
-        except Exception as e:
-            logger.debug(f"Could not fetch equipment from JSON: {e}")
+            logger.error(
+                f"[BASELINE] Failed to load equipment {equipment_id} from Supabase: {e}. "
+                f"Baseline capture skipped — will retry on next cycle.",
+                exc_info=True,
+            )
 
         return False
 
@@ -663,22 +653,11 @@ class BaselineCaptureService:
             if equipment and hasattr(equipment, "equipment_type"):
                 return self._map_device_type_to_equipment_type(equipment.equipment_type)
         except Exception as e:
-            logger.debug(f"Could not get equipment type from repository: {e}")
-
-        # Try JSON fallback (reference devices in bms_simulator/data/)
-        try:
-            import json as _json
-            from pathlib import Path as _Path
-
-            _ref_path = _Path(__file__).parent / "bms_simulator" / "data" / "reference_devices.json"
-            if _ref_path.exists():
-                devices = _json.loads(_ref_path.read_text())
-                for device in devices:
-                    if device.get("device_id") == equipment_id or device.get("id") == equipment_id:
-                        device_type = device.get("type", "")
-                        return self._map_device_type_to_equipment_type(device_type)
-        except Exception as e:
-            logger.debug(f"Could not get equipment type from JSON: {e}")
+            logger.error(
+                f"[BASELINE] Failed to load equipment type for {equipment_id} from Supabase: {e}. "
+                f"Equipment type will fall back to 'default' — will retry on next cycle.",
+                exc_info=True,
+            )
 
         return "default"
 

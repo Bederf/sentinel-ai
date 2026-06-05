@@ -32,7 +32,7 @@ class CommissioningService:
     async def run_scorecard(self, site_id: str) -> CommissioningScorecard:
         """Run all 8 commissioning gates and produce a scorecard."""
         settings = app_settings
-        ingestion_mode = settings.resolved_ingestion_mode.value
+        ingestion_mode = self._get_site_phase(site_id) or settings.resolved_ingestion_mode.value
 
         # Fetch quality metrics once — reused by several gates
         quality = self._repo.get_quality_metrics(site_id)
@@ -198,6 +198,8 @@ class CommissioningService:
             ingestion_mode=ingestion_mode,
             checked_at=datetime.utcnow(),
             gates=gates,
+            gates_passed=passed_count,
+            gates_total=len(gates),
             truth_check=truth_check,
             summary={"passed": passed_count, "failed": failed_count, "total": len(gates)},
             all_gates_passed=all_gates_passed,
@@ -205,6 +207,19 @@ class CommissioningService:
             can_promote=can_promote,
             blocking_gates=blocking,
         )
+
+    def _get_site_phase(self, site_id: str) -> str | None:
+        """Read onboarding_phase from Supabase sites table."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            resp = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+            if resp.data:
+                return resp.data[0].get("onboarding_phase")
+        except Exception:
+            pass
+        return None
 
     def _get_sync_frequency(self, site_id: str) -> int:
         """Get the sync frequency in minutes for the building's active sources."""

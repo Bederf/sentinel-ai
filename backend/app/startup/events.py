@@ -785,33 +785,10 @@ async def startup_event(_: FastAPI) -> None:
 
     _validate_block_booking_config()
 
-    # === Simulation Engine (gated by ENABLE_SITE002_SOURCE) ===
-    # Check persistent "simulationStopped" flag — if admin stopped simulation via Settings,
-    # do not auto-start on restart.
-    _simulation_stopped = False
-    try:
-        import json as _json
-        from pathlib import Path as _Path
-
-        _settings_path = _Path(__file__).parent.parent / "data" / "settings.json"
-        if _settings_path.exists():
-            _sim_settings = _json.loads(_settings_path.read_text())
-            _simulation_stopped = _sim_settings.get("simulationStopped", False)
-    except Exception:
-        pass
-
-    if _simulation_stopped:
-        _logger.info("Simulation stopped by admin (simulationStopped=true in settings.json) — skipping auto-start")
-
-    if settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode:
-        # Simulation services (bms_simulation_service, lifecycle_orchestrator) were removed.
-        # Lifecycle is now fully manual via API — no auto-start on restart.
-        _logger.info("Lifecycle simulations are manual-start only on backend startup")
-    else:
-        if settings.edge_mode and settings.site002_source_enabled:
-            _logger.info("Simulation queue disabled (EDGE_MODE=true)")
-        else:
-            _logger.info("Site 002 data source disabled — simulation engine inactive")
+    # === Shadow Mode Bridge Polling (only active bridge integration) ===
+    # ENABLE_SITE002_SOURCE was deprecated 2026-06 — simulator removed.
+    # Shadow polling runs independently, always-on for live site-002 bridge.
+    # Simulation auto-start block was removed with simulator.
 
     # Shadow mode bridge polling — runs whenever edge mode is disabled.
     # Polls the live bridge (10.99.0.1:8080) every 5 minutes and feeds data to

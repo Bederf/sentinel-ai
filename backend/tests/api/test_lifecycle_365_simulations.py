@@ -22,15 +22,7 @@ import pytest
 from httpx import AsyncClient
 
 
-@pytest.fixture(autouse=True)
-def enable_site002_source():
-    """Enable SITE002 source so lifecycle simulation endpoints return real data."""
-    from app.config.settings import settings as app_settings
-
-    original = app_settings.site002_source_enabled
-    app_settings.site002_source_enabled = True
-    yield
-    app_settings.site002_source_enabled = original
+# site002_source_enabled is deprecated (always False) — simulator removed 2026-06
 
 
 # Simple wrapper class for mock events

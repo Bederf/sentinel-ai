@@ -1761,9 +1761,7 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
         if bridge_connected:
             bridge_data_source = bridge_data_source or "remote_bridge"
 
-        if settings.site002_source_enabled and settings.ingestion_mode == "simulation":
-            bridge_data_source = "local_adapter"
-            bridge_connected = True
+        # Local adapter (sim) mode was removed (2026-06). Bridge status always reflects live data.
 
         return {
             "bridge_connected": bridge_connected,

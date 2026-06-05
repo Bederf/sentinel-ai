@@ -35,6 +35,7 @@ class QualityGateStatusResponse(BaseModel):
 
     site_id: str = Field(description="Site identifier")
     ingestion_mode: str = Field(description="Current ingestion mode")
+    mode: str = Field(description="Alias for ingestion_mode (frontend compatibility)")
     thresholds_used: str = Field(description="Mode whose thresholds were applied")
     metric_values: dict = Field(default_factory=dict, description="Raw metric values collected")
     rule_results: list[QualityMetricDetail] = Field(default_factory=list, description="Per-metric evaluation results")

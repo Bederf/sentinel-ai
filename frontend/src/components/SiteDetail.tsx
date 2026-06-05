@@ -363,7 +363,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
         // Fetch alerts for this site
         const { alerts: allAlerts, total: apiTotal } = await api.getAlerts();
-        setAlerts(allAlerts.filter((a) => a.site_id === siteId));
+        const siteAlerts = allAlerts.filter((a) => a.site_id === siteId);
+        setAlerts(siteAlerts.slice(0, 50));
         setAlertsTotal(apiTotal);
 
         // Fetch predictions for this site

@@ -602,6 +602,24 @@ async def residential_telegram_webhook(request: Request):
                 service.handle_ha_deployment_callback(int(cb_chat_id), cb_id, deployment)
                 return JSONResponse(content={"status": "deployment", "deployment": deployment})
 
+            if cb_chat_id and data == "back:platforms":
+                service.handle_connect(int(cb_chat_id))
+                return JSONResponse(content={"status": "back_platforms"})
+
+            if cb_chat_id and data == "ha:guide":
+                sender = ResidentialTelegramSender()
+                await sender.send_text(
+                    int(cb_chat_id),
+                    "📋 SENTINEL Home Assistant Add-on Guide\n\n"
+                    "1. In Home Assistant, go to Settings → Add-ons → Store\n"
+                    "2. Click the ⋮ menu (top-right) → Repositories\n"
+                    "3. Add: https://github.com/sentinel/ha-addon-repo\n"
+                    "4. Browse store → SENTINEL Home → Install\n"
+                    "5. Start the add-on → it will auto-register\n\n"
+                    "Once connected, I'll notify you here."
+                )
+                return JSONResponse(content={"status": "ha_guide"})
+
             return JSONResponse(content={"status": "unknown_callback"})
 
         if not message:
@@ -617,9 +635,7 @@ async def residential_telegram_webhook(request: Request):
         service = ResidentialOnboardService()
 
         if text == "/connect":
-            result = service.handle_connect(chat_id)
-            sender = ResidentialTelegramSender()
-            await sender.send_text(chat_id, result)
+            service.handle_connect(chat_id)  # sends keyboard inline via _send
             return JSONResponse(content={"status": "connect"})
 
         if text == "/hapeer_ready":

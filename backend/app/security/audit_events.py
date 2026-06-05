@@ -370,13 +370,20 @@ def audit_config_change(
     setting_key: str,
     user: str,
     source_ip: str | None = None,
+    old_value: Any = None,
+    new_value: Any = None,
 ) -> str:
     """Audit a configuration change."""
+    metadata: dict[str, Any] = {"setting_key": setting_key}
+    if old_value is not None:
+        metadata["old_value"] = old_value
+    if new_value is not None:
+        metadata["new_value"] = new_value
     return write_security_audit(
         "CONFIG_CHANGE",
         user=user,
         source_ip=source_ip,
-        metadata={"setting_key": setting_key},
+        metadata=metadata,
     )
 
 

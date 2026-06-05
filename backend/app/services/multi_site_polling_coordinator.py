@@ -78,7 +78,7 @@ class MultiSitePollingCoordinator:
                 if errors:
                     logger.warning("[COORDINATOR] %s poll errors: %s", site_id, errors)
                 else:
-                    logger.info(
+                    logger.warning(
                         "[COORDINATOR] %s: %d states, ml_hours=%s",
                         site_id,
                         result.get("equipment_states", 0),
@@ -97,7 +97,19 @@ class MultiSitePollingCoordinator:
 
         Caching preserves object catalog, energy accumulators, and FCU tracker
         across poll cycles — identical to the old singleton pattern.
+
+        Uses the module-level singleton for site-002 so system health probes
+        that also reference get_shadow_mode_polling_service() see the same instance.
         """
+        if site_id == "site-002":
+            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+
+            svc = get_shadow_mode_polling_service()
+            if svc not in self._services.values():
+                self._services[site_id] = svc
+                logger.info("[COORDINATOR] Using singleton polling service for %s", site_id)
+            return self._services.get(site_id) or svc
+
         if site_id not in self._services:
             self._services[site_id] = ShadowModePollingService(
                 site_id=site_id,

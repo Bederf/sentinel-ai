@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 # Cache TTL in seconds
 CACHE_TTL = 300  # 5 minutes
 
-# Default thresholds (used as ultimate fallback)
-DEFAULT_THRESHOLDS = {"healthy": 75, "warning": 50, "critical": 30}
+# Default thresholds (used as ultimate fallback — overridden by Supabase system_settings)
+DEFAULT_THRESHOLDS = {"healthy": 85, "warning": 65, "critical": 40}
 
 
 class HealthThresholdService:

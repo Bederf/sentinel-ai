@@ -392,7 +392,7 @@ export function OverviewCockpitHost({
           equipment_type: eq.equipment_type,
           floor_id: floorId,
           health_score: eq.health_score,
-          health_state: eq.health_score >= 70 ? 'degraded' : 'critical',
+          health_state: eq.health_score >= 40 ? 'degraded' : 'critical',
           zone_id: zoneKey,
         }
       })

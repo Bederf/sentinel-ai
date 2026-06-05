@@ -104,15 +104,21 @@ class DeviceControlRequest(BaseModel):
 DATA_DIR = Path(__file__).parent.parent / "data"
 SITES_DIR = DATA_DIR / "sites"
 
-# Reference devices for Site-002 simulation (inside bms_simulator package)
-REFERENCE_DEVICES_PATH = Path(__file__).parent.parent / "services" / "bms_simulator" / "data" / "reference_devices.json"
-
-
+# Reference devices loader (formerly read from bms_simulator/data/reference_devices.json).
+# Removed: production AI/device code must not fall back to simulator exports.
+# Reference devices are now sourced from Supabase (equipment table) via
+# load_equipment_from_buildings() and the equipment repository.
 async def load_reference_devices() -> list[dict]:
-    """Load Site-002 reference devices from JSON file."""
-    if REFERENCE_DEVICES_PATH.exists():
-        with open(REFERENCE_DEVICES_PATH) as f:
-            return json.load(f)
+    """Load Site-002 reference devices.
+
+    Previously read from bms_simulator/data/reference_devices.json (sim artifacts).
+    Now returns an empty list — reference devices are sourced from Supabase by
+    load_equipment_from_buildings() and the equipment repository.
+    """
+    logger.info(
+        "[DEVICES] load_reference_devices() is a no-op in production. "
+        "Reference devices come from Supabase via load_equipment_from_buildings()."
+    )
     return []
 
 
@@ -230,7 +236,6 @@ async def startup_event():
     Called from main.py startup event.
     Loads local reference devices when enabled, plus discovered building equipment.
     """
-    from app.config.settings import settings as _settings
 
     try:
         testing_mode = os.getenv("TESTING", "").lower() == "true"
@@ -238,12 +243,11 @@ async def startup_event():
 
         devices_data: list[dict] = []
         ref_count = 0
-        if _settings.site002_source_enabled:
-            devices_data = await load_reference_devices()
-            ref_count = len(devices_data)
-            print(f"[DEVICES] Loaded {ref_count} local reference devices (Site-002)")
-        else:
-            print("[DEVICES] Site-002 data source disabled — skipping reference devices")
+        # load_reference_devices() is a no-op since simulator removal (2026-06).
+        # Reference devices come from Supabase via load_equipment_from_buildings().
+        devices_data = await load_reference_devices()
+        ref_count = len(devices_data)
+        print(f"[DEVICES] Loaded {ref_count} local reference devices (Site-002) — simulator fallback removed, no-op")
 
         site_devices = []
         if not testing_mode:

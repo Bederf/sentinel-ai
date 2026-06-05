@@ -119,12 +119,11 @@ class TestEdgeModeGating:
         settings = Settings(
             _env_file=None,
             edge_mode=True,
-            site002_source_enabled=True,
             jwt_secret_key="test-secret-key-minimum-32-chars-long",
         )
 
-        # The gating condition in events.py:
-        #   if settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode:
+        # site002_source_enabled always False (simulator removed) — edge_mode blocks remaining paths
+        # Original gating: settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode
         _simulation_stopped = False
         should_start_sim = settings.site002_source_enabled and not _simulation_stopped and not settings.edge_mode
         assert should_start_sim is False

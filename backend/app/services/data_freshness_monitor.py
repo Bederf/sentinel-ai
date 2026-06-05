@@ -36,7 +36,7 @@ class DataFreshnessMonitor:
 
     # Standard data sources and their SLI targets (seconds)
     _STANDARD_SOURCES: ClassVar[dict[str, int]] = {
-        "bms_telemetry": 30,
+        "bms_telemetry": 300,
         "anomalies": 300,
         "documents": 7200,
         "recommendations": 900,

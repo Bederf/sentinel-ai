@@ -17,6 +17,7 @@ Fault events from /alarms accumulate in SentinelMLFeeder._fault_events buffer.
 When 500+ events are buffered → train Fault Classifier.
 """
 
+import asyncio
 import logging
 import re
 from datetime import UTC, datetime
@@ -313,6 +314,7 @@ class ShadowModePollingService:
         now = datetime.now(tz=UTC)
         result: dict[str, Any] = {"poll_count": self._poll_count, "errors": []}
 
+
         try:
             base, token = self._get_bridge_credentials()
         except Exception as e:
@@ -355,16 +357,31 @@ class ShadowModePollingService:
 
         errors: list[str] = []
 
+        async def _fetch_with_retry(path: str) -> dict | None:
+            for attempt in range(2):
+                try:
+                    transport = httpx.AsyncHTTPTransport(limits=httpx.Limits(max_connections=1, max_keepalive_connections=0))
+                    async with httpx.AsyncClient(timeout=5.0, transport=transport) as client:
+                        resp = await client.get(f"{base}{path}", headers=headers)
+                        resp.raise_for_status()
+                        return resp.json()
+                except httpx.ConnectError:
+                    logger.warning(f"[SHADOW] {path} attempt {attempt+1}: ConnectError — retrying")
+                    await asyncio.sleep(1.0)
+                    continue
+                except Exception as e:
+                    if attempt == 0:
+                        logger.warning(f"[SHADOW] {path} attempt {attempt+1}: {e!r} — retrying")
+                        await asyncio.sleep(1.0)
+                        continue
+                    return None
+
         # ── 2. Fetch zone readings ────────────────────────────────────────────
         zone_states: dict[str, dict[str, Any]] = {}
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(
-                    f"{base}/api/sites/{self.site_id}/zones",
-                    headers=headers,
-                )
-                resp.raise_for_status()
-                data = resp.json()
+            data = await _fetch_with_retry(f"/api/sites/{self.site_id}/zones")
+            if data is None:
+                raise httpx.ConnectError("retry exhausted")
 
             zones = data.get("zones", [])
             logger.debug(f"[SHADOW] Got {len(zones)} zone readings")
@@ -408,16 +425,15 @@ class ShadowModePollingService:
             logger.warning(f"[SHADOW] Zone poll error: {e}")
             errors.append(f"zones: {e}")
 
+        # Stagger requests to avoid bridge connection pool exhaustion
+        await asyncio.sleep(1.5)
+
         # ── 3. Fetch aggregated telemetry ────────────────────────────────────
         agg_states: dict[str, dict[str, Any]] = {}
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(
-                    f"{base}/api/sites/{self.site_id}/telemetry",
-                    headers=headers,
-                )
-                resp.raise_for_status()
-                data = resp.json()
+            data = await _fetch_with_retry(f"/api/sites/{self.site_id}/telemetry")
+            if data is None:
+                raise httpx.ConnectError("retry exhausted")
 
             power = data.get("power", {})
             water = data.get("water", {})
@@ -661,17 +677,16 @@ class ShadowModePollingService:
             logger.debug(f"[SHADOW] Occupancy poll skipped: {e}")
             errors.append(f"occupancy: {e}")
 
+        # Stagger requests to avoid bridge connection pool exhaustion
+        await asyncio.sleep(1.5)
+
         # ── 3c. Fetch BESS/Solar/Generator data from bridge objects ─────────
         # Polls the BACnet object catalog for energy equipment telemetry
         try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(
-                    f"{base}/api/sites/{self.site_id}/objects",
-                    headers=headers,
-                )
-                resp.raise_for_status()
-                objects_data = resp.json()
-                objects = objects_data.get("objects", [])
+            objects_data = await _fetch_with_retry(f"/api/sites/{self.site_id}/objects")
+            if objects_data is None:
+                raise httpx.ConnectError("retry exhausted")
+            objects = objects_data.get("objects", [])
 
             # Group objects by equipment
             energy_equipment: dict[str, dict[str, Any]] = {}
@@ -698,14 +713,9 @@ class ShadowModePollingService:
 
             for eq_id in energy_equipment_ids[:5]:  # Limit to top 5 to avoid timeout
                 try:
-                    # Fetch current point values for this equipment
-                    point_resp = await client.get(
-                        f"{base}/api/sites/{self.site_id}/points",
-                        headers=headers,
-                        params={"equipment_id": eq_id},
+                    points_data = await _fetch_with_retry(
+                        f"/api/sites/{self.site_id}/points?equipment_id={eq_id}"
                     )
-                    point_resp.raise_for_status()
-                    points_data = point_resp.json()
                     points = points_data.get("points", [])
 
                     readings: dict[str, float] = {}
@@ -758,13 +768,9 @@ class ShadowModePollingService:
 
             # Also fetch detailed water meter points
             try:
-                water_point_resp = await client.get(
-                    f"{base}/api/sites/{self.site_id}/points",
-                    headers=headers,
-                    params={"equipment_id": f"{self._site_prefix}-WATER-MTR-001"},
+                water_points_data = await _fetch_with_retry(
+                    f"/api/sites/{self.site_id}/points?equipment_id={self._site_prefix}-WATER-MTR-001"
                 )
-                water_point_resp.raise_for_status()
-                water_points_data = water_point_resp.json()
                 water_points = water_points_data.get("points", [])
 
                 water_detailed_readings: dict[str, float] = {}
@@ -920,8 +926,6 @@ class ShadowModePollingService:
                         except Exception:
                             return sensor_code, None
 
-                    import asyncio
-
                     trend_results = await asyncio.gather(
                         *[fetch_trend(sc) for sc in sensor_batch],
                         return_exceptions=True,
@@ -979,8 +983,6 @@ class ShadowModePollingService:
                     except Exception:
                         pass
                     return sp_code, None
-
-                import asyncio
 
                 sp_results = await asyncio.gather(
                     *[fetch_setpoint(sp) for sp in sp_batch],
@@ -1076,7 +1078,7 @@ class ShadowModePollingService:
         if equipment_states:
             self._upsert_log_source(len(equipment_states))
 
-        logger.info(
+        logger.warning(
             f"[SHADOW] Poll {self._poll_count}: {len(equipment_states)} states, "
             f"zones={result.get('zones_polled', 0)}, faults={fault_count}, "
             f"trends={result.get('trends_with_data', 0)}, "
@@ -1178,7 +1180,7 @@ class ShadowModePollingService:
                     "severity": alarm.get("severity") or alarm.get("priority", "warning"),
                     "message_text": message[:500],  # Truncate to avoid overflow
                     "recorded_at": recorded_at,
-                    "raw_data": alarm,
+                    "raw_payload": alarm,
                 }
             )
 
@@ -1186,11 +1188,18 @@ class ShadowModePollingService:
             return
 
         try:
-            # Insert fault events (upsert to avoid duplicates)
+            # Deduplicate rows before upsert (bridge may return same alarm multiple times)
+            seen = set()
+            deduped = []
+            for row in rows_to_insert:
+                key = (row["site_id"], row["equipment_code"], row["alarm_code"], row["recorded_at"])
+                if key not in seen:
+                    seen.add(key)
+                    deduped.append(row)
             supabase.table("equipment_fault_events").upsert(
-                rows_to_insert, on_conflict="site_id,equipment_code,alarm_code,recorded_at"
+                deduped, on_conflict="site_id,equipment_code,alarm_code,recorded_at"
             ).execute()
-            logger.info(f"[SHADOW] Persisted {len(rows_to_insert)} fault events to equipment_fault_events")
+            logger.warning(f"[SHADOW] Persisted {len(deduped)} fault events to equipment_fault_events")
         except Exception as e:
             logger.warning(f"[SHADOW] Failed to insert fault events: {e}")
 

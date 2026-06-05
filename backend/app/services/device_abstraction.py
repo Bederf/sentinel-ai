@@ -333,10 +333,9 @@ class DeviceManager:
     async def _create_adapter(self, device: Device) -> None:
         """Create appropriate adapter for device protocol.
 
-        SimulatedDeviceAdapter is imported lazily so the bms_simulator package
-        can be removed without impacting SENTINEL core.
+        Production-only: bms_simulator/SimulatedDeviceAdapter was removed.
+        Unknown protocols raise ValueError; no silent fallbacks to simulator data.
         """
-        from app.config.settings import settings
         from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
 
         # Lazy import KNX adapter
@@ -345,51 +344,19 @@ class DeviceManager:
         except ImportError:
             KNXAdapter = None
 
-        production_island = False
-
-        # Lazy-load SimulatedDeviceAdapter (removable with bms_simulator/)
-        SimulatedDeviceAdapter = None
-        try:
-            from app.services.bms_simulator.adapters.simulated_adapter import (
-                SimulatedDeviceAdapter as _SimAdapter,
-            )
-
-            SimulatedDeviceAdapter = _SimAdapter
-        except ImportError:
-            pass
         adapter_map: dict = {
             "bacnet": NiagaraBACnetAdapter,
             "knx": KNXAdapter,
             # Future: "modbus": ModbusDeviceAdapter,
         }
-        if SimulatedDeviceAdapter is not None:
-            adapter_map["site002"] = SimulatedDeviceAdapter
 
         adapter_class = adapter_map.get(device.protocol.value)
         if not adapter_class:
-            if SimulatedDeviceAdapter is not None:
-                logger.warning(f"No adapter for protocol {device.protocol.value}, using simulated adapter")
-                adapter_class = SimulatedDeviceAdapter
-            else:
-                logger.warning(
-                    "No adapter for protocol %s and simulator unavailable — skipping device %s",
-                    device.protocol.value,
-                    device.id,
-                )
-                return
-        elif adapter_class is NiagaraBACnetAdapter and settings.site002_source_enabled and not production_island:
-            if SimulatedDeviceAdapter is not None:
-                logger.info(
-                    "Site-002 source enabled: using simulated adapter for BACnet device %s",
-                    device.id,
-                )
-                adapter_class = SimulatedDeviceAdapter
-            else:
-                logger.warning(
-                    "Site-002 source enabled but simulator unavailable — skipping BACnet device %s",
-                    device.id,
-                )
-                return
+            raise ValueError(
+                f"Unknown adapter protocol '{device.protocol.value}' for device {device.id}. "
+                f"Supported protocols: {sorted(adapter_map.keys())}. "
+                f"SimulatedDeviceAdapter is not available in production."
+            )
 
         adapter = adapter_class(device)
         self._adapters[device.id] = adapter

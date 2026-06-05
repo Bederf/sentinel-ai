@@ -60,6 +60,7 @@ _PUBLIC_PREFIXES = (
     "/api/whatsapp/",  # WhatsApp/Twilio webhooks (authenticated at webhook layer)
     "/api/telegram/",  # Telegram bot webhook (authenticated via X-Telegram-Bot-Api-Secret-Token)
     "/api/residential/telegram/",  # Home bot webhook (Phase 220 — authenticated via X-Telegram-Bot-Api-Secret-Token)
+    "/api/residential/addon-register",  # HA add-on registration (Phase 219 — called from HA add-on locally, no JWT)
     "/api/mcp/sse",  # MCP SSE transport for Claude Desktop (authenticated at MCP layer)
     "/api/mcp/openai",  # MCP OpenAI endpoints for ChatGPT/M365 Copilot (authenticated at MCP layer)
     "/api/lifecycle/",  # Lifecycle simulation status endpoints (frontend health checks)

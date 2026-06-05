@@ -15,6 +15,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getAccessToken } from '@/lib/api'
+import { tryRefreshAccessToken, setAccessToken as setClientAccessToken } from '@/lib/api/client'
 
 // Event types that can be received
 export type ServerEvent =
@@ -239,11 +240,18 @@ export function useServerEvents(
     connectingRef.current = true
 
     const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:9095'
-    const token = getAccessToken()
+    let token = getAccessToken()
 
     // Async ticket acquisition then EventSource connection
     const doConnect = async () => {
       try {
+        if (!token) {
+          token = await tryRefreshAccessToken()
+          if (token) {
+            setClientAccessToken(token)
+          }
+        }
+
         let eventSourceUrl = `${apiUrl}/api/events/stream`
 
         if (token) {

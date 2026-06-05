@@ -402,7 +402,12 @@ class Settings(BaseSettings):
     edge_mode: bool = False
 
     # BMS source gate: enable simulator or live bridge polling for site-002 (ENABLE_SITE002_SOURCE env var)
-    site002_source_enabled: bool = Field(default=False, validation_alias="ENABLE_SITE002_SOURCE")
+    # DEPRECATED 2026-06: simulator removed. Always returns False.
+    # The env var is still read but ignored — all sites route to live bridge/Supabase.
+    @property
+    def site002_source_enabled(self) -> bool:  # type: ignore[override]
+        """Deprecated — simulator removed 2026-06. Always returns False."""
+        return False
 
     # Advisory kernel routing switch for chat investigation mode
     sentinel_advisory_kernel_enabled: bool = Field(default=False, validation_alias="SENTINEL_ADVISORY_KERNEL_ENABLED")

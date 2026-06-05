@@ -4767,8 +4767,8 @@ class BackgroundSchedulerService:
         from the bridge, transforms them into equipment_states, and feeds
         SentinelDataSync (Supabase writes + ML feeder accumulation).
 
-        This keeps ML models current during shadow mode operation when the simulation
-        engine is disabled (ENABLE_SITE002_SOURCE=false) but the bridge is live.
+        This keeps ML models current during shadow mode operation when the bridge is live.
+        Note: ENABLE_SITE002_SOURCE was deprecated 2026-06 — simulation engine removed.
 
         Args:
             interval_seconds: How often to poll the bridge (default: 300s = 5 minutes)
@@ -4838,7 +4838,7 @@ class BackgroundSchedulerService:
         Fetches service reports and documents from the MRI Evolution documents
         endpoint, normalises them to DocumentRecord, and upserts to the documents table.
 
-        Only runs when ENABLE_SITE002_SOURCE=false (shadow mode / bridge polling).
+        Always runs; site-002 bridge polling is independent of the deprecated ENABLE_SITE002_SOURCE flag.
 
         Args:
             interval_hours: How often to sync (default: 4 hours)

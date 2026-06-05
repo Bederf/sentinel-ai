@@ -15,6 +15,22 @@ import {
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { IntegrationHealthSummary, Site } from '@/lib/api';
 import type { CommissioningSnapshot, QualityGateStatus } from '@/lib/api/system';
+
+const GATE_IDS = [
+  'match_coverage', 'unmatched_points', 'data_freshness', 'error_rate',
+  'duplicate_rate', 'source_provenance', 'value_validity', 'timestamp_integrity',
+];
+
+const GATE_LABEL_MAP: Record<string, string> = {
+  match_coverage: 'Match Coverage',
+  unmatched_points: 'Unmatched Points',
+  data_freshness: 'Data Freshness',
+  error_rate: 'Error Rate',
+  duplicate_rate: 'Duplicate Rate',
+  source_provenance: 'Source Provenance',
+  value_validity: 'Value Validity',
+  timestamp_integrity: 'Timestamp Integrity',
+};
 import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
 
@@ -453,6 +469,11 @@ export default function SystemHealthPage() {
               <PhaseProgressCard
                 currentPhase={commissioning?.ingestion_mode ?? null}
                 isLoading={loading}
+                gates={commissioning ? GATE_IDS.map(id => ({
+                  name: id,
+                  passed: !commissioning.blocking_gates.includes(id),
+                  label: GATE_LABEL_MAP[id] ?? id,
+                })) : undefined}
               />
               <CommissioningGatePanel
                 commissioning={commissioning}

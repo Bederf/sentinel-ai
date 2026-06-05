@@ -638,8 +638,9 @@ class DXFParserService:
         """
         Build v2.0 equipment ID.
 
-        Format: {site}-{type}-{floor}-{zone}
-        Example: S002-CHILLER-B1-001
+        Format: {site}-{type}-{zone_id}
+        Zone ID combines level + zone number (e.g., 204 = level 2, zone 04)
+        Example: S002-CHILLER-001
 
         Args:
             site_code: Site code (e.g., "site-002")
@@ -650,11 +651,27 @@ class DXFParserService:
         Returns:
             v2.0 format equipment ID
         """
+        from app.services.equipment_id_converter import get_equipment_id_converter
+
         # Extract site number from site_code
         site_match = re.search(r"(\d+)", site_code)
-        site_code = f"S{site_match.group(1).zfill(3)}" if site_match else "S999"
+        site_code_prefix = f"S{site_match.group(1).zfill(3)}" if site_match else "S999"
 
-        return f"{site_code}-{equipment_type}-{floor}-{zone}"
+        converter = get_equipment_id_converter()
+        level_num = converter._extract_level_number(floor)
+
+        # Resolve zone letter to number
+        zone_mappings = converter._get_zone_mappings_for_site(site_code)
+        letter_to_zone = {v: k for k, v in zone_mappings.items()}
+        if zone.isdigit():
+            zone_num = zone.zfill(2)
+        elif zone in letter_to_zone:
+            zone_num = letter_to_zone[zone]
+        else:
+            zone_num = "001"
+
+        zone_id = f"{level_num}{zone_num}"
+        return f"{site_code_prefix}-{equipment_type}-{zone_id}"
 
     def _infer_floor_definitions(self, equipment: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """

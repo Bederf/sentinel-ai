@@ -6,6 +6,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Clock, X } from "lucide-react";
 import { authApi, type AuthUser, setAccessToken } from "@/lib/api";
+import { setAccessToken as setClientAccessToken } from "@/lib/api/client";
 
 interface MfaApprovalWaitingProps {
   email: string;
@@ -56,6 +57,7 @@ export function MfaApprovalWaiting({ email, onCancel, onApproved }: MfaApprovalW
             };
             localStorage.setItem("sentinel_user", JSON.stringify(user));
             setAccessToken(data.access_token);
+            setClientAccessToken(data.access_token);
             if (data.refresh_token) {
               localStorage.setItem("sentinel_refresh_token", data.refresh_token);
             } else {

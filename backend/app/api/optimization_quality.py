@@ -50,7 +50,10 @@ async def get_quality_gate(site_id: str):
 
     try:
         evaluator = QualityGateEvaluator()
-        mode = settings.resolved_ingestion_mode.value
+        from app.services.commissioning_service import CommissioningService
+
+        db_mode = CommissioningService()._get_site_phase(site_id)
+        mode = db_mode if db_mode else settings.resolved_ingestion_mode.value
 
         # Collect all 14 raw metric values
         metrics = await evaluator.collect_metrics(site_id)
@@ -74,6 +77,7 @@ async def get_quality_gate(site_id: str):
         return QualityGateStatusResponse(
             site_id=site_id,
             ingestion_mode=mode,
+            mode=mode,
             thresholds_used=mode,
             metric_values=metrics,
             rule_results=rule_details,
