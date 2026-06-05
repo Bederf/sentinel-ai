@@ -472,9 +472,11 @@ function PlayCircleIcon(props: React.ComponentProps<typeof Sparkles>) {
 
 function ZoneEquipmentPanel({
   zone,
+  state,
   onClose,
 }: {
   zone: CockpitTwinZoneSignal
+  state: CockpitState
   onClose: () => void
 }) {
   const panelRef = useRef<HTMLDivElement | null>(null)
@@ -491,10 +493,28 @@ function ZoneEquipmentPanel({
     return () => ctx.revert()
   }, [zone.zoneId])
 
-  const severity = zone.isPrimary ? 'Primary' : 'Secondary'
-  const severityClass = zone.isPrimary
-    ? 'text-red-300 border-red-400/30 bg-red-400/10'
-    : 'text-amber-300 border-amber-400/30 bg-amber-400/10'
+  const equipmentInZone = useMemo(() => {
+    if (!state?.equipmentWarnings) return []
+    return state.equipmentWarnings.filter(
+      (eq) => eq.zoneId === zone.zoneId || eq.floorId === zone.floorId,
+    )
+  }, [state?.equipmentWarnings, zone.zoneId, zone.floorId])
+
+  const zoneSeverity = useMemo(() => {
+    const hasCritical = equipmentInZone.some((eq) => eq.healthScore < 40)
+    const hasWarning = equipmentInZone.some(
+      (eq) => (eq.healthScore >= 40 && eq.healthScore < 65) || eq.faultType,
+    )
+    if (hasCritical) return { label: 'Critical', cls: 'text-red-300 border-red-400/30 bg-red-400/10' }
+    if (hasWarning) return { label: 'Warning', cls: 'text-amber-300 border-amber-400/30 bg-amber-400/10' }
+    return { label: 'OK', cls: 'text-green-300 border-green-400/30 bg-green-400/10' }
+  }, [equipmentInZone])
+
+  const activeIssues = useMemo(
+    () =>
+      equipmentInZone.filter((eq) => eq.healthScore < 65 || eq.faultType).slice(0, 5),
+    [equipmentInZone],
+  )
 
   return (
     <div
@@ -507,12 +527,12 @@ function ZoneEquipmentPanel({
             <div className="text-[10px] uppercase tracking-[0.28em] text-slate-500">Zone equipment</div>
             <div className="mt-2 text-lg font-medium text-white">{zone.label}</div>
             <div className="mt-1 flex items-center gap-2">
-              <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${severityClass}`}>
-                {severity}
+              <span className={`rounded-full border px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] ${zoneSeverity.cls}`}>
+                {zoneSeverity.label}
               </span>
               <span className="text-xs text-slate-400">{zone.floorId}</span>
-              {zone.actionLabel && (
-                <span className="text-xs text-cyan-400">{zone.actionLabel}</span>
+              {equipmentInZone.length > 0 && (
+                <span className="text-xs text-slate-500">{equipmentInZone.length} equipment</span>
               )}
             </div>
           </div>
@@ -526,20 +546,76 @@ function ZoneEquipmentPanel({
         </button>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
-        <div className="rounded-md border border-white/8 bg-black/20 px-3 py-3">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Weight</div>
-          <div className="mt-2 text-base font-medium text-white">{Math.round(zone.weight * 100)}%</div>
+      {equipmentInZone.length === 0 ? (
+        <div className="mt-4 rounded-md border border-white/5 bg-black/10 px-4 py-6 text-center">
+          <p className="text-sm text-slate-500">No equipment data available for this zone.</p>
         </div>
-        <div className="rounded-md border border-white/8 bg-black/20 px-3 py-3">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Floor</div>
-          <div className="mt-2 text-base font-medium text-white">{zone.level}</div>
-        </div>
-        <div className="rounded-md border border-white/8 bg-black/20 px-3 py-3">
-          <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Slot</div>
-          <div className="mt-2 text-base font-medium text-white">{zone.slot ?? '—'}</div>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="mt-4 space-y-2">
+            <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Equipment</div>
+            {equipmentInZone.slice(0, 8).map((eq) => {
+              const barColor =
+                eq.healthScore >= 80
+                  ? 'bg-green-500'
+                  : eq.healthScore >= 40
+                    ? 'bg-amber-500'
+                    : 'bg-red-500'
+              return (
+                <div key={eq.id} className="flex items-center gap-3 rounded-md border border-white/5 bg-black/15 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate text-sm font-medium text-white">{eq.equipmentCode}</span>
+                      <span className="shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[9px] uppercase text-slate-400">
+                        {eq.equipmentType}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <div className="h-1.5 flex-1 rounded-full bg-white/8">
+                        <div
+                          className={`h-full rounded-full transition-all ${barColor}`}
+                          style={{ width: `${Math.min(eq.healthScore, 100)}%` }}
+                        />
+                      </div>
+                      <span className={`text-xs font-mono ${eq.healthScore < 40 ? 'text-red-400' : eq.healthScore < 65 ? 'text-amber-400' : 'text-green-400'}`}>
+                        {eq.healthScore}/100
+                      </span>
+                    </div>
+                  </div>
+                  {eq.faultType && (
+                    <span className="shrink-0 rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] text-red-300">
+                      Alert
+                    </span>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {activeIssues.length > 0 && (
+            <div className="mt-4 space-y-2">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-red-400">Active issues</div>
+              {activeIssues.map((eq) => (
+                <div key={`issue-${eq.id}`} className="rounded-md border border-red-400/15 bg-red-400/5 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-medium text-white">{eq.equipmentCode}</span>
+                    <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] ${eq.healthScore < 40 ? 'border-red-400/30 bg-red-400/10 text-red-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
+                      {eq.healthState}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {eq.healthScore < 40
+                      ? 'Below critical threshold — action required'
+                      : eq.healthScore < 65
+                        ? 'Below warning threshold — monitor closely'
+                        : eq.faultType ?? 'Equipment requires attention'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
     </div>
   )
 }
@@ -814,7 +890,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
           </div>
 
           {selectedZone && (
-            <ZoneEquipmentPanel zone={selectedZone} onClose={onZoneClose ?? (() => {})} />
+            <ZoneEquipmentPanel zone={selectedZone} state={state} onClose={onZoneClose ?? (() => {})} />
           )}
 
           <div className="grid gap-3 md:grid-cols-3">
