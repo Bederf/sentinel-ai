@@ -47,6 +47,16 @@ _ENTITY_TOPIC_PATTERNS = {
 # Fields that are binary (on/off) rather than numeric
 _BINARY_FIELDS = {"geyser_state"}
 
+# Fields that are writable (controllable switches)
+# Derived from entity_map field names — entities mapped to these fields
+# are switches that can be turned on/off via MQTT command topic
+_WRITABLE_FIELDS = {"geyser_state"}
+
+# HA MQTT command topic patterns for controllable entities
+_COMMAND_TOPIC_PATTERNS = {
+    "geyser_state": "homeassistant/switch/{entity_id}/set",
+}
+
 # HA state values that represent unavailable/missing data
 _UNAVAILABLE_STATES = {"unavailable", "unknown", "none", ""}
 
@@ -213,6 +223,63 @@ class HomeAssistantGateway(SIMBIOTGateway):
         except Exception as e:
             logger.error("HA gateway %s failed to connect to Mosquitto: %s", self.site_id, e)
             return False
+
+    async def send_command(self, field: str, value: str) -> bool:
+        """Send a control command to a writable HA entity via MQTT.
+
+        Args:
+            field: sentinel field name (e.g. "geyser_state")
+            value: "on" or "off"
+
+        Returns:
+            True if command was published successfully
+        """
+        if field not in _WRITABLE_FIELDS:
+            logger.warning("HA gateway %s: field %s is not writable", self.site_id, field)
+            return False
+
+        entity_id = self.entity_map.get(field)
+        if not entity_id:
+            logger.warning("HA gateway %s: no entity mapped for field %s", self.site_id, field)
+            return False
+
+        pattern = _COMMAND_TOPIC_PATTERNS.get(field)
+        if not pattern:
+            logger.warning("HA gateway %s: no command topic for field %s", self.site_id, field)
+            return False
+
+        topic = pattern.format(entity_id=entity_id)
+        payload = "ON" if value.lower() == "on" else "OFF"
+
+        if self._mqtt_client is None or not self._connected:
+            logger.warning("HA gateway %s: cannot send command — not connected", self.site_id)
+            return False
+
+        try:
+            result = self._mqtt_client.publish(topic, payload, qos=1, retain=False)
+            logger.info(
+                "HA gateway %s: command %s -> %s on %s (rc=%s)",
+                self.site_id, field, payload, topic, result.rc,
+            )
+            return result.rc == mqtt.MQTT_ERR_SUCCESS
+        except Exception as e:
+            logger.error("HA gateway %s: command failed for %s: %s", self.site_id, field, e)
+            return False
+
+    async def get_writable_entities(self) -> list[dict]:
+        """Return list of controllable entities with their current state."""
+        entities = []
+        for field in _WRITABLE_FIELDS:
+            entity_id = self.entity_map.get(field)
+            if entity_id:
+                friendly = field.replace("_state", "").replace("_", " ").title()
+                entities.append({
+                    "field": field,
+                    "entity_id": entity_id,
+                    "friendly_name": friendly,
+                    "current_state": self._state.get(field),
+                })
+        return entities
 
     async def get_point_list(self) -> list[SIMBIOTPoint]:
         """Build SIMBIOTPoint list from entity_map configuration."""

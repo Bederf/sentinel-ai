@@ -537,6 +537,77 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     }
 
 
+async def _ha_gateway_for_chat(chat_id: int) -> HomeAssistantGateway | None:
+    """Look up HA site for chat_id, decrypt config, build and connect gateway."""
+    from app.config.settings import settings
+    from app.gateways.home_assistant import HomeAssistantGateway
+
+    supabase = get_supabase_client()
+    rows = supabase.table("residential_sites").select("*").eq("chat_id", chat_id).eq("is_active", True).execute()
+    if not rows.data:
+        return None
+
+    row = rows.data[0]
+    if row.get("platform") != "home_assistant":
+        return None
+
+    try:
+        raw = get_encryption_service().decrypt(row.get("site_config", "{}"))
+        site_config = json.loads(raw)
+    except Exception:
+        return None
+
+    site_id = row["site_id"]
+    gateway = HomeAssistantGateway(site_id, site_config)
+    ok = await gateway.connect()
+    if not ok:
+        return None
+    return gateway
+
+
+async def _ha_control_list(chat_id: int) -> str:
+    """List controllable HA devices and their current state."""
+    gateway = await _ha_gateway_for_chat(chat_id)
+    if gateway is None:
+        return "No Home Assistant connection found.\n\nUse /connect and select Home Assistant to set it up."
+
+    entities = await gateway.get_writable_entities()
+    await gateway.disconnect()
+
+    if not entities:
+        return "No controllable devices found.\n\nMake sure you mapped switches during onboarding."
+
+    lines = ["🎛 Controllable Devices:"]
+    for e in entities:
+        state = e["current_state"] or "unknown"
+        icon = {"on": "🟢", "off": "⚫"}.get(str(state), "⚪")
+        lines.append(f"  {icon} {e['friendly_name']} ({state})")
+        lines.append(f"    /control {e['field']} on   /control {e['field']} off")
+
+    return "\n".join(lines)
+
+
+async def _ha_control_send(chat_id: int, field: str, value: str) -> str:
+    """Send a control command to a HA device."""
+    if value.lower() not in ("on", "off"):
+        return "Value must be 'on' or 'off'."
+
+    if not field.endswith("_state"):
+        field = f"{field}_state"
+
+    gateway = await _ha_gateway_for_chat(chat_id)
+    if gateway is None:
+        return "No Home Assistant connection found."
+
+    ok = await gateway.send_command(field, value)
+    await gateway.disconnect()
+
+    if ok:
+        friendly = field.replace("_state", "").replace("_", " ").title()
+        return f"✅ Sent: {friendly} → {value.upper()}"
+    return f"❌ Failed to send command to {field}."
+
+
 @router.get("/status/{site_id}")
 async def residential_site_status(site_id: str) -> dict:
     """
@@ -658,6 +729,22 @@ async def residential_telegram_webhook(request: Request):
             result = await _residential_status(chat_id)
             await sender.send_text(chat_id, result)
             return JSONResponse(content={"status": "status_sent"})
+
+        if text == "/devices":
+            sender = ResidentialTelegramSender()
+            result = await _ha_control_list(chat_id)
+            await sender.send_text(chat_id, result)
+            return JSONResponse(content={"status": "devices_sent"})
+
+        if text.startswith("/control "):
+            sender = ResidentialTelegramSender()
+            parts = text[len("/control "):].strip().split(None, 1)
+            if len(parts) == 2:
+                result = await _ha_control_send(chat_id, parts[0], parts[1])
+            else:
+                result = "Usage: /control <device> <on|off>\nExample: /control geyser on"
+            await sender.send_text(chat_id, result)
+            return JSONResponse(content={"status": "control_sent"})
 
         state = service._state.get(chat_id)
         if state is not None:
