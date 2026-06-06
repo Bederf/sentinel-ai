@@ -271,14 +271,12 @@ async def get_health_thresholds(
     site_id: str | None = Query(None, description="Site code for per-site thresholds"),
     auth: AuthContext = Depends(require_role(1)),
 ) -> dict[str, int]:
-    """Get health score thresholds. Requires AUDITOR (level 1).
+    """Get health score thresholds (legacy compat — delegates to canonical service)."""
+    from app.services.health_threshold_service import get_health_threshold_service
 
-    If site_id is provided, returns site-specific thresholds if they exist,
-    falling back to global defaults.
-    """
-    key = f"healthThresholds_{site_id}" if site_id else "healthThresholds"
     try:
-        return _get_setting(key) or {"healthy": 90, "warning": 70, "critical": 0}
+        svc = get_health_threshold_service()
+        return svc.get_thresholds(site_id=site_id).health
     except Exception as e:
         import traceback
 
@@ -293,32 +291,39 @@ async def update_health_thresholds(
     site_id: str | None = Query(None, description="Site code for per-site thresholds"),
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, int]:
-    """Update health score thresholds. Requires ADMIN (level 4)."""
+    """Update health score thresholds (legacy compat — delegates to canonical service)."""
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
+
     required_fields = ["healthy", "warning", "critical"]
     for field in required_fields:
         if field not in thresholds:
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
-
-    for field in required_fields:
         if not isinstance(thresholds[field], (int, float)):
             raise HTTPException(status_code=400, detail=f"{field} must be a number")
-
-    for field in required_fields:
-        value = thresholds[field]
-        if not (0 <= value <= 100):
+        if not (0 <= thresholds[field] <= 100):
             raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100")
 
     if thresholds["healthy"] <= thresholds["warning"]:
         raise HTTPException(status_code=400, detail="healthy threshold must be greater than warning threshold")
-
     if thresholds["warning"] <= thresholds["critical"]:
         raise HTTPException(status_code=400, detail="warning threshold must be greater than critical threshold")
 
-    key = f"healthThresholds_{site_id}" if site_id else "healthThresholds"
-    _upsert_setting(key, thresholds)
+    site_key = site_id or "__global__"
+    repo = SiteThresholdRepository()
+    existing = repo.get(site_key)
+    current_risk = existing["risk"] if existing else {"medium": 31, "high": 61, "critical": 81}
+    repo.upsert(
+        site_key,
+        {"healthy": thresholds["healthy"], "warning": thresholds["warning"], "critical": thresholds["critical"]},
+        current_risk,
+    )
+
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    get_health_threshold_service().clear_cache(site_key)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-    audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip)
+    audit_config_change("settings.health-thresholds", user=auth.user_id, source_ip=source_ip, site_id=site_key)
 
     return thresholds
 
@@ -328,17 +333,11 @@ async def get_risk_thresholds(
     site_id: str | None = Query(None, description="Site code for per-site thresholds"),
     auth: AuthContext = Depends(require_role(1)),
 ) -> dict[str, int]:
-    """Get risk score thresholds. Requires AUDITOR (level 1)."""
-    key = f"riskThresholds_{site_id}" if site_id else "riskThresholds"
-    result = _get_setting(key)
-    if result:
-        return result
-    # Per-site falls back to global when no custom thresholds exist
-    if site_id:
-        global_result = _get_setting("riskThresholds")
-        if global_result:
-            return global_result
-    return {"medium": 31, "high": 61, "critical": 81}
+    """Get risk score thresholds (legacy compat — delegates to canonical service)."""
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    svc = get_health_threshold_service()
+    return svc.get_thresholds(site_id=site_id).risk
 
 
 @router.put("/settings/risk-thresholds")
@@ -348,29 +347,41 @@ async def update_risk_thresholds(
     site_id: str | None = Query(None, description="Site code for per-site thresholds"),
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, int]:
-    """Update risk score thresholds. Requires ADMIN (level 4)."""
+    """Update risk score thresholds (legacy compat — delegates to canonical service)."""
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
+
     required_fields = ["medium", "high", "critical"]
     for field in required_fields:
         if field not in thresholds:
             raise HTTPException(status_code=400, detail=f"Missing required field: {field}")
-
-    for field in required_fields:
         if not isinstance(thresholds[field], (int, float)):
             raise HTTPException(status_code=400, detail=f"{field} must be a number")
-
-    for field in required_fields:
-        value = thresholds[field]
-        if not (0 <= value <= 100):
+        if not (0 <= thresholds[field] <= 100):
             raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100")
 
     if thresholds["high"] <= thresholds["medium"]:
         raise HTTPException(status_code=400, detail="high threshold must be greater than medium threshold")
-
     if thresholds["critical"] <= thresholds["high"]:
         raise HTTPException(status_code=400, detail="critical threshold must be greater than high threshold")
 
-    key = f"riskThresholds_{site_id}" if site_id else "riskThresholds"
-    _upsert_setting(key, thresholds)
+    site_key = site_id or "__global__"
+    repo = SiteThresholdRepository()
+    existing = repo.get(site_key)
+    current_health = existing["health"] if existing else {"healthy": 85, "warning": 65, "critical": 40}
+    repo.upsert(
+        site_key,
+        current_health,
+        {"medium": thresholds["medium"], "high": thresholds["high"], "critical": thresholds["critical"]},
+    )
+
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    get_health_threshold_service().clear_cache(site_key)
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("settings.risk-thresholds", user=auth.user_id, source_ip=source_ip, site_id=site_key)
+
+    return thresholds
 
     # When saving global, also update legacy key;
     # when saving per-site, do NOT clobber global defaults.

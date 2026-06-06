@@ -61,6 +61,9 @@ export interface CockpitSiteSummary {
   dataFreshnessLabel: string
   siteFloors?: string[] | null // floors from building config (settings page)
   buildingGeometry?: Record<string, unknown> | null // geometry from photo extraction
+  healthThreshold?: number // backend-resolved health threshold (default 85)
+  warningThreshold?: number // backend-resolved warning threshold (default 65)
+  criticalThreshold?: number // backend-resolved critical threshold (default 40)
 }
 
 export interface EnergyCentreTelemetry {
@@ -297,6 +300,10 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
     emergingRisks: [],
     equipmentWarnings: [],
     emailClusters: [],
+    thresholds: {
+      health: { healthy: summary.healthThreshold ?? 85, warning: summary.warningThreshold ?? 65, critical: summary.criticalThreshold ?? 40 },
+      risk: { medium: 31, high: 61, critical: 81 },
+    },
   }
 }
 
@@ -544,6 +551,7 @@ export function mapCockpitState(
   remoteTelemetry?: RemoteSiteTelemetry | null,
   systemFilter?: string | null,
   equipmentWarnings?: EquipmentWarningInput[] | null,
+  thresholds?: { health: { healthy: number; warning: number; critical: number }; risk: { medium: number; high: number; critical: number } } | null,
 ): CockpitState {
   if (!payload) return buildUnavailableState(summary)
 
@@ -885,6 +893,10 @@ export function mapCockpitState(
       faultType: eq.fault_type,
       zoneId: eq.zone_id,
     })),
-    systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar-bess' | null,
+    systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null,
+    thresholds: thresholds ?? {
+      health: { healthy: summary.healthThreshold ?? 85, warning: summary.warningThreshold ?? 65, critical: summary.criticalThreshold ?? 40 },
+      risk: { medium: 31, high: 61, critical: 81 },
+    },
   }
 }

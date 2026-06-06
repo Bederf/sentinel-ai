@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { useHealthThresholds } from "../../hooks/useHealthThresholds";
-import { useRiskThresholds } from "../../hooks/useRiskThresholds";
+import { useSiteThresholds } from "../../hooks/useHealthThresholds";
 import { useModules } from "../../contexts/ModuleHooks";
 import { useBuildingsList } from "../../hooks/useBuildingsList";
 import { setStoredSelectedSite } from "../../lib/siteSelection";
@@ -172,17 +171,11 @@ function useFeatureToggleActions({
 export function useSettingsController({ siteId, onError }: UseSettingsControllerParams) {
   const [selectedSiteId, setSelectedSiteId] = useState<string | null>(siteId || null);
   const {
-    thresholds: healthThresholds,
-    loading: healthThresholdLoading,
-    error: healthThresholdError,
-    updateThresholds: updateHealthThresholds,
-  } = useHealthThresholds(selectedSiteId ?? undefined);
-  const {
-    thresholds: riskThresholds,
-    loading: riskThresholdLoading,
-    error: riskThresholdError,
-    updateThresholds: updateRiskThresholds,
-  } = useRiskThresholds(selectedSiteId ?? undefined);
+    thresholds: siteThresholds,
+    loading: siteThresholdLoading,
+    error: siteThresholdError,
+    updateSiteThresholds,
+  } = useSiteThresholds(selectedSiteId ?? undefined);
   const { data: buildings = [] } = useBuildingsList();
   const { availableModules, isModuleActive, isMandatory, activateModule, deactivateModule, setSite: setModuleSite } = useModules();
 
@@ -199,7 +192,7 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
   const readOnly = currentUserRole !== "admin" && !settingsPageUnlocked;
   const canToggleModules = currentUserRole === "admin";
   const [sitePhase, setSitePhase] = useState<string | null>(null);
-  const loading = healthThresholdLoading || riskThresholdLoading;
+  const loading = siteThresholdLoading;
 
   useEffect(() => {
     if (siteId && siteId !== selectedSiteId) {
@@ -243,31 +236,17 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     showSaveSuccess(3000);
   }, [showSaveSuccess]);
 
-  const handleSaveThresholds = useCallback(async (newThresholds: {
-    healthy: number;
-    warning: number;
-    critical: number;
+  const handleSaveSiteThresholds = useCallback(async (thresholds: {
+    health: { healthy: number; warning: number; critical: number };
+    risk: { medium: number; high: number; critical: number };
   }) => {
-    const success = await updateHealthThresholds(newThresholds);
+    const success = await updateSiteThresholds(thresholds);
     if (success) {
       showSaveSuccess(3000);
       return;
     }
     onError?.("Failed to update thresholds");
-  }, [onError, showSaveSuccess, updateHealthThresholds]);
-
-  const handleSaveRiskThresholds = useCallback(async (newThresholds: {
-    medium: number;
-    high: number;
-    critical: number;
-  }) => {
-    const success = await updateRiskThresholds(newThresholds);
-    if (success) {
-      showSaveSuccess(3000);
-      return;
-    }
-    onError?.("Failed to update risk thresholds");
-  }, [onError, showSaveSuccess, updateRiskThresholds]);
+  }, [onError, showSaveSuccess, updateSiteThresholds]);
 
   const handleSiteChange = useCallback((nextSiteId: string | null) => {
     if (!nextSiteId) return;
@@ -283,21 +262,18 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     currentUserRole,
     handleFeatureToggle,
     handleMlTrainingToggle,
-    handleSaveRiskThresholds,
-    handleSaveThresholds,
+    handleSaveSiteThresholds,
     handleSiteChange,
     handleSuccess,
     hasSessionToken,
     availableModules,
-    healthThresholdError,
-    healthThresholds,
+    siteThresholdError,
+    siteThresholds,
     isModuleActive,
     loading,
     mlTrainingEnabled,
     mlTrainingLoading,
     readOnly,
-    riskThresholdError,
-    riskThresholds,
     saveSuccess,
     selectedSiteId,
     settingsPageUnlocked,

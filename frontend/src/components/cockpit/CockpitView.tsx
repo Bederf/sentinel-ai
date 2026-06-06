@@ -14,13 +14,14 @@ import {
   Sparkles,
   TimerReset,
 } from 'lucide-react'
-import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitRenderMode, CockpitRiskItem, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
+import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitRenderMode, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
 import { CockpitIssuePanel } from './CockpitIssuePanel'
 import { phaseAllows } from '@/lib/onboardingPhase'
 import { BUILDING_TAB_ITEMS, type BuildingTabId } from '@/lib/navigation'
 import { SupervisedConfirmBar } from './useHoldToConfirm'
 import { motionReduced } from './motionPreference'
 import { CockpitNervousSystemTwin } from './CockpitNervousSystemTwin'
+import { CockpitTwinErrorBoundary } from './CockpitTwinErrorBoundary'
 
 interface CockpitViewProps {
   state: CockpitState
@@ -245,12 +246,6 @@ function freshnessLabel(state: CockpitState) {
   if (state.site.onboardingPhase === 'advisory') return 'Guidance freshness'
   if (state.site.onboardingPhase === 'supervised') return 'Control freshness'
   return 'Automation freshness'
-}
-
-function queueSeverity(state: CockpitState, item: CockpitRiskItem, index: number): QueueItem['severity'] {
-  if (state.primaryMetric.tone === 'critical' && index === 0) return 'Critical'
-  if (state.primaryMetric.tone === 'warning' || state.primaryMetric.tone === 'elevated') return index === 0 ? 'Escalating' : 'Monitor'
-  return 'Monitor'
 }
 
 function buildQueue(state: CockpitState): QueueItem[] {
@@ -509,20 +504,22 @@ function ZoneEquipmentPanel({
     )
   }, [state?.equipmentWarnings, zone.zoneId, zone.floorId])
 
+  const { healthy, warning, critical } = state.thresholds.health
+
   const zoneSeverity = useMemo(() => {
-    const hasCritical = equipmentInZone.some((eq) => eq.healthScore < 40)
+    const hasCritical = equipmentInZone.some((eq) => eq.healthScore < critical)
     const hasWarning = equipmentInZone.some(
-      (eq) => (eq.healthScore >= 40 && eq.healthScore < 65) || eq.faultType,
+      (eq) => (eq.healthScore >= critical && eq.healthScore < warning) || eq.faultType,
     )
     if (hasCritical) return { label: 'Critical', cls: 'text-red-300 border-red-400/30 bg-red-400/10' }
     if (hasWarning) return { label: 'Warning', cls: 'text-amber-300 border-amber-400/30 bg-amber-400/10' }
     return { label: 'OK', cls: 'text-green-300 border-green-400/30 bg-green-400/10' }
-  }, [equipmentInZone])
+  }, [equipmentInZone, critical, warning])
 
   const activeIssues = useMemo(
     () =>
-      equipmentInZone.filter((eq) => eq.healthScore < 65 || eq.faultType).slice(0, 5),
-    [equipmentInZone],
+      equipmentInZone.filter((eq) => eq.healthScore < warning || eq.faultType).slice(0, 5),
+    [equipmentInZone, warning],
   )
 
   return (
@@ -565,9 +562,9 @@ function ZoneEquipmentPanel({
             <div className="text-[10px] uppercase tracking-[0.18em] text-slate-500">Equipment</div>
             {equipmentInZone.slice(0, 8).map((eq) => {
               const barColor =
-                eq.healthScore >= 80
+                eq.healthScore >= healthy
                   ? 'bg-green-500'
-                  : eq.healthScore >= 40
+                  : eq.healthScore >= critical
                     ? 'bg-amber-500'
                     : 'bg-red-500'
               return (
@@ -586,7 +583,7 @@ function ZoneEquipmentPanel({
                           style={{ width: `${Math.min(eq.healthScore, 100)}%` }}
                         />
                       </div>
-                      <span className={`text-xs font-mono ${eq.healthScore < 40 ? 'text-red-400' : eq.healthScore < 65 ? 'text-amber-400' : 'text-green-400'}`}>
+                      <span className={`text-xs font-mono ${eq.healthScore < critical ? 'text-red-400' : eq.healthScore < warning ? 'text-amber-400' : 'text-green-400'}`}>
                         {eq.healthScore}/100
                       </span>
                     </div>
@@ -608,14 +605,14 @@ function ZoneEquipmentPanel({
                 <div key={`issue-${eq.id}`} className="rounded-md border border-red-400/15 bg-red-400/5 px-3 py-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-medium text-white">{eq.equipmentCode}</span>
-                    <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] ${eq.healthScore < 40 ? 'border-red-400/30 bg-red-400/10 text-red-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
+                    <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.12em] ${eq.healthScore < critical ? 'border-red-400/30 bg-red-400/10 text-red-300' : 'border-amber-400/30 bg-amber-400/10 text-amber-300'}`}>
                       {eq.healthState}
                     </span>
                   </div>
                   <p className="mt-1 text-xs text-slate-400">
-                    {eq.healthScore < 40
+                    {eq.healthScore < critical
                       ? 'Below critical threshold — action required'
-                      : eq.healthScore < 65
+                      : eq.healthScore < warning
                         ? 'Below warning threshold — monitor closely'
                         : eq.faultType ?? 'Equipment requires attention'}
                   </p>
@@ -683,7 +680,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
     if (typeof window === 'undefined') return
     const stored = window.localStorage.getItem(FULLSCREEN_STORAGE_KEY)
     if (stored === '1') {
-      setIsFullscreen(false)
+      setIsFullscreen(true)
     }
 
     const sync = () => {
@@ -728,6 +725,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
     <section
       ref={shellRef}
       className={`sentinel-shell rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.96),rgba(2,6,23,0.98)_58%)] p-5 text-slate-100 md:p-6 ${isFullscreen ? 'h-[100dvh] overflow-y-auto' : ''}`}
+      data-cockpit-root
       data-render-mode={renderMode}
       data-site-id={state.site.id}
     >
@@ -887,7 +885,9 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             }}
           >
             <div className="w-full h-full">
-              {canvas}
+              <CockpitTwinErrorBoundary>
+                {canvas}
+              </CockpitTwinErrorBoundary>
             </div>
           </div>
 

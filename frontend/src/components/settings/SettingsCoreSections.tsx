@@ -1,10 +1,9 @@
 import type { ReactNode } from "react";
-import { Gauge, Lock, Monitor, Settings as SettingsIcon, Shield, Unlock } from "lucide-react";
+import { Gauge, Lock, Settings as SettingsIcon, Shield, Unlock } from "lucide-react";
 import { PasswordModal } from "../PasswordModal";
-import { RiskThresholdEditor } from "../RiskThresholdEditor";
 import { SafetyRulesEditor } from "../SafetyRulesEditor";
 import { SiteSelector } from "../SiteSelector";
-import { ThresholdEditor } from "../ThresholdEditor";
+import { SiteThresholdEditor } from "../SiteThresholdEditor";
 import type { useSettingsController } from "./useSettingsController";
 
 function SettingsTitleBlock({ selectedSiteId }: { selectedSiteId: string | null }) {
@@ -191,50 +190,24 @@ function SettingsPanelFrame({
   );
 }
 
-function HealthThresholdPanel({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
+function SiteThresholdPanel({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
   return (
     <SettingsPanelFrame
-      description="Configure the health score boundaries for equipment classification"
-      icon={<Monitor className="h-5 w-5" />}
+      description="Configure health and risk boundaries for this site. Health thresholds classify equipment scores; risk thresholds drive cockpit severity bands."
+      icon={<Gauge className="h-5 w-5" />}
       iconBackground="rgba(16, 185, 129, 0.15)"
       iconColor="var(--color-sentinel-green)"
-      title="Health Score Thresholds"
+      title="Thresholds"
     >
-      {controller.healthThresholdError ? (
+      {controller.siteThresholdError ? (
         <div className="p-4 rounded-md text-center" style={{ background: "rgba(220, 38, 38, 0.15)", border: "1px solid rgba(220, 38, 38, 0.3)" }}>
           <p style={{ color: "var(--color-sentinel-red)" }}>Failed to load thresholds</p>
         </div>
       ) : (
-        <ThresholdEditor
-          healthy={controller.healthThresholds.healthy}
-          warning={controller.healthThresholds.warning}
-          critical={controller.healthThresholds.critical}
-          onSave={controller.handleSaveThresholds}
-        />
-      )}
-    </SettingsPanelFrame>
-  );
-}
-
-function RiskThresholdPanel({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
-  return (
-    <SettingsPanelFrame
-      description="Configure how cockpit and heat map severity bands interpret risk scores"
-      icon={<Gauge className="h-5 w-5" />}
-      iconBackground="rgba(249, 115, 22, 0.15)"
-      iconColor="var(--color-sentinel-amber)"
-      title="Cockpit Risk Thresholds"
-    >
-      {controller.riskThresholdError ? (
-        <div className="rounded-md p-4 text-center" style={{ background: "rgba(220, 38, 38, 0.15)", border: "1px solid rgba(220, 38, 38, 0.3)" }}>
-          <p style={{ color: "var(--color-sentinel-red)" }}>Failed to load risk thresholds</p>
-        </div>
-      ) : (
-        <RiskThresholdEditor
-          medium={controller.riskThresholds.medium}
-          high={controller.riskThresholds.high}
-          critical={controller.riskThresholds.critical}
-          onSave={controller.handleSaveRiskThresholds}
+        <SiteThresholdEditor
+          health={controller.siteThresholds.health}
+          risk={controller.siteThresholds.risk}
+          onSave={controller.handleSaveSiteThresholds}
         />
       )}
     </SettingsPanelFrame>
@@ -270,8 +243,7 @@ export function ThresholdSettingsSection({
 }) {
   return (
     <>
-      <HealthThresholdPanel controller={controller} />
-      <RiskThresholdPanel controller={controller} />
+      <SiteThresholdPanel controller={controller} />
       <SafetyRulesPanel controller={controller} onError={onError} />
     </>
   );

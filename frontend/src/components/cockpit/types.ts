@@ -169,6 +169,18 @@ export interface BuildingGeometryData {
   source: string
 }
 
+export interface CockpitHealthThresholds {
+  healthy: number
+  warning: number
+  critical: number
+}
+
+export interface CockpitRiskThresholds {
+  medium: number
+  high: number
+  critical: number
+}
+
 export interface CockpitState {
   site: {
     id: string
@@ -197,6 +209,11 @@ export interface CockpitState {
   emailClusters: EmailClusterData[]
   /** Active system filter — when set, only zones/equipment of this system type render */
   systemFilter?: 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null
+  /** Backend-resolved thresholds — single source of truth for cockpit rendering */
+  thresholds: {
+    health: CockpitHealthThresholds
+    risk: CockpitRiskThresholds
+  }
 }
 
 export interface ModelReadiness {

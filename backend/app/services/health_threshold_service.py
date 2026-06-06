@@ -1,209 +1,152 @@
 """
-Centralized Health Threshold Service
+Centralized Health Threshold Service — Site-Aware
 
-Provides a single source of truth for health score thresholds used across
-the entire application. Reads from Supabase system_settings with fallback
-to JSON settings.
+Provides a single source of truth for health and risk thresholds used across
+the entire application. Reads from site_thresholds table with:
+  site-specific → global fallback (__global__) → hardcoded defaults
 
-Phase: Health Score Threshold Consistency Fix
+Phase: Threshold Unification (Phase 221)
 """
 
-import logging
-from datetime import datetime, timedelta
-from typing import Any
+from __future__ import annotations
 
-from app.database.supabase_client import get_supabase_client
+import logging
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 logger = logging.getLogger(__name__)
 
-# Cache TTL in seconds
 CACHE_TTL = 300  # 5 minutes
 
-# Default thresholds (used as ultimate fallback — overridden by Supabase system_settings)
-DEFAULT_THRESHOLDS = {"healthy": 85, "warning": 65, "critical": 40}
+# Hardcoded defaults (ultimate fallback)
+DEFAULT_HEALTH = {"healthy": 85, "warning": 65, "critical": 40}
+DEFAULT_RISK = {"medium": 31, "high": 61, "critical": 81}
+
+
+@dataclass(frozen=True)
+class SiteThresholds:
+    health: dict[str, int]
+    risk: dict[str, int]
+    site_id: str | None = None
+
+    @staticmethod
+    def defaults() -> SiteThresholds:
+        return SiteThresholds(health=dict(DEFAULT_HEALTH), risk=dict(DEFAULT_RISK))
 
 
 class HealthThresholdService:
-    """Centralized service for health score thresholds."""
+    """Centralized service for health and risk thresholds — site-aware."""
 
     def __init__(self):
-        self._cache: dict[str, Any] | None = None
-        self._cache_expiry: datetime | None = None
+        self._cache: dict[str, tuple[SiteThresholds, datetime]] = {}
 
-    def get_thresholds(self, force_refresh: bool = False) -> dict[str, int]:
-        """
-        Get current health score thresholds.
+    # ── public API ──────────────────────────────────────────────────────
 
-        Returns:
-            Dict with keys: healthy, warning, critical (all 0-100)
+    def get_thresholds(
+        self,
+        *,
+        site_id: str | None = None,
+        force_refresh: bool = False,
+    ) -> SiteThresholds:
+        cache_key = site_id or "__global__"
 
-        Priority order:
-            1. Supabase system_settings table (key: health_thresholds)
-            2. JSON settings file (backend/app/data/settings.json)
-            3. Hardcoded defaults (healthy: 90, warning: 70, critical: 50)
-        """
-        # Check cache first
-        if not force_refresh and self._is_cache_valid():
-            logger.debug("Using cached health thresholds")
-            return self._cache
+        if not force_refresh and cache_key in self._cache:
+            thresholds, expires = self._cache[cache_key]
+            if datetime.now() < expires:
+                return thresholds
 
-        # Try Supabase first
-        thresholds = self._load_from_supabase()
+        thresholds = self._load(site_id)
 
-        # Fallback to JSON
-        if not thresholds:
-            thresholds = self._load_from_json()
-
-        # Ultimate fallback to defaults
-        if not thresholds:
-            logger.warning("Using default health thresholds")
-            thresholds = DEFAULT_THRESHOLDS.copy()
-
-        # Update cache
-        self._cache = thresholds
-        self._cache_expiry = datetime.now() + timedelta(seconds=CACHE_TTL)
-
-        logger.info(
-            f"Health thresholds: healthy={thresholds['healthy']}, "
-            f"warning={thresholds['warning']}, critical={thresholds['critical']}"
-        )
-
+        self._cache[cache_key] = (thresholds, datetime.now() + timedelta(seconds=CACHE_TTL))
         return thresholds
 
-    def get_health_status(self, health_score: float) -> str:
-        """
-        Get health status string from score using current thresholds.
-
-        Uses all three configurable thresholds from settings:
-        - healthy (default 90): Score >= this is "healthy"
-        - critical (default 50): Score < this is "critical"
-        - Everything in between is "warning"
-
-        Args:
-            health_score: Health score (0-100)
-
-        Returns:
-            Status string: "healthy", "warning", or "critical"
-        """
-        thresholds = self.get_thresholds()
-
-        if health_score >= thresholds["healthy"]:
+    def get_health_status(self, health_score: float, *, site_id: str | None = None) -> str:
+        thresholds = self.get_thresholds(site_id=site_id)
+        h = thresholds.health
+        if health_score >= h["healthy"]:
             return "healthy"
-        elif health_score < thresholds["critical"]:
+        elif health_score < h["critical"]:
             return "critical"
         else:
             return "warning"
 
-    def get_health_color(self, health_score: float) -> str:
-        """
-        Get color for health score display.
-
-        Args:
-            health_score: Health score (0-100)
-
-        Returns:
-            Color string: "green", "amber", or "red"
-        """
-        status = self.get_health_status(health_score)
+    def get_health_color(self, health_score: float, *, site_id: str | None = None) -> str:
+        status = self.get_health_status(health_score, site_id=site_id)
         return {"healthy": "green", "warning": "amber", "critical": "red"}[status]
 
-    def _is_cache_valid(self) -> bool:
-        """Check if cache is still valid."""
-        if self._cache is None or self._cache_expiry is None:
-            return False
-        return datetime.now() < self._cache_expiry
+    def get_risk_level(self, risk_score: float, *, site_id: str | None = None) -> str:
+        thresholds = self.get_thresholds(site_id=site_id)
+        r = thresholds.risk
+        if risk_score >= r["critical"]:
+            return "critical"
+        elif risk_score >= r["high"]:
+            return "high"
+        elif risk_score >= r["medium"]:
+            return "medium"
+        else:
+            return "low"
 
-    def _load_from_supabase(self) -> dict[str, int] | None:
-        """Load thresholds from Supabase system_settings."""
-        try:
-            supabase = get_supabase_client()
-            result = supabase.table("system_settings").select("value").eq("key", "health_thresholds").execute()
+    def clear_cache(self, site_id: str | None = None) -> None:
+        if site_id:
+            self._cache.pop(site_id, None)
+            self._cache.pop("__global__", None)
+        else:
+            self._cache.clear()
+        logger.debug("Health threshold cache cleared (site_id=%s)", site_id)
 
-            if result.data:
-                thresholds = result.data[0]["value"]
-                # Validate structure
-                if all(k in thresholds for k in ["healthy", "warning", "critical"]):
-                    logger.debug("Loaded health thresholds from Supabase")
-                    return thresholds
-                else:
-                    logger.warning("Invalid health thresholds structure in Supabase")
+    # ── internal ────────────────────────────────────────────────────────
 
-        except Exception as e:
-            logger.debug(f"Could not load thresholds from Supabase: {e}")
+    def _load(self, site_id: str | None) -> SiteThresholds:
+        from app.database.repositories.site_threshold_repository import SiteThresholdRepository
 
-        return None
+        repo = SiteThresholdRepository()
 
-    def _load_from_json(self) -> dict[str, int] | None:
-        """Load thresholds from JSON settings file."""
-        try:
-            from app.api.settings import load_settings
+        candidate_sites = []
+        if site_id:
+            candidate_sites.append(site_id)
+        candidate_sites.append("__global__")
 
-            settings_data = load_settings()
-            thresholds = settings_data.get("healthThresholds")
+        for sid in candidate_sites:
+            try:
+                row = repo.get(sid)
+                if row:
+                    return SiteThresholds(health=row["health"], risk=row["risk"], site_id=sid)
+            except Exception as e:
+                logger.debug("Could not load thresholds for %s: %s", sid, e)
 
-            if thresholds and all(k in thresholds for k in ["healthy", "warning", "critical"]):
-                logger.debug("Loaded health thresholds from JSON settings")
-                return thresholds
-
-        except Exception as e:
-            logger.debug(f"Could not load thresholds from JSON: {e}")
-
-        return None
-
-    def clear_cache(self):
-        """Clear the threshold cache (for testing or manual refresh)."""
-        self._cache = None
-        self._cache_expiry = None
-        logger.debug("Health threshold cache cleared")
+        return SiteThresholds.defaults()
 
 
-# ============================================================================
-# Singleton Instance
-# ============================================================================
+# ── singleton ───────────────────────────────────────────────────────────────
 
 _service_instance: HealthThresholdService | None = None
 
 
 def get_health_threshold_service() -> HealthThresholdService:
-    """Get singleton health threshold service instance."""
     global _service_instance
     if _service_instance is None:
         _service_instance = HealthThresholdService()
     return _service_instance
 
 
-# ============================================================================
-# Convenience Functions
-# ============================================================================
+# ── convenience functions ────────────────────────────────────────────────────
 
 
-def get_health_thresholds(force_refresh: bool = False) -> dict[str, int]:
-    """
-    Get current health score thresholds.
-
-    Convenience function that uses the singleton service.
-    """
-    return get_health_threshold_service().get_thresholds(force_refresh)
+def get_health_thresholds(*, site_id: str | None = None, force_refresh: bool = False) -> dict[str, int]:
+    return get_health_threshold_service().get_thresholds(site_id=site_id, force_refresh=force_refresh).health
 
 
-def get_health_status(health_score: float) -> str:
-    """
-    Get health status string from score.
-
-    Convenience function that uses the singleton service.
-    """
-    return get_health_threshold_service().get_health_status(health_score)
+def get_risk_thresholds(*, site_id: str | None = None, force_refresh: bool = False) -> dict[str, int]:
+    return get_health_threshold_service().get_thresholds(site_id=site_id, force_refresh=force_refresh).risk
 
 
-def get_health_color(health_score: float) -> str:
-    """
-    Get color for health score display.
-
-    Convenience function that uses the singleton service.
-    """
-    return get_health_threshold_service().get_health_color(health_score)
+def get_health_status(health_score: float, *, site_id: str | None = None) -> str:
+    return get_health_threshold_service().get_health_status(health_score, site_id=site_id)
 
 
-def clear_health_threshold_cache():
-    """Clear the health threshold cache."""
-    get_health_threshold_service().clear_cache()
+def get_health_color(health_score: float, *, site_id: str | None = None) -> str:
+    return get_health_threshold_service().get_health_color(health_score, site_id=site_id)
+
+
+def clear_health_threshold_cache(site_id: str | None = None):
+    get_health_threshold_service().clear_cache(site_id=site_id)

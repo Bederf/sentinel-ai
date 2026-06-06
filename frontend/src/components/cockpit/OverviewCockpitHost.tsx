@@ -245,7 +245,7 @@ function useCockpitIssues(siteId: string) {
 }
 
 function buildCockpitSummary(
-  props: OverviewCockpitHostProps,
+  props: OverviewCockpitHostProps & { healthThreshold: number; warningThreshold: number; criticalThreshold: number },
   lastUpdatedAt: number | null,
   loading: boolean,
 ) {
@@ -262,6 +262,9 @@ function buildCockpitSummary(
     equipmentCount: props.equipmentCount,
     dataFreshnessLabel: formatFreshness(lastUpdatedAt, loading),
     siteFloors: props.siteFloors ?? null,
+    healthThreshold: props.healthThreshold,
+    warningThreshold: props.warningThreshold,
+    criticalThreshold: props.criticalThreshold,
   }
 }
 
@@ -365,9 +368,23 @@ export function OverviewCockpitHost({
     }
   }, [siteId])
 
+  // Load thresholds from canonical API
+  const [siteThresholds, setSiteThresholds] = useState<{ health: { healthy: number; warning: number; critical: number }; risk: { medium: number; high: number; critical: number } } | null>(null)
+  useEffect(() => {
+    let mounted = true
+    authorizedFetch(`/api/settings/site-thresholds?site_id=${encodeURIComponent(siteId)}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => { if (mounted && data) setSiteThresholds(data) })
+      .catch(() => {})
+    return () => { mounted = false }
+  }, [siteId])
+
   const state = useMemo(() => {
+    const { healthy: ht, warning: wt, critical: ct } = siteThresholds?.health ?? { healthy: 85, warning: 65, critical: 40 }
+    const thresholds = siteThresholds ?? { health: { healthy: ht, warning: wt, critical: ct }, risk: { medium: 31, high: 61, critical: 81 } }
+
     const summary = buildCockpitSummary(
-      { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, siteFloors },
+      { siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, siteFloors, healthThreshold: ht, warningThreshold: wt, criticalThreshold: ct },
       lastUpdatedAt,
       loading,
     )
@@ -376,7 +393,7 @@ export function OverviewCockpitHost({
     const equipmentWarnings: EquipmentWarningInput[] = (equipment ?? [])
       .filter((eq) => {
         const type = (eq.equipment_type || eq.type || '').toLowerCase()
-        return eq.health_score < 85 && MECHANICAL_TYPES.has(type)
+        return eq.health_score < ht && MECHANICAL_TYPES.has(type)
       })
       .map((eq) => {
         let floorId = ''
@@ -392,12 +409,12 @@ export function OverviewCockpitHost({
           equipment_type: eq.equipment_type,
           floor_id: floorId,
           health_score: eq.health_score,
-          health_state: eq.health_score >= 40 ? 'degraded' : 'critical',
+          health_state: eq.health_score >= ct ? 'degraded' : 'critical',
           zone_id: zoneKey,
         }
       })
-    return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter, equipmentWarnings)
-  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter, siteFloors, equipment])
+      return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter, equipmentWarnings, thresholds)
+  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter, siteFloors, equipment, thresholds, siteThresholds, loading])
 
   return (
     <CockpitView

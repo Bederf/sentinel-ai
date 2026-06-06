@@ -3,17 +3,28 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
 from app.database import get_supabase_client
+from app.models.auth import AuthContext
+from app.security.audit_events import audit_config_change
+from app.security.pipeline import require_role
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
+class SiteThresholdsUpdate(BaseModel):
+    """Unified health + risk threshold update model."""
+
+    health: dict[str, int]
+    risk: dict[str, int]
+    site_id: str | None = None
+
+
 class HealthThresholdsUpdate(BaseModel):
-    """Health threshold update model."""
+    """Health threshold update model (legacy compat)."""
 
     healthy: int
     warning: int
@@ -46,6 +57,55 @@ class SettingUpdate(BaseModel):
     category: str | None = None
     description: str | None = None
     site_id: str | None = None
+
+
+# ── Unified site thresholds (canonical endpoint) ─────────────────────
+#
+# GET  /api/settings/site-thresholds?site_id=X  →  {health: {...}, risk: {...}}
+# PUT  /api/settings/site-thresholds            →  upserts both domains
+#
+
+
+@router.get("/settings/site-thresholds")
+async def get_site_thresholds(
+    site_id: str | None = None,
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, Any]:
+    """Get unified health + risk thresholds for a site.
+
+    Falls back: per-site → global (__global__) → hardcoded defaults.
+    """
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    svc = get_health_threshold_service()
+    thresholds = svc.get_thresholds(site_id=site_id)
+    return {"health": thresholds.health, "risk": thresholds.risk, "site_id": site_id}
+
+
+@router.put("/settings/site-thresholds")
+async def update_site_thresholds(
+    thresholds: SiteThresholdsUpdate,
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> dict[str, Any]:
+    """Update unified health + risk thresholds. Requires ADMIN (level 4)."""
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
+
+    site_key = thresholds.site_id or "__global__"
+    repo = SiteThresholdRepository()
+    result = repo.upsert(site_key, thresholds.health, thresholds.risk)
+
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    get_health_threshold_service().clear_cache(site_key)
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("site-thresholds.update", user=auth.user_id, source_ip=source_ip, site_id=site_key)
+
+    return result
+
+
+# ── Legacy health/risk threshold endpoints (compat adapters) ─────────
 
 
 @router.get("/settings")
@@ -101,144 +161,59 @@ async def get_public_settings() -> dict[str, Any]:
 
 
 @router.get("/settings/health-thresholds")
-async def get_health_thresholds(site_id: str | None = None) -> dict[str, int]:
-    """Get health score thresholds from database.
+async def get_health_thresholds_legacy(
+    site_id: str | None = None,
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, int]:
+    """Get health score thresholds (legacy compat — delegates to canonical endpoint)."""
+    from app.services.health_threshold_service import get_health_threshold_service
 
-    Args:
-        site_id: Optional site identifier for per-site thresholds.
-                 Falls back to global settings if no site-specific entry exists.
-
-    Returns: {healthy: 90, warning: 70, critical: 50}
-    """
-    try:
-        supabase = get_supabase_client()
-
-        # Try site-specific first, then fall back to global
-        if site_id:
-            result = (
-                supabase.table("system_settings")
-                .select("value")
-                .eq("key", "health_thresholds")
-                .eq("site_id", site_id)
-                .execute()
-            )
-            if result.data:
-                return result.data[0]["value"]
-
-        # Fall back to global
-        result = supabase.table("system_settings").select("value").eq("key", "health_thresholds").execute()
-
-        if result.data:
-            return result.data[0]["value"]
-        else:
-            # Return defaults if not found in database
-            logger.warning("Health thresholds not found in database, using defaults")
-            return {"healthy": 90, "warning": 70, "critical": 50}
-
-    except Exception as e:
-        logger.error(f"Error loading health thresholds: {e}")
-        # Return defaults on error
-        return {"healthy": 90, "warning": 70, "critical": 50}
+    svc = get_health_threshold_service()
+    return svc.get_thresholds(site_id=site_id).health
 
 
 @router.put("/settings/health-thresholds")
-async def update_health_thresholds(thresholds: HealthThresholdsUpdate) -> dict[str, int]:
-    """Update health score thresholds in database.
+async def update_health_thresholds_legacy(
+    thresholds: HealthThresholdsUpdate,
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> dict[str, int]:
+    """Update health score thresholds (legacy compat — delegates to canonical endpoint)."""
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
 
-    Validates:
-    - All values between 0-100
-    - healthy > warning > critical
-    - site_id for per-site settings
-    """
-    # Validate threshold ranges (0-100)
-    for field in ["healthy", "warning", "critical"]:
-        value = getattr(thresholds, field)
-        if not (0 <= value <= 100):
-            raise HTTPException(status_code=400, detail=f"{field} must be between 0 and 100, got {value}")
+    site_key = thresholds.site_id or "__global__"
+    repo = SiteThresholdRepository()
 
-    # Validate threshold ordering (healthy > warning > critical)
-    if thresholds.healthy <= thresholds.warning:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"healthy threshold ({thresholds.healthy}) must be greater "
-                f"than warning threshold ({thresholds.warning})"
-            ),
-        )
+    # Fetch existing risk to preserve it
+    existing = repo.get(site_key)
+    current_risk = existing["risk"] if existing else {"medium": 31, "high": 61, "critical": 81}
 
-    if thresholds.warning <= thresholds.critical:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"warning threshold ({thresholds.warning}) must be greater "
-                f"than critical threshold ({thresholds.critical})"
-            ),
-        )
+    result = repo.upsert(
+        site_key,
+        {"healthy": thresholds.healthy, "warning": thresholds.warning, "critical": thresholds.critical},
+        current_risk,
+    )
 
-    try:
-        supabase = get_supabase_client()
+    from app.services.health_threshold_service import get_health_threshold_service
 
-        # Build upsert payload
-        payload = {
-            "key": "health_thresholds",
-            "value": {
-                "healthy": thresholds.healthy,
-                "warning": thresholds.warning,
-                "critical": thresholds.critical,
-            },
-            "category": "health",
-            "description": "Health score thresholds for equipment classification (0-100 scale)",
-            "data_type": "object",
-            "is_public": True,
-            "site_id": thresholds.site_id,
-        }
+    get_health_threshold_service().clear_cache(site_key)
 
-        # Update in database with composite key (key, site_id)
-        (supabase.table("system_settings").upsert(payload, on_conflict="key,site_id").execute())
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change("site-thresholds.health.update", user=auth.user_id, source_ip=source_ip, site_id=site_key)
 
-        logger.info(f"Updated health thresholds: site_id={thresholds.site_id}, values={thresholds.dict()}")
-
-        return {"healthy": thresholds.healthy, "warning": thresholds.warning, "critical": thresholds.critical}
-
-    except Exception as e:
-        logger.error(f"Error updating health thresholds: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update health thresholds: {e!s}")
+    return result["health"]
 
 
 @router.get("/settings/risk-thresholds")
-async def get_risk_thresholds(site_id: str | None = None) -> dict[str, int]:
-    """Get risk score thresholds from database.
+async def get_risk_thresholds_legacy(
+    site_id: str | None = None,
+    auth: AuthContext = Depends(require_role(1)),
+) -> dict[str, int]:
+    """Get risk score thresholds (legacy compat — delegates to canonical endpoint)."""
+    from app.services.health_threshold_service import get_health_threshold_service
 
-    Args:
-        site_id: Optional site identifier for per-site thresholds.
-
-    Returns: {medium: 31, high: 61, critical: 81}
-    """
-    try:
-        supabase = get_supabase_client()
-
-        if site_id:
-            result = (
-                supabase.table("system_settings")
-                .select("value")
-                .eq("key", "risk_thresholds")
-                .eq("site_id", site_id)
-                .execute()
-            )
-            if result.data:
-                return result.data[0]["value"]
-
-        result = supabase.table("system_settings").select("value").eq("key", "risk_thresholds").execute()
-
-        if result.data:
-            return result.data[0]["value"]
-
-        logger.warning("Risk thresholds not found in database, using defaults")
-        return {"medium": 31, "high": 61, "critical": 81}
-
-    except Exception as e:
-        logger.error(f"Error loading risk thresholds: {e}")
-        return {"medium": 31, "high": 61, "critical": 81}
+    svc = get_health_threshold_service()
+    return svc.get_thresholds(site_id=site_id).risk
 
 
 @router.get("/settings/safety-thresholds")

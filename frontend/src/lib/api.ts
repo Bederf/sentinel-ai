@@ -1269,6 +1269,11 @@ export interface RiskThresholds {
   critical: number;
 }
 
+export interface SiteThresholds {
+  health: HealthThresholds;
+  risk: RiskThresholds;
+}
+
 // Safety rule interface
 export interface SafetyRule {
   id: string;
@@ -2816,6 +2821,28 @@ export const api = {
     return fetchApi<RiskThresholds>(`/api/settings/risk-thresholds${qs}`, {
       method: "PUT",
       body: JSON.stringify(thresholds),
+    });
+  },
+
+  /**
+   * Get unified health + risk thresholds for a site (canonical endpoint).
+   * @param siteId - Optional site code (falls back to global)
+   */
+  async getSiteThresholds(siteId?: string): Promise<SiteThresholds> {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    return fetchApi<SiteThresholds>(`/api/settings/site-thresholds${qs}`);
+  },
+
+  /**
+   * Update unified health + risk thresholds for a site (canonical endpoint).
+   * @param thresholds - Full health + risk threshold object
+   * @param siteId - Optional site code (falls back to global)
+   */
+  async updateSiteThresholds(thresholds: SiteThresholds, siteId?: string): Promise<SiteThresholds> {
+    const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}` : "";
+    return fetchApi<SiteThresholds>(`/api/settings/site-thresholds${qs}`, {
+      method: "PUT",
+      body: JSON.stringify({ ...thresholds, site_id: siteId ?? null }),
     });
   },
 

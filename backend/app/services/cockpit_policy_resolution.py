@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from app.api.settings import load_settings
+from app.services.health_threshold_service import SiteThresholds
 
 RiskBand = Literal["low", "medium", "high", "critical"]
 PolicyLevel = Literal["site_asset_criticality", "site_asset", "site", "posture", "system"]
@@ -138,15 +138,14 @@ def _normalized_posture(value: str | None) -> str:
     return value.strip().lower()
 
 
-def _load_system_thresholds() -> tuple[dict[str, int], dict[str, int]]:
-    try:
-        settings = load_settings()
-    except Exception:
-        return SYSTEM_HEALTH_FALLBACK, SYSTEM_POLICY_FALLBACK
+def _load_system_thresholds(site_id: str | None = None) -> SiteThresholds:
+    from app.services.health_threshold_service import get_health_threshold_service
 
-    health_thresholds = settings.get("healthThresholds", SYSTEM_HEALTH_FALLBACK)
-    risk_thresholds = settings.get("riskThresholds", SYSTEM_POLICY_FALLBACK)
-    return health_thresholds, risk_thresholds
+    try:
+        svc = get_health_threshold_service()
+        return svc.get_thresholds(site_id=site_id)
+    except Exception:
+        return SiteThresholds(health=dict(SYSTEM_HEALTH_FALLBACK), risk=dict(SYSTEM_POLICY_FALLBACK))
 
 
 def infer_asset_context(site_id: str, primary_asset_id: str | None) -> AssetContext:
@@ -178,7 +177,7 @@ def infer_asset_context(site_id: str, primary_asset_id: str | None) -> AssetCont
 
 
 def resolve_policy(site_id: str, asset_context: AssetContext, active_posture: str | None) -> ResolvedPolicy:
-    _, system_risk_thresholds = _load_system_thresholds()
+    thresholds = _load_system_thresholds(site_id=site_id)
 
     site_asset_criticality_key = (site_id, asset_context.asset_class, asset_context.criticality)
     if site_asset_criticality_key in SITE_ASSET_CRITICALITY_POLICIES:
@@ -220,7 +219,7 @@ def resolve_policy(site_id: str, asset_context: AssetContext, active_posture: st
         )
 
     return ResolvedPolicy(
-        risk_thresholds=system_risk_thresholds,
+        risk_thresholds=thresholds.risk,
         policy_source="system.default",
         policy_level="system",
         constraint_type="asset",
@@ -421,7 +420,7 @@ def resolve_cockpit_contract(
     reasoning_summary: str | None,
     urgency_components: dict[str, float] | None,
 ) -> CockpitResolution:
-    health_thresholds, _ = _load_system_thresholds()
+    thresholds = _load_system_thresholds(site_id=site_id)
     asset_context = infer_asset_context(site_id, primary_asset_id)
     policy = resolve_policy(site_id, asset_context, active_posture)
     affected_scope = resolve_affected_scope(site_id, affected_zone_ids, primary_asset_id)
@@ -446,7 +445,7 @@ def resolve_cockpit_contract(
     )
     health = ResolvedHealth(
         score=health_score,
-        state=resolve_health_state(health_score, health_thresholds, asset_context.criticality),
+        state=resolve_health_state(health_score, thresholds.health, asset_context.criticality),
         trend=resolve_health_trend(urgency_score, time_to_constraint_breach_min, time_confidence),
         reason=build_health_reason(
             asset_context=asset_context,
