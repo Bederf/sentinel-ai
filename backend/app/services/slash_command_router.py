@@ -10,13 +10,11 @@ Mirrors the Sentry Telegram bot's slash command handling.
 import asyncio
 import logging
 import re
-import subprocess
 from dataclasses import dataclass
 
 import httpx
 
 from app.config.settings import settings
-from app.services.sentry_integration.config import get_sentry_bot_cli
 
 logger = logging.getLogger(__name__)
 
@@ -107,33 +105,30 @@ async def _notify_technician(
 
     Uses ``sentry message send`` CLI for Telegram and work_order_notifier for email.
     """
-    code_dashed = equipment_code.replace("_", "-")
+    # SECURITY: /api/chat is unauthenticated (in _PUBLIC_PREFIXES). All user-supplied
+    # values interpolated into Telegram messages must be plain text only.
+    # Do NOT add parse_mode: HTML without escaping every interpolated field —
+    # an attacker can inject phishing links into trusted SENTINEL bot messages.
 
-    # --- Telegram via sentry CLI ---
+    # --- Telegram via Bot API directly ---
     if tech_telegram_id:
         assigned = tech_name or "Pending"
         msg = f"Work Order Created #{wo_code}\nAssigned: {assigned}\nPriority: {priority.upper()}"
-        cli = get_sentry_bot_cli()
         try:
-            await asyncio.to_thread(
-                subprocess.run,
-                [
-                    cli,
-                    "message",
-                    "send",
-                    "--channel",
-                    "telegram",
-                    "--account",
-                    "default",
-                    "--target",
-                    str(tech_telegram_id),
-                    "--message",
-                    msg,
-                ],
-                timeout=15,
-                capture_output=True,
-            )
-            logger.info("Telegram sent to %s for %s", tech_telegram_id, wo_code)
+            bot_token = settings.sentry_client_bot_token
+            if bot_token:
+                async with httpx.AsyncClient(timeout=15) as client:
+                    resp = await client.post(
+                        f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                        json={"chat_id": str(tech_telegram_id), "text": msg},
+                    )
+                    result = resp.json()
+                    if result.get("ok"):
+                        logger.info("Telegram sent to %s for %s", tech_telegram_id, wo_code)
+                    else:
+                        logger.warning("Telegram send failed for %s: %s", wo_code, result.get("description"))
+            else:
+                logger.warning("SENTRY_CLIENT_BOT_TOKEN not configured")
         except Exception as exc:
             logger.warning("Telegram notification failed for %s: %s", wo_code, exc)
 
