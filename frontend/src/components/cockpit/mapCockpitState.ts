@@ -1,4 +1,4 @@
-import type { CockpitGuidanceMode, CockpitHealthState, CockpitModuleId, CockpitState, CockpitTwinRiskLevel } from './types'
+import type { CockpitGuidanceMode, CockpitHealthState, CockpitModuleId, CockpitState, CockpitTwinRiskLevel, WaterTelemetry } from './types'
 import { getModuleScope } from './moduleScopes'
 import type { HVACOverview } from '@/lib/hvacApi'
 
@@ -308,6 +308,313 @@ function buildUnavailableState(summary: CockpitSiteSummary): CockpitState {
   }
 }
 
+function buildWaterUnavailableState(
+  summary: CockpitSiteSummary,
+  thresholds?: CockpitState['thresholds'] | null,
+  siteFloors?: string[] | null,
+): CockpitState {
+  return {
+    site: {
+      id: summary.siteId,
+      name: summary.siteName,
+      latitude: summary.gpsLat ?? null,
+      longitude: summary.gpsLon ?? null,
+      orientationDegrees: summary.orientationDegrees ?? null,
+      onboardingPhase: summary.onboardingPhase ?? 'shadow',
+      posture: 'Waiting',
+      mode: 'waiting',
+      renderState: 'waiting',
+      dataFreshnessLabel: summary.dataFreshnessLabel,
+      buildingGeometry: summary.buildingGeometry ?? null,
+    },
+    sitePulse: {
+      tone: 'normal',
+      attentionScore: 0.1,
+      activeConditionCount: 0,
+      emergingRiskCount: 0,
+      equipmentWarningCount: 0,
+      evidenceStrength: 'limited',
+    },
+    primaryMetric: {
+      tone: 'normal',
+      label: 'Live State',
+      value: 'Waiting',
+      detail: 'Water telemetry unavailable. No flow, pressure, or consumption data received.',
+    },
+    activeCondition: {
+      summary: 'Water telemetry unavailable',
+      rationale: `No water telemetry from ${summary.siteName} yet.`,
+      confidenceLabel: 'Waiting',
+    },
+    decision: {
+      impact: 'Waiting',
+      summary: 'Watch for water telemetry',
+      tradeoff: 'No operator action required until water telemetry arrives.',
+      confidence: 'Waiting',
+    },
+    visualTwin: {
+      headline: 'Water telemetry unavailable',
+      activeLabel: summary.siteName,
+      modeLabel: 'Waiting',
+      motionProfile: 'waiting',
+      breathingIntensity: 0.12,
+      flowSpeed: 0.9,
+      consumptionIntensity: 0.12,
+      focusFloorId: null,
+      floors: buildFloorOrder(summary.siteId, null, [], siteFloors).map((floorId, index, order) => ({
+        id: floorId,
+        label: formatFloorLabel(floorId),
+        meshId: `floor:${floorId}`,
+        level: 'stable',
+        intensity: 0.14,
+        spread: 0,
+        elevation: (order.length - index - 1) * 2.25,
+        isManaged: (siteFloors ?? SITE_TOWER_PROFILES[summary.siteId]?.managedFloors ?? order).includes(floorId),
+      })),
+      zoneSignals: [],
+      flowPaths: [],
+      energyCentre: {
+        online: false,
+        totalKw: 0,
+        hvacKw: 0,
+        lightingKw: 0,
+        powerKw: 0,
+        loadRatio: 0.12,
+        powerShareRatio: 0,
+        stateLabel: 'low',
+      },
+    },
+    evidence: {
+      strength: 'limited',
+      summary: 'Waiting for water telemetry.',
+      refs: [],
+    },
+    severity: {
+      riskScore: null,
+      riskBand: 'medium',
+      thresholdReason: null,
+      policySource: null,
+      policyLevel: null,
+      constraintType: null,
+      timeToConstraintBreachMin: null,
+      affectedScope: null,
+      healthScore: null,
+      healthState: null,
+      healthTrend: null,
+      healthReason: null,
+      assetClass: null,
+      criticality: null,
+    },
+    emergingRisks: [],
+    equipmentWarnings: [],
+    emailClusters: [],
+    thresholds: thresholds ?? {
+      health: { healthy: summary.healthThreshold ?? 85, warning: summary.warningThreshold ?? 65, critical: summary.criticalThreshold ?? 40 },
+      risk: { medium: 31, high: 61, critical: 81 },
+    },
+  }
+}
+
+function buildWaterCockpitState(
+  summary: CockpitSiteSummary,
+  waterTelemetry: WaterTelemetry,
+  equipmentWarnings?: EquipmentWarningInput[] | null,
+  thresholds?: CockpitState['thresholds'] | null,
+  siteFloors?: string[] | null,
+  payload?: BuildingStatePayload | null,
+): CockpitState {
+  if (!waterTelemetry || !waterTelemetry.sourceHealthy) {
+    return buildWaterUnavailableState(summary, thresholds, siteFloors)
+  }
+  const waterScope = getModuleScope('water')
+  const waterEquipmentTypes = waterScope.equipmentTypes
+  const waterEquipmentWarnings = (equipmentWarnings ?? []).filter(
+    (eq) => waterEquipmentTypes.includes(eq.equipment_type ?? ''),
+  )
+  const criticalValue = thresholds?.health.critical ?? summary.criticalThreshold ?? 40
+  const warningValue = thresholds?.health.warning ?? summary.warningThreshold ?? 65
+  const hasCriticalAlert = waterTelemetry.leakDetected === true
+  const hasWarningAlert = waterTelemetry.leakDetected === false && waterTelemetry.pressureBar !== null && waterTelemetry.pressureBar < 1.0
+  const tone: CockpitState['primaryMetric']['tone'] = hasCriticalAlert ? 'critical' : hasWarningAlert ? 'warning' : 'normal'
+  const motionProfile: CockpitState['visualTwin']['motionProfile'] = hasCriticalAlert ? 'alert' : hasWarningAlert ? 'watch' : 'calm'
+  const riskBand: CockpitState['severity']['riskBand'] = hasCriticalAlert ? 'critical' : hasWarningAlert ? 'medium' : 'low'
+  const headline = hasCriticalAlert ? 'Water leak detected' : hasWarningAlert ? 'Water pressure anomaly' : waterScope.stableHeadline
+  const summaryText = hasCriticalAlert
+    ? `${waterEquipmentWarnings.length} water equipment affected by leak`
+    : hasWarningAlert
+      ? `${waterEquipmentWarnings.length} water equipment at warning threshold`
+      : 'Water systems stable. No leaks, pressure drops, or consumption anomalies detected.'
+
+  const focusFloorId = null
+  const floorOrder = buildFloorOrder(summary.siteId, focusFloorId, [], siteFloors)
+  const zoneSignals: CockpitState['visualTwin']['zoneSignals'] = waterEquipmentWarnings.map((eq, index) => ({
+    zoneId: eq.zone_id ?? eq.equipment_id,
+    label: eq.code.replace(/-/g, ' '),
+    floorId: eq.floor_id,
+    meshId: `mesh:${(eq.zone_id ?? eq.equipment_id).toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    level: eq.health_score < criticalValue ? 'critical' : eq.health_score < warningValue ? 'approaching' : 'drift',
+    weight: Math.max(0.2, 1 - index * 0.18),
+    slot: index,
+    isPrimary: index === 0,
+    actionLabel: `${eq.equipment_type} ${eq.health_score}`,
+  }))
+  const flowPaths: CockpitState['visualTwin']['flowPaths'] = zoneSignals.length > 0
+    ? [{ id: 'flow-water-0', d: 'M356 390 C376 346 390 318 396 276 C400 238 405 206 416 172', fromFloorId: zoneSignals[0]?.floorId ?? null, toFloorId: null, intensity: 0.5, direction: 'contained' }]
+    : []
+
+  // Filter email clusters to water-related complaints
+  const WATER_KEYWORDS = ['leak', 'water', 'plumbing', 'pipe', 'flood', 'damp', 'wet', 'drip', 'overflow']
+  const emailClusters = (payload?.email_clusters ?? []).filter((c) => {
+    const ct = c.complaint_type.toLowerCase()
+    return WATER_KEYWORDS.some((kw) => ct.includes(kw))
+  }).map((c) => ({
+    clusterId: c.cluster_id,
+    zoneId: c.zone_id,
+    zoneName: c.zone_name,
+    floor: c.floor,
+    emailCount: c.email_count,
+    complaintType: c.complaint_type,
+    severity: c.severity as CockpitState['emailClusters'][number]['severity'],
+    summary: c.summary,
+  }))
+
+  // Build evidence refs — only water-related or cross-system with relatedModuleIds
+  const waterRefs: string[] = ['module:water']
+  if (waterTelemetry.flowLpm !== null) waterRefs.push(`water:flow-${waterTelemetry.flowLpm.toFixed(1)}lpm`)
+  if (waterTelemetry.totalM3 !== null) waterRefs.push(`water:total-${waterTelemetry.totalM3.toFixed(1)}m3`)
+  if (hasCriticalAlert) waterRefs.push('water:leak-active')
+
+  return {
+    site: {
+      id: summary.siteId,
+      name: summary.siteName,
+      latitude: summary.gpsLat ?? null,
+      longitude: summary.gpsLon ?? null,
+      orientationDegrees: summary.orientationDegrees ?? null,
+      onboardingPhase: summary.onboardingPhase ?? 'shadow',
+      posture: hasCriticalAlert ? 'Critical' : hasWarningAlert ? 'Drifting — safe bounds' : 'Calm',
+      mode: hasCriticalAlert ? 'intervene_soon' : hasWarningAlert ? 'watch' : 'none',
+      renderState: 'live',
+      dataFreshnessLabel: summary.dataFreshnessLabel,
+      buildingGeometry: summary.buildingGeometry ?? null,
+    },
+    sitePulse: {
+      tone,
+      attentionScore: hasCriticalAlert ? 1 : hasWarningAlert ? 0.6 : 0.2,
+      activeConditionCount: waterEquipmentWarnings.length + emailClusters.length,
+      emergingRiskCount: waterEquipmentWarnings.length,
+      equipmentWarningCount: waterEquipmentWarnings.length,
+      evidenceStrength: hasCriticalAlert ? 'moderate' : 'weak',
+    },
+    primaryMetric: {
+      tone,
+      label: 'Flow Rate',
+      value: waterTelemetry.flowLpm !== null ? `${waterTelemetry.flowLpm.toFixed(1)} LPM` : '—',
+      detail: hasCriticalAlert
+        ? `Leak detected · Flow ${waterTelemetry.flowLpm?.toFixed(1)} LPM · ${waterTelemetry.totalM3?.toFixed(1) ?? '—'} m³ total`
+        : `${waterScope.stableHeadline} · Flow ${waterTelemetry.flowLpm?.toFixed(1) ?? '—'} LPM · ${waterTelemetry.totalM3?.toFixed(1) ?? '—'} m³ total`,
+    },
+    activeCondition: {
+      summary: summaryText,
+      rationale: hasCriticalAlert
+        ? `Water leak active — ${waterEquipmentWarnings.length} equipment affected.`
+        : hasWarningAlert
+          ? `Water pressure anomaly — ${waterEquipmentWarnings.length} equipment at warning.`
+          : `${waterScope.stableSummary}`,
+      confidenceLabel: hasCriticalAlert ? 'Leak detected' : hasWarningAlert ? 'Pressure anomaly' : 'Stable',
+    },
+    decision: {
+      impact: hasCriticalAlert ? `${waterEquipmentWarnings.length} water equipment at risk` : 'Water systems',
+      summary: hasCriticalAlert ? 'Investigate leak source immediately.' : hasWarningAlert ? 'Monitor water pressure and equipment.' : 'No action needed.',
+      tradeoff: hasCriticalAlert
+        ? `Water leak active — pressure at ${waterTelemetry.pressureBar?.toFixed(1) ?? '—'} bar`
+        : hasWarningAlert
+          ? `Water pressure at ${waterTelemetry.pressureBar?.toFixed(1) ?? '—'} bar — monitoring`
+          : 'Water pressure, flow, and tank levels within normal range.',
+      confidence: hasCriticalAlert ? 'Alert confirmed' : hasWarningAlert ? 'Warning threshold' : 'Stable',
+    },
+    visualTwin: {
+      headline,
+      activeLabel: hasCriticalAlert ? 'Water leak detected' : 'Water systems',
+      modeLabel: hasCriticalAlert ? 'Alert' : hasWarningAlert ? 'Watch' : 'Calm',
+      motionProfile,
+      breathingIntensity: 0.18,
+      flowSpeed: 1.05,
+      consumptionIntensity: 0.18,
+      focusFloorId,
+      floors: buildFloorOrder(summary.siteId, focusFloorId, [], siteFloors).map((floorId, index, order) => ({
+        id: floorId,
+        label: formatFloorLabel(floorId),
+        meshId: `floor:${floorId}`,
+        level: 'stable',
+        intensity: 0.16,
+        spread: 0,
+        elevation: (order.length - index - 1) * 2.25,
+        isManaged: (siteFloors ?? SITE_TOWER_PROFILES[summary.siteId]?.managedFloors ?? order).includes(floorId),
+      })),
+      zoneSignals,
+      flowPaths,
+      energyCentre: {
+        online: false,
+        totalKw: 0,
+        hvacKw: 0,
+        lightingKw: 0,
+        powerKw: 0,
+        loadRatio: 0.12,
+        powerShareRatio: 0,
+        stateLabel: 'low',
+      },
+    },
+    evidence: {
+      strength: hasCriticalAlert ? 'moderate' : 'weak',
+      summary: 'Rendered from water telemetry and active alerts.',
+      refs: waterRefs,
+      relatedModuleIds: hasCriticalAlert ? ['water'] : undefined,
+    },
+    severity: {
+      riskScore: null,
+      riskBand,
+      thresholdReason: null,
+      policySource: null,
+      policyLevel: null,
+      constraintType: null,
+      timeToConstraintBreachMin: null,
+      affectedScope: zoneSignals.length > 0
+        ? { zones: zoneSignals.map((s) => s.zoneId), assets: [], occupantsEstimate: null }
+        : null,
+      healthScore: null,
+      healthState: null,
+      healthTrend: null,
+      healthReason: null,
+      assetClass: null,
+      criticality: null,
+    },
+    emergingRisks: waterEquipmentWarnings.map((eq, index) => ({
+      id: `water-equipment-${index}-${eq.equipment_id}`,
+      title: eq.code,
+      detail: `${eq.equipment_type} health score ${eq.health_score}/100 — ${eq.fault_type ?? 'monitoring'}.`,
+    })),
+    emailClusters,
+    equipmentWarnings: waterEquipmentWarnings.map((eq) => ({
+      id: eq.id,
+      equipmentId: eq.equipment_id,
+      equipmentCode: eq.code,
+      equipmentType: eq.equipment_type,
+      floorId: eq.floor_id ?? null,
+      healthScore: eq.health_score,
+      healthState: eq.health_state as CockpitHealthState,
+      faultType: eq.fault_type,
+      zoneId: eq.zone_id,
+    })),
+    systemFilter: 'water',
+    waterTelemetry,
+    thresholds: thresholds ?? {
+      health: { healthy: summary.healthThreshold ?? 85, warning: summary.warningThreshold ?? 65, critical: summary.criticalThreshold ?? 40 },
+      risk: { medium: 31, high: 61, critical: 81 },
+    },
+  }
+}
+
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value))
 }
@@ -553,7 +860,14 @@ export function mapCockpitState(
   systemFilter?: string | null,
   equipmentWarnings?: EquipmentWarningInput[] | null,
   thresholds?: { health: { healthy: number; warning: number; critical: number }; risk: { medium: number; high: number; critical: number } } | null,
+  waterTelemetry?: WaterTelemetry | null,
 ): CockpitState {
+  // Water module short-circuit — no narrative or HVAC data needed
+  const normalizedFilter = systemFilter?.replace(/-/g, '_') ?? null
+  if (normalizedFilter === 'water') {
+    return buildWaterCockpitState(summary, waterTelemetry, equipmentWarnings, thresholds, summary.siteFloors ?? null, payload)
+  }
+
   if (!payload) return buildUnavailableState(summary)
 
   const onboardingPhase = summary.onboardingPhase ?? 'shadow'
@@ -562,7 +876,6 @@ export function mapCockpitState(
   const riskBand = riskBandFromPosture(payload.building_posture)
   // --- System-filtered narrative selection ---
   // Normalize hyphenated module IDs to underscores at the boundary
-  const normalizedFilter = systemFilter?.replace(/-/g, '_') ?? null
   const scope = getModuleScope(normalizedFilter as CockpitModuleId)
   const matchVoices = scope.id !== 'overview' ? scope.acceptedVoices : []
   // When a tab is active but has no mapped voices (e.g. lighting, water),

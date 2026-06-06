@@ -5,7 +5,7 @@ import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
 import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry, type EquipmentWarningInput } from './mapCockpitState'
-import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitTwinZoneSignal, ModelReadiness } from './types'
+import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitTwinZoneSignal, ModelReadiness, WaterTelemetry } from './types'
 
 import type { BuildingTabId } from '@/lib/navigation'
 
@@ -129,6 +129,64 @@ function useBuildingStatePayload(siteId: string) {
   }, [siteId])
 
   return { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading }
+}
+
+function useWaterTelemetry(siteId: string) {
+  const [waterTelemetry, setWaterTelemetry] = useState<WaterTelemetry | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    let timer: ReturnType<typeof setInterval> | null = null
+
+    async function load() {
+      try {
+        const [currentRes, alertsRes] = await Promise.all([
+          authorizedFetch(`/api/water/sites/${encodeURIComponent(siteId)}/current`),
+          authorizedFetch(`/api/water/sites/${encodeURIComponent(siteId)}/alerts/active`),
+        ])
+
+        if (!mounted) return
+
+        if (!currentRes.ok) {
+          setWaterTelemetry({ flowLpm: null, pressureBar: null, totalM3: null, dailyM3: null, leakDetected: null, lastUpdated: null, sourceHealthy: false })
+          return
+        }
+
+        const current = await currentRes.json() as {
+          flow_rate_lpm: number
+          volume_liters: number
+          pressure: number | null
+          timestamp: string
+        }
+        const alertsData = alertsRes.ok ? await alertsRes.json() as { alerts: Array<{ severity: string }> } : null
+        const hasLeak = alertsData !== null && alertsData.alerts.length > 0
+
+        setWaterTelemetry({
+          flowLpm: current.flow_rate_lpm ?? null,
+          pressureBar: current.pressure ?? null,
+          totalM3: current.volume_liters != null ? current.volume_liters / 1000 : null,
+          dailyM3: null,
+          leakDetected: hasLeak,
+          lastUpdated: current.timestamp ?? null,
+          sourceHealthy: true,
+        })
+      } catch {
+        if (mounted) {
+          setWaterTelemetry({ flowLpm: null, pressureBar: null, totalM3: null, dailyM3: null, leakDetected: null, lastUpdated: null, sourceHealthy: false })
+        }
+      }
+    }
+
+    load()
+    timer = setInterval(load, POLL_INTERVAL_MS)
+
+    return () => {
+      mounted = false
+      if (timer) clearInterval(timer)
+    }
+  }, [siteId])
+
+  return waterTelemetry
 }
 
 // ─── Phase 209 — issue-based decision hook ────────────────────────────────────
@@ -288,6 +346,7 @@ export function OverviewCockpitHost({
 }: OverviewCockpitHostProps) {
   const { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading } = useBuildingStatePayload(siteId)
   const issuesPayload = useCockpitIssues(siteId)
+  const waterTelemetry = useWaterTelemetry(siteId)
   const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
   const [modelReadiness, setModelReadiness] = useState<ModelReadiness | null>(null)
 
@@ -389,7 +448,7 @@ export function OverviewCockpitHost({
       loading,
     )
     // Extract floor_id from zone_key (e.g. Zone-L1-1 → L1, Zone-L3-ICU → L3)
-    const MECHANICAL_TYPES = new Set(['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler', 'generator'])
+    const MECHANICAL_TYPES = new Set(['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler', 'generator', 'water_meter', 'water_pump', 'water_tank', 'valve', 'leak_sensor', 'pressure_sensor', 'flow_meter', 'water_treatment'])
     const equipmentWarnings: EquipmentWarningInput[] = (equipment ?? [])
       .filter((eq) => {
         const type = (eq.equipment_type || eq.type || '').toLowerCase()
@@ -413,8 +472,8 @@ export function OverviewCockpitHost({
           zone_id: zoneKey,
         }
       })
-      return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter, equipmentWarnings, thresholds)
-  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter, siteFloors, equipment, thresholds, siteThresholds, loading])
+      return mapCockpitState(summary, payload, hvacOverview, energyTelemetry, undefined, systemFilter, equipmentWarnings, thresholds, waterTelemetry)
+  }, [siteId, siteName, gpsLat, gpsLon, orientationDegrees, onboardingPhase, posture, activeAlerts, predictionsCount, equipmentCount, lastUpdatedAt, payload, hvacOverview, energyTelemetry, systemFilter, siteFloors, equipment, siteThresholds, waterTelemetry, loading])
 
   return (
     <CockpitView

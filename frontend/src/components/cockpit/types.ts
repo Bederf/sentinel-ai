@@ -47,6 +47,17 @@ export interface CockpitDecision {
 
 export type CockpitTwinRiskLevel = 'stable' | 'drift' | 'approaching' | 'critical'
 
+/** Water telemetry — fetched independently from the water API */
+export interface WaterTelemetry {
+  flowLpm: number | null
+  pressureBar: number | null
+  totalM3: number | null
+  dailyM3: number | null
+  leakDetected: boolean | null
+  lastUpdated: string | null
+  sourceHealthy: boolean
+}
+
 /** Email complaint cluster — surfaces in cockpit when email_count >= 3 */
 export interface EmailClusterData {
   clusterId: string
@@ -224,6 +235,8 @@ export interface CockpitState {
   emailClusters: EmailClusterData[]
   /** Active module scope — when set, only this module's zones/equipment/evidence render */
   systemFilter?: CockpitModuleId | null
+    /** Water telemetry — populated when systemFilter === 'water' */
+  waterTelemetry?: WaterTelemetry
   /** Backend-resolved thresholds — single source of truth for cockpit rendering */
   thresholds: {
     health: CockpitHealthThresholds
