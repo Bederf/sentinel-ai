@@ -81,7 +81,7 @@ class MQTTProvisioner:
                 logger.info("Sent SIGHUP to mosquitto PID %d", pid)
             else:
                 result = subprocess.run(
-                    ["pkill", "-HUP", "mosquitto"],
+                    ["sudo", "pkill", "-HUP", "mosquitto"],
                     capture_output=True,
                     timeout=5,
                 )
@@ -129,7 +129,7 @@ mqtt:
         """
         try:
             subprocess.run(
-                ["mosquitto_passwd", "-b", str(_PASSWD_FILE), username, password],
+                ["sudo", "mosquitto_passwd", "-b", str(_PASSWD_FILE), username, password],
                 capture_output=True,
                 timeout=5,
                 check=False,
@@ -278,7 +278,7 @@ mqtt:
         # Remove user from passwd file
         try:
             subprocess.run(
-                ["mosquitto_passwd", "-D", str(_PASSWD_FILE), username],
+                ["sudo", "mosquitto_passwd", "-D", str(_PASSWD_FILE), username],
                 capture_output=True,
                 timeout=5,
                 check=False,

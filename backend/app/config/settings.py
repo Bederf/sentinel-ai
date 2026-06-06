@@ -185,6 +185,9 @@ class Settings(BaseSettings):
     sentry_bot_api_key: str = Field(default="", validation_alias="SENTRY_BOT_API_KEY")
     sentry_bot_cli: str = Field(default="sentry", validation_alias="SENTRY_BOT_CLI")
 
+    # Technician Telegram bot token (for direct work order notifications)
+    sentry_client_bot_token: str = Field(default="", validation_alias="SENTRY_CLIENT_BOT_TOKEN")
+
     # Prometheus metrics bearer token (required for /metrics endpoint — no auth bypass)
     # Prometheus must send: Authorization: Bearer <token>
     metrics_bearer_token: str = Field(default="", validation_alias="METRICS_BEARER_TOKEN")
@@ -453,14 +456,14 @@ class Settings(BaseSettings):
     # LD2410C Radar Distance Filtering
     # Firmware: v2.44.25070917 | Resolution: 0.75 m | Effective range: 3.0 m
     # Mounting: ceiling, downward | Unmanned duration: 15 s
-    # Per-room override: FR-L1 (Fairlands staging, 2m×2m) → max 1.0 m
+    # Per-room override: FR-L1 (Fairlands staging, 2m x 2m) -> max 1.0 m
     radar_distance_filter_enabled: bool = True  # Reject readings outside valid range
     radar_distance_min_m: float = 0.2  # Ignore very close readings (noise)
     radar_distance_max_m: float = 3.0  # Max effective range (gate 4 @ 0.75 m resolution)
     # Per-room max distances (room_code → max_m), applied on top of global max
     # Any detection beyond a room's physical dimensions = adjacent-space bleed
     radar_room_max_distance_m: dict[str, float] = {
-        # FR-L1 (2m×2m): 1.3m stationary readings in an "empty" room were confirmed
+        # FR-L1 (2m x 2m): 1.3m stationary readings in an "empty" room were confirmed
         # adjacent-room bleed (LD2410C detects through thin walls). Cap at 1.0m
         # so only genuine in-room presence (<1m from ceiling sensor) registers.
         "FR-L1": 1.0,
@@ -730,7 +733,7 @@ class Settings(BaseSettings):
                     "This suggests an invalid Fernet key format."
                 )
         except (base64.binascii.Error, UnicodeDecodeError) as e:
-            raise ValueError(f"ENCRYPTION_KEY must be valid base64-encoded data: {e}")
+            raise ValueError(f"ENCRYPTION_KEY must be valid base64-encoded data: {e}") from e
         return value
 
     @field_validator("space_default_site_id", "plant_site_id", "plant_building_name", mode="after")
