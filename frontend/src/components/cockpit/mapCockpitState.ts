@@ -1,4 +1,5 @@
-import type { CockpitGuidanceMode, CockpitHealthState, CockpitState, CockpitTwinRiskLevel } from './types'
+import type { CockpitGuidanceMode, CockpitHealthState, CockpitModuleId, CockpitState, CockpitTwinRiskLevel } from './types'
+import { getModuleScope } from './moduleScopes'
 import type { HVACOverview } from '@/lib/hvacApi'
 
 export interface BuildingStateLocation {
@@ -560,19 +561,10 @@ export function mapCockpitState(
   const tone = toneFromPosture(payload.building_posture)
   const riskBand = riskBandFromPosture(payload.building_posture)
   // --- System-filtered narrative selection ---
-  // Map systemFilter to the voice types that belong to that system.
-  // When a system tab is active, prefer a matching narrative; fall back to the
-  // first available narrative so the right rail never goes blank.
-  const SYSTEM_VOICE_MAP: Record<string, BuildingStateNarrative['voice'][]> = {
-    hvac:     ['comfort_stress', 'occupant_friction', 'asset_stress'],
-    energy:   ['energy_pressure'],
-    lighting: [],
-    water:    [],
-    fire:     [],
-    security: [],
-     "solar-bess": ['energy_pressure'],
-  }
-  const matchVoices = systemFilter ? (SYSTEM_VOICE_MAP[systemFilter] ?? []) : []
+  // Normalize hyphenated module IDs to underscores at the boundary
+  const normalizedFilter = systemFilter?.replace(/-/g, '_') ?? null
+  const scope = getModuleScope(normalizedFilter as CockpitModuleId)
+  const matchVoices = scope.id !== 'overview' ? scope.acceptedVoices : []
   // When a tab is active but has no mapped voices (e.g. lighting, water),
   // suppress the fallback to primary_narrative so unrelated HVAC content
   // doesn't bleed into other system views.
@@ -584,28 +576,20 @@ export function mapCockpitState(
       : null
     : null
 
-  const narrative = systemFilter ? systemNarrative : (systemNarrative ?? payload.primary_narrative)
+  const narrative = normalizedFilter ? systemNarrative : (systemNarrative ?? payload.primary_narrative)
 
   // Filter secondary tensions by system voice when a system tab is active
   const secondaryTensions = matchVoices.length > 0
     ? payload.secondary_tensions.filter((t) => matchVoices.includes(t.voice))
     : payload.secondary_tensions
 
-  // Filter equipment warnings by system tab — e.g. HVAC tab shows only hvac equipment
-  const SYSTEM_EQUIPMENT_FILTER: Record<string, string[]> = {
-    hvac: ['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler'],
-    energy: ['generator', 'ups', 'bess', 'meter', 'inverter', 'solar_panel', 'solar_inverter', 'transformer'],
-    lighting: ['dali', 'luminaire', 'lighting_panel', 'lighting_driver', 'scene_controller'],
-    water: ['water_meter', 'pump'],
-    fire: ['fire_alarm', 'sprinkler', 'fire_panel'],
-    security: ['access_control', 'access_control_server', 'cctv', 'gate', 'door'],
-    "solar-bess": ['solar_panel', 'inverter', 'bess', 'meter'],
-  }
-  const allowedTypes = systemFilter ? (SYSTEM_EQUIPMENT_FILTER[systemFilter] ?? []) : []
+  // Filter equipment warnings by module scope — e.g. HVAC tab shows only hvac equipment
+  const allowedTypes = scope.id !== 'overview' ? scope.equipmentTypes : []
   const filteredEquipmentWarnings = allowedTypes.length > 0
-    ? equipmentWarnings.filter((eq) => allowedTypes.includes(eq.equipment_type ?? eq.type ?? ''))
-    : equipmentWarnings
+    ? (equipmentWarnings ?? []).filter((eq) => allowedTypes.includes(eq.equipment_type ?? ''))
+    : (equipmentWarnings ?? [])
 
+  const criticalValue = thresholds?.health.critical ?? summary.criticalThreshold ?? 40
   const urgencyScore = payload.urgency_score ?? 0
   const bands = { low: 0.3, medium: 0.5, high: 0.7, critical: 0.9 }
   const timeToBreach = narrative?.time_to_breach_min ?? null
@@ -689,41 +673,7 @@ export function mapCockpitState(
     })
   }
 
-  // --- Inject representative equipment zone signals when system tab is active
-  // but no matching narrative exists — ensures the 3D building always shows
-  // relevant orbs regardless of which system the operator has selected.
-  const SYSTEM_EQUIPMENT_ZONES: Record<string, Array<{ zoneId: string; floorId: string; label: string; level: CockpitTwinRiskLevel }>> = {
-    energy: [
-      { zoneId: 'Zone-B1-001', floorId: 'B1', label: 'Chiller & Meter', level: 'stable' },
-    ],
-    lighting: [
-      { zoneId: 'Zone-L1-A', floorId: 'L1', label: 'DALI Controller L1', level: 'stable' },
-      { zoneId: 'Zone-L2-B', floorId: 'L2', label: 'DALI Controller L2', level: 'stable' },
-    ],
-    "solar-bess": [
-      { zoneId: 'Zone-B1-001', floorId: 'B1', label: 'Solar & BESS', level: 'stable' },
-    ],
-  }
-
-  const equipZones = systemFilter ? (SYSTEM_EQUIPMENT_ZONES[systemFilter] ?? []) : []
-  const equipZoneIds = new Set(zoneSignalsWithClusters.map((s) => s.zoneId))
-  for (const ez of equipZones) {
-    if (!equipZoneIds.has(ez.zoneId)) {
-      zoneSignalsWithClusters.push({
-        zoneId: ez.zoneId,
-        label: ez.label,
-        floorId: ez.floorId,
-        meshId: `mesh:${ez.zoneId.toLowerCase()}`,
-        level: ez.level,
-        weight: 0.85,
-        slot: zoneSignalsWithClusters.length,
-        isPrimary: false,
-        actionLabel: systemFilter === 'energy' ? 'Energy Centre' : systemFilter === 'lighting' ? 'Lighting' : 'Solar & BESS',
-      })
-    }
-  }
-
-  // Deduplicate by zoneId — keep last occurrence (equipZone version wins over standalone cluster).
+  // Deduplicate by zoneId — keep last occurrence.
   const seen = new Map<string, typeof zoneSignalsWithClusters[0]>()
   for (const s of zoneSignalsWithClusters) seen.set(s.zoneId, s)
   zoneSignalsWithClusters = [...seen.values()]
@@ -749,9 +699,9 @@ export function mapCockpitState(
     sitePulse: {
       tone,
       attentionScore: tone === 'critical' ? 1 : tone === 'elevated' ? 0.8 : tone === 'warning' ? 0.6 : 0.2,
-      activeConditionCount: narrative ? 1 : (secondaryTensions.length + filteredEquipmentWarnings.length),
+      activeConditionCount: narrative ? 1 : (secondaryTensions.length + (filteredEquipmentWarnings?.length ?? 0)),
       emergingRiskCount: secondaryTensions.length + (filteredEquipmentWarnings?.length ?? 0),
-      equipmentWarningCount: filteredEquipmentWarnings.length,
+      equipmentWarningCount: filteredEquipmentWarnings?.length ?? 0,
       evidenceStrength: narrative ? 'moderate' : 'weak',
     },
     primaryMetric: {
@@ -761,7 +711,7 @@ export function mapCockpitState(
       // Suppress HVAC operator_guidance headline when a non-HVAC system tab is active
       // without a matching narrative — prevents HVAC content from bleeding into
       // Energy, Lighting, Water, Fire, Security tabs.
-      detail: systemFilter && !narrative
+      detail: normalizedFilter && !narrative
         ? (energyCentreTelemetry ? `Energy Centre ${energyCentreTelemetry.totalKw.toFixed(0)} kW` : '—')
         : (energyCentreTelemetry
             ? `${payload.operator_guidance.headline} · Energy Centre ${energyCentreTelemetry.totalKw.toFixed(0)} kW`
@@ -783,7 +733,7 @@ export function mapCockpitState(
             ? `${formatVoiceLabel(narrative.voice)} centered on ${locationSummary(narrative)}.`
             : filteredEquipmentWarnings.length > 0
                 ? (() => {
-                    const crit = filteredEquipmentWarnings.filter((e) => (e.health_score ?? 100) < 40).length
+                    const crit = filteredEquipmentWarnings.filter((e) => (e.health_score ?? 100) < criticalValue).length
                     const warn = filteredEquipmentWarnings.length - crit
                     const parts: string[] = []
                     if (crit > 0) parts.push(`${crit} critical`)
@@ -893,7 +843,7 @@ export function mapCockpitState(
       faultType: eq.fault_type,
       zoneId: eq.zone_id,
     })),
-    systemFilter: (systemFilter ?? null) as 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null,
+    systemFilter: normalizedFilter as CockpitModuleId | null,
     thresholds: thresholds ?? {
       health: { healthy: summary.healthThreshold ?? 85, warning: summary.warningThreshold ?? 65, critical: summary.criticalThreshold ?? 40 },
       risk: { medium: 31, high: 61, critical: 81 },

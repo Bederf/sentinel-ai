@@ -56,15 +56,7 @@ const OVERVIEW_SCOPE: CockpitModuleScope = {
 const HVAC_SCOPE: CockpitModuleScope = {
   id: 'hvac',
   label: 'HVAC',
-  acceptedVoices: [
-    'hvac_pressure',
-    'discharge_temp',
-    'zone_temp_deviation',
-    'hvac_energy_demand',
-    'air_quality',
-    'hvac_anomaly',
-    'hvac_constraint',
-  ],
+  acceptedVoices: ['comfort_stress', 'occupant_friction', 'asset_stress'],
   subsystemAliases: ['hvac', 'ahu', 'fcu', 'vav', 'chiller', 'boiler', 'hvac_control'],
   equipmentTypes: ['ahu', 'chiller', 'fcu', 'vav', 'boiler', 'cooling_tower', 'hvac_sensor', 'thermostat', 'duct_pressure_sensor'],
   stableHeadline: 'HVAC systems stable',
@@ -78,7 +70,7 @@ const HVAC_SCOPE: CockpitModuleScope = {
 const ENERGY_SCOPE: CockpitModuleScope = {
   id: 'energy',
   label: 'Energy',
-  acceptedVoices: ['energy_pressure', 'power_quality', 'demand_spike', 'solar_generation', 'bess_state'],
+  acceptedVoices: ['energy_pressure'],
   subsystemAliases: ['energy', 'power', 'solar', 'bess', 'metering', 'energy_control'],
   equipmentTypes: ['meter', 'solar_panel', 'inverter', 'bess', 'generator', 'power_meter', 'energy_meter', 'submeter'],
   stableHeadline: 'Energy systems stable',
@@ -92,7 +84,7 @@ const ENERGY_SCOPE: CockpitModuleScope = {
 const LIGHTING_SCOPE: CockpitModuleScope = {
   id: 'lighting',
   label: 'Lighting',
-  acceptedVoices: ['lighting_anomaly', 'dali_fault', 'occupancy_lighting'],
+  acceptedVoices: [],
   subsystemAliases: ['lighting', 'dali', 'luminaire', 'lighting_control'],
   equipmentTypes: ['luminaire', 'dali_controller', 'light_sensor', 'occupancy_sensor'],
   stableHeadline: 'Lighting systems stable',
@@ -106,14 +98,7 @@ const LIGHTING_SCOPE: CockpitModuleScope = {
 const WATER_SCOPE: CockpitModuleScope = {
   id: 'water',
   label: 'Water',
-  acceptedVoices: [
-    'water_consumption',
-    'water_pressure',
-    'leak_detection',
-    'tank_level',
-    'water_quality',
-    'pump_status',
-  ],
+  acceptedVoices: [],
   subsystemAliases: ['water', 'plumbing', 'irrigation', 'water_control'],
   equipmentTypes: [
     'water_meter',
@@ -136,7 +121,7 @@ const WATER_SCOPE: CockpitModuleScope = {
 const FIRE_SCOPE: CockpitModuleScope = {
   id: 'fire',
   label: 'Fire',
-  acceptedVoices: ['fire_alarm', 'sprinkler_flow', 'smoke_detection', 'fire_panel_status', 'fire_pump_status'],
+  acceptedVoices: [],
   subsystemAliases: ['fire', 'sprinkler', 'smoke', 'fire_control', 'fire_safety'],
   equipmentTypes: ['fire_panel', 'smoke_detector', 'sprinkler', 'fire_pump', 'heat_detector', 'manual_call_point', 'fire_damper'],
   stableHeadline: 'Fire systems stable',
@@ -150,7 +135,7 @@ const FIRE_SCOPE: CockpitModuleScope = {
 const SECURITY_SCOPE: CockpitModuleScope = {
   id: 'security',
   label: 'Security',
-  acceptedVoices: ['access_event', 'intrusion_alarm', 'camera_fault', 'door_forced', 'motion_detected'],
+  acceptedVoices: [],
   subsystemAliases: ['security', 'access', 'cctv', 'intrusion', 'security_control'],
   equipmentTypes: [
     'access_reader',
@@ -172,7 +157,7 @@ const SECURITY_SCOPE: CockpitModuleScope = {
 const SOLAR_BESS_SCOPE: CockpitModuleScope = {
   id: 'solar_bess',
   label: 'Solar & BESS',
-  acceptedVoices: ['energy_pressure', 'solar_generation', 'bess_state', 'grid_interaction'],
+  acceptedVoices: ['energy_pressure'],
   subsystemAliases: ['solar', 'bess', 'battery', 'solar_control'],
   equipmentTypes: ['solar_panel', 'inverter', 'bess', 'meter', 'solar_charger'],
   stableHeadline: 'Solar & BESS systems stable',
@@ -186,7 +171,7 @@ const SOLAR_BESS_SCOPE: CockpitModuleScope = {
 const OCCUPANCY_SCOPE: CockpitModuleScope = {
   id: 'occupancy',
   label: 'Occupancy',
-  acceptedVoices: ['occupancy_density', 'space_utilisation', 'desk_booking', 'zone_capacity'],
+  acceptedVoices: [],
   subsystemAliases: ['occupancy', 'space', 'desk_booking', 'tenant'],
   equipmentTypes: ['occupancy_sensor', 'people_counter', 'desk_sensor'],
   stableHeadline: 'Occupancy normal',

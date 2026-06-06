@@ -14,6 +14,7 @@ import {
   Sparkles,
   TimerReset,
 } from 'lucide-react'
+import { getModuleScope, subsystemBelongsToModule } from './moduleScopes'
 import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitRenderMode, CockpitState, CockpitTwinZoneSignal, ModelReadiness } from './types'
 import { CockpitIssuePanel } from './CockpitIssuePanel'
 import { phaseAllows } from '@/lib/onboardingPhase'
@@ -502,7 +503,7 @@ function ZoneEquipmentPanel({
     return state.equipmentWarnings.filter(
       (eq) => eq.zoneId === zone.zoneId || eq.floorId === zone.floorId,
     )
-  }, [state?.equipmentWarnings, zone.zoneId, zone.floorId])
+  }, [state.equipmentWarnings, zone.zoneId, zone.floorId])
 
   const { healthy, warning, critical } = state.thresholds.health
 
@@ -642,6 +643,17 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
   const twinCanvas = useMemo(() => <CockpitNervousSystemTwin state={state} onZoneSelect={onZoneSelect} />, [state, onZoneSelect])
   const canvas = spatialCanvas ?? twinCanvas
 
+  const filteredIssuesPayload = useMemo(() => {
+    if (!issuesPayload) return null
+    if (!state.systemFilter || state.systemFilter === 'overview') return issuesPayload
+    return {
+      ...issuesPayload,
+      issues: issuesPayload.issues.filter(issue =>
+        subsystemBelongsToModule(issue.subsystem, state.systemFilter),
+      ),
+    }
+  }, [issuesPayload, state.systemFilter])
+
   const [zoomLevel, setZoomLevel] = useState(1)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
@@ -694,6 +706,19 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
     document.addEventListener('fullscreenchange', sync)
     return () => document.removeEventListener('fullscreenchange', sync)
   }, [])
+
+  // Clear selected zone when switching to a module that doesn't contain its zone
+  useEffect(() => {
+    if (selectedZone && state.systemFilter) {
+      const zoneScope = getModuleScope(state.systemFilter)
+      const zoneType = (selectedZone.zoneId || '').toLowerCase()
+      const matchesModule = zoneScope.equipmentTypes.length === 0 ||
+        zoneScope.equipmentTypes.some(t => zoneType.includes(t))
+      if (!matchesModule) {
+        onZoneClose?.()
+      }
+    }
+  }, [state.systemFilter, selectedZone?.zoneId])
 
   useLayoutEffect(() => {
     if (!shellRef.current) return
@@ -965,7 +990,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
 
           {issuesPayload !== undefined ? (
             <CockpitIssuePanel
-              payload={issuesPayload ?? null}
+              payload={filteredIssuesPayload}
               onAction={onIssueAction ?? (async () => {})}
               selectedIssueId={selectedIssueId}
               onSelectIssue={setSelectedIssueId}
