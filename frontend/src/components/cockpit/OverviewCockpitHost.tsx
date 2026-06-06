@@ -4,6 +4,7 @@ import type { Equipment } from '@/lib/api/sites'
 import type { HVACOverview } from '@/lib/hvacApi'
 import { CockpitView } from './CockpitView'
 import { CockpitBuildingThree } from './CockpitBuildingThree'
+import { getModuleScope } from './moduleScopes'
 import { mapCockpitState, type BuildingStatePayload, type EnergyCentreTelemetry, type EquipmentWarningInput } from './mapCockpitState'
 import type { CockpitIssueActionType, CockpitIssuesPayload, CockpitTwinZoneSignal, ModelReadiness, WaterTelemetry } from './types'
 
@@ -158,8 +159,8 @@ function useWaterTelemetry(siteId: string) {
           pressure: number | null
           timestamp: string
         }
-        const alertsData = alertsRes.ok ? await alertsRes.json() as { alerts: Array<{ severity: string }> } : null
-        const hasLeak = alertsData !== null && alertsData.alerts.length > 0
+        const alertsData = alertsRes.ok ? await alertsRes.json() as { alerts?: Array<{ severity: string }> } : null
+        const hasLeak = alertsData !== null && (alertsData.alerts?.length ?? 0) > 0
 
         setWaterTelemetry({
           flowLpm: current.flow_rate_lpm ?? null,
@@ -447,12 +448,20 @@ export function OverviewCockpitHost({
       lastUpdatedAt,
       loading,
     )
-    // Extract floor_id from zone_key (e.g. Zone-L1-1 → L1, Zone-L3-ICU → L3)
-    const MECHANICAL_TYPES = new Set(['ahu', 'chiller', 'fcu', 'vav', 'pump', 'cooling_tower', 'boiler', 'generator', 'water_meter', 'water_pump', 'water_tank', 'valve', 'leak_sensor', 'pressure_sensor', 'flow_meter', 'water_treatment'])
+    // Collect all known equipment types from module scopes
+    const KNOWN_EQUIPMENT_TYPES = new Set(
+      ['overview', 'hvac', 'energy', 'lighting', 'water', 'fire', 'security', 'solar_bess', 'occupancy']
+        .flatMap((mid) => getModuleScope(mid).equipmentTypes),
+    )
+    // When a module scope is active, only equipment types from that scope pass through.
+    // In overview mode, all known equipment types pass through.
+    const scopeTypes = systemFilter ? getModuleScope(systemFilter).equipmentTypes : [...KNOWN_EQUIPMENT_TYPES]
+    const activeTypeSet = new Set(scopeTypes)
+
     const equipmentWarnings: EquipmentWarningInput[] = (equipment ?? [])
       .filter((eq) => {
         const type = (eq.equipment_type || eq.type || '').toLowerCase()
-        return eq.health_score < ht && MECHANICAL_TYPES.has(type)
+        return eq.health_score < ht && activeTypeSet.has(type)
       })
       .map((eq) => {
         let floorId = ''

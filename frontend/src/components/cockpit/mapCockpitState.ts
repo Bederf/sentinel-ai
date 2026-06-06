@@ -89,6 +89,17 @@ export interface RemoteSiteTelemetry {
 
 const DEFAULT_FLOOR_ORDER = ['R', 'L2', 'L1', 'L0', 'G', 'B1']
 
+const MODULE_EMAIL_KEYWORDS: Record<string, string[]> = {
+  water: ['leak', 'water', 'plumbing', 'pipe', 'flood', 'damp', 'wet', 'drip', 'overflow'],
+  hvac: ['hvac', 'heating', 'cooling', 'ventilation', 'aircon', 'ac', 'thermostat', 'temperature', 'too hot', 'too cold'],
+  energy: ['power', 'electricity', 'energy', 'solar', 'generator', 'outage', 'voltage'],
+  lighting: ['light', 'lamp', 'bulb', 'dim', 'flicker', 'darkness', 'illumination'],
+  fire: ['fire', 'smoke', 'alarm', 'sprinkler', 'evacuation'],
+  security: ['security', 'door', 'access', 'lock', 'intruder', 'camera', 'alarm'],
+  occupancy: ['occupancy', 'crowded', 'full', 'capacity', 'desk', 'space', 'noise'],
+  solar_bess: ['solar', 'battery', 'inverter', 'generation', 'bess'],
+}
+
 type TowerProfile = {
   towerFloors: string[];
   managedFloors: string[];
@@ -463,10 +474,9 @@ function buildWaterCockpitState(
     : []
 
   // Filter email clusters to water-related complaints
-  const WATER_KEYWORDS = ['leak', 'water', 'plumbing', 'pipe', 'flood', 'damp', 'wet', 'drip', 'overflow']
   const emailClusters = (payload?.email_clusters ?? []).filter((c) => {
     const ct = c.complaint_type.toLowerCase()
-    return WATER_KEYWORDS.some((kw) => ct.includes(kw))
+    return MODULE_EMAIL_KEYWORDS.water.some((kw) => ct.includes(kw))
   }).map((c) => ({
     clusterId: c.cluster_id,
     zoneId: c.zone_id,
@@ -767,7 +777,14 @@ function inferModuleRefsFromTelemetry(telemetry?: RemoteSiteTelemetry | null): s
 function buildShadowTelemetrySummary(
   hvacOverview?: HVACOverview | null,
   energyCentre?: EnergyCentreTelemetry | null,
+  systemFilter?: string | null,
 ): string {
+  // When a non-HVAC module scope is active, use module-appropriate stable summary
+  if (systemFilter && systemFilter !== 'overview' && systemFilter !== 'hvac') {
+    const scope = getModuleScope(systemFilter as CockpitModuleId)
+    return scope.stableSummary
+  }
+
   const hvacKw = Math.round(hvacOverview?.raw_telemetry?.power?.hvac_kw ?? 0)
   const zoneTotal = hvacOverview?.zones.total ?? 0
   const zoneFault = hvacOverview?.zones.fault ?? 0
@@ -932,15 +949,29 @@ export function mapCockpitState(
   const consumptionIntensity = normalizeConsumptionIntensity(energyCentreTelemetry)
   const energyLoadRatio = clamp((energyCentreTelemetry?.totalKw ?? 0) / 1800, 0, 1)
   const energyPowerShare = clamp((energyCentreTelemetry?.powerPercent ?? 0) / 100, 0, 1)
-  const shadowSummary = buildShadowTelemetrySummary(hvacOverview, energyCentreTelemetry)
+  const shadowSummary = buildShadowTelemetrySummary(hvacOverview, energyCentreTelemetry, normalizedFilter)
   const remoteModuleRefs = inferModuleRefsFromTelemetry(remoteTelemetry)
+  const moduleRefsForEvidence = remoteModuleRefs
+    .filter((r) => r.startsWith('module:'))
+    .map((r) => r.replace('module:', '') as CockpitModuleId)
+    .filter((ref): ref is CockpitModuleId =>
+      ['overview', 'hvac', 'energy', 'lighting', 'water', 'fire', 'security', 'solar_bess', 'occupancy', 'controls'].includes(ref),
+    )
   const flowPaths = flowPathsFromNarrative(narrative).map((path, index) => ({
     ...path,
     intensity: clamp(hvacSignal.intensity - index * 0.1, 0.25, 1),
   }))
 
   // --- Email cluster heatmap: merge into zoneSignals ---
-  const emailClusters = (payload.email_clusters ?? []).map((c) => ({
+  // When a module scope is active, filter email clusters to relevant complaint types
+  const moduleEmailKeywords = normalizedFilter ? (MODULE_EMAIL_KEYWORDS[normalizedFilter] ?? []) : []
+  const emailClusters = (payload.email_clusters ?? [])
+    .filter((c) => {
+      if (!normalizedFilter || normalizedFilter === 'overview') return true
+      const ct = c.complaint_type?.toLowerCase() ?? ''
+      return moduleEmailKeywords.length === 0 || moduleEmailKeywords.some((kw) => ct.includes(kw))
+    })
+    .map((c) => ({
     clusterId: c.cluster_id,
     zoneId: c.zone_id,
     zoneName: c.zone_name,
@@ -1015,7 +1046,7 @@ export function mapCockpitState(
       activeConditionCount: narrative ? 1 : (secondaryTensions.length + (filteredEquipmentWarnings?.length ?? 0)),
       emergingRiskCount: secondaryTensions.length + (filteredEquipmentWarnings?.length ?? 0),
       equipmentWarningCount: filteredEquipmentWarnings?.length ?? 0,
-      evidenceStrength: narrative ? 'moderate' : 'weak',
+      evidenceStrength: narrative ? 'strong' : 'weak',
     },
     primaryMetric: {
       tone,
@@ -1104,7 +1135,7 @@ export function mapCockpitState(
       },
     },
     evidence: {
-      strength: narrative ? 'moderate' : 'strong',
+      strength: narrative ? 'strong' : 'weak',
       summary: 'Rendered from the backend building-state contract.',
       refs: narrative
         ? [
@@ -1116,6 +1147,7 @@ export function mapCockpitState(
             ...(energyCentreTelemetry ? [`energy-centre:${energyCentreTelemetry.totalKw.toFixed(0)}kw`] : []),
             ...remoteModuleRefs,
           ],
+      relatedModuleIds: moduleRefsForEvidence.length > 0 ? moduleRefsForEvidence : undefined,
     },
     severity: {
       riskScore: null,

@@ -74,13 +74,7 @@ function activeModuleLabels(state: CockpitState): string[] {
   const labels = new Set<string>()
   // When a system filter is active, prioritize that system label first
   const filter = state.systemFilter
-  if (filter === 'hvac') labels.add('HVAC')
-  if (filter === 'energy') labels.add('Energy')
-  if (filter === 'lighting') labels.add('Lighting')
-  if (filter === 'water') labels.add('Water')
-  if (filter === 'fire') labels.add('Fire')
-  if (filter === 'security') labels.add('Security')
-  if (filter === 'solar_bess') labels.add('Solar & BESS')
+  if (filter) labels.add(getModuleScope(filter).label)
   if (state.evidence.refs.some((ref) => ref.startsWith('zone:'))) labels.add('HVAC')
   if (state.evidence.refs.some((ref) => ref.startsWith('energy-centre:'))) labels.add('Energy Centre')
   for (const risk of state.emergingRisks) {
@@ -171,16 +165,7 @@ function phaseLabel(phase: CockpitState['site']['onboardingPhase']) {
 
 function systemLabel(filter: string | null | undefined): string | null {
   if (!filter) return null
-  const map: Record<string, string> = {
-    hvac: 'HVAC',
-    energy: 'Energy',
-    lighting: 'Lighting',
-    water: 'Water',
-    fire: 'Fire',
-    security: 'Security',
-    solar_bess: 'Solar & BESS',
-  }
-  return map[filter] ?? null
+  return getModuleScope(filter).label
 }
 
 function railTitle(state: CockpitState) {
