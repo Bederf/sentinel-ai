@@ -1,6 +1,19 @@
 export type CockpitRenderMode = 'embedded' | 'operator' | 'wall'
 export type CockpitGuidanceMode = 'waiting' | 'none' | 'watch' | 'prepare' | 'intervene_soon' | 'act_now'
 
+/** Canonical module ID — single source of truth for all module/tab references. */
+export type CockpitModuleId =
+  | 'overview'
+  | 'hvac'
+  | 'energy'
+  | 'lighting'
+  | 'water'
+  | 'fire'
+  | 'security'
+  | 'solar_bess'
+  | 'occupancy'
+  | 'controls'
+
 export interface CockpitMetricTone {
   tone: 'normal' | 'warning' | 'elevated' | 'critical'
 }
@@ -108,6 +121,8 @@ export interface CockpitEvidence {
   strength: 'strong' | 'moderate' | 'limited'
   summary: string
   refs: string[]
+  /** Module IDs explicitly related to this evidence. Used for cross-system discovery. */
+  relatedModuleIds?: CockpitModuleId[]
 }
 
 export interface CockpitRiskItem {
@@ -207,8 +222,8 @@ export interface CockpitState {
   equipmentWarnings: CockpitEquipmentWarning[]
   /** Active occupant complaint clusters (count >= 3) — email heatmap signals */
   emailClusters: EmailClusterData[]
-  /** Active system filter — when set, only zones/equipment of this system type render */
-  systemFilter?: 'hvac' | 'energy' | 'lighting' | 'water' | 'fire' | 'security' | 'solar_bess' | null
+  /** Active module scope — when set, only this module's zones/equipment/evidence render */
+  systemFilter?: CockpitModuleId | null
   /** Backend-resolved thresholds — single source of truth for cockpit rendering */
   thresholds: {
     health: CockpitHealthThresholds
