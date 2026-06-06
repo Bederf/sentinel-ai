@@ -1,10 +1,14 @@
 -- =====================================================
 -- Migration: Add site_thresholds table
 -- Unified per-site health + risk thresholds.
--- single row per site (site_id PK), one global fallback row.
+-- Single row per site (site_id PK), one global fallback row.
 -- Replaces fragmented system_settings keys
---   (healthThresholds, riskThresholds, healthThresholds_{site})
+--   (healthThresholds/health_thresholds, riskThresholds/risk_thresholds)
 -- =====================================================
+--
+-- ROLLBACK:
+--   DROP TABLE IF EXISTS site_thresholds;
+--   DROP FUNCTION IF EXISTS update_site_thresholds_timestamp();
 
 CREATE TABLE IF NOT EXISTS site_thresholds (
     site_id TEXT NOT NULL,
@@ -27,6 +31,24 @@ CREATE TABLE IF NOT EXISTS site_thresholds (
     )
 );
 
+-- RLS: enable + allow authenticated reads, admin writes
+ALTER TABLE site_thresholds ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY site_thresholds_select ON site_thresholds
+    FOR SELECT
+    USING (true);  -- all authenticated users can read thresholds
+
+CREATE POLICY site_thresholds_insert ON site_thresholds
+    FOR INSERT
+    WITH CHECK (auth.role() = 'authenticated');  -- API-level auth handles admin enforcement
+
+CREATE POLICY site_thresholds_update ON site_thresholds
+    FOR UPDATE
+    USING (auth.role() = 'authenticated');
+
+-- Index for site_id lookups (already covered by PK, but explicit for clarity)
+CREATE INDEX IF NOT EXISTS idx_site_thresholds_site_id ON site_thresholds(site_id);
+
 -- Trigger for updated_at
 CREATE OR REPLACE FUNCTION update_site_thresholds_timestamp()
 RETURNS TRIGGER AS $$
@@ -47,32 +69,38 @@ INSERT INTO site_thresholds (site_id, health, risk)
 VALUES ('__global__', '{"healthy": 85, "warning": 65, "critical": 40}', '{"medium": 31, "high": 61, "critical": 81}')
 ON CONFLICT (site_id) DO NOTHING;
 
--- Backfill existing per-site health thresholds from system_settings
+-- ── Backfill per-site from legacy system_settings ──────────────────────
+-- Handles both camelCase (settings.py) and snake_case (settings_db.py) keys.
+
 INSERT INTO site_thresholds (site_id, health, risk)
 SELECT
-    REPLACE(s.key, 'healthThresholds_', ''),
-    s.value AS health,
-    COALESCE(r.value, '{"medium": 31, "high": 61, "critical": 81}') AS risk
+    REPLACE(REPLACE(s.key, 'healthThresholds_', ''), 'health_thresholds_', ''),
+    s.value::jsonb AS health,
+    COALESCE(
+        (SELECT value::jsonb FROM system_settings
+         WHERE key = REPLACE(REPLACE(s.key, 'healthThresholds', 'riskThresholds'), 'health_thresholds', 'risk_thresholds')
+         LIMIT 1),
+        '{"medium": 31, "high": 61, "critical": 81}'::jsonb
+    ) AS risk
 FROM system_settings s
-LEFT JOIN LATERAL (
-    SELECT value FROM system_settings
-    WHERE key = REPLACE(s.key, 'healthThresholds_', 'riskThresholds_')
-) r ON TRUE
-WHERE s.key LIKE 'healthThresholds_%'
+WHERE s.key LIKE 'healthThresholds_%' OR s.key LIKE 'health_thresholds_%'
 ON CONFLICT (site_id) DO UPDATE SET
     health = EXCLUDED.health,
     risk = EXCLUDED.risk;
 
--- Backfill global from system_settings
+-- Backfill global defaults from system_settings
 UPDATE site_thresholds
-SET health = COALESCE(
-    (SELECT value FROM system_settings WHERE key = 'healthThresholds')::jsonb,
-    health
-),
+SET
+    health = COALESCE(
+        (SELECT value::jsonb FROM system_settings WHERE key = 'healthThresholds' LIMIT 1),
+        (SELECT value::jsonb FROM system_settings WHERE key = 'health_thresholds' LIMIT 1),
+        health
+    ),
     risk = COALESCE(
-    (SELECT value FROM system_settings WHERE key = 'riskThresholds')::jsonb,
-    risk
-)
+        (SELECT value::jsonb FROM system_settings WHERE key = 'riskThresholds' LIMIT 1),
+        (SELECT value::jsonb FROM system_settings WHERE key = 'risk_thresholds' LIMIT 1),
+        risk
+    )
 WHERE site_id = '__global__';
 
 COMMENT ON TABLE site_thresholds IS 'Unified per-site health and risk thresholds. site_id = ''__global__'' is the fallback default.';
