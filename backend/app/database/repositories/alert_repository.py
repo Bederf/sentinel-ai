@@ -68,15 +68,36 @@ class AlertRepository:
             return response.data[0]
         return None
 
+    def _resolve_site_uuid(self, site_id: str) -> str:
+        """Resolve a site code (e.g. 'site-002') to its UUID if needed.
+
+        alerts.site_id is a UUID FK — callers that pass a site code get zero rows
+        without this resolution step.
+        """
+        import re
+
+        _UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE)
+        if _UUID_RE.match(site_id):
+            return site_id
+        try:
+            row = self.client.table("sites").select("id").eq("code", site_id).maybe_single().execute()
+            if row.data:
+                return row.data["id"]
+        except Exception:
+            pass
+        return site_id
+
     def get_active_by_site(self, site_uuid: str) -> list[dict[str, Any]]:
         """Get active alerts for a building.
 
         Args:
-            site_uuid: Building UUID
+            site_uuid: Building UUID or site code (resolved automatically)
 
         Returns:
             List of active alerts
         """
+        site_uuid = self._resolve_site_uuid(site_uuid)
+
         cached = cache.get(CacheKeys.alerts_active(site_uuid))
         if cached is not None:
             return cached
