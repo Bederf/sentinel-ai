@@ -49,7 +49,10 @@ def build_source_dedupe_key(alarm: dict[str, Any]) -> str:
     3. equipment + code + type                 — fallback composite key
     """
     notif_class = alarm.get("notification_class") or alarm.get("notificationClass")
-    obj_id = alarm.get("object_id") or alarm.get("objectIdentifier") or alarm.get("objectId")
+    # Bridge uses 'bacnet_object' (e.g. 'binaryInput,2033') — map to obj_id
+    obj_id = (
+        alarm.get("object_id") or alarm.get("objectIdentifier") or alarm.get("objectId") or alarm.get("bacnet_object")
+    )
     if notif_class is not None and obj_id:
         return f"nc:{notif_class}|obj:{obj_id}"
 
