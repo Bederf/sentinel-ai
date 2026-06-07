@@ -13,7 +13,8 @@ class AlertRepository:
     _COLUMNS = (
         "id, title, message, severity, status, type, "
         "site_id, equipment_id, created_at, updated_at, "
-        "acknowledged_by, acknowledged_at"
+        "acknowledged_by, acknowledged_at, "
+        "source, source_dedupe_key, lifecycle_state, last_seen_at"
     )
 
     def __init__(self):
