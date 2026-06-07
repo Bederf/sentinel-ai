@@ -542,8 +542,20 @@ class AdapterHealthMonitor:
                 except (ValueError, TypeError):
                     pass
 
-            raw_severity = str(alarm.get("severity") or alarm.get("priority") or "warning").lower()
-            severity = "critical" if raw_severity in ("critical", "high", "fault", "active") else "warning"
+            # Severity: string labels take priority, then BACnet numeric priority
+            # (bridge sends priority as integer; higher = more critical on this bridge)
+            # to_state=FAULT always → critical regardless of numeric priority.
+            raw_sev = alarm.get("severity") or ""
+            numeric_priority = alarm.get("priority") if isinstance(alarm.get("priority"), (int, float)) else None
+            to_state_upper = str(alarm.get("to_state") or "").upper()
+            if (
+                str(raw_sev).lower() in ("critical", "high", "fault", "active")
+                or to_state_upper == "FAULT"
+                or (numeric_priority is not None and numeric_priority >= 75)
+            ):
+                severity = "critical"
+            else:
+                severity = "warning"
 
             # Equipment FK resolution (best-effort; NULL on miss)
             equipment_id: str | None = alarm.get("equipment_id") or alarm.get("equipment_code") or None
