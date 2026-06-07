@@ -62,6 +62,8 @@ python-docx>=1.1.0  # DOCX text extraction for document upload
 # Docling: better scanned-PDF OCR, table extraction, key-value pair detection
 # Import: from docling.document_converter import DocumentConverter
 docling>=2.94.0
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0+cpu  # CPU-only build — system has no GPU
 
 # Image Processing & OCR (Core Infrastructure)
 # ⚠️  REQUIRES SYSTEM BINARY: tesseract-ocr

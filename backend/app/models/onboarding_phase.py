@@ -78,7 +78,7 @@ def phase_allows(phase: str | None, feature: str, module_type: str | None = None
         True if phase >= the feature's minimum required phase.
         False for unknown feature names (fail-safe deny).
     """
-    p = phase or "shadow"
+    p = LEGACY_MAP.get(phase or "shadow", phase or "shadow")
     required = _FEATURE_GATES.get(feature)
     if required is None:
         return False  # unknown feature → deny

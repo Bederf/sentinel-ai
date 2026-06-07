@@ -21,7 +21,20 @@ from app.models.health_rating import (
     HealthRating,
     RecomputeResult,
 )
-from app.services.health_threshold_service import DEFAULT_THRESHOLDS
+from app.services.health_threshold_service import DEFAULT_HEALTH as DEFAULT_THRESHOLDS
+
+import os
+
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+
+
+def _make_token(role: str = "operator") -> str:
+    from app.middleware.auth_middleware import create_jwt_token
+
+    return create_jwt_token("test-user-id", "test@sentinel.local", role, "Test User")
+
+
+_AUTH_HEADERS = {"Authorization": f"Bearer {_make_token()}"}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -203,7 +216,7 @@ async def test_health_rating_returns_200_with_all_fields(
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/S002-AHU-001/health-rating")
 
     assert response.status_code == 200
@@ -240,7 +253,7 @@ async def test_health_rating_returns_404_unknown(mock_snapshot_service):
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/DOES-NOT-EXIST/health-rating")
 
     assert response.status_code == 404
@@ -277,7 +290,7 @@ async def test_health_rating_status_matches_threshold_service(
             ),
         ):
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
                 response = await client.get("/api/equipment/S002-AHU-001/health-rating")
 
         assert response.status_code == 200
@@ -312,7 +325,7 @@ async def test_health_rating_includes_component_breakdown(
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/S002-AHU-001/health-rating")
 
     assert response.status_code == 200
@@ -351,7 +364,7 @@ async def test_health_rating_includes_data_quality(
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/S002-AHU-001/health-rating")
 
     assert response.status_code == 200
@@ -392,7 +405,7 @@ async def test_history_returns_200_sorted_newest_first():
         return_value=mock_svc,
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get(
                 "/api/equipment/S002-AHU-001/health-rating/history",
                 params={"range": "7d"},
@@ -423,7 +436,7 @@ async def test_history_respects_range_filter():
             return_value=mock_svc,
         ):
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
                 response = await client.get(
                     "/api/equipment/S002-AHU-001/health-rating/history",
                     params={"range": range_str},
@@ -450,7 +463,7 @@ async def test_history_empty_returns_200():
         return_value=mock_svc,
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get(
                 "/api/equipment/S002-AHU-001/health-rating/history",
                 params={"range": "7d"},
@@ -470,7 +483,7 @@ async def test_history_invalid_range_returns_400():
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
         response = await client.get(
             "/api/equipment/S002-AHU-001/health-rating/history",
             params={"range": "999d"},
@@ -489,7 +502,7 @@ def _mock_asset_health_service():
     """Create a mock AssetHealthService for summary tests."""
     assets = [
         _make_asset_health_baseline("S002-AHU-001", 85, "warning", has_baseline=True),
-        _make_asset_health_baseline("S002-CHILLER-B1-001", 45, "critical", has_baseline=False),
+        _make_asset_health_baseline("S002-CHILLER-B1-001", 35, "critical", has_baseline=False),
         _make_asset_health_baseline("S002-FCU-101", 95, "healthy", has_baseline=True),
     ]
     svc = MagicMock()
@@ -526,7 +539,7 @@ async def test_health_summary_returns_one_per_asset():
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/sites/site-002/assets/health-summary")
 
     assert response.status_code == 200
@@ -564,7 +577,7 @@ async def test_health_summary_includes_required_fields():
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/sites/site-002/assets/health-summary")
 
     assert response.status_code == 200
@@ -613,7 +626,7 @@ async def test_health_summary_filter_critical():
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get(
                 "/api/sites/site-002/assets/health-summary",
                 params={"status": "critical"},
@@ -655,7 +668,7 @@ async def test_health_summary_filter_no_baseline():
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get(
                 "/api/sites/site-002/assets/health-summary",
                 params={"has_baseline": "false"},
@@ -698,7 +711,7 @@ async def test_health_summary_filter_low_confidence():
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get(
                 "/api/sites/site-002/assets/health-summary",
                 params={"confidence": "low"},
@@ -728,7 +741,7 @@ async def test_recompute_returns_202(mock_snapshot_service):
         return_value=mock_snapshot_service,
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.post(
                 "/api/health-assessment/recompute",
                 json={"equipment_id": "S002-AHU-001", "scope": "single"},
@@ -749,7 +762,7 @@ async def test_recompute_requires_equipment_id_for_single():
     from tests.conftest import app
 
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
         response = await client.post(
             "/api/health-assessment/recompute",
             json={"scope": "single"},
@@ -778,7 +791,7 @@ async def test_recompute_logs_audit(mock_snapshot_service):
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.post(
                 "/api/health-assessment/recompute",
                 json={"equipment_id": "S002-AHU-001", "scope": "single"},
@@ -822,7 +835,7 @@ async def test_health_endpoints_never_return_risk_probability(
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/S002-AHU-001/health-rating")
 
     assert response.status_code == 200
@@ -883,7 +896,7 @@ async def test_health_status_invariant(mock_equipment_repo):
             ),
         ):
             transport = ASGITransport(app=app)
-            async with AsyncClient(transport=transport, base_url="http://test") as client:
+            async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
                 response = await client.get("/api/equipment/S002-AHU-001/health-rating")
 
         assert response.status_code == 200

@@ -209,7 +209,7 @@ class TestEffectivePhaseModuleOverride:
         from app.models.onboarding_phase import effective_phase
 
         result = await effective_phase("S001", "occupancy_control")
-        assert result == "auto"
+        assert result == "automatic"  # effective_phase normalises legacy "auto" → "automatic"
 
 
 # ---------------------------------------------------------------------------

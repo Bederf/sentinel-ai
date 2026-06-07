@@ -53,11 +53,7 @@ def mock_visit_store(tmp_path: Path) -> Generator[None, None, None]:
     lock_file = tmp_path / "visit_store.lock"
     visit_store.write_text(json.dumps({"visits": []}))
 
-    with (
-        patch("app.database.repositories.visit_repository.VISIT_STORE_PATH", visit_store),
-        patch("app.database.repositories.visit_repository.VISIT_LOCK_PATH", lock_file),
-        patch("app.database.repositories.visit_repository.DATA_DIR", tmp_path),
-    ):
+    with patch("app.database.repositories.visit_repository.DATA_DIR", tmp_path):
         yield
 
 

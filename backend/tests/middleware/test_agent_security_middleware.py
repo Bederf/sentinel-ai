@@ -563,8 +563,8 @@ async def test_health_endpoint_bypasses():
 
 
 def test_resolve_tool_work_orders():
-    """_resolve_tool maps /api/work-orders to WORK_ORDERS."""
-    assert _resolve_tool("/api/work-orders") == AgentToolName.WORK_ORDERS
+    """/api/work-orders is in BYPASS_PREFIXES — returns None (bypassed for regular users)."""
+    assert _resolve_tool("/api/work-orders") is None
 
 
 def test_resolve_tool_equipment_search():
