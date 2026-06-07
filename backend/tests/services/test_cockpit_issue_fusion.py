@@ -54,7 +54,7 @@ def test_dedupe_prefers_bms_alert_over_intake():
         "created_at": timestamp.isoformat(),
     }
 
-    issues, _, _, _ = service.aggregate(
+    issues, _, _, _, _ = service.aggregate(
         "S002",
         alert_entries=[bms_entry],
         intake_entries=[intake_entry],
@@ -102,7 +102,7 @@ def test_dedupe_runs_against_zone_when_equipment_missing():
         "created_at": timestamp.isoformat(),
     }
 
-    issues, _, _, _ = service.aggregate(
+    issues, _, _, _, _ = service.aggregate(
         "S002",
         alert_entries=[bms_entry],
         intake_entries=[intake_entry],
@@ -148,7 +148,7 @@ def test_selected_issue_id_preserved_when_present():
         "created_at": timestamp.isoformat(),
     }
 
-    _, _, _, selected = service.aggregate(
+    _, _, _, _, selected = service.aggregate(
         "S002",
         alert_entries=[first_entry],
         intake_entries=[second_entry],
@@ -158,7 +158,7 @@ def test_selected_issue_id_preserved_when_present():
 
     assert selected == second_entry["id"]
 
-    _, _, _, fallback = service.aggregate(
+    _, _, _, _, fallback = service.aggregate(
         "S002",
         alert_entries=[first_entry],
         intake_entries=[second_entry],
@@ -203,7 +203,7 @@ def test_bms_source_becomes_stale_when_freshness_exceeded():
         "created_at": fresh_time.isoformat(),
     }
 
-    _, statuses, _, _ = service.aggregate(
+    _, _, statuses, _, _ = service.aggregate(
         "S002",
         alert_entries=[stale_entry],
         intake_entries=[fresh_intake],
@@ -223,11 +223,13 @@ def test_issue_ordering_prioritizes_severity_unresolved_and_sla():
         audit_repo=_NoOpRepo(),
     )
     timestamp = _now()
+    # Use distinct types per alert to prevent cascade grouping — this test
+    # verifies ranking logic, not cascade collapse.
     critical_new_soon = {
         "id": "alert-5",
         "site_id": "S002",
         "equipment_id": "EQ-5",
-        "type": "fault",
+        "type": "fault_a",
         "title": "Soon SLA",
         "summary": "Critical soon",
         "severity": "critical",
@@ -240,7 +242,7 @@ def test_issue_ordering_prioritizes_severity_unresolved_and_sla():
         "id": "alert-6",
         "site_id": "S002",
         "equipment_id": "EQ-6",
-        "type": "fault",
+        "type": "fault_b",
         "title": "Late SLA",
         "summary": "Critical later",
         "severity": "critical",
@@ -253,7 +255,7 @@ def test_issue_ordering_prioritizes_severity_unresolved_and_sla():
         "id": "alert-7",
         "site_id": "S002",
         "equipment_id": "EQ-7",
-        "type": "fault",
+        "type": "fault_c",
         "title": "Resolved issue",
         "summary": "Critical resolved",
         "severity": "critical",
@@ -266,7 +268,7 @@ def test_issue_ordering_prioritizes_severity_unresolved_and_sla():
         "id": "alert-8",
         "site_id": "S002",
         "equipment_id": "EQ-8",
-        "type": "fault",
+        "type": "fault_d",
         "title": "High issue",
         "summary": "High severity",
         "severity": "high",
@@ -276,7 +278,7 @@ def test_issue_ordering_prioritizes_severity_unresolved_and_sla():
         "sla_due_at": (timestamp + timedelta(minutes=10)).isoformat(),
     }
 
-    issues, _, _, _ = service.aggregate(
+    issues, _, _, _, _ = service.aggregate(
         "S002",
         alert_entries=[critical_resolved, high_new, critical_new_late, critical_new_soon],
         intake_entries=[],
@@ -297,12 +299,13 @@ def test_issue_ordering_prefers_recent_updates_when_sla_ties():
         audit_repo=_NoOpRepo(),
     )
     timestamp = _now()
+    # Distinct types to prevent cascade grouping — tests update-recency ranking
     sla_due = (timestamp + timedelta(minutes=15)).isoformat()
     older_issue = {
         "id": "alert-9",
         "site_id": "S002",
         "equipment_id": "EQ-9",
-        "type": "fault",
+        "type": "rank_x",
         "title": "Older update",
         "summary": "Older summary",
         "severity": "critical",
@@ -315,7 +318,7 @@ def test_issue_ordering_prefers_recent_updates_when_sla_ties():
         "id": "alert-10",
         "site_id": "S002",
         "equipment_id": "EQ-10",
-        "type": "fault",
+        "type": "rank_y",
         "title": "Newer update",
         "summary": "Newer summary",
         "severity": "critical",
@@ -325,7 +328,7 @@ def test_issue_ordering_prefers_recent_updates_when_sla_ties():
         "sla_due_at": sla_due,
     }
 
-    issues, _, _, _ = service.aggregate(
+    issues, _, _, _, _ = service.aggregate(
         "S002",
         alert_entries=[older_issue, newer_issue],
         intake_entries=[],

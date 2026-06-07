@@ -140,6 +140,8 @@ class CockpitDecisionPayload(BaseModel):
     building_metadata: dict[str, Any] | None = None
     risk: CockpitRiskResolution | None = None
     health: CockpitHealthResolution | None = None
+    overflow_issues: list[CockpitIssue] = []
+    overflow_count: int = 0
 
 
 # ---------------------------------------------------------------------------
@@ -260,13 +262,14 @@ async def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
     if phase in ("commissioning", "shadow_live"):
         return None
 
-    issues, source_statuses, _tensions, selected_id = cockpit_issue_service.aggregate(site_id)
+    issues, overflow_issues, source_statuses, _tensions, selected_id = cockpit_issue_service.aggregate(site_id)
     if not issues:
         return None
 
     # Merge in-session status mutations from _ISSUE_STORE (e.g., after actions)
     cached = {i.id: i for i in _ISSUE_STORE.get(site_id, [])}
     merged = [cached.get(issue.id, issue) for issue in issues]
+    overflow_merged = [cached.get(issue.id, issue) for issue in overflow_issues]
 
     # Derive posture from phase
     posture_map = {"advisory": "advisory", "supervised": "supervised", "automatic": "autonomous"}
@@ -276,6 +279,8 @@ async def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
         building_id=site_id,
         active_posture=posture,
         issues=merged,
+        overflow_issues=overflow_merged,
+        overflow_count=len(overflow_merged),
         selected_issue_id=selected_id,
         source_health=source_statuses,
     )

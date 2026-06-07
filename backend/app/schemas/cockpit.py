@@ -55,6 +55,12 @@ class CockpitIssue(BaseModel):
     location: CockpitIssueLocation
     evidence_refs: list[CockpitIssueEvidenceRef] = []
     source_record_id: str | None = None
+    # Phase 224 — cascade grouping
+    is_group: bool = False
+    member_count: int = 1
+    member_ids: list[str] = []
+    member_equipment_ids: list[str] = []
+    group_type: str | None = None
 
     def dict(self, *args, **kwargs):
         """Backward-compatible Pydantic v1-style export without deprecation warnings."""

@@ -161,6 +161,7 @@ interface IssueListItemProps {
 }
 
 function IssueListItem({ issue, isSelected, onSelect }: IssueListItemProps) {
+  const isGroup = issue.is_group && (issue.member_count ?? 1) > 1
   return (
     <button
       type="button"
@@ -173,6 +174,11 @@ function IssueListItem({ issue, isSelected, onSelect }: IssueListItemProps) {
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${severityDotClass(issue.severity)}`} />
       <span className="flex-1 truncate text-[11px] text-slate-300">{issue.title}</span>
+      {isGroup && (
+        <span className="shrink-0 rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[9px] text-slate-400">
+          ×{issue.member_count}
+        </span>
+      )}
       <span
         className={`shrink-0 rounded border px-2 py-0.5 text-[9px] uppercase tracking-[0.14em] ${severityBadgeClass(issue.severity)}`}
       >
@@ -193,29 +199,17 @@ export function CockpitIssuePanel({
   const [loadingAction, setLoadingAction] = useState<CockpitIssueActionType | null>(null)
   const [succeededAction, setSucceededAction] = useState<CockpitIssueActionType | null>(null)
 
-  // Calm building state
-  if (!payload || payload.issues.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 px-5 py-8 text-center">
-        <span className="h-2 w-2 rounded-full bg-emerald-400/60" />
-        <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
-          No active issues — building stable
-        </span>
-      </div>
-    )
-  }
-
-  const resolvedSelectedId = selectedIssueId ?? payload.selectedIssueId ?? payload.issues[0]?.id ?? null
-  const selectedIssue = payload.issues.find((i) => i.id === resolvedSelectedId) ?? payload.issues[0]
+  const resolvedSelectedId = selectedIssueId ?? payload?.selectedIssueId ?? payload?.issues[0]?.id ?? null
+  const selectedIssue = payload?.issues?.find((i) => i.id === resolvedSelectedId) ?? null
 
   const otherIssues = useMemo(
-    () => payload.issues.filter((i) => i.id !== selectedIssue?.id),
-    [payload.issues, selectedIssue?.id],
+    () => (selectedIssue ? (payload?.issues?.filter((i) => i.id !== selectedIssue.id) ?? []) : []),
+    [payload?.issues, selectedIssue],
   )
 
   const availableActions = useMemo(
-    () => actionsForPosture(payload.posture),
-    [payload.posture],
+    () => actionsForPosture(payload?.posture ?? null),
+    [payload?.posture],
   )
 
   const handleAction = useCallback(
@@ -234,6 +228,18 @@ export function CockpitIssuePanel({
     },
     [selectedIssue, onAction],
   )
+
+  // Calm building state — all hooks above, safe to return early now
+  if (!payload || payload.issues.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-2 px-5 py-8 text-center">
+        <span className="h-2 w-2 rounded-full bg-emerald-400/60" />
+        <span className="text-[10px] uppercase tracking-[0.22em] text-slate-500">
+          No active issues — building stable
+        </span>
+      </div>
+    )
+  }
 
   if (!selectedIssue) return null
 
@@ -262,6 +268,11 @@ export function CockpitIssuePanel({
           <h3 className="flex-1 text-sm font-medium leading-snug text-slate-100">
             {selectedIssue.title}
           </h3>
+          {selectedIssue.is_group && (selectedIssue.member_count ?? 1) > 1 && (
+            <span className="mt-0.5 shrink-0 rounded-full border border-white/15 bg-white/[0.06] px-2 py-0.5 text-[9px] text-slate-400">
+              ×{selectedIssue.member_count}
+            </span>
+          )}
         </div>
 
         {/* Summary */}
@@ -315,7 +326,7 @@ export function CockpitIssuePanel({
         </div>
       </div>
 
-      {/* Other issues list */}
+      {/* Other issues list (remaining primary rail) */}
       {otherIssues.length > 0 && (
         <div>
           <div className="px-5 pt-3 pb-1 text-[9px] uppercase tracking-[0.18em] text-slate-600">
@@ -331,6 +342,15 @@ export function CockpitIssuePanel({
               />
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Overflow section — collapsed by default */}
+      {(payload.overflow_count ?? 0) > 0 && (
+        <div className="px-5 py-3">
+          <span className="text-[9px] uppercase tracking-[0.18em] text-slate-600">
+            +{payload.overflow_count} more issue{(payload.overflow_count ?? 0) !== 1 ? 's' : ''} not shown
+          </span>
         </div>
       )}
     </div>

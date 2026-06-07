@@ -5,8 +5,6 @@ import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 import httpx
 
 from app.config.settings import settings
@@ -21,6 +19,8 @@ from app.schemas.cockpit import (
     CockpitIssue,
     CockpitSourceStatus,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class CockpitIssueFusionService:
@@ -54,7 +54,7 @@ class CockpitIssueFusionService:
         recommendation_entries: list[dict[str, Any]] | None = None,
         audit_entries: list[dict[str, Any]] | None = None,
         local_audit_entries: list[dict[str, Any]] | None = None,
-    ) -> tuple[list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
+    ) -> tuple[list[CockpitIssue], list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
         """Fetch + fuse issue rows into a ranked, deduplicated feed.
 
         Includes AI recommendations as a source for cockpit intelligence.

@@ -48,6 +48,31 @@ SOURCE_THRESHOLDS: dict[str, dict[str, int]] = {
 
 SEVERITY_MAP: dict[str, int] = {"critical": 4, "high": 3, "medium": 2, "low": 1}
 
+# ---------------------------------------------------------------------------
+# Phase 224 — cascade grouping
+# ---------------------------------------------------------------------------
+
+_CASCADE_WINDOW_MINUTES: int = 30
+_PRIMARY_RAIL_LIMIT: int = 5
+_SEVERITY_ORDER: dict[str, int] = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+
+_CASCADE_ELIGIBLE_TYPES: frozenset[str] = frozenset(
+    {
+        "co2_high",
+        "co2_alert",
+        "unsigned_range",
+        "hvac_fault",
+        "change_of_state",
+        "out_of_range",
+        "ahu_fault",
+        "fcu_fault",
+        "vav_fault",
+        "temperature_high",
+        "temperature_low",
+        "equipment_alert",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Internal record type — pure data, no I/O
@@ -60,6 +85,129 @@ class _NormalizedIssue:
     priority: int
     dedupe_key: str
     updated_at: datetime
+
+
+def _time_bucket(dt: datetime) -> int:
+    """Floor a datetime to a 30-minute bucket index."""
+    return int(dt.timestamp() // (_CASCADE_WINDOW_MINUTES * 60))
+
+
+def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
+    """Collapse same-type, same-severity, co-incident issues into group records.
+
+    BMS-source issues in the same 30-min window with the same alarm type are
+    collapsed into one group issue.  Single-member groups and non-BMS issues
+    pass through unchanged.  Any grouping failure degrades to individual items.
+    """
+    if len(items) <= 1:
+        return items
+
+    eligible: list[_NormalizedIssue] = []
+    non_eligible: list[_NormalizedIssue] = []
+    for item in items:
+        raw_type = item.dedupe_key.split("|")[-1] if "|" in item.dedupe_key else ""
+        if item.issue.source == "bms" or raw_type in _CASCADE_ELIGIBLE_TYPES:
+            eligible.append(item)
+        else:
+            non_eligible.append(item)
+
+    # Bucket by (type, severity, time_window)
+    buckets: dict[tuple[str, str, int], list[_NormalizedIssue]] = {}
+    for item in eligible:
+        raw_type = item.dedupe_key.split("|")[-1] if "|" in item.dedupe_key else "unknown"
+        key = (raw_type, item.issue.severity, _time_bucket(item.issue.opened_at))
+        buckets.setdefault(key, []).append(item)
+
+    result: list[_NormalizedIssue] = []
+
+    for (raw_type, _sev, _bucket), members in buckets.items():
+        if len(members) == 1:
+            m = members[0]
+            result.append(
+                _NormalizedIssue(
+                    issue=m.issue.model_copy(update={"is_group": False, "member_count": 1}),
+                    priority=m.priority,
+                    dedupe_key=m.dedupe_key,
+                    updated_at=m.updated_at,
+                )
+            )
+            continue
+
+        members_sorted = sorted(
+            members,
+            key=lambda m: (
+                m.issue.sla_due_at or datetime.max.replace(tzinfo=UTC),
+                m.issue.opened_at,
+            ),
+        )
+        rep = members_sorted[0]
+        count = len(members)
+
+        is_co2 = "co2" in raw_type or any("co2" in (m.issue.title or "").lower() for m in members)
+
+        if is_co2 or raw_type == "unsigned_range":
+            group_title = f"CO2 elevated — {count} zones affected"
+            group_summary = (
+                f"{count} zones reporting elevated CO2. "
+                f"Likely root cause: fresh air supply disruption. "
+                f"Inspect AHUs and cooling plant."
+            )
+        else:
+            type_label = raw_type.replace("_", " ").title()
+            group_title = f"{type_label} — {count} equipment"
+            group_summary = (
+                f"{count} equipment units reporting {raw_type.replace('_', ' ')}. "
+                f"Review affected equipment and upstream systems."
+            )
+
+        sla_values = [m.issue.sla_due_at for m in members if m.issue.sla_due_at]
+        member_asset_ids = [m.issue.location.asset_ids[0] for m in members if m.issue.location.asset_ids]
+
+        result.append(
+            _NormalizedIssue(
+                issue=rep.issue.model_copy(
+                    update={
+                        "title": group_title,
+                        "summary": group_summary,
+                        "sla_due_at": min(sla_values) if sla_values else None,
+                        "is_group": True,
+                        "member_count": count,
+                        "member_ids": [m.issue.id for m in members],
+                        "member_equipment_ids": member_asset_ids,
+                        "group_type": raw_type,
+                    }
+                ),
+                priority=rep.priority,
+                dedupe_key=rep.dedupe_key,
+                updated_at=rep.updated_at,
+            )
+        )
+
+    for item in non_eligible:
+        result.append(
+            _NormalizedIssue(
+                issue=item.issue.model_copy(update={"is_group": False, "member_count": 1}),
+                priority=item.priority,
+                dedupe_key=item.dedupe_key,
+                updated_at=item.updated_at,
+            )
+        )
+
+    result.sort(
+        key=lambda item: (
+            _SEVERITY_ORDER.get(item.issue.severity, 9),
+            item.issue.sla_due_at or datetime.max.replace(tzinfo=UTC),
+            -(item.issue.member_count or 1),
+        )
+    )
+    return result
+
+
+def _apply_rail_limit(
+    items: list[_NormalizedIssue],
+) -> tuple[list[_NormalizedIssue], list[_NormalizedIssue]]:
+    """Split into primary rail (max _PRIMARY_RAIL_LIMIT) and overflow."""
+    return items[:_PRIMARY_RAIL_LIMIT], items[_PRIMARY_RAIL_LIMIT:]
 
 
 # ---------------------------------------------------------------------------
@@ -83,8 +231,8 @@ class CockpitTableProcessor:
         *,
         bridge_last_updated: datetime | None = None,
         recommendations: list[dict[str, Any]] | None = None,
-    ) -> tuple[list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
-        """Combine issue sources into a deduplicated, ranked feed.
+    ) -> tuple[list[CockpitIssue], list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
+        """Combine issue sources into a deduplicated, grouped, rail-limited feed.
 
         Args:
             alerts:            BMS alert rows (source = "bms", priority 0).
@@ -95,7 +243,9 @@ class CockpitTableProcessor:
             recommendations:   AI recommendation rows (source = "ai", priority -1).
 
         Returns:
-            (issues, source_statuses, audit_trail, selected_id)
+            (primary_issues, overflow_issues, source_statuses, audit_trail, selected_id)
+            primary_issues: max _PRIMARY_RAIL_LIMIT grouped issues for the decision rail.
+            overflow_issues: remaining issues collapsed into the overflow section.
         """
         normalized: list[_NormalizedIssue] = []
         normalized.extend(CockpitTableProcessor._to_normalized_issues(alerts, source="bms", priority=0))
@@ -105,12 +255,14 @@ class CockpitTableProcessor:
             normalized.extend(CockpitTableProcessor._to_normalized_issues(recommendations, source="ai", priority=-1))
 
         deduped = CockpitTableProcessor._dedupe(normalized)
+        grouped = _group_cascades(deduped)
+        primary_items, overflow_items = _apply_rail_limit(grouped)
 
         selected = selected_issue_id
-        if selected and selected not in {item.issue.id for item in deduped}:
+        if selected and selected not in {item.issue.id for item in primary_items}:
             selected = None
-        if not selected and deduped:
-            selected = deduped[0].issue.id
+        if not selected and primary_items:
+            selected = primary_items[0].issue.id
 
         source_statuses = CockpitTableProcessor._build_source_statuses(
             alerts,
@@ -119,7 +271,13 @@ class CockpitTableProcessor:
             bridge_last_updated=bridge_last_updated,
         )
         audit_trail = CockpitTableProcessor._build_audit_trail(audit_logs)
-        return [item.issue for item in deduped], source_statuses, audit_trail, selected
+        return (
+            [item.issue for item in primary_items],
+            [item.issue for item in overflow_items],
+            source_statuses,
+            audit_trail,
+            selected,
+        )
 
     # ------------------------------------------------------------------
     # Normalisation

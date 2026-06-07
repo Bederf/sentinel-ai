@@ -141,17 +141,20 @@ class TestDedupe:
                 "updated_at": datetime.now(UTC).isoformat(),
             }
         ]
-        issues, _, _, _ = CockpitTableProcessor.fuse(alerts, intakes, [], [], None)
+        issues, _, _, _, _ = CockpitTableProcessor.fuse(alerts, intakes, [], [], None)
         # Two sources, same equipment + type → deduplicated to 1
         assert len(issues) == 1
 
-    def test_different_equipment_not_merged(self):
+    def test_different_equipment_same_type_cascades_to_group(self):
+        # Phase 224: two BMS alerts, same type, same 30-min window → cascade group
         alerts = [
             _alert("a1", equipment_id="eq-1", type_="hvac"),
             _alert("a2", equipment_id="eq-2", type_="hvac"),
         ]
-        issues, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
-        assert len(issues) == 2
+        issues, _, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+        assert len(issues) == 1
+        assert issues[0].is_group is True
+        assert issues[0].member_count == 2
 
     def test_bms_priority_over_intake_for_same_key(self):
         now = datetime.now(UTC)
@@ -166,7 +169,7 @@ class TestDedupe:
                 "updated_at": (now - timedelta(hours=1)).isoformat(),
             }
         ]
-        issues, _, _, _ = CockpitTableProcessor.fuse(alerts, intakes, [], [], None)
+        issues, _, _, _, _ = CockpitTableProcessor.fuse(alerts, intakes, [], [], None)
         assert len(issues) == 1
         # BMS (priority 0) wins over intake (priority 1)
         assert issues[0].source == "bms"
@@ -184,35 +187,50 @@ class TestRanking:
             _alert("a-medium", severity="medium", equipment_id="eq-m", updated_at=now.isoformat()),
             _alert("a-critical", severity="critical", equipment_id="eq-c", updated_at=now.isoformat()),
         ]
-        issues, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+        issues, _, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
         assert issues[0].severity == "critical"
 
     def test_resolved_ranked_last_among_same_severity(self):
         """Resolved issues rank behind non-resolved ones of the same severity."""
         now = datetime.now(UTC)
         alerts = [
-            _alert("a-resolved", severity="medium", status="resolved", equipment_id="eq-r", updated_at=now.isoformat()),
-            _alert("a-new", severity="medium", status="new", equipment_id="eq-n", updated_at=now.isoformat()),
+            _alert(
+                "a-resolved",
+                severity="medium",
+                status="resolved",
+                equipment_id="eq-r",
+                type_="fault_r",
+                updated_at=now.isoformat(),
+            ),
+            _alert(
+                "a-new",
+                severity="medium",
+                status="new",
+                equipment_id="eq-n",
+                type_="fault_n",
+                updated_at=now.isoformat(),
+            ),
         ]
-        issues, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+        issues, _, _, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
         assert issues[-1].id == "a-resolved"
 
     def test_selected_id_preserved(self):
+        # Use distinct types so cascade grouping doesn't collapse them
         now = datetime.now(UTC)
         alerts = [
-            _alert("a1", equipment_id="eq-1", updated_at=now.isoformat()),
-            _alert("a2", equipment_id="eq-2", updated_at=now.isoformat()),
+            _alert("a1", equipment_id="eq-1", type_="type_x", updated_at=now.isoformat()),
+            _alert("a2", equipment_id="eq-2", type_="type_y", updated_at=now.isoformat()),
         ]
-        _, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], "a2")
+        _, _, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], "a2")
         assert selected == "a2"
 
     def test_selected_id_falls_back_to_top_if_not_found(self):
         alerts = [_alert("a1", equipment_id="eq-1")]
-        _, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], "missing-id")
+        _, _, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], "missing-id")
         assert selected == "a1"
 
     def test_no_issues_returns_none_selected(self):
-        _, _, _, selected = CockpitTableProcessor.fuse([], [], [], [], None)
+        _, _, _, _, selected = CockpitTableProcessor.fuse([], [], [], [], None)
         assert selected is None
 
 
@@ -223,25 +241,25 @@ class TestRanking:
 
 class TestSourceStatuses:
     def test_returns_three_statuses(self):
-        _, statuses, _, _ = CockpitTableProcessor.fuse([], [], [], [], None)
-        assert len(statuses) == 3
+        _, _, statuses, _, _ = CockpitTableProcessor.fuse([], [], [], [], None)
+        assert len(statuses) == 4  # bms, intake, tech, ai
         sources = {s.source for s in statuses}
-        assert sources == {"bms", "intake", "tech"}
+        assert sources == {"bms", "intake", "tech", "ai"}
 
     def test_healthy_when_fresh(self):
         recent = datetime.now(UTC).isoformat()
         alerts = [_alert(updated_at=recent)]
-        _, statuses, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+        _, _, statuses, _, _ = CockpitTableProcessor.fuse(alerts, [], [], [], None)
         bms_status = next(s for s in statuses if s.source == "bms")
         assert bms_status.state == "healthy"
 
     def test_unavailable_when_no_data(self):
-        _, statuses, _, _ = CockpitTableProcessor.fuse([], [], [], [], None)
+        _, _, statuses, _, _ = CockpitTableProcessor.fuse([], [], [], [], None)
         bms_status = next(s for s in statuses if s.source == "bms")
         assert bms_status.state == "unavailable"
 
     def test_stale_thresholds_in_output(self):
-        _, statuses, _, _ = CockpitTableProcessor.fuse([], [], [], [], None)
+        _, _, statuses, _, _ = CockpitTableProcessor.fuse([], [], [], [], None)
         bms_status = next(s for s in statuses if s.source == "bms")
         assert bms_status.stale_after_seconds == SOURCE_THRESHOLDS["bms"]["stale"]
 
@@ -255,18 +273,18 @@ class TestAuditTrail:
     def test_sorted_newest_first(self):
         old = {**_audit("old"), "timestamp": (datetime.now(UTC) - timedelta(hours=2)).isoformat()}
         new = {**_audit("new"), "timestamp": datetime.now(UTC).isoformat()}
-        _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], [old, new], None)
+        _, _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], [old, new], None)
         assert trail[0].id == "new"
 
     def test_max_ten_entries(self):
         entries = [_audit(str(i)) for i in range(15)]
-        _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], entries, None)
+        _, _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], entries, None)
         assert len(trail) <= 10
 
     def test_empty_entries_returns_empty_trail(self):
-        _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], [], None)
+        _, _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], [], None)
         assert trail == []
 
     def test_success_outcome(self):
-        _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], [_audit()], None)
+        _, _, _, trail, _ = CockpitTableProcessor.fuse([], [], [], [_audit()], None)
         assert trail[0].outcome == "success"

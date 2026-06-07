@@ -211,6 +211,10 @@ interface RawIssueItem {
   confidence_label: string | null
   subsystem: string | null
   location: { zone_ids: string[]; asset_ids: string[]; floor_id: string | null }
+  is_group?: boolean
+  member_count?: number
+  member_ids?: string[]
+  group_type?: string
 }
 
 interface RawSourceHealth {
@@ -225,6 +229,8 @@ interface RawDecisionResponse {
   payload: {
     building_id: string
     issues: RawIssueItem[]
+    overflow_issues?: RawIssueItem[]
+    overflow_count?: number
     selected_issue_id: string | null
     source_health: RawSourceHealth[]
     active_posture: string | null
@@ -233,33 +239,43 @@ interface RawDecisionResponse {
   fetched_at: string
 }
 
+function mapRawIssue(i: RawIssueItem): CockpitIssuesPayload['issues'][number] {
+  return {
+    id: i.id,
+    title: i.title,
+    summary: i.summary,
+    severity: i.severity as CockpitIssuesPayload['issues'][number]['severity'],
+    source: i.source as CockpitIssuesPayload['issues'][number]['source'],
+    status: i.status as CockpitIssuesPayload['issues'][number]['status'],
+    owner: i.owner,
+    owner_team: i.owner_team,
+    opened_at: i.opened_at ?? new Date().toISOString(),
+    updated_at: i.updated_at ?? new Date().toISOString(),
+    sla_due_at: i.sla_due_at,
+    stale: i.stale ?? false,
+    impact_summary: i.impact_summary,
+    recommended_action: i.recommended_action,
+    confidence: i.confidence,
+    confidence_label: i.confidence_label,
+    subsystem: i.subsystem,
+    location: {
+      zone_ids: i.location?.zone_ids ?? [],
+      asset_ids: i.location?.asset_ids ?? [],
+      floor_id: i.location?.floor_id ?? null,
+    },
+    is_group: i.is_group,
+    member_count: i.member_count,
+    member_ids: i.member_ids,
+    group_type: i.group_type,
+  }
+}
+
 function mapIssuesPayload(raw: RawDecisionResponse): CockpitIssuesPayload | null {
   if (!raw.payload) return null
   return {
-    issues: raw.payload.issues.map((i) => ({
-      id: i.id,
-      title: i.title,
-      summary: i.summary,
-      severity: i.severity as CockpitIssuesPayload['issues'][number]['severity'],
-      source: i.source as CockpitIssuesPayload['issues'][number]['source'],
-      status: i.status as CockpitIssuesPayload['issues'][number]['status'],
-      owner: i.owner,
-      owner_team: i.owner_team,
-      opened_at: i.opened_at ?? new Date().toISOString(),
-      updated_at: i.updated_at ?? new Date().toISOString(),
-      sla_due_at: i.sla_due_at,
-      stale: i.stale ?? false,
-      impact_summary: i.impact_summary,
-      recommended_action: i.recommended_action,
-      confidence: i.confidence,
-      confidence_label: i.confidence_label,
-      subsystem: i.subsystem,
-      location: {
-        zone_ids: i.location?.zone_ids ?? [],
-        asset_ids: i.location?.asset_ids ?? [],
-        floor_id: i.location?.floor_id ?? null,
-      },
-    })),
+    issues: raw.payload.issues.map(mapRawIssue),
+    overflow_issues: raw.payload.overflow_issues?.map(mapRawIssue) ?? [],
+    overflow_count: raw.payload.overflow_count ?? 0,
     selectedIssueId: raw.payload.selected_issue_id,
     sourceHealth: raw.payload.source_health.map((s) => ({
       source: s.source as CockpitIssuesPayload['sourceHealth'][number]['source'],

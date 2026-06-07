@@ -287,6 +287,11 @@ export interface CockpitIssueItem {
   confidence_label: string | null
   subsystem: string | null
   location: CockpitIssueLocation
+  // Phase 224 — cascade grouping
+  is_group?: boolean
+  member_count?: number
+  member_ids?: string[]
+  group_type?: string
 }
 
 export interface CockpitIssueSourceHealth {
@@ -302,4 +307,7 @@ export interface CockpitIssuesPayload {
   selectedIssueId: string | null
   sourceHealth: CockpitIssueSourceHealth[]
   posture: string | null
+  // Phase 224 — overflow rail
+  overflow_issues?: CockpitIssueItem[]
+  overflow_count?: number
 }
