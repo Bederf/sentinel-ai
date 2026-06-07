@@ -234,7 +234,15 @@ class CockpitTableProcessor:
             constraint_type=constraint_type,
             location=CockpitIssueLocation(
                 zone_ids=[z for z in (zone_ids or []) if z],
-                asset_ids=[equipment_id] if equipment_id else [],
+                asset_ids=[equipment_id]
+                if equipment_id
+                # BACnet alerts have no equipment FK but ARE physically grounded —
+                # use the dedupe key as a synthetic asset_id so spatially_grounded=True
+                else (
+                    [entry["source_dedupe_key"]]
+                    if entry.get("source_dedupe_key") and entry.get("source") == "bacnet_bridge"
+                    else []
+                ),
                 floor_id=floor_id,
             ),
             evidence_refs=CockpitTableProcessor._extract_evidence(entry, source),

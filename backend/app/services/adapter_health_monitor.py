@@ -519,7 +519,12 @@ class AdapterHealthMonitor:
             # Skip alarms with no parseable identity
             alarm_code = alarm.get("code") or alarm.get("alarm_code") or ""
             notif_class = alarm.get("notification_class") or alarm.get("notificationClass")
-            obj_id = alarm.get("object_id") or alarm.get("objectIdentifier")
+            obj_id = (
+                alarm.get("object_id")
+                or alarm.get("objectIdentifier")
+                or alarm.get("objectId")
+                or alarm.get("bacnet_object")
+            )
             has_bacnet_identity = notif_class is not None and obj_id
             if not alarm_code and not has_bacnet_identity:
                 logger.warning("[BRIDGE ALERTS] Skipping unparseable alarm (no code, no BACnet identity): %s", alarm)
