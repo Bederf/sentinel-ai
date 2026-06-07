@@ -1,4 +1,5 @@
 # BMS Intelligence Backend Dockerfile
+# python:3.11-slim-bookworm — perl/ncurses CVEs fix_deferred (unused at runtime)
 FROM python:3.11-slim-bookworm
 
 # Set working directory

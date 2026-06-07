@@ -1,6 +1,7 @@
 # BMS Intelligence Frontend Dockerfile
 
 # Build stage
+# node:20.19-alpine — builder stage only, not in production image
 FROM node:20.19-alpine AS builder
 
 WORKDIR /app
@@ -18,6 +19,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
+# nginx:1.31-alpine — libxml2 CVE pending Alpine 2.13.9-r1 release
 FROM nginx:1.31-alpine
 
 # Copy nginx configuration
