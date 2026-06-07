@@ -12,7 +12,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, ClassVar
 
 from app.core.site_resolver import normalize_site_id
 
@@ -23,6 +23,53 @@ _CONSECUTIVE_FAILURE_ALERT_THRESHOLD = 3
 
 # How long to look back for consecutive-failure count
 _FAILURE_LOOKBACK_HOURS = 1
+
+# BACnet alarm states that represent a cleared/normal condition
+_CLEARED_STATES: frozenset[str] = frozenset(
+    {
+        "NORMAL",
+        "normal",
+        "INACTIVE",
+        "inactive",
+        "CLEARED",
+        "cleared",
+        "CLOSE",
+        "close",
+        "OFFNORMAL_CLEARED",
+    }
+)
+
+
+def build_source_dedupe_key(alarm: dict[str, Any]) -> str:
+    """Build a stable BACnet identity key for UPSERT deduplication.
+
+    Priority order:
+    1. notification_class + object_identifier  — canonical BACnet alarm identity
+    2. alarm id + event_id                     — bridge-assigned stable IDs
+    3. equipment + code + type                 — fallback composite key
+    """
+    notif_class = alarm.get("notification_class") or alarm.get("notificationClass")
+    obj_id = alarm.get("object_id") or alarm.get("objectIdentifier") or alarm.get("objectId")
+    if notif_class is not None and obj_id:
+        return f"nc:{notif_class}|obj:{obj_id}"
+
+    alarm_id = alarm.get("id") or alarm.get("alarm_id")
+    event_id = alarm.get("event_id")
+    if alarm_id and event_id:
+        return f"id:{alarm_id}|ev:{event_id}"
+
+    equipment = alarm.get("equipment_id") or alarm.get("equipment_code") or "UNKNOWN"
+    code = alarm.get("code") or alarm.get("alarm_code") or "UNPARSEABLE"
+    alarm_type = alarm.get("alarm_type") or alarm.get("event_type") or "UNCLASSIFIED"
+    return f"eq:{equipment}|code:{code}|type:{alarm_type}"
+
+
+def is_alarm_cleared(alarm: dict[str, Any]) -> bool:
+    """Return True if this alarm represents a cleared/normal state."""
+    to_state = alarm.get("to_state") or alarm.get("toState") or alarm.get("event_state")
+    if to_state:
+        return str(to_state).upper() in {"NORMAL", "INACTIVE", "CLEARED", "CLOSE", "OFFNORMAL_CLEARED"}
+    return False
 
 
 @dataclass
@@ -278,7 +325,7 @@ class AdapterHealthMonitor:
             logger.error(f"Failed to write adapter health alert: {e}")
 
     # BACnet alarm type mapping for intelligent descriptions
-    _BACNET_ALARM_TYPES: dict[str, str] = {
+    _BACNET_ALARM_TYPES: ClassVar[dict[str, str]] = {
         # Temperature-related
         "temp_hi": "High temperature detected",
         "temp_high": "High temperature detected",
@@ -396,143 +443,215 @@ class AdapterHealthMonitor:
 
         return title, message
 
-    async def _write_bridge_alerts(self, site_id: str, alarms: list[dict[str, Any]]) -> None:
-        """Write active bridge alarms to the alerts table for cockpit posture.
+    async def _write_bridge_alerts(
+        self,
+        site_id: str,
+        alarms: list[dict[str, Any]],
+        *,
+        is_complete_snapshot: bool = False,
+        poll_succeeded: bool = True,
+    ) -> None:
+        """Upsert bridge alarms with lifecycle tracking.
 
-        Deduplicates by alarm code + source to avoid flooding on repeated polls.
-        Only writes alarms from the last poll cycle that are still active.
+        Designed for BACnet's persistent alarm model: the bridge returns the same
+        alarm on every poll until it clears, with its original event timestamp.
+
+        - No age filter: alarms are valid regardless of how old the original event is.
+        - UPSERT by (site_id, source, source_dedupe_key) — never blindly INSERT.
+        - Snapshot resolution: when is_complete_snapshot=True, alarms absent from
+          the current poll are transitioned to 'resolved'.
+        - On poll failure: all writes are skipped entirely.
+        - ML lifecycle events emitted only on transitions (opened/cleared/reopened).
         """
-        import uuid
+        if not poll_succeeded:
+            logger.debug("[BRIDGE ALERTS] Poll failed — skipping all alert writes for %s", site_id)
+            return
 
         from app.database.supabase_client import get_supabase_client
 
-        if not alarms:
-            return
-
         supabase = get_supabase_client()
         now = datetime.now(UTC)
+        source = "bacnet_bridge"
 
         # Resolve site UUID
         try:
             site_row = supabase.table("sites").select("id").eq("code", site_id).execute()
             if not site_row.data:
-                logger.warning(f"[BRIDGE ALERTS] Site not found: {site_id}")
+                logger.warning("[BRIDGE ALERTS] Site not found: %s", site_id)
                 return
             site_uuid = site_row.data[0]["id"]
         except Exception as e:
-            logger.warning(f"[BRIDGE ALERTS] Could not resolve site UUID for {site_id}: {e}")
+            logger.warning("[BRIDGE ALERTS] Could not resolve site UUID for %s: %s", site_id, e)
             return
 
-        # Build a dedupe key from each alarm: use code + message hash
-        seen_keys: set[str] = set()
-        rows_to_insert = []
+        # ── Fetch current active alarms for transition detection ─────────────
+        try:
+            existing_resp = (
+                supabase.table("alerts")
+                .select("source_dedupe_key, lifecycle_state, occurrence_count")
+                .eq("site_id", site_uuid)
+                .eq("source", source)
+                .neq("status", "resolved")
+                .execute()
+            )
+            existing_map: dict[str, dict[str, Any]] = {
+                r["source_dedupe_key"]: r for r in (existing_resp.data or []) if r.get("source_dedupe_key")
+            }
+        except Exception as e:
+            logger.warning("[BRIDGE ALERTS] Could not fetch existing alarms: %s", e)
+            existing_map = {}
 
-        for alarm in alarms:
-            # Extract fields for dedupe and classification
+        # ── Phase 1: Upsert each active alarm ────────────────────────────────
+        seen_dedupe_keys: set[str] = set()
+        transitions: list[tuple[str, str, str]] = []  # (dedupe_key, old_state, new_state)
+        upserted = 0
+
+        for alarm in alarms or []:
+            # Cleared-state alarms are handled by snapshot resolution, not upserted as active
+            if is_alarm_cleared(alarm):
+                continue
+
+            dedupe_key = build_source_dedupe_key(alarm)
+
+            # Skip alarms with no parseable identity
             alarm_code = alarm.get("code") or alarm.get("alarm_code") or ""
-            source_equipment = alarm.get("equipment_id") or alarm.get("equipment_code") or "UNKNOWN_EQUIPMENT"
-            alarm_type = alarm.get("alarm_type") or alarm.get("event_type") or "UNCLASSIFIED"
-
-            # Generate intelligent title and message
-            title, message = self._generate_alarm_description(alarm)
-
-            # Dedupe key: source_equipment + code + alarm_type (NOT title/message which vary)
-            # When code is empty, collapse all instances of this alarm class into one entry
-            dedupe_key = f"{source_equipment}|{alarm_code or 'UNPARSEABLE'}|{alarm_type}"
-            if dedupe_key in seen_keys:
+            notif_class = alarm.get("notification_class") or alarm.get("notificationClass")
+            obj_id = alarm.get("object_id") or alarm.get("objectIdentifier")
+            has_bacnet_identity = notif_class is not None and obj_id
+            if not alarm_code and not has_bacnet_identity:
+                logger.warning("[BRIDGE ALERTS] Skipping unparseable alarm (no code, no BACnet identity): %s", alarm)
                 continue
-            seen_keys.add(dedupe_key)
 
-            # Severity mapping — log UNPARSEABLE alarms
-            raw_severity = str(alarm.get("severity") or alarm.get("priority") or "medium").lower()
-            alarm_timestamp = alarm.get("timestamp") or alarm.get("time") or "unknown"
-            bacnet_object_id = alarm.get("object_id") or alarm.get("objectIdentifier") or "unknown"
-            bacnet_object_type = alarm.get("object_type") or alarm.get("objectType") or "unknown"
-            if not alarm_code:
-                logger.warning(
-                    "[BRIDGE ALERTS] Unparseable alarm: source=%s type=%s obj_id=%s obj_type=%s ts=%s raw=%s",
-                    source_equipment,
-                    alarm_type,
-                    bacnet_object_id,
-                    bacnet_object_type,
-                    alarm_timestamp,
-                    alarm,
-                )
-                # Skip storing empty-code alarms — they indicate a bridge/BMS parsing issue
-                # The warning is already logged; do not flood the alerts table
+            # Per-poll dedup: bridge may send the same alarm twice in one response
+            if dedupe_key in seen_dedupe_keys:
                 continue
-            if raw_severity in ("critical", "high", "fault", "active"):
-                severity = "critical"
-            elif raw_severity in ("warning", "warn", "elevated"):
-                severity = "warning"
-            else:
-                severity = "warning"
+            seen_dedupe_keys.add(dedupe_key)
 
-            # Equipment ID resolution
-            equipment_id = alarm.get("equipment_id") or alarm.get("equipment_code") or None
+            # Parse original event timestamp (immutable — written only on first INSERT)
+            alarm_time_str = alarm.get("timestamp") or alarm.get("time")
+            event_at: str = now.isoformat()
+            if alarm_time_str:
+                try:
+                    alarm_dt = datetime.fromisoformat(alarm_time_str.replace("Z", "+00:00"))
+                    if alarm_dt.tzinfo is None:
+                        alarm_dt = alarm_dt.replace(tzinfo=UTC)
+                    event_at = alarm_dt.isoformat()
+                except (ValueError, TypeError):
+                    pass
+
+            raw_severity = str(alarm.get("severity") or alarm.get("priority") or "warning").lower()
+            severity = "critical" if raw_severity in ("critical", "high", "fault", "active") else "warning"
+
+            # Equipment FK resolution (best-effort; NULL on miss)
+            equipment_id: str | None = alarm.get("equipment_id") or alarm.get("equipment_code") or None
             if equipment_id:
                 try:
                     eq_row = supabase.table("equipment").select("id").eq("code", equipment_id).maybe_single().execute()
-                    if eq_row.data:
-                        equipment_id = eq_row.data["id"]
+                    equipment_id = eq_row.data["id"] if eq_row.data else None
                 except Exception:
                     equipment_id = None
 
-            rows_to_insert.append(
-                {
-                    "id": str(uuid.uuid4()),
-                    "site_id": site_uuid,
-                    "equipment_id": equipment_id,
-                    "type": "fault",
-                    "severity": severity,
-                    "status": "active",
-                    "title": title,
-                    "message": message,
-                    "created_at": now.isoformat(),
-                    "updated_at": now.isoformat(),
-                }
+            title, message = self._generate_alarm_description(alarm)
+
+            existing_row = existing_map.get(dedupe_key)
+            is_reopen = existing_row is not None and existing_row.get("lifecycle_state") == "resolved"
+            if not existing_row:
+                occurrence_count = 1
+                lifecycle_state = "active"
+            elif is_reopen:
+                occurrence_count = (existing_row.get("occurrence_count") or 1) + 1
+                lifecycle_state = "reopened"
+            else:
+                occurrence_count = existing_row.get("occurrence_count") or 1
+                lifecycle_state = "active"
+
+            upsert_payload: dict[str, Any] = {
+                "site_id": site_uuid,
+                "source": source,
+                "source_dedupe_key": dedupe_key,
+                "equipment_id": equipment_id,
+                "type": "fault",
+                "severity": severity,
+                "status": "active",
+                "title": title,
+                "message": message,
+                "last_seen_at": now.isoformat(),
+                "updated_at": now.isoformat(),
+                "lifecycle_state": lifecycle_state,
+                "occurrence_count": occurrence_count,
+            }
+
+            # event_at and first_seen_at only on first INSERT
+            # (DB trigger protects them from being overwritten on subsequent UPSERTs)
+            if not existing_row:
+                upsert_payload["event_at"] = event_at
+                upsert_payload["first_seen_at"] = now.isoformat()
+                upsert_payload["created_at"] = now.isoformat()
+
+            try:
+                supabase.table("alerts").upsert(
+                    upsert_payload,
+                    on_conflict="site_id,source,source_dedupe_key",
+                ).execute()
+                upserted += 1
+                if is_reopen:
+                    transitions.append((dedupe_key, "resolved", "active"))
+                elif not existing_row:
+                    transitions.append((dedupe_key, "none", "active"))
+            except Exception as e:
+                logger.error("[BRIDGE ALERTS] Upsert failed for %s: %s", dedupe_key, e)
+
+        if upserted:
+            logger.info("[BRIDGE ALERTS] Upserted %d alarms for %s", upserted, site_id)
+
+        # ── Phase 2: Snapshot-based resolution ───────────────────────────────
+        # Only resolve when the bridge response is a complete snapshot of active alarms.
+        # Partial polls must not resolve anything they don't mention.
+        if is_complete_snapshot and existing_map:
+            resolved_keys = set(existing_map.keys()) - seen_dedupe_keys
+            if resolved_keys:
+                try:
+                    for key in resolved_keys:
+                        supabase.table("alerts").update(
+                            {
+                                "status": "resolved",
+                                "lifecycle_state": "resolved",
+                                "resolved_at": now.isoformat(),
+                                "last_seen_at": now.isoformat(),
+                                "updated_at": now.isoformat(),
+                            }
+                        ).eq("site_id", site_uuid).eq("source", source).eq("source_dedupe_key", key).execute()
+                        transitions.append((key, "active", "resolved"))
+                    logger.info(
+                        "[BRIDGE ALERTS] Resolved %d alarms absent from snapshot for %s",
+                        len(resolved_keys),
+                        site_id,
+                    )
+                except Exception as e:
+                    logger.error("[BRIDGE ALERTS] Snapshot resolution failed: %s", e)
+
+        # ── Phase 3: ML lifecycle event stubs ────────────────────────────────
+        if transitions:
+            await self._emit_alarm_lifecycle_events(site_id, transitions)
+
+    async def _emit_alarm_lifecycle_events(
+        self,
+        site_id: str,
+        transitions: list[tuple[str, str, str]],
+    ) -> None:
+        """Emit ML lifecycle events for alarm state transitions.
+
+        Phase 224 will wire these into the ML fault classifier training pipeline.
+        For now: structured log only.
+        """
+        for dedupe_key, old_state, new_state in transitions:
+            logger.info(
+                "[ALARM LIFECYCLE] %s → %s | key=%s | site=%s",
+                old_state,
+                new_state,
+                dedupe_key,
+                site_id,
             )
-
-        if not rows_to_insert:
-            return
-
-        # Deduplicate: skip if an identical (type, equipment_id, message_hash) alert
-        # already exists for this site, regardless of age.
-        # This prevents fault-alert storms where the same COV condition fires every minute.
-        try:
-            existing = (
-                supabase.table("alerts")
-                .select("equipment_id, type, message, title")
-                .eq("site_id", site_uuid)
-                .eq("status", "active")
-                .execute()
-            )
-
-            # Build dedupe key: (type, equipment_id, message_hash)
-            # For null equipment_id, use title as fallback identifier
-            def _alert_key(r: dict) -> str:
-                eq_id = r.get("equipment_id") or r.get("title", "UNKNOWN")
-                return f"{r.get('type', '')}:{eq_id}:{r.get('message', '')}"
-
-            existing_keys = {_alert_key(r) for r in (existing.data or [])}
-            # Filter: skip row if its (type, equipment_id, message) already has an active alert
-            rows_to_insert = [
-                r
-                for r in rows_to_insert
-                if f"{r.get('type', '')}:{r.get('equipment_id') or r.get('title', 'UNKNOWN')}:{r.get('message', '')}"
-                not in existing_keys
-            ]
-        except Exception as e:
-            logger.warning(f"[BRIDGE ALERTS] Dedup query failed, inserting anyway: {e}")
-
-        if not rows_to_insert:
-            return
-
-        try:
-            supabase.table("alerts").insert(rows_to_insert).execute()
-            logger.info(f"[BRIDGE ALERTS] Wrote {len(rows_to_insert)} alerts for {site_id}")
-        except Exception as e:
-            logger.error(f"[BRIDGE ALERTS] Failed to insert alerts: {e}")
 
     # ------------------------------------------------------------------
     # Helpers

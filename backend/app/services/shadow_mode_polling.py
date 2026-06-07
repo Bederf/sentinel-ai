@@ -18,6 +18,7 @@ When 500+ events are buffered → train Fault Classifier.
 """
 
 import asyncio
+import contextlib
 import logging
 import re
 from datetime import UTC, datetime
@@ -323,10 +324,18 @@ class ShadowModePollingService:
 
         headers = {"Authorization": f"Bearer {token}"}
 
+        # ── 4a. Fetch fault alarms — always, regardless of telemetry sampling ──
+        # BACnet alarms are a persistent queue: the bridge returns the same alarm
+        # on every poll until it clears. Alarm polling must never be sampled or
+        # filtered by age — every poll is a complete snapshot of active alarms.
+        fault_count = await self._poll_alarms(base, headers)
+        result["faults_polled"] = fault_count
+
         # ── Ingestion quality gate — tied to onboarding phase ─────────────────
         # commissioning → 10% sampling (protect baselines from startup noise)
         # shadow_live  → 50% sampling (building baselines, monitoring quality)
         # advisory+    → 100% sampling (policies passed, full trust)
+        # Alarm polling (above) is always exempt from this gate.
         try:
             from app.database.supabase_client import get_supabase_client
 
@@ -342,7 +351,7 @@ class ShadowModePollingService:
                 "automatic": 0.0,
             }.get(phase, 0.5)
             if skip_pct > 0 and (hash(f"{self.site_id}:{self._poll_count}") % 100) / 100 < skip_pct:
-                logger.debug("[SHADOW] Phase %s — skipping poll %d", phase, self._poll_count)
+                logger.debug("[SHADOW] Phase %s — skipping telemetry poll %d", phase, self._poll_count)
                 result["gate"] = phase
                 result["skipped"] = True
                 return result
@@ -553,10 +562,8 @@ class ShadowModePollingService:
                     for bridge_key, op_key in ahu_field_map.items():
                         val = ahu.get(bridge_key)
                         if val is not None:
-                            try:
+                            with contextlib.suppress(ValueError, TypeError):
                                 ahu_readings[op_key] = float(val)
-                            except (ValueError, TypeError):
-                                pass
                     if ahu_readings:
                         agg_states[equip_code] = {
                             "type": "ahu",
@@ -575,10 +582,8 @@ class ShadowModePollingService:
                         key = f"{ahu_prefix}_{bridge_suffix}"
                         val = ahu_data.get(key)
                         if val is not None:
-                            try:
+                            with contextlib.suppress(ValueError, TypeError):
                                 ahu_readings[op_key] = float(val)
-                            except (ValueError, TypeError):
-                                pass
                     if ahu_readings:
                         agg_states[equip_code] = {
                             "type": "ahu",
@@ -823,79 +828,7 @@ class ShadowModePollingService:
             logger.warning(f"[SHADOW] Energy equipment poll error: {e}")
             errors.append(f"energy_equipment: {e}")
 
-        # ── 4. Fetch fault alarms (Fault Classifier buffer) ──────────────────
-        fault_count = 0
-        try:
-            async with httpx.AsyncClient(timeout=20.0) as client:
-                resp = await client.get(
-                    f"{base}/api/sites/{self.site_id}/alarms",
-                    headers=headers,
-                    params={"active_only": False},
-                )
-                resp.raise_for_status()
-                alarm_data = resp.json()
-
-            alarms = alarm_data.get("alarms", [])
-            if alarms:
-                from app.services.sentinel_data_sync import get_sentinel_data_sync
-
-                sync = get_sentinel_data_sync(site_id=self.site_id)
-
-                # Recency filter — only alarms within alarm_recency_window_minutes are current signal
-
-                from app.config.settings import settings as app_settings
-
-                stale_count = 0
-                active_alarms_for_db: list[dict[str, Any]] = []
-                for alarm in alarms:
-                    alarm_time_str = alarm.get("timestamp") or alarm.get("time")
-                    is_stale = False
-                    if alarm_time_str:
-                        try:
-                            alarm_time = datetime.fromisoformat(alarm_time_str.replace("Z", "+00:00"))
-                            if alarm_time.tzinfo is None:
-                                alarm_time = alarm_time.replace(tzinfo=UTC)
-                            age_minutes = (datetime.now(tz=UTC) - alarm_time).total_seconds() / 60
-                            if age_minutes > app_settings.alarm_recency_window_minutes:
-                                stale_count += 1
-                                is_stale = True
-                        except (ValueError, TypeError):
-                            pass  # timestamp unparseable — allow through
-
-                    if is_stale:
-                        continue
-
-                    active_alarms_for_db.append(alarm)
-                    sync.ml_feeder.ingest_fault_event(alarm)
-
-                # Persist active bridge alarms to DB so they feed cockpit posture
-                if active_alarms_for_db:
-                    try:
-                        from app.services.adapter_health_monitor import AdapterHealthMonitor
-
-                        monitor = AdapterHealthMonitor()
-                        await monitor._write_bridge_alerts(self.site_id, active_alarms_for_db)
-                    except Exception as e:
-                        logger.warning(f"[SHADOW] Failed to write bridge alarms to alerts table: {e}")
-
-                    # Also persist to equipment_fault_events for prediction generation
-                    try:
-                        await self._persist_fault_events(active_alarms_for_db)
-                    except Exception as e:
-                        logger.warning(f"[SHADOW] Failed to persist fault events: {e}")
-
-                fault_count = len(alarms) - stale_count
-                logger.info(
-                    f"[SHADOW] {fault_count}/{len(alarms)} alarms → Fault Classifier buffer "
-                    f"({stale_count} stale, cutoff={app_settings.alarm_recency_window_minutes}m)"
-                )
-
-            result["faults_polled"] = fault_count
-
-        except httpx.HTTPStatusError as e:
-            logger.warning(f"[SHADOW] Alarms poll HTTP {e.response.status_code}: {e.response.text[:200]}")
-        except Exception as e:
-            logger.warning(f"[SHADOW] Alarms poll error: {e}")
+        # Section 4 moved to _poll_alarms(), called before the sampling gate above.
 
         # ── 5. Fetch trends for richer LSTM sequences (async batch) ───────────
         # Poll the most ML-relevant sensor trends. History accumulates in bridge;
@@ -1085,7 +1018,7 @@ class ShadowModePollingService:
 
         logger.warning(
             f"[SHADOW] Poll {self._poll_count}: {len(equipment_states)} states, "
-            f"zones={result.get('zones_polled', 0)}, faults={fault_count}, "
+            f"zones={result.get('zones_polled', 0)}, faults={result.get('faults_polled', 0)}, "
             f"trends={result.get('trends_with_data', 0)}, "
             f"ml_hours={result.get('ml_hours_ingested', '?')}, "
             f"fault_buf={result.get('fault_buffer_size', '?')}, "
@@ -1119,6 +1052,79 @@ class ShadowModePollingService:
             "ml_hours_ingested": last.get("ml_hours_ingested"),
             "bridge_data_source": "remote_bridge",
         }
+
+    async def _poll_alarms(self, base: str, headers: dict[str, str]) -> int:
+        """Fetch active alarms from bridge and upsert into the alerts table.
+
+        BACnet alarms are a persistent queue: the bridge returns the complete set
+        of currently-active alarms on every call. Each alarm retains its original
+        event timestamp until explicitly cleared.
+
+        This method:
+          - Never filters by alarm age (persistent queue semantics)
+          - Passes is_complete_snapshot=True so absent alarms are resolved
+          - Sets poll_succeeded=False on any HTTP/network error (no state changes)
+          - Feeds all alarms into the ML fault event buffer regardless of age
+        """
+        poll_succeeded = False
+        alarms: list[dict[str, Any]] = []
+
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                resp = await client.get(
+                    f"{base}/api/sites/{self.site_id}/alarms",
+                    headers=headers,
+                    params={"active_only": True},
+                )
+                resp.raise_for_status()
+                alarm_data = resp.json()
+
+            alarms = alarm_data.get("alarms", [])
+            poll_succeeded = True
+
+        except httpx.HTTPStatusError as e:
+            logger.warning("[SHADOW] Alarms poll HTTP %d: %s", e.response.status_code, e.response.text[:200])
+        except Exception as e:
+            logger.warning("[SHADOW] Alarms poll error: %s", e)
+
+        # Feed all alarms into ML feeder regardless of poll outcome
+        if alarms:
+            try:
+                from app.services.sentinel_data_sync import get_sentinel_data_sync
+
+                sync = get_sentinel_data_sync(site_id=self.site_id)
+                for alarm in alarms:
+                    sync.ml_feeder.ingest_fault_event(alarm)
+            except Exception as e:
+                logger.warning("[SHADOW] ML feeder alarm ingest failed: %s", e)
+
+        # Upsert into alerts table with lifecycle tracking
+        try:
+            from app.services.adapter_health_monitor import AdapterHealthMonitor
+
+            monitor = AdapterHealthMonitor()
+            await monitor._write_bridge_alerts(
+                self.site_id,
+                alarms,
+                is_complete_snapshot=poll_succeeded,
+                poll_succeeded=poll_succeeded,
+            )
+        except Exception as e:
+            logger.warning("[SHADOW] Failed to write bridge alarms to alerts table: %s", e)
+
+        # Persist to equipment_fault_events for prediction generation
+        if alarms and poll_succeeded:
+            try:
+                await self._persist_fault_events(alarms)
+            except Exception as e:
+                logger.warning("[SHADOW] Failed to persist fault events: %s", e)
+
+        if poll_succeeded:
+            logger.info("[SHADOW] %d alarms → upserted (complete snapshot)", len(alarms))
+        else:
+            logger.warning("[SHADOW] Alarm poll failed — zero state changes applied")
+
+        return len(alarms) if poll_succeeded else 0
 
     async def _persist_fault_events(self, alarms: list[dict[str, Any]]) -> None:
         """Persist fault events to equipment_fault_events table for prediction generation.
@@ -1462,9 +1468,8 @@ class ShadowModePollingService:
         # ── Heuristic rules (ordered most to least specific) ────────────
 
         # Power / electrical metering
-        if "active_power" in search_text or "power" in search_text:
-            if "kw" in search_text or "kwh" in search_text:
-                return "meter"
+        if ("active_power" in search_text or "power" in search_text) and ("kw" in search_text or "kwh" in search_text):
+            return "meter"
 
         # Temperature sensors in a zone context
         if "temp" in search_text or "temperature" in search_text:
