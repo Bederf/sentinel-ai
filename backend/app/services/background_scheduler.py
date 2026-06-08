@@ -991,7 +991,6 @@ class BackgroundSchedulerService:
                     continue
                 try:
                     from app.config.settings import settings as _app_settings
-                    from app.services.notification_service import NotificationService
                     from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
                     _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
@@ -1873,7 +1872,7 @@ class BackgroundSchedulerService:
             logger.info(f"Generating recommendations for {len(all_equipment)} equipment ({at_risk} at-risk)")
 
             # Phase 227 — maintenance gap detection (runs once per eligible site)
-            from app.services.maintenance_gap_detector import detect_maintenance_gaps, build_gap_recommendation_id
+            from app.services.maintenance_gap_detector import build_gap_recommendation_id, detect_maintenance_gaps
 
             gap_member_codes: set[str] = set()
             for gap_site in generation_site_ids or []:
