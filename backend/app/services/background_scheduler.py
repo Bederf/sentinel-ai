@@ -541,25 +541,45 @@ class BackgroundSchedulerService:
                         logger.exception(f"[AI-OPT] analyze_building failed for {site_id}")
                         continue
 
-                    # Holistic optimizer — runs rules for all active modules
+                    # Holistic optimizer — creates recommendations for all active modules
+                    # Goes through recommendation_repo.create() to trigger Telegram notifications
                     from app.services.optimization.evaluator import evaluate as holistic_evaluate
 
                     try:
                         holistic_recs = holistic_evaluate(site_id)
+                        for hrec in holistic_recs:
+                            hrec_equipment = hrec.get("target_equipment", "")
+                            hrec_action = hrec.get("action", {})
+                            try:
+                                hrec_model = Recommendation(
+                                    site_id=site_id,
+                                    timestamp=datetime.utcnow(),
+                                    action_type="ai_optimization",
+                                    risk_level=ActionRiskLevel.MEDIUM,
+                                    target_equipment=hrec_equipment,
+                                    action=hrec_action,
+                                    reason=hrec.get("reason", ""),
+                                    expected_impact=hrec.get("expected_impact", {}),
+                                    confidence=str(hrec.get("confidence_score", 0.7)),
+                                    confidence_score=hrec.get("confidence_score", 0.7),
+                                    profile="holistic_optimizer",
+                                    source="ai_optimizer",
+                                    source_type="rule_based",
+                                    status=RecommendationStatus.PENDING,
+                                    requires_approval=True,
+                                )
+                                asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.create(hrec_model), self._main_loop
+                                ).result(timeout=30)
+                                created_count += 1
+                            except Exception as e:
+                                logger.warning(
+                                    "[HOLISTIC] Failed to persist rec for %s: %s",
+                                    hrec_equipment,
+                                    e,
+                                )
                         if holistic_recs:
-                            from app.database.supabase_client import get_supabase_client as _get_sb
-
-                            _sb = _get_sb()
-                            for rec in holistic_recs:
-                                try:
-                                    _sb.table("recommendations").upsert(rec, on_conflict="id").execute()
-                                except Exception as e:
-                                    logger.warning("[HOLISTIC] Failed to persist rec %s: %s", rec.get("id", "?"), e)
-                            logger.info(
-                                "[HOLISTIC] %d recommendations for %s",
-                                len(holistic_recs),
-                                site_id,
-                            )
+                            logger.info("[HOLISTIC] %d recommendations created for %s", len(holistic_recs), site_id)
                     except Exception as e:
                         logger.warning("[HOLISTIC] evaluation failed for %s: %s", site_id, e)
 
