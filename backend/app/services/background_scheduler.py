@@ -998,7 +998,7 @@ class BackgroundSchedulerService:
                     )
                     if not _chat_id:
                         continue
-                    _lines = [f"SENTINEL Advisory — {_site_id}"]
+                    _lines = []
                     for _r in _recs[:8]:
                         _target = _r.target_equipment or ""
                         _point = _r.action.get("point", "") if isinstance(_r.action, dict) else ""
