@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 from typing import Any
-from uuid import uuid5, NAMESPACE_URL
+from uuid import NAMESPACE_URL, uuid5
 
 from app.models.module_registry import ModuleType
 from app.services.module_registry_service import module_registry
@@ -140,7 +140,9 @@ def evaluate(site_id: str) -> list[dict[str, Any]]:
                 "id": _dedup_key(site_id, rule.name, target),
                 "site_id": site_id,
                 "timestamp": datetime.now(UTC).isoformat(),
-                "action_type": "optimization",
+                "action_type": "ai_optimization",
+                "source": "ai_optimizer",
+                "source_type": "rule_based",
                 "risk_level": "medium",
                 "target_equipment": target,
                 "action": rec.get("action", {}),
