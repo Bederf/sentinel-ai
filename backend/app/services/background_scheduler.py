@@ -999,26 +999,28 @@ class BackgroundSchedulerService:
                     if not _chat_id:
                         continue
                     _lines = []
+                    _rows = []
                     for _r in _recs[:8]:
                         _target = _r.target_equipment or ""
                         _point = _r.action.get("point", "") if isinstance(_r.action, dict) else ""
                         _val = _r.action.get("value", "") if isinstance(_r.action, dict) else ""
-                        _reason = (_r.reason or "")[:120]
-                        _lines.append(f"• {_target}: {_point} → {_val}")
-                        _lines.append(f"  {_reason}")
+                        _how = f"{_point} to {_val}" if _point else ""
+                        _why = _r.reason or ""
+                        _lines.append(f"📋 {_target}")
+                        if _how:
+                            _lines.append(f"   What: Set {_how}")
+                        _lines.append(f"   Why: {_why}")
+                        _lines.append("")
+                        _rows.append([InlineButton(
+                            label=f"🔧 Work Order — {_target}",
+                            callback_data=f"wo:rec_id:{_r.id}",
+                        )])
                     if len(_recs) > 8:
                         _lines.append(f"… and {len(_recs) - 8} more")
-                    _lines.append("")
-                    _lines.append("Open dashboard to create work orders or approve:")
-                    _base_url = getattr(_app_settings, "app_base_url", "https://bms.sentinel-ai.co.za")
-                    _lines.append(f"{_base_url}/buildings/{_site_id}")
-                    _combined = "\n".join(_lines)
+                    _combined = "\n".join(_lines).strip()
 
-                    _keyboard = InlineKeyboard(
-                        rows=[
-                            [InlineButton(label="✅ Acknowledged", callback_data=f"ack:combined:{_site_id}")],
-                        ]
-                    )
+                    _rows.append([InlineButton(label="✅ Acknowledged", callback_data=f"ack:combined:{_site_id}")])
+                    _keyboard = InlineKeyboard(rows=_rows)
                     _sender = get_telegram_sender()
                     _send_result = _sender.send_text(
                         chat_id=str(_chat_id),
