@@ -419,6 +419,7 @@ class BackgroundSchedulerService:
             created_count = 0
             skipped_count = 0
             error_count = 0
+            self._pending_advisories: dict[str, list] = {}
 
             for site_id in site_ids:
                 try:
@@ -953,7 +954,7 @@ class BackgroundSchedulerService:
                                 rec.target_equipment,
                             )
                             continue
-                        # Emit SSE toast event for new AI recommendation
+                            # Emit SSE toast event for new AI recommendation
                         try:
                             from app.services.event_emitter import get_event_emitter
 
@@ -973,60 +974,53 @@ class BackgroundSchedulerService:
                         except Exception as emit_err:
                             logger.warning(f"Failed to emit recommendation_created SSE event: {emit_err}")
 
-                            # Send Telegram notification for AI optimization recs.
-                            # Work-order creation remains gated by the maintenance module;
-                            # advisory sites get acknowledgement only.
-                            try:
-                                if self._is_sendable_ai_recommendation(rec):
-                                    from app.config.settings import settings as _app_settings
-                                    from app.models.module_registry import ModuleType
-                                    from app.services.module_registry_service import module_registry
-                                    from app.services.notification_service import NotificationService
-
-                                    _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
-                                        _app_settings, "sentry_fm_chat_id", None
-                                    )
-                                    if _chat_id:
-                                        maintenance_active = module_registry.is_module_active(
-                                            site_id,
-                                            ModuleType.MAINTENANCE,
-                                        )
-                                        _msg = self._format_advisory_notification(
-                                            rec,
-                                            can_create_work_order=maintenance_active,
-                                        )
-                                        _svc = NotificationService()
-                                        if maintenance_active:
-                                            send_result = _svc.send_certified(
-                                                site_id=site_id,
-                                                recipient_telegram_id=str(_chat_id),
-                                                title=rec.reason or "SENTINEL Advisory",
-                                                message=_msg,
-                                                reference_id=rec.id,
-                                                action_label="Create Work Order",
-                                                callback_action=f"wo:rec_id:{rec.id}",
-                                            )
-                                        else:
-                                            send_result = _svc.send_certified(
-                                                site_id=site_id,
-                                                recipient_telegram_id=str(_chat_id),
-                                                title=rec.reason or "SENTINEL Advisory",
-                                                message=_msg,
-                                                reference_id=rec.target_equipment,
-                                            )
-                                        asyncio.run_coroutine_threadsafe(send_result, self._main_loop).result(
-                                            timeout=30
-                                        )
-                                        logger.info(f"[NOTIFY] Advisory notification sent for {rec.target_equipment}")
-                            except Exception as notify_err:
-                                logger.warning(f"Failed to send Telegram notification: {notify_err}")
-                        except Exception as e:
-                            logger.warning(f"Failed to persist recommendation for {equipment_id}: {e}")
-                            error_count += 1
+                        # Batch Telegram notifications — collect sendable recs for combined summary
+                        try:
+                            if self._is_sendable_ai_recommendation(rec):
+                                self._pending_advisories.setdefault(site_id, []).append(rec)
+                        except Exception:
+                            pass
 
                 except Exception as e:
                     logger.error(f"Error analyzing site {site_id}: {e}")
                     error_count += 1
+
+            # ── Combined Telegram summary per site ──────────────────────────
+            for _site_id, _recs in self._pending_advisories.items():
+                if not _recs:
+                    continue
+                try:
+                    from app.config.settings import settings as _app_settings
+                    from app.services.notification_service import NotificationService
+
+                    _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
+                        _app_settings, "sentry_fm_chat_id", None
+                    )
+                    if not _chat_id:
+                        continue
+                    _lines = [f"SENTINEL Advisory — {_site_id}"]
+                    for _r in _recs[:8]:
+                        _target = _r.target_equipment or ""
+                        _point = _r.action.get("point", "") if isinstance(_r.action, dict) else ""
+                        _val = _r.action.get("value", "") if isinstance(_r.action, dict) else ""
+                        _reason = (_r.reason or "")[:120]
+                        _lines.append(f"• {_target}: {_point} → {_val}")
+                        _lines.append(f"  {_reason}")
+                    if len(_recs) > 8:
+                        _lines.append(f"… and {len(_recs) - 8} more")
+                    _combined = "\n".join(_lines)
+                    _svc = NotificationService()
+                    _send_result = _svc.send_certified(
+                        site_id=_site_id,
+                        recipient_telegram_id=str(_chat_id),
+                        title=f"SENTINEL Advisory — {len(_recs)} recommendations",
+                        message=_combined,
+                        reference_id=_site_id,
+                    )
+                    asyncio.run_coroutine_threadsafe(_send_result, self._main_loop).result(timeout=30)
+                    logger.info("[NOTIFY] Combined advisory sent for %s (%d recs)", _site_id, len(_recs))
+                except Exception as _notify_err:
+                    logger.warning("Failed to send combined Telegram advisory: %s", _notify_err)
 
             # Health engine disabled — data exists in equipment (health scores) and predictions tables.
             # Maintenance panel reads directly from those tables. No duplication needed.
