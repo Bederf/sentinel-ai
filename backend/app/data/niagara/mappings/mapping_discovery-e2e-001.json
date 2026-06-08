@@ -1,14 +1,14 @@
 {
   "discovery_id": "discovery-e2e-001",
   "site_id": "site-002",
-  "created_at": "2026-05-31T13:26:34.462752",
+  "created_at": "2026-06-06T14:12:11.072575",
   "equipment_count": 3,
   "total_points": 7,
   "equipment": {
-    "S002-CHILLER-B1-001": {
-      "equipment_id": "S002-CHILLER-B1-001",
+    "S002-CHILLER-001": {
+      "equipment_id": "S002-CHILLER-001",
       "equipment_type": "chiller",
-      "equipment_name": "Chiller (S002-CHILLER-B1-001)",
+      "equipment_name": "Chiller (S002-CHILLER-001)",
       "site_id": "site-002",
       "points": [
         {
@@ -45,22 +45,22 @@
         "avg_confidence_score": 3.0,
         "bms_original_id": "CH-1",
         "zone": {
-          "zone_id": "Zone-B1-001",
-          "floor": "B1",
-          "zone_letter": "001",
+          "zone_id": "Zone-L0-01",
+          "floor": "L0",
+          "zone_letter": "01",
           "zone_type": "open_office",
           "site_id": "site-002"
         }
       },
-      "created_at": "2026-05-31T13:26:34.423283",
+      "created_at": "2026-06-06T14:12:11.027371",
       "approved": true,
-      "approved_at": "2026-05-31T13:26:34.462579",
+      "approved_at": "2026-06-06T14:12:11.072157",
       "approved_by": "test-user"
     },
-    "S002-VAV-L1-A": {
-      "equipment_id": "S002-VAV-L1-A",
+    "S002-VAV-101": {
+      "equipment_id": "S002-VAV-101",
       "equipment_type": "vav",
-      "equipment_name": "Variable Air Volume Box (S002-VAV-L1-A)",
+      "equipment_name": "Variable Air Volume Box (S002-VAV-101)",
       "site_id": "site-002",
       "points": [
         {
@@ -109,22 +109,22 @@
         "avg_confidence_score": 2.67,
         "bms_original_id": "VAV-L1-A",
         "zone": {
-          "zone_id": "Zone-L1-A",
+          "zone_id": "Zone-L1-01",
           "floor": "L1",
-          "zone_letter": "A",
+          "zone_letter": "01",
           "zone_type": "open_office",
           "site_id": "site-002"
         }
       },
-      "created_at": "2026-05-31T13:26:34.423358",
+      "created_at": "2026-06-06T14:12:11.027453",
       "approved": true,
-      "approved_at": "2026-05-31T13:26:34.462579",
+      "approved_at": "2026-06-06T14:12:11.072157",
       "approved_by": "test-user"
     },
-    "S002-FCU-L2-B": {
-      "equipment_id": "S002-FCU-L2-B",
+    "S002-FCU-202": {
+      "equipment_id": "S002-FCU-202",
       "equipment_type": "fcu",
-      "equipment_name": "Fan Coil Unit (S002-FCU-L2-B)",
+      "equipment_name": "Fan Coil Unit (S002-FCU-202)",
       "site_id": "site-002",
       "points": [
         {
@@ -161,16 +161,16 @@
         "avg_confidence_score": 3.0,
         "bms_original_id": "FCU-L2-B",
         "zone": {
-          "zone_id": "Zone-L2-B",
+          "zone_id": "Zone-L2-02",
           "floor": "L2",
-          "zone_letter": "B",
+          "zone_letter": "02",
           "zone_type": "open_office",
           "site_id": "site-002"
         }
       },
-      "created_at": "2026-05-31T13:26:34.423443",
+      "created_at": "2026-06-06T14:12:11.027507",
       "approved": true,
-      "approved_at": "2026-05-31T13:26:34.462579",
+      "approved_at": "2026-06-06T14:12:11.072157",
       "approved_by": "test-user"
     }
   }

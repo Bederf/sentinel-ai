@@ -45,7 +45,9 @@ def register_core_routers(app: FastAPI) -> None:
 
     # Settings (JSON-based deprecated + Supabase-based new)
     app.include_router(settings_api.router, prefix="/api", tags=["settings"])
-    app.include_router(settings_db.router, prefix="/api/db", tags=["settings-db"])
+    app.include_router(settings_db.router, prefix="/api", tags=["settings-db"])
+    # Keep /api/db prefix for backward compat with any direct callers
+    app.include_router(settings_db.router, prefix="/api/db", tags=["settings-db-legacy"])
 
     # Space optimization settings (grace periods, concierge CRUD)
     app.include_router(space_settings.router, prefix="/api", tags=["space-settings"])

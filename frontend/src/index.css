@@ -52,6 +52,8 @@
   --color-sentinel-blue: #3B82F6;
   --color-sentinel-blue-rgb: 59, 130, 246;
   --color-sentinel-blue-light: #60A5FA;
+  --color-sentinel-cyan: #22d3ee;
+  --color-sentinel-purple: #8B5CF6;
 
   --color-grafana-bg-canvas: var(--color-sentinel-bg-canvas);
   --color-grafana-bg-primary: var(--color-sentinel-bg-primary);
@@ -226,6 +228,8 @@
   --color-sentinel-blue: #3B82F6;
   --color-sentinel-blue-rgb: 59, 130, 246;
   --color-sentinel-blue-light: #60A5FA;
+  --color-sentinel-cyan: #22d3ee;
+  --color-sentinel-purple: #8B5CF6;
 
   /* Grafana-style aliases for backward compatibility */
   --color-grafana-bg-canvas: var(--color-sentinel-bg-canvas);

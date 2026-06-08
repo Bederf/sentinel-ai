@@ -449,11 +449,11 @@ def test_cleanup_trigger_functional(cur, conn):
     sig_id = uuid.uuid4()
 
     try:
-        # Create a temporary site
+        # Create a temporary site (onboarding_phase must be a valid enum value)
         cur.execute(
             """
-            INSERT INTO sites (id, name, code, address, latitude, longitude)
-            VALUES (%s, 'Temp Trigger Test Site', %s, '1 Test Rd', -26.1, 28.0)
+            INSERT INTO sites (id, name, code, address, latitude, longitude, onboarding_phase)
+            VALUES (%s, 'Temp Trigger Test Site', %s, '1 Test Rd', -26.1, 28.0, 'commissioning')
             RETURNING id
             """,
             (str(temp_site_id), site_code),

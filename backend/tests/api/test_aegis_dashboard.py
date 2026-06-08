@@ -14,6 +14,11 @@ from app.database.repositories.parasite_decision_repository import (
 )
 
 
+@pytest.fixture
+def site_id() -> str:
+    return "test-site-001"
+
+
 def _now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
@@ -21,7 +26,7 @@ def _now_iso() -> str:
 def _make_aegis_decision(
     *,
     id: str,
-    site_id: str = "site-002",
+    site_id: str = "test-site-001",
     write_status: str = "blocked",
     execution_mode: str = "blocked",
     approval_outcome: str = "pending",
@@ -47,7 +52,7 @@ def _make_aegis_decision(
     }
 
 
-def _make_non_aegis_decision(*, id: str, site_id: str = "site-002") -> dict:
+def _make_non_aegis_decision(*, id: str, site_id: str = "test-site-001") -> dict:
     """Build a non-AEGIS decision."""
     ts = _now_iso()
     return {
@@ -82,15 +87,15 @@ def patch_repo(isolated_repo):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_returns_200_empty(client, patch_repo, auth_headers_operator):
+async def test_dashboard_returns_200_empty(client, patch_repo, auth_headers_operator, site_id):
     """Dashboard returns 200 with zero decisions."""
     resp = await client.get(
-        "/api/parasite/aegis/dashboard?site_id=site-002",
+        f"/api/parasite/aegis/dashboard?site_id={site_id}",
         headers=auth_headers_operator,
     )
     assert resp.status_code == 200
     data = resp.json()
-    assert data["site_id"] == "site-002"
+    assert data["site_id"] == site_id
     assert data["period"] == "last_24h"
     assert data["kpis"]["proposals_24h"] == 0
     assert data["activity"] == []
@@ -98,13 +103,16 @@ async def test_dashboard_returns_200_empty(client, patch_repo, auth_headers_oper
 
 
 @pytest.mark.asyncio
-async def test_dashboard_filters_by_execution_mode(client, patch_repo):
+async def test_dashboard_filters_by_execution_mode(client, patch_repo, auth_headers_operator, site_id):
     """Filter by execution_mode should narrow the activity list."""
     repo = patch_repo
-    await repo.record_decision(_make_aegis_decision(id="a1", execution_mode="blocked"))
-    await repo.record_decision(_make_aegis_decision(id="a2", execution_mode="live"))
+    await repo.record_decision(_make_aegis_decision(id="a1", site_id=site_id, execution_mode="blocked"))
+    await repo.record_decision(_make_aegis_decision(id="a2", site_id=site_id, execution_mode="live"))
 
-    resp = await client.get("/api/parasite/aegis/dashboard?site_id=site-002&execution_mode=blocked")
+    resp = await client.get(
+        f"/api/parasite/aegis/dashboard?site_id={site_id}&execution_mode=blocked",
+        headers=auth_headers_operator,
+    )
     assert resp.status_code == 200
     data = resp.json()
     # KPIs should count both (unfiltered)
@@ -115,14 +123,23 @@ async def test_dashboard_filters_by_execution_mode(client, patch_repo):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_kpis_count_correctly(client, patch_repo):
+async def test_dashboard_kpis_count_correctly(client, patch_repo, auth_headers_operator, site_id):
     """KPIs should count approved/rejected/blocked accurately."""
     repo = patch_repo
-    await repo.record_decision(_make_aegis_decision(id="k1", approval_outcome="approved", write_status="blocked"))
-    await repo.record_decision(_make_aegis_decision(id="k2", approval_outcome="rejected", write_status="blocked"))
-    await repo.record_decision(_make_aegis_decision(id="k3", approval_outcome="pending", write_status="blocked"))
+    await repo.record_decision(
+        _make_aegis_decision(id="k1", site_id=site_id, approval_outcome="approved", write_status="blocked")
+    )
+    await repo.record_decision(
+        _make_aegis_decision(id="k2", site_id=site_id, approval_outcome="rejected", write_status="blocked")
+    )
+    await repo.record_decision(
+        _make_aegis_decision(id="k3", site_id=site_id, approval_outcome="pending", write_status="blocked")
+    )
 
-    resp = await client.get("/api/parasite/aegis/dashboard?site_id=site-002")
+    resp = await client.get(
+        f"/api/parasite/aegis/dashboard?site_id={site_id}",
+        headers=auth_headers_operator,
+    )
     assert resp.status_code == 200
     kpis = resp.json()["kpis"]
     assert kpis["proposals_24h"] == 3
@@ -132,13 +149,16 @@ async def test_dashboard_kpis_count_correctly(client, patch_repo):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_ignores_non_aegis_decisions(client, patch_repo):
+async def test_dashboard_ignores_non_aegis_decisions(client, patch_repo, auth_headers_operator, site_id):
     """Non-AEGIS decisions should not appear in dashboard."""
     repo = patch_repo
-    await repo.record_decision(_make_aegis_decision(id="aegis-1"))
-    await repo.record_decision(_make_non_aegis_decision(id="other-1"))
+    await repo.record_decision(_make_aegis_decision(id="aegis-1", site_id=site_id))
+    await repo.record_decision(_make_non_aegis_decision(id="other-1", site_id=site_id))
 
-    resp = await client.get("/api/parasite/aegis/dashboard?site_id=site-002")
+    resp = await client.get(
+        f"/api/parasite/aegis/dashboard?site_id={site_id}",
+        headers=auth_headers_operator,
+    )
     assert resp.status_code == 200
     data = resp.json()
     assert data["kpis"]["proposals_24h"] == 1
@@ -147,13 +167,16 @@ async def test_dashboard_ignores_non_aegis_decisions(client, patch_repo):
 
 
 @pytest.mark.asyncio
-async def test_dashboard_pending_only_pending(client, patch_repo):
+async def test_dashboard_pending_only_pending(client, patch_repo, auth_headers_operator, site_id):
     """pending_proposals should only contain decisions with outcome=pending."""
     repo = patch_repo
-    await repo.record_decision(_make_aegis_decision(id="p1", approval_outcome="pending"))
-    await repo.record_decision(_make_aegis_decision(id="p2", approval_outcome="approved"))
+    await repo.record_decision(_make_aegis_decision(id="p1", site_id=site_id, approval_outcome="pending"))
+    await repo.record_decision(_make_aegis_decision(id="p2", site_id=site_id, approval_outcome="approved"))
 
-    resp = await client.get("/api/parasite/aegis/dashboard?site_id=site-002")
+    resp = await client.get(
+        f"/api/parasite/aegis/dashboard?site_id={site_id}",
+        headers=auth_headers_operator,
+    )
     assert resp.status_code == 200
     pending = resp.json()["pending_proposals"]
     assert len(pending) == 1
@@ -161,10 +184,10 @@ async def test_dashboard_pending_only_pending(client, patch_repo):
 
 
 @pytest.mark.asyncio
-async def test_existing_endpoints_unaffected(client, patch_repo):
+async def test_existing_endpoints_unaffected(client, patch_repo, auth_headers_operator):
     """Existing /decisions and /health endpoints should still work."""
-    resp = await client.get("/api/parasite/decisions")
+    resp = await client.get("/api/parasite/decisions", headers=auth_headers_operator)
     assert resp.status_code == 200
 
-    resp = await client.get("/api/parasite/health")
+    resp = await client.get("/api/parasite/health", headers=auth_headers_operator)
     assert resp.status_code == 200

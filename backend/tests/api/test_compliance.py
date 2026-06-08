@@ -7,9 +7,34 @@ Legionella, Electrical, Lift, and Audit workflows.
 Phase 28: SENTINEL Compliance
 """
 
+import os
+from collections.abc import AsyncGenerator
 from datetime import datetime, timedelta
 
 import pytest
+from httpx import ASGITransport, AsyncClient
+
+from tests.conftest import app
+
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+
+
+def _make_token(role: str = "operator") -> str:
+    from app.middleware.auth_middleware import create_jwt_token
+
+    return create_jwt_token("test-user-id", "test@sentinel.local", role, "Test User")
+
+
+_AUTH_HEADERS = {"Authorization": f"Bearer {_make_token()}"}
+
+
+@pytest.fixture
+async def client() -> AsyncGenerator[AsyncClient, None]:
+    """Authenticated async HTTP client for compliance tests."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as c:
+        yield c
+
 
 # ============================================================================
 # OHS Compliance Tests

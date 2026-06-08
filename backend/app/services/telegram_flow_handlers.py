@@ -1176,8 +1176,6 @@ async def handle_focus_room(
 
     action, room_code = parts[1], parts[2]
 
-    confirmed_by = f"telegram:{chat_id}"
-
     if action == "occupied":
         from app.services import occupancy_store
 

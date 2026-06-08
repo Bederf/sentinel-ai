@@ -678,7 +678,6 @@ class DiagnosisFlowEngine:
         mfr_actions = DEFAULT_MAINTENANCE_ACTIONS.get(equip_type) or DEFAULT_MAINTENANCE_ACTIONS.get("default", {})
         guidance = mfr_actions.get(mfr_risk, [])
         if guidance:
-            maintenance_note = "Maintenance guidance for this equipment type:"
             for action in guidance:
                 if action not in repair_steps:
                     repair_steps.append(action)

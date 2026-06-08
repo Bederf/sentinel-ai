@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from typing import Any
 
 from app.config.settings import settings
@@ -114,7 +114,7 @@ class MorningSummaryService:
 
         grid_status = "Grid available" if (isinstance(grid, (int, float)) and grid and grid > 0) else "Off-grid"
         lines.append("")
-        lines.append(f"Right now:")
+        lines.append("Right now:")
         if soc is not None:
             try:
                 lines.append(f"🔋 Battery: {float(soc):.0f}%")

@@ -19,6 +19,7 @@ Ref:
 - https://learn.microsoft.com/en-us/microsoft-copilot-studio/mcp-add-existing-server-to-agent
 """
 
+import hmac
 import json
 import logging
 from datetime import datetime
@@ -242,7 +243,7 @@ async def mcp_streamable_http_endpoint(
                 },
                 headers=CORS_HEADERS,
             )
-        if token != expected_key:
+        if not hmac.compare_digest(token.encode(), expected_key.encode()):
             logger.warning(f"MCP request with invalid API key: {token[:8]}...")
             return JSONResponse(
                 status_code=401,
@@ -673,7 +674,7 @@ def _require_bearer_auth(authorization: str | None) -> tuple[bool, JSONResponse 
             content={"error": "Authorization must be: Bearer <api-key>"},
             headers=CORS_HEADERS,
         )
-    if token != expected_key:
+    if not hmac.compare_digest(token.encode(), expected_key.encode()):
         return False, JSONResponse(
             status_code=401,
             content={"error": "Invalid API key"},

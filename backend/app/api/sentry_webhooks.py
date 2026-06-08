@@ -1863,7 +1863,7 @@ async def advance_wo_milestone(
             raise HTTPException(status_code=404, detail=f"Work order not found: {req.wo_code}")
 
         wo_id = wo["id"]
-        prev_milestone = wo.get("milestone_status", "assigned")
+        wo.get("milestone_status", "assigned")
         created_by = wo.get("created_by", "")
 
         # Advance milestone
@@ -2522,7 +2522,7 @@ async def get_building_info(site_id: str = Query("site-002")):
 async def update_building_info(data: dict, x_sentry_secret: str | None = Header(None)):
     """Update building info for a site."""
     _require_sentry_secret(x_sentry_secret, endpoint_name="building_info")
-    site_id = data.get("site_id", "site-002")
+    data.get("site_id", "site-002")
     try:
         from app.database.supabase_client import get_supabase_client
 
@@ -2565,7 +2565,6 @@ async def focus_room_status(site_id: str = Query("site-002")):
         from datetime import datetime
 
         now = datetime.now(UTC)
-        nearing = []
         for s in active.data or []:
             start = s.get("start_time")
             if start:

@@ -304,7 +304,7 @@ class LoadsheddingService:
 
                 time_str = f"{hours_until}h {mins_until}min" if hours_until > 0 else f"{mins_until}min"
                 lines.append(f"⏰ Next outage: {time_str} away (Stage {stage}, {duration} min)")
-            except:
+            except Exception:
                 lines.append(f"⏰ Next outage: {start} (Stage {stage}, {duration} min)")
         else:
             lines.append("✅ No loadshedding scheduled for next 48 hours")

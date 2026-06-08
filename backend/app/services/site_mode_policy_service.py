@@ -241,7 +241,7 @@ class SiteModePolicyService:
 
         stages = policy.get("stages", {})
         current_stage = state.get("current_stage", policy.get("default_stage", "commissioning"))
-        stage_cfg = stages.get(current_stage, {})
+        stages.get(current_stage, {})
 
         if not promotion_cfg:
             return {

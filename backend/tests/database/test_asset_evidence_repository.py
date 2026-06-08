@@ -10,7 +10,6 @@ Verifies:
 """
 
 from datetime import datetime
-from uuid import uuid4
 
 import pytest
 from backend.app.models.asset_evidence import (
@@ -37,11 +36,11 @@ class TestAssetEvidenceRepository:
         return AssetEvidenceRepository()
 
     @pytest.fixture
-    def test_input(self):
-        """Fixture: valid CreateAssetEvidenceInput for testing."""
+    def test_input(self, real_site_id, real_equipment_id):
+        """Fixture: valid CreateAssetEvidenceInput with real FK IDs."""
         return CreateAssetEvidenceInput(
-            site_id=uuid4(),
-            equipment_id=uuid4(),
+            site_id=real_site_id,
+            equipment_id=real_equipment_id,
             source_type=SourceType.UPLOAD,
             artifact_type=ArtifactType.DOCUMENT,
             evidence_class=EvidenceClass.SERVICE_REPORT,
@@ -52,7 +51,7 @@ class TestAssetEvidenceRepository:
             assessment_relevance=True,
             provenance_type=ProvenanceType.USER_UPLOAD,
             provenance_uri="test:uri",
-            uploader_user_id=uuid4(),
+            uploader_user_id=None,
         )
 
     async def test_create_evidence(self, repository, test_input):
@@ -75,11 +74,11 @@ class TestAssetEvidenceRepository:
 
         assert result is not None
         assert result.evidence_id == created.evidence_id
-        assert result.document_name == "test.pdf"  # From normalized_payload
+        assert result.normalized_payload.get("document_name") == "test.pdf"
 
-    async def test_list_by_equipment(self, repository, test_input):
+    async def test_list_by_equipment(self, repository, test_input, real_equipment_id):
         """List all evidence for equipment, ordered by event_timestamp DESC."""
-        equipment_id = uuid4()
+        equipment_id = real_equipment_id
         test_input.equipment_id = equipment_id
 
         # Create multiple records
@@ -94,9 +93,9 @@ class TestAssetEvidenceRepository:
         # Verify ordering: newest first
         assert result[0].event_timestamp >= result[1].event_timestamp
 
-    async def test_list_by_site(self, repository, test_input):
+    async def test_list_by_site(self, repository, test_input, real_site_id):
         """List all evidence for site."""
-        site_id = uuid4()
+        site_id = real_site_id
         test_input.site_id = site_id
 
         # Create
@@ -169,14 +168,14 @@ class TestAssetEvidenceRepository:
         await repository.supersede(e1.evidence_id, e2.evidence_id)
         await repository.supersede(e2.evidence_id, e3.evidence_id)
 
-        # Traverse from e3 (newest)
-        chain = await repository.get_supersession_chain(e3.evidence_id)
+        # Traverse from e1 (oldest) — supersedes_evidence_id links old→new
+        chain = await repository.get_supersession_chain(e1.evidence_id)
 
-        # Should be [e3, e2, e1]
+        # Should be [e1, e2, e3]
         assert len(chain) == 3
-        assert chain[0].evidence_id == e3.evidence_id
+        assert chain[0].evidence_id == e1.evidence_id
         assert chain[1].evidence_id == e2.evidence_id
-        assert chain[2].evidence_id == e1.evidence_id
+        assert chain[2].evidence_id == e3.evidence_id
 
     async def test_supersession_chain_cycle_detection(self, repository, test_input):
         """Cycle detection in supersession chain prevents infinite loop."""
@@ -232,9 +231,9 @@ class TestAssetEvidenceRepository:
         assert len(result) >= 1
         assert any(e.evidence_id == created.evidence_id for e in result)
 
-    async def test_pagination_limit_offset(self, repository, test_input):
+    async def test_pagination_limit_offset(self, repository, test_input, real_equipment_id):
         """Pagination with limit and offset."""
-        equipment_id = uuid4()
+        equipment_id = real_equipment_id
         test_input.equipment_id = equipment_id
 
         # Create 5 records

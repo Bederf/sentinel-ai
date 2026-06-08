@@ -289,7 +289,13 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
   const _normalSites = buildingsList.filter((s: Site) => s.status === "normal").length;
   // eslint-disable-next-line @typescript-eslint/ban-ts-comment
   // @ts-ignore - Site type mismatch from legacy api.ts
-  const warningSites = buildingsList.filter((s: Site) => s.status === "warning").length;
+  const warningSites = buildingsList.filter((s: Site) =>
+    s.status === "warning" ||
+    s.status === "critical" ||
+    (s.bridge_connected === false &&
+      s.bridge_data_source != null &&
+      s.bridge_data_source !== "none")
+  ).length;
 
   // Filter predictions to only show critical/warning severity (from health thresholds)
   const criticalPredictions = predictions.filter(p =>

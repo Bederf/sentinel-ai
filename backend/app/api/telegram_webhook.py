@@ -222,7 +222,7 @@ async def telegram_webhook(request: Request):
     except Exception:
         return {"ok": False, "error": "invalid JSON"}
 
-    update_id = body.get("update_id", 0)
+    body.get("update_id", 0)
 
     # Handle callback query (inline keyboard button press)
     if "callback_query" in body:

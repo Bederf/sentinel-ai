@@ -268,7 +268,7 @@ class GateEvaluationService:
         if site_row.data:
             row = site_row.data[0]
             metrics["ml_hours_ingested"] = float(row.get("ml_hours_ingested") or 0.0)
-            phase = row.get("onboarding_phase", "")
+            row.get("onboarding_phase", "")
             metrics["time_in_advisory_days"] = self._days_in_phase(row.get("created_at"), row.get("onboarding_phase"))
             metrics["created_at"] = row.get("created_at")
 
@@ -400,7 +400,7 @@ class GateEvaluationService:
             if hasattr(rows, "count"):
                 # Total equipment updated in window — need to count those with anomaly_score
                 pass
-            total = len(rows.data or [])
+            len(rows.data or [])
             # Count equipment with non-null anomaly_score in operating_data
             has_score = (
                 client.table("equipment")
@@ -517,7 +517,7 @@ class GateEvaluationService:
             )
             # Count those where network_info is not empty dict
             mapped_data = [r for r in (mapped.data or [])]
-            mapped_count = sum(1 for r in mapped_data if r.get("id"))
+            sum(1 for r in mapped_data if r.get("id"))
             # Re-query with filter for non-empty network_info
             non_empty = (
                 client.table("equipment")

@@ -260,12 +260,6 @@ class MagicLinkService:
         self._mark_token_accepted(token, ip, user_agent)
 
         # Issue JWT tokens and session
-        user_info = {
-            "user_id": user_id,
-            "email": email,
-            "role": role,
-            "full_name": full_name,
-        }
         access_token = create_jwt_token(
             user_id=user_id,
             email=email,

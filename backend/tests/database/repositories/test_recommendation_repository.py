@@ -29,8 +29,10 @@ def test_filter_supabase_payload_drops_model_only_fields():
     assert payload["status"] == "pending"
     assert payload["action_type"] == "setpoint_change"
     assert payload["reason"] == "Test recommendation"
-    assert "source" not in payload
-    assert "source_type" not in payload
+    # source and source_type exist in the live table — they should be retained
+    assert payload["source"] == "health_alert"
+    assert payload["source_type"] == "rule_based"
+    # correlation_id, outcome_validated, outcome_notes are model-only — dropped
     assert "correlation_id" not in payload
     assert "outcome_validated" not in payload
     assert "outcome_notes" not in payload

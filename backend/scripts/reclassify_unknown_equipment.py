@@ -142,7 +142,7 @@ async def main():
 
         new_type = classify_from_catalog(code, object_catalog)
 
-        eq_id = eq.get("id")  # UUID for CacheInvalidation
+        eq.get("id")  # UUID for CacheInvalidation
         eq_code = eq.get("code")  # used by repo.update()
 
         if new_type != "unknown":

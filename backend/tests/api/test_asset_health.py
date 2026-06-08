@@ -6,6 +6,7 @@ Group C: Baseline + deviation (4 tests)
 Group D: Mode behavior (2 tests)
 """
 
+import os
 from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -13,6 +14,17 @@ import pytest
 
 from app.models.asset_health import AssetHealthBaseline
 from app.services.asset_health_service import AssetHealthService
+
+os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+
+
+def _make_token(role: str = "operator") -> str:
+    from app.middleware.auth_middleware import create_jwt_token
+
+    return create_jwt_token("test-user-id", "test@sentinel.local", role, "Test User")
+
+
+_AUTH_HEADERS = {"Authorization": f"Bearer {_make_token()}"}
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -171,7 +183,7 @@ async def test_equipment_detail_returns_200():
 
     with patch("app.api.asset_health.get_asset_health_service", return_value=_mock_asset_svc()):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/S002-AHU-001/health-baseline")
     assert response.status_code == 200
     data = response.json()
@@ -191,7 +203,7 @@ async def test_equipment_detail_404_unknown():
 
     with patch("app.api.asset_health.get_asset_health_service", return_value=_mock_asset_svc()):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as client:
+        async with AsyncClient(transport=transport, base_url="http://test", headers=_AUTH_HEADERS) as client:
             response = await client.get("/api/equipment/DOES-NOT-EXIST-999/health-baseline")
     assert response.status_code == 404
 
@@ -247,11 +259,11 @@ async def test_health_source_reflects_origin(asset_health_service):
     svc._baseline_repo.get_bulk_max_deviation_24h = AsyncMock(return_value={})
 
     with patch("app.services.asset_health_service.settings") as mock_settings:
-        mock_settings.demo_mode = True
+        mock_settings.resolved_ingestion_mode.value = "simulation"
         result = await svc.get_equipment_detail("S002-AHU-001")
         assert result.health_source == "simulation"
 
-        mock_settings.demo_mode = False
+        mock_settings.resolved_ingestion_mode.value = "live_control"
         result = await svc.get_equipment_detail("S002-AHU-001")
         assert result.health_source == "equipment_table"
 

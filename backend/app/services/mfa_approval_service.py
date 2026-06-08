@@ -200,13 +200,12 @@ def send_approval_request(
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            success = loop.run_in_executor(None, _sync_send_all)
+            loop.run_in_executor(None, _sync_send_all)
             # Don't block — fire and forget; Telegram is best-effort
         finally:
             loop.close()
     except Exception as e:
         logger.error("Failed to send MFA approval Telegram messages: %s", e)
-        success = False
 
     return True, approval_token
 

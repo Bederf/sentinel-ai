@@ -459,7 +459,7 @@ class SavingsCalculator:
         period_records = [r for r in records if reporting_start <= r.timestamp <= reporting_end]
 
         # Identify load shedding days
-        ls_days = {r.timestamp.date() for r in period_records if r.load_shedding}
+        {r.timestamp.date() for r in period_records if r.load_shedding}
         ls_records = [r for r in period_records if r.load_shedding]
         normal_records = [r for r in period_records if not r.load_shedding]
 
@@ -797,7 +797,7 @@ class IPMVPEngine:
 
         overall_kwh = sum(r.savings_kwh for r in results)
         overall_zar = sum(r.savings_zar for r in results)
-        n_total = sum(r.n_days_in_period for r in results)
+        sum(r.n_days_in_period for r in results)
         n_samples = sum(r.baseline.n_samples for r in results if r.baseline)
         agg_cv = (
             sum(r.cv_rmse_pct * r.baseline.n_samples for r in results if r.baseline) / n_samples if n_samples else 999

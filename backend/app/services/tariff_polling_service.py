@@ -440,7 +440,7 @@ class TariffPollingService:
 
         structure = tariff.get("tariff_structure", {})
         tiers = structure.get("tiered_rates", [])
-        sewerage_rate = structure.get("sewerage_rate_r_per_kiloliter", 4.45) / 1000  # Convert to R/L
+        structure.get("sewerage_rate_r_per_kiloliter", 4.45) / 1000  # Convert to R/L
         fixed_charge = structure.get("fixed_monthly_charge", 250.0)
 
         # Calculate tiered cost

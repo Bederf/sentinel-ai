@@ -8,14 +8,6 @@ const FALLBACK_MANDATORY_MODULES: ModuleType[] = [
   'simbiot',
   'logging',
   'assets',
-  'hvac',
-  'energy',
-  'lighting',
-  'solar',
-  'water',
-  'fire',
-  'security',
-  'digital_twin',
 ];
 
 let mandatoryModules = [...FALLBACK_MANDATORY_MODULES];

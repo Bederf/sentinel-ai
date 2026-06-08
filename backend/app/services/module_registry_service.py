@@ -17,7 +17,6 @@ from typing import Any
 
 from app.config.settings import settings
 from app.models.module_registry import (
-    BUILDING_SYSTEM_MODULE_TYPES,
     INTEGRATION_DEFINITIONS,
     MANDATORY_MODULE_TYPES,
     MODULE_DEFINITIONS,

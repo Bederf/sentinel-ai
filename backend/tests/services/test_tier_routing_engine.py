@@ -16,7 +16,7 @@ class TestTierRoutingEngine:
     """Test tier routing engine functionality."""
 
     @pytest.fixture
-    async def engine(self):
+    async def engine(self, monkeypatch):
         """Create a fresh tier routing engine for each test."""
         engine = TierRoutingEngine()
         # Mock settings to ensure consistent behavior
@@ -34,6 +34,32 @@ class TestTierRoutingEngine:
         engine.parasite_repo = AsyncMock()
         engine.parasite_repo.record_decision = AsyncMock()
 
+        # Mock supabase phase lookup — default to "supervised" so phase gate
+        # doesn't override the risk/threshold/rate-limit logic under test.
+        # Individual tests can override via _set_site_phase().
+        _supabase_state = {"phase": "supervised"}
+        _fake_table = MagicMock()
+        _fake_table.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+            data=[{"onboarding_phase": _supabase_state["phase"]}]
+        )
+        _fake_sb = MagicMock()
+        _fake_sb.table.return_value = _fake_table
+        # Patch at the import source — tier_routing_engine does
+        # `from app.database.supabase_client import get_supabase_client`,
+        # so a local module-level patch would be shadowed.
+        monkeypatch.setattr(
+            "app.database.supabase_client.get_supabase_client",
+            lambda: _fake_sb,
+        )
+
+        # Helper to override the mocked phase in a test:
+        async def _set_site_phase(phase: str) -> None:
+            _supabase_state["phase"] = phase
+            _fake_table.select.return_value.eq.return_value.limit.return_value.execute.return_value = MagicMock(
+                data=[{"onboarding_phase": phase}]
+            )
+
+        engine._set_site_phase = _set_site_phase  # type: ignore[attr-defined]
         return engine
 
     @pytest.mark.parametrize(
@@ -126,6 +152,64 @@ class TestTierRoutingEngine:
 
         assert result.tier == TierLevel.TIER1.value
         assert result.action == "advisory"
+
+    @pytest.mark.parametrize(
+        "phase",
+        ["commissioning", "shadow_live", "advisory"],
+    )
+    async def test_phase_caps_tier1_for_no_control_phases(self, engine, phase):
+        """Phases that disallow control writes must cap at Tier 1 (advisory only).
+
+        onboarding_phase in {commissioning, shadow_live, advisory} means the
+        site is in observe/recommend mode — no control writes, no approvals.
+        Even with very high confidence and minimal risk, the phase gate must
+        hold the recommendation to Tier 1.
+        """
+        await engine._set_site_phase(phase)  # type: ignore[attr-defined]
+
+        recommendation = {
+            "site_id": "S002",
+            "target_equipment": "S002-CHILLER-B1-001",
+            "confidence_score": 0.99,  # Would otherwise reach Tier 3
+            "risk_level": "minimal",
+            "action_type": "set_setpoint",
+            "action": {"point": "setpoint", "value": 25.0},
+            "reason": f"Phase '{phase}' must cap this at Tier 1 even with high confidence",
+        }
+
+        result = await engine.route_recommendation(recommendation)
+
+        assert result.tier == TierLevel.TIER1.value, f"Phase '{phase}' should cap at Tier 1, got {result.tier}"
+        assert result.action == "advisory"
+        assert result.threshold_source == "phase_gate"
+
+    async def test_advisory_phase_cap_replaces_silent_tier2_promotion(self, engine):
+        """Regression: advisory phase used to fall through to Tier 2 with caps_auto_execute.
+
+        Before the phase cap list was extended to include 'advisory', a site in
+        advisory phase with high confidence could reach Tier 2 (require_approval)
+        even though advisory phase semantically forbids control writes. The fix
+        moves advisory into the explicit Tier 1 cap list.
+        """
+        await engine._set_site_phase("advisory")  # type: ignore[attr-defined]
+
+        recommendation = {
+            "site_id": "S002",
+            "target_equipment": "S002-CHILLER-B1-001",
+            "confidence_score": 0.95,  # Well above tier2 threshold (0.70)
+            "risk_level": "minimal",
+            "action_type": "set_setpoint",
+            "action": {"point": "setpoint", "value": 25.0},
+            "reason": "High-confidence minimal-risk rec in advisory phase",
+        }
+
+        result = await engine.route_recommendation(recommendation)
+
+        # Must NOT be Tier 2 — that would mean user is being asked to approve
+        # a control write in a phase that explicitly forbids control writes.
+        assert result.tier == TierLevel.TIER1.value, (
+            f"Advisory phase must not reach Tier 2 (no approvals), got {result.tier}"
+        )
 
     async def test_extract_confidence_numeric(self, engine):
         """Test confidence extraction from numeric score."""

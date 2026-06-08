@@ -4236,7 +4236,6 @@ def _run_single_verification_sync(recommendation_id: str) -> None:
     """Synchronous wrapper for APScheduler — runs outcome verification for a single recommendation."""
     import asyncio
 
-    from app.database.supabase_client import get_supabase_client
     from app.services.background_scheduler import scheduler_service
     from app.services.recommendation_outcome_service import process_single_verification
 

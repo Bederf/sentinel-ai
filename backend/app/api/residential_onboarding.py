@@ -4,7 +4,6 @@ import asyncio
 import json
 import logging
 import re
-from datetime import datetime
 from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -578,7 +577,6 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
 
 async def _ha_gateway_for_chat(chat_id: int) -> HomeAssistantGateway | None:
     """Look up HA site for chat_id, decrypt config, build and connect gateway."""
-    from app.config.settings import settings
     from app.gateways.home_assistant import HomeAssistantGateway
 
     supabase = get_supabase_client()

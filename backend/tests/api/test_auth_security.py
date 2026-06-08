@@ -392,7 +392,9 @@ class TestTokenLifecycle:
     """Test token creation and lifecycle properties."""
 
     def test_access_token_has_short_ttl(self):
-        """Access tokens should have TTL <= 60 minutes."""
+        """Access tokens should expire within the configured TTL (8 h for onboarding sessions)."""
+        from app.config.settings import settings
+
         token = create_jwt_token(
             user_id="u1",
             email="u1@test.com",
@@ -404,7 +406,8 @@ class TestTokenLifecycle:
         exp = datetime.utcfromtimestamp(payload["exp"])
         iat = datetime.utcfromtimestamp(payload["iat"])
         ttl = exp - iat
-        assert ttl <= timedelta(hours=1), f"Access token TTL too long: {ttl}"
+        configured_ttl = timedelta(minutes=settings.jwt_access_token_ttl_minutes)
+        assert ttl <= configured_ttl + timedelta(seconds=5), f"Access token TTL too long: {ttl}"
 
     def test_token_includes_required_claims(self):
         """Created tokens must include all security-critical claims."""

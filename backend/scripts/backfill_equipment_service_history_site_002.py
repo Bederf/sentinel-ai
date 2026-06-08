@@ -176,7 +176,7 @@ def run_backfill():
     # Phase D: Upsert into equipment_service_history
     print(f"\n=== Phase D: Upserting {len(records)} records ===\n")
     for rec in records:
-        result = supabase.table("equipment_service_history").upsert(rec, on_conflict="site_id,equipment_code").execute()
+        supabase.table("equipment_service_history").upsert(rec, on_conflict="site_id,equipment_code").execute()
         print(f"  {rec['equipment_code']:30s} → {rec['commissioning_date']} (upserted)")
 
     # Phase E: Link equipment to service_history

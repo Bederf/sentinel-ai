@@ -307,7 +307,7 @@ class TestExpiredPath:
 
         from app.agents.recommendation_graph import build_recommendation_graph
 
-        rec = make_recommendation(age_minutes=60)
+        rec = make_recommendation(age_minutes=130)  # threshold is 120 min
 
         with (
             patch(
