@@ -541,6 +541,28 @@ class BackgroundSchedulerService:
                         logger.exception(f"[AI-OPT] analyze_building failed for {site_id}")
                         continue
 
+                    # Holistic optimizer — runs rules for all active modules
+                    from app.services.optimization.evaluator import evaluate as holistic_evaluate
+
+                    try:
+                        holistic_recs = holistic_evaluate(site_id)
+                        if holistic_recs:
+                            from app.database.supabase_client import get_supabase_client as _get_sb
+
+                            _sb = _get_sb()
+                            for rec in holistic_recs:
+                                try:
+                                    _sb.table("recommendations").upsert(rec, on_conflict="id").execute()
+                                except Exception as e:
+                                    logger.warning("[HOLISTIC] Failed to persist rec %s: %s", rec.get("id", "?"), e)
+                            logger.info(
+                                "[HOLISTIC] %d recommendations for %s",
+                                len(holistic_recs),
+                                site_id,
+                            )
+                    except Exception as e:
+                        logger.warning("[HOLISTIC] evaluation failed for %s: %s", site_id, e)
+
                     # Gate: load active urgent/critical work orders before persisting any recs
                     # Prevents SENTINEL from recommending on equipment with active faults
                     urgent_equipment: set[str] = set()

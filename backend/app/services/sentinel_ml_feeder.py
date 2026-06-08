@@ -150,6 +150,52 @@ SENSOR_MAPPING: dict[str, dict[str, str]] = {
         "fan_speed": "fan_speed",
         "valve_position": "valve_position",
     },
+    # ── Lighting (holistic optimizer) ──
+    "luminaire": {
+        "power_consumption": "luminaire_power_kw",
+        "luminaire_level": "luminaire_level_pct",
+        "occupancy": "luminaire_occupancy",
+    },
+    "dali_controller": {
+        "power_consumption": "dali_power_kw",
+        "alarm": "dali_alarm_status",
+    },
+    # ── Security (holistic optimizer) ──
+    "door": {
+        "door_status": "door_status",
+        "badge_events": "badge_event_count",
+    },
+    "badge_reader": {
+        "badge_events": "badge_event_count",
+        "occupancy_delta": "occupancy_delta",
+    },
+    "camera": {
+        "camera_status": "camera_online",
+        "motion_events": "motion_event_count",
+    },
+    "access": {
+        "access_events": "access_event_count",
+        "zone_occupancy": "zone_occupancy_count",
+    },
+    # ── Fire (holistic optimizer) ──
+    "fire_panel": {
+        "fire_alarm_status": "alarm_status",
+        "fault_status": "panel_fault",
+        "communication_status": "panel_online",
+    },
+    "detector": {
+        "detector_status": "detector_online",
+        "alarm_count": "alarm_count",
+    },
+    # ── Water (holistic optimizer) ──
+    "flow_meter": {
+        "flow_rate_lpm": "flow_rate_lpm",
+        "volume_liters": "volume_total_l",
+    },
+    "water_meter": {
+        "flow_rate_lpm": "meter_flow_lpm",
+        "volume_liters": "meter_volume_l",
+    },
 }
 
 
