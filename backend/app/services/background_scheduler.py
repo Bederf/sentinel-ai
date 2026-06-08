@@ -1014,9 +1014,11 @@ class BackgroundSchedulerService:
                     _lines.append(f"{_base_url}/buildings/{_site_id}")
                     _combined = "\n".join(_lines)
 
-                    _keyboard = InlineKeyboard(rows=[
-                        [InlineButton(label="✅ Acknowledged", callback_data=f"ack:combined:{_site_id}")],
-                    ])
+                    _keyboard = InlineKeyboard(
+                        rows=[
+                            [InlineButton(label="✅ Acknowledged", callback_data=f"ack:combined:{_site_id}")],
+                        ]
+                    )
                     _sender = get_telegram_sender()
                     _send_result = _sender.send_text(
                         chat_id=str(_chat_id),

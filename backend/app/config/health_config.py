@@ -12,65 +12,69 @@ Scoreability resolution (in order):
 5. Default → scoreable (fail-open for novel equipment types)
 """
 
-MECHANICAL_TYPES = frozenset({
-    # HVAC
-    "ahu",
-    "fcu",
-    "vav",
-    "chiller",
-    "cooling_tower",
-    "boiler",
-    "pump",
-    "heat_exchanger",
-    "air_handler",
-    # Electrical / power
-    "generator",
-    "ups",
-    "bess",
-    "inverter",
-    "transfer_switch",
-    # Other active
-    "compressor",
-    "fan",
-    "motor",
-    # Renewable / electrical generation
-    "solar_panel",
-    "pv_array",
-})
+MECHANICAL_TYPES = frozenset(
+    {
+        # HVAC
+        "ahu",
+        "fcu",
+        "vav",
+        "chiller",
+        "cooling_tower",
+        "boiler",
+        "pump",
+        "heat_exchanger",
+        "air_handler",
+        # Electrical / power
+        "generator",
+        "ups",
+        "bess",
+        "inverter",
+        "transfer_switch",
+        # Other active
+        "compressor",
+        "fan",
+        "motor",
+        # Renewable / electrical generation
+        "solar_panel",
+        "pv_array",
+    }
+)
 
-PASSIVE_TYPES = frozenset({
-    "dali",
-    "dali_controller",
-    "dali_zone",
-    "lighting",
-    "lighting_panel",
-    "lighting_zone",
-    "lighting_driver",
-    "luminaire",
-    "meter",
-    "submeter",
-    "energy_meter",
-    "water_meter",
-    "sensor",
-    "co2_sensor",
-    "temp_sensor",
-    "humidity_sensor",
-    "outdoor_air_sensor",
-    "zone_sensor",
-    "weather_station",
-    "access_control",
-    "access_control_server",
-    "door",
-    "gate",
-    "barrier",
-    "camera",
-    "security_camera",
-    "pir",
-    "scene_controller",
-    "general",
-    "weather",
-    "zone",
-})
+PASSIVE_TYPES = frozenset(
+    {
+        "dali",
+        "dali_controller",
+        "dali_zone",
+        "lighting",
+        "lighting_panel",
+        "lighting_zone",
+        "lighting_driver",
+        "luminaire",
+        "meter",
+        "submeter",
+        "energy_meter",
+        "water_meter",
+        "sensor",
+        "co2_sensor",
+        "temp_sensor",
+        "humidity_sensor",
+        "outdoor_air_sensor",
+        "zone_sensor",
+        "weather_station",
+        "access_control",
+        "access_control_server",
+        "door",
+        "gate",
+        "barrier",
+        "camera",
+        "security_camera",
+        "pir",
+        "scene_controller",
+        "general",
+        "weather",
+        "zone",
+    }
+)
 
 EQUIPMENT_HEALTH_SCOREABILITY: dict[str, dict] = {
     # ── Mechanical (rotating/heat-exchange): full 5-factor scoring ──

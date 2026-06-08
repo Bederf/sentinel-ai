@@ -219,7 +219,9 @@ def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperating
         message=message,
         location=NarrativeLocation(
             epicenter=epicenter,
-            affected=[_clean_bacnet_id(z) for z in (affected_zones[1:] if raw_epicenter in affected_zones else affected_zones)],
+            affected=[
+                _clean_bacnet_id(z) for z in (affected_zones[1:] if raw_epicenter in affected_zones else affected_zones)
+            ],
             propagation=_propagation_from_issue(issue),
         ),
         action=action,

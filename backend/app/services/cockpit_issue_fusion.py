@@ -180,12 +180,7 @@ class CockpitIssueFusionService:
             if not client:
                 return 0
             site_uuid = self.alert_repo._resolve_site_uuid(site_id)
-            rows = (
-                client.table("zones")
-                .select("id", count="exact")
-                .eq("site_id", site_uuid)
-                .execute()
-            )
+            rows = client.table("zones").select("id", count="exact").eq("site_id", site_uuid).execute()
             return rows.count or 0
         except Exception:
             return 0
@@ -196,13 +191,7 @@ class CockpitIssueFusionService:
             client = self.alert_repo.client
             if not client:
                 return "supervised"
-            row = (
-                client.table("sites")
-                .select("onboarding_phase")
-                .eq("code", site_id)
-                .maybe_single()
-                .execute()
-            )
+            row = client.table("sites").select("onboarding_phase").eq("code", site_id).maybe_single().execute()
             return (row.data or {}).get("onboarding_phase") or "supervised"
         except Exception:
             return "supervised"
