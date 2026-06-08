@@ -63,9 +63,7 @@ EQUIPMENT_EXPECTED_LIFE: dict[str, int] = {
     "bess": 10,
     "generator": 25,
     "ups": 10,
-    "meter": 20,
-    "lighting": 15,
-    "dali": 15,
+    "solar_panel": 25,
 }
 
 
@@ -221,7 +219,14 @@ class SentinelDataSync:
         else:
             # Fresh — proceed with ML ingestion
             try:
-                self.ml_feeder.ingest(equipment_states, simulated_time, data_source=data_source)
+                from app.services.module_registry_service import ModuleRegistryService
+
+                self.ml_feeder.ingest(
+                    equipment_states,
+                    simulated_time,
+                    data_source=data_source,
+                    site_id=ModuleRegistryService._normalize_site_id(self.site_id),
+                )
                 ml_results = self.ml_feeder.train_if_ready()
                 if ml_results:
                     successful = [r for r in ml_results if "error" not in r]
@@ -640,7 +645,8 @@ class SentinelDataSync:
             )
 
             health_int = round(score)
-            updates.append((code, health_int, confidence, "unknown", simulated_time.isoformat()))
+            current_trend = eq.get("health_trend", "unknown")
+            updates.append((code, health_int, confidence, current_trend, simulated_time.isoformat()))
             logger.debug(
                 f"[HEALTH] {code} \u2014 age-based score: {score}%% (no telemetry, install_date={raw_install})"
             )

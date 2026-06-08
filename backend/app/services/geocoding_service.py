@@ -17,6 +17,13 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+def _assert_https_url(url: str) -> None:
+    """Validate that a URL uses HTTPS scheme (prevents file:// injection)."""
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError(f"Only HTTPS URLs allowed, got scheme '{parsed.scheme}'")
+
+
 class GeocodingService:
     """Geocode building addresses and extract GPS orientation."""
 
@@ -37,8 +44,9 @@ class GeocodingService:
         req = urllib.request.Request(url, headers={"User-Agent": "SentinelBMS/1.0"})
 
         try:
-            with urllib.request.urlopen(req, timeout=5) as r:
-                data = json.loads(r.read())
+            _assert_https_url(url)
+            with urllib.request.urlopen(req, timeout=5) as r:  # nosec - scheme validated by _assert_https_url
+                data = json_mod.loads(r.read())
                 if not data:
                     return None
                 d = data[0]
@@ -76,8 +84,6 @@ class GeocodingService:
         Returns:
             List of [lon, lat] polygon coordinates or None if nothing found
         """
-        import urllib.request
-
         overpass_url = "https://overpass-api.de/api/interpreter"
         query = f"""
 [out:json][timeout:15];
@@ -93,7 +99,8 @@ out body geom;
         )
 
         try:
-            with urllib.request.urlopen(req, timeout=20) as r:
+            _assert_https_url(overpass_url)
+            with urllib.request.urlopen(req, timeout=20) as r:  # nosec - scheme validated by _assert_https_url
                 data = json_mod.loads(r.read())
         except Exception as e:
             logger.warning(f"Overpass API failed for ({lat},{lon}): {e}")

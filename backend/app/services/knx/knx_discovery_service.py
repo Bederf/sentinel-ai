@@ -12,8 +12,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import socket
-import xml.etree.ElementTree as ET
 from typing import Any
+
+import defusedxml.ElementTree as ET
 
 logger = logging.getLogger(__name__)
 

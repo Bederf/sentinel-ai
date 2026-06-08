@@ -60,6 +60,7 @@ class ModuleType(StrEnum):
     FUEL_ALERTS = "fuel_alerts"  # Fuel alert notifications (theft, leak, low fuel)
 
 
+# Platform modules — always on, cannot be deactivated regardless of site
 MANDATORY_MODULE_TYPES: frozenset[ModuleType] = frozenset(
     {
         ModuleType.KPI,
@@ -69,6 +70,12 @@ MANDATORY_MODULE_TYPES: frozenset[ModuleType] = frozenset(
         ModuleType.SIMBIOT,
         ModuleType.LOGGING,
         ModuleType.ASSETS,
+    }
+)
+
+# Building system modules — hardware-conditional, require licensing per site
+BUILDING_SYSTEM_MODULE_TYPES: frozenset[ModuleType] = frozenset(
+    {
         ModuleType.HVAC,
         ModuleType.ENERGY,
         ModuleType.LIGHTING,
@@ -76,7 +83,6 @@ MANDATORY_MODULE_TYPES: frozenset[ModuleType] = frozenset(
         ModuleType.WATER,
         ModuleType.FIRE,
         ModuleType.SECURITY,
-        ModuleType.DIGITAL_TWIN,
     }
 )
 
@@ -148,6 +154,8 @@ class ModuleInstance:
     health_score: float = 100.0
     last_telemetry: str | None = None
     error_message: str | None = None
+    licensed: bool = False  # client has purchased/enabled this discipline for this site
+    connected: bool = False  # SIMBIOT confirmed hardware data points for this discipline
 
 
 @dataclass

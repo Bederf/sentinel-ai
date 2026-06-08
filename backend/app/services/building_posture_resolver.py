@@ -26,8 +26,8 @@ def resolve_building_posture(candidates: list[NarrativeCandidate]) -> BuildingPo
         return "critical"
     if soonest_breach is not None and soonest_breach <= 15:
         return "strained"
-    if margin_erosion:
-        return "compensating"
     if high_criticality >= 0.9 and widespread >= 0.6:
         return "strained"
+    if margin_erosion:
+        return "compensating"
     return "drifting"

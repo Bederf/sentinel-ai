@@ -1702,11 +1702,12 @@ export const api = {
    */
   async getAlerts(siteId?: string): Promise<{ alerts: Alert[]; total: number; pending_recommendations: number }> {
     try {
-      const response = await fetchApi<{ total: number; alerts: Alert[]; pending_recommendations: number }>("/api/alerts?limit=50");
+      const qs = siteId ? `?site_id=${encodeURIComponent(siteId)}&limit=50` : "?limit=50";
+      const response = await fetchApi<{ total: number; alerts: Alert[]; pending_recommendations: number }>(`/api/alerts${qs}`);
       const alerts = response.alerts || [];
       return {
         alerts: siteId ? alerts.filter((a) => a.site_id === siteId) : alerts,
-        total: response.total ?? alerts.length,
+        total: siteId ? alerts.filter((a) => a.site_id === siteId).length : (response.total ?? alerts.length),
         pending_recommendations: response.pending_recommendations ?? 0,
       };
     } catch (err) {

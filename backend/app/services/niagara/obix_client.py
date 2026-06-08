@@ -15,8 +15,9 @@ import logging
 import os
 from datetime import datetime
 from typing import Any
-from xml.etree import ElementTree as ET
 
+import defusedxml.ElementTree as ET
+from xml.etree.ElementTree import Element as _XmlElement
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -404,7 +405,7 @@ class OBIXClient:
 
         return result
 
-    def _extract_value_from_element(self, elem: ET.Element) -> dict[str, Any]:
+    def _extract_value_from_element(self, elem: _XmlElement) -> dict[str, Any]:
         """Extract value, status, and type from an oBIX element."""
         tag = elem.tag.split("}")[-1] if "}" in elem.tag else elem.tag
         val = elem.attrib.get("val")
@@ -488,7 +489,7 @@ class OBIXClient:
 
         return records
 
-    def _parse_history_record(self, elem: ET.Element) -> dict[str, Any] | None:
+    def _parse_history_record(self, elem: _XmlElement) -> dict[str, Any] | None:
         """Parse a single history record element."""
         timestamp = None
         value = None
@@ -560,7 +561,7 @@ class OBIXClient:
 
         return alarms
 
-    def _parse_alarm_record(self, elem: ET.Element) -> dict[str, Any] | None:
+    def _parse_alarm_record(self, elem: _XmlElement) -> dict[str, Any] | None:
         """Parse a single alarm record element."""
         alarm = {
             "alarm_id": None,
@@ -596,7 +597,7 @@ class OBIXClient:
             return alarm
         return None
 
-    def _find_element_by_name(self, root: ET.Element, name: str) -> ET.Element | None:
+    def _find_element_by_name(self, root: _XmlElement, name: str) -> _XmlElement | None:
         """Find a child element by its 'name' attribute."""
         for child in root:
             if child.attrib.get("name") == name:

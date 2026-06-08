@@ -155,6 +155,22 @@ function extractFloorCode(value: string | null | undefined): string | null {
   return match?.[1]?.toUpperCase() ?? null
 }
 
+function formatZoneLabel(zoneId: string): string {
+  // Zone-XXX format → use floor code + remaining
+  if (zoneId.startsWith('Zone-')) {
+    const floorCode = extractFloorCode(zoneId)
+    const suffix = zoneId.replace(/^Zone-[A-Z]\d+-/, '').replace(/-/g, ' ')
+    const floor = floorCode ? formatFloorLabel(floorCode) : ''
+    return suffix && floor ? `${floor} — ${suffix}` : (floor || suffix || zoneId)
+  }
+  // Floor code only (B1, L2, etc.)
+  if (/^(R|L\d+|G|B\d+)$/i.test(zoneId)) return formatFloorLabel(zoneId)
+  // Equipment code like S002-CHILLER-001 → keep as-is (meaningful to operator)
+  if (/^S\d+-/.test(zoneId)) return zoneId
+  // Fallback: basic cleanup
+  return zoneId.replace(/-/g, ' ')
+}
+
 function formatFloorLabel(floorId: string): string {
   if (floorId === 'B1') return 'Basement'
   if (floorId === 'L0') return 'Ground Floor'
@@ -934,7 +950,7 @@ export function mapCockpitState(
         const floorId = extractFloorCode(zoneId) ?? focusFloorId ?? floorOrder[Math.min(index, floorOrder.length - 1)] ?? 'L0'
         return {
           zoneId,
-          label: zoneId.replace(/^Zone-/, '').replace(/-/g, ' '),
+          label: formatZoneLabel(zoneId),
           floorId,
           meshId: `mesh:${zoneId.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
           level: index === 0 ? riskLevelFromTone(tone) : tone === 'critical' ? 'approaching' : riskLevelFromTone(tone),

@@ -17,7 +17,9 @@ from typing import Any
 
 from app.config.settings import settings
 from app.models.module_registry import (
+    BUILDING_SYSTEM_MODULE_TYPES,
     INTEGRATION_DEFINITIONS,
+    MANDATORY_MODULE_TYPES,
     MODULE_DEFINITIONS,
     AIRecommendation,
     CrossModuleLink,
@@ -124,6 +126,8 @@ class ModuleRegistryService:
                         health_score=m.get("health_score", 100.0),
                         last_telemetry=m.get("last_telemetry"),
                         error_message=m.get("error_message"),
+                        licensed=m.get("licensed", False),
+                        connected=m.get("connected", False),
                     )
                     for m in module_rows
                 ],
@@ -202,6 +206,7 @@ class ModuleRegistryService:
                         "health_score": m.health_score,
                         "last_telemetry": m.last_telemetry,
                         "error_message": m.error_message,
+                        "licensed": m.licensed,
                         "updated_at": datetime.utcnow().isoformat(),
                     },
                     on_conflict="instance_id",
@@ -266,6 +271,8 @@ class ModuleRegistryService:
                     health_score=m.get("health_score", 100.0),
                     last_telemetry=m.get("last_telemetry"),
                     error_message=m.get("error_message"),
+                    licensed=m.get("licensed", False),
+                    connected=m.get("connected", False),
                 )
                 for m in data.get("active_modules", [])
             ],
@@ -300,6 +307,8 @@ class ModuleRegistryService:
                     "health_score": m.health_score,
                     "last_telemetry": m.last_telemetry,
                     "error_message": m.error_message,
+                    "licensed": m.licensed,
+                    "connected": m.connected,
                 }
                 for m in config.active_modules
             ],
@@ -334,19 +343,44 @@ class ModuleRegistryService:
 
     def get_site_config(self, site_id: str) -> SiteModuleConfig | None:
         """Get module configuration for a site."""
+        site_id = self._normalize_site_id(site_id)
         return self._site_configs.get(site_id)
 
     def get_active_modules(self, site_id: str) -> list[ModuleInstance]:
-        """Get all active modules for a site."""
+        """Get all active modules for a site.
+        site_id = self._normalize_site_id(site_id)
+
+        A module is operationally active only when:
+        - status = ACTIVE, AND
+        - licensed = True OR module is a mandatory platform module
+        """
         config = self._site_configs.get(site_id)
         if not config:
             return []
-        return [m for m in config.active_modules if m.status == ModuleStatus.ACTIVE]
+        return [
+            m
+            for m in config.active_modules
+            if m.status == ModuleStatus.ACTIVE and (m.licensed or m.module_type in MANDATORY_MODULE_TYPES)
+        ]
 
     def is_module_active(self, site_id: str, module_type: ModuleType) -> bool:
-        """Check if a specific module is active for a site."""
+        """Check if a specific module is active for a site.
+        site_id = self._normalize_site_id(site_id)
+
+        Mandatory platform modules are always considered active regardless of licensed flag.
+        """
+        if module_type in MANDATORY_MODULE_TYPES:
+            return True
         modules = self.get_active_modules(site_id)
         return any(m.module_type == module_type for m in modules)
+
+    @staticmethod
+    def _normalize_site_id(site_id: str) -> str:
+        """Normalize site_id to ``site-NNN`` format."""
+        normalized = site_id.strip().lower().replace("_", "-")
+        if normalized.startswith("s") and len(normalized) == 4 and normalized[1:].isdigit():
+            return f"site-{normalized[1:]}"
+        return normalized
 
     def activate_module(
         self, site_id: str, site_name: str, module_type: ModuleType, config: dict[str, Any] | None = None
@@ -356,6 +390,8 @@ class ModuleRegistryService:
 
         Creates cross-module links automatically if auto_integration is enabled.
         """
+        site_id = self._normalize_site_id(site_id)
+
         # Get or create site config
         if site_id not in self._site_configs:
             self._site_configs[site_id] = SiteModuleConfig(site_id=site_id, site_name=site_name)
@@ -366,11 +402,12 @@ class ModuleRegistryService:
         existing = next((m for m in site_config.active_modules if m.module_type == module_type), None)
         if existing:
             existing.status = ModuleStatus.ACTIVE
+            existing.licensed = True
             existing.error_message = None
             self._save_configs()
             return existing
 
-        # Create new module instance
+        # Create new module instance — explicit activation implies licensing
         instance = ModuleInstance(
             instance_id=f"{site_id}-{module_type.value}-{uuid.uuid4().hex[:8]}",
             site_id=site_id,
@@ -378,6 +415,7 @@ class ModuleRegistryService:
             status=ModuleStatus.ACTIVE,
             activated_at=datetime.utcnow().isoformat(),
             config=config or {},
+            licensed=True,
         )
 
         site_config.active_modules.append(instance)
@@ -392,11 +430,11 @@ class ModuleRegistryService:
         return instance
 
     def deactivate_module(self, site_id: str, module_type: ModuleType) -> bool:
-        """
-        Deactivate a module for a site (idempotent operation).
+        """Deactivate a module for a site (idempotent operation).
 
         Returns True even if module not found (idempotent behavior for safety).
         """
+        site_id = self._normalize_site_id(site_id)
         if module_type in NON_DEACTIVATABLE_MODULES:
             raise ValueError(f"{module_type.value} is part of the base pack and cannot be deactivated")
 
@@ -826,12 +864,59 @@ class ModuleRegistryService:
             ),
         }
 
+    def license_module(self, site_id: str, module_type: ModuleType) -> bool:
+        """License a building system module for a site.
+
+        site_id = self._normalize_site_id(site_id)
+        Makes it visible in the UI and eligible for monitoring.
+        If the module is not yet in active_modules, activates it.
+        """
+        config = self._site_configs.get(site_id)
+        if not config:
+            return False
+
+        for module in config.active_modules:
+            if module.module_type == module_type:
+                module.licensed = True
+                self._save_configs()
+                logger.info(f"Licensed module {module_type.value} for site {site_id}")
+                return True
+
+        # Module not yet in active_modules — activate and license it
+        self.activate_module(site_id, config.site_name, module_type)
+        return True
+
+    def unlicense_module(self, site_id: str, module_type: ModuleType) -> bool:
+        """Remove license for a building system module.
+
+        site_id = self._normalize_site_id(site_id)
+        Hides it from the UI and stops monitoring.
+        Cannot unlicense mandatory platform modules.
+        """
+        if module_type in MANDATORY_MODULE_TYPES:
+            raise ValueError(f"{module_type.value} is a platform module and cannot be unlicensed")
+
+        config = self._site_configs.get(site_id)
+        if not config:
+            return True  # Idempotent
+
+        for module in config.active_modules:
+            if module.module_type == module_type:
+                module.licensed = False
+                self._save_configs()
+                logger.info(f"Unlicensed module {module_type.value} for site {site_id}")
+                return True
+
+        return True  # Idempotent
+
     def ensure_base_modules(self, site_id: str, site_name: str) -> list[str]:
-        """Ensure all 15 mandatory base modules exist and are active for a site.
+        """Ensure all 7 mandatory platform modules exist and are active for a site.
 
         Idempotent — activating an existing module is a no-op.
+        Building system modules are NOT seeded here — they require explicit licensing.
         Returns list of module_types that were newly created.
         """
+        site_id = self._normalize_site_id(site_id)
         from app.models.module_registry import MANDATORY_MODULES
 
         created = []

@@ -15,6 +15,7 @@ export interface BuildingSystemCard {
   baseModule: ModuleType;
   controlModule?: ModuleType;
   description: string;
+  licensed: boolean;
 }
 
 const PLATFORM_MODULE_TYPES = new Set<ModuleType>([
@@ -27,6 +28,9 @@ const PLATFORM_MODULE_TYPES = new Set<ModuleType>([
   "assets",
 ]);
 
+// All 7 building system modules — require licensing per site.
+// Monitoring is always on when licensed; control is a separate toggle.
+// Digital Twin is a visualization add-on (listed in Add-ons), not a building system.
 const BUILDING_SYSTEM_MODULE_TYPES = new Set<ModuleType>([
   "hvac",
   "energy",
@@ -35,7 +39,6 @@ const BUILDING_SYSTEM_MODULE_TYPES = new Set<ModuleType>([
   "water",
   "fire",
   "security",
-  "digital_twin",
 ]);
 
 const CONTROL_MODULE_BY_BASE: Partial<Record<ModuleType, ModuleType>> = {
@@ -45,7 +48,6 @@ const CONTROL_MODULE_BY_BASE: Partial<Record<ModuleType, ModuleType>> = {
   solar: "solar_control",
   water: "water_control",
   security: "security_control",
-  digital_twin: "digital_twin_control",
 };
 
 function sortModules(modules: ModuleDefinition[]): ModuleDefinition[] {
@@ -64,7 +66,7 @@ export function getPlatformStatusCards(modules: ModuleDefinition[]): FeatureTogg
     }));
 }
 
-export function getBuildingSystemCards(modules: ModuleDefinition[]): BuildingSystemCard[] {
+export function getBuildingSystemCards(modules: ModuleDefinition[], controller?: { isModuleActive: (type: ModuleType) => boolean }): BuildingSystemCard[] {
   const moduleMap = new Map(modules.map((moduleDef) => [moduleDef.module_type, moduleDef]));
   return sortModules(modules)
     .filter((moduleDef) => BUILDING_SYSTEM_MODULE_TYPES.has(moduleDef.module_type))
@@ -76,6 +78,7 @@ export function getBuildingSystemCards(modules: ModuleDefinition[]): BuildingSys
         ? CONTROL_MODULE_BY_BASE[moduleDef.module_type]
         : undefined,
       description: moduleDef.description,
+      licensed: controller ? controller.isModuleActive(moduleDef.module_type) : false,
     }));
 }
 

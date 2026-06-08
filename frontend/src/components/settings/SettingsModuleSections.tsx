@@ -142,11 +142,11 @@ function BuildingSystemToggle({
 }
 
 function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
-  const buildingSystemCards = getBuildingSystemCards(controller.availableModules);
+  const buildingSystemCards = getBuildingSystemCards(controller.availableModules, controller);
   const canToggleControl = controller.canToggleControl ?? false;
 
   return (
-    <ModuleCard description="Monitoring always on. Toggle control features per discipline." icon={<Gauge className="h-5 w-5" />} title="Building Systems">
+    <ModuleCard description="Licensed monitoring per discipline. Toggle control features separately." icon={<Gauge className="h-5 w-5" />} title="Building Systems">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         {buildingSystemCards.map((card) => {
           const controlActive = card.controlModule ? controller.isModuleActive(card.controlModule) : false;
@@ -157,9 +157,15 @@ function BuildingSystemsCard({ controller }: { controller: ReturnType<typeof use
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>{card.label}</h3>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>
-                      Monitoring
-                    </span>
+                    {card.licensed ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)" }}>
+                        Licensed
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: "rgba(107, 114, 128, 0.15)", color: "var(--color-sentinel-text-disabled)" }}>
+                        Not Licensed
+                      </span>
+                    )}
                   </div>
                   <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>{card.description}</p>
                   <BuildingSystemToggle

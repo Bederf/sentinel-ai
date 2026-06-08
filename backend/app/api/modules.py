@@ -261,6 +261,46 @@ async def deactivate_module(
     return {"status": "deactivated", "module_type": module_type, "site_id": site_id}
 
 
+@router.patch("/sites/{site_id}/modules/{module_type}/license")
+async def license_module(
+    site_id: str,
+    module_type: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
+    """License a building system module for a site."""
+    try:
+        mt = ModuleType(module_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Unknown module type: {module_type}")
+
+    try:
+        module_registry.license_module(site_id, mt)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+    return {"site_id": site_id, "module_type": module_type, "licensed": True}
+
+
+@router.patch("/sites/{site_id}/modules/{module_type}/unlicense")
+async def unlicense_module(
+    site_id: str,
+    module_type: str,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
+    """Remove license for a building system module."""
+    try:
+        mt = ModuleType(module_type)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Unknown module type: {module_type}")
+
+    try:
+        module_registry.unlicense_module(site_id, mt)
+    except ValueError as exc:
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
+
+    return {"site_id": site_id, "module_type": module_type, "licensed": False}
+
+
 @router.get("/site/{site_id}/check/{module_type}")
 async def check_module_active(site_id: str, module_type: str, request: Request):
     """Check if a specific module is active for a site."""

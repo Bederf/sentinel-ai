@@ -21,10 +21,13 @@ from app.api.cockpit import (
 
 
 def _make_jwt_headers() -> dict:
-    """Generate a minimal valid JWT for cockpit API tests."""
+    """Generate a minimal valid JWT for cockpit API tests using settings."""
     import jwt as pyjwt
+    from app.config.settings import settings
 
-    secret = os.environ.get("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
+    secret = settings.jwt_secret_key or os.environ.get(
+        "JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars"
+    )
     payload = {
         "sub": "operator-test-user",
         "email": "operator@test.sentinel.local",
@@ -115,7 +118,7 @@ async def test_get_decision_returns_payload(monkeypatch):
     monkeypatch.setattr(
         cockpit_api.cockpit_issue_service,
         "aggregate",
-        lambda site_id, **kwargs: ([issue], statuses, [], issue.id),
+        lambda site_id, **kwargs: ([issue], [], statuses, [], issue.id),
     )
 
     response = await cockpit_api.get_cockpit_decision("S002")
@@ -137,7 +140,7 @@ async def test_get_decision_returns_null_when_no_issues(monkeypatch):
     monkeypatch.setattr(
         cockpit_api.cockpit_issue_service,
         "aggregate",
-        lambda site_id, **kwargs: ([], [], [], None),
+        lambda site_id, **kwargs: ([], [], [], [], None),
     )
 
     response = await cockpit_api.get_cockpit_decision("S002")
@@ -243,7 +246,7 @@ async def test_decision_payload_uses_cached_issue_state(monkeypatch):
     monkeypatch.setattr(
         cockpit_api.cockpit_issue_service,
         "aggregate",
-        lambda site_id, **kwargs: ([issue], statuses, [], issue.id),
+        lambda site_id, **kwargs: ([issue], [], statuses, [], issue.id),
     )
 
     payload = await cockpit_api._build_cockpit_payload("S002")
@@ -287,7 +290,7 @@ async def test_api_get_decision_with_issues(monkeypatch):
     monkeypatch.setattr(
         c.cockpit_issue_service,
         "aggregate",
-        lambda site_id, **kw: ([issue], [source], [], issue.id),
+        lambda site_id, **kw: ([issue], [], [source], [], issue.id),
     )
 
     async with AsyncClient(

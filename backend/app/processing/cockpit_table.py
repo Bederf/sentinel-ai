@@ -73,6 +73,35 @@ _CASCADE_ELIGIBLE_TYPES: frozenset[str] = frozenset(
     }
 )
 
+# ---------------------------------------------------------------------------
+# Phase 225 — advisory mode intelligence filter
+# ---------------------------------------------------------------------------
+
+CASCADE_PROMOTE_THRESHOLD: int = 3
+
+# bacnet_bridge alerts normalize to source="bms" in our pipeline
+FAULT_ECHO_SOURCES: frozenset[str] = frozenset({"bms"})
+
+FAULT_ECHO_TYPES: frozenset[str] = frozenset(
+    {
+        "fault_state",
+        "change_of_state",
+        "out_of_range",
+        "unsigned_range",
+        "equipment_alert",
+        "equipment_fault",
+        "ahu_fault",
+        "fcu_fault",
+        "chiller_alarm",
+        "co2_alert",
+        "co2_high",
+        "bacnet_alarm",
+    }
+)
+
+# IssueSource values (Literal) that represent SENTINEL-generated intelligence
+ADVISORY_ALLOWED_SOURCES: frozenset[str] = frozenset({"ai"})
+
 
 # ---------------------------------------------------------------------------
 # Internal record type — pure data, no I/O
@@ -141,7 +170,16 @@ def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
             ),
         )
         rep = members_sorted[0]
-        count = len(members)
+
+        # Count distinct zones (not raw alarm rows — one zone can fire many alerts)
+        distinct_zones: set[str] = set()
+        for m in members:
+            for zid in m.issue.location.zone_ids or []:
+                distinct_zones.add(zid)
+            if not m.issue.location.zone_ids:
+                for aid in m.issue.location.asset_ids or []:
+                    distinct_zones.add(aid)
+        count = len(distinct_zones) if distinct_zones else len(members)
 
         is_co2 = "co2" in raw_type or any("co2" in (m.issue.title or "").lower() for m in members)
 
@@ -162,6 +200,8 @@ def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
 
         sla_values = [m.issue.sla_due_at for m in members if m.issue.sla_due_at]
         member_asset_ids = [m.issue.location.asset_ids[0] for m in members if m.issue.location.asset_ids]
+        # Use a semantically meaningful group_type (used by _enrich_cascade_summary)
+        effective_type = "co2_alert" if is_co2 else raw_type
 
         result.append(
             _NormalizedIssue(
@@ -174,7 +214,7 @@ def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
                         "member_count": count,
                         "member_ids": [m.issue.id for m in members],
                         "member_equipment_ids": member_asset_ids,
-                        "group_type": raw_type,
+                        "group_type": effective_type,
                     }
                 ),
                 priority=rep.priority,
@@ -210,6 +250,96 @@ def _apply_rail_limit(
     return items[:_PRIMARY_RAIL_LIMIT], items[_PRIMARY_RAIL_LIMIT:]
 
 
+def _enrich_cascade_summary(item: _NormalizedIssue, zone_count: int = 0) -> _NormalizedIssue:
+    """Promote a grouped BACnet cascade into a SENTINEL intelligence insight.
+
+    Groups with member_count >= CASCADE_PROMOTE_THRESHOLD are reclassified to
+    source='ai' (SENTINEL inference) and given predictive root-cause framing.
+    Single-member items and small groups pass through unchanged.
+
+    zone_count: known zone count for the site.  When > 0, CO2 cascade counts are
+    capped at zone_count — BACnet alerts carry no zone_id, so member_count reflects
+    distinct sensor points (many per zone).  min(sensor_points, zone_count) gives
+    the correct "zones affected" display count.
+    """
+    if not item.issue.is_group or item.issue.member_count < CASCADE_PROMOTE_THRESHOLD:
+        return item
+
+    # Normalise before matching — BACnet type field may arrive in any case
+    group_type_lower = (item.issue.group_type or "").lower()
+    raw_count = item.issue.member_count
+
+    if "co2" in group_type_lower or "unsigned_range" in group_type_lower:
+        # BACnet alerts carry no zone_id; member_count = distinct sensor points.
+        # Cap at zone_count so the display reflects zones, not sensors.
+        count = min(raw_count, zone_count) if zone_count > 0 else raw_count
+        new_title = f"Fresh air disruption — {count} zones affected"
+        new_summary = (
+            f"CO2 is elevated across {count} zones. "
+            f"Root cause: fresh air supply interrupted — inspect AHUs and cooling plant. "
+            f"Comfort breach risk increases with each additional 30-minute window."
+        )
+    elif "change_of_state" in group_type_lower or "fault_state" in group_type_lower or group_type_lower == "fault":
+        count = raw_count
+        new_title = f"Equipment cascade — {count} units in fault state"
+        new_summary = (
+            f"{count} units reporting fault state simultaneously. "
+            f"Likely upstream cause: cooling plant or power supply. "
+            f"Investigate common upstream dependencies before resetting individual units."
+        )
+    else:
+        return item
+
+    return _NormalizedIssue(
+        issue=item.issue.model_copy(update={"title": new_title, "summary": new_summary, "source": "ai"}),
+        priority=item.priority,
+        dedupe_key=item.dedupe_key,
+        updated_at=item.updated_at,
+    )
+
+
+def _filter_advisory_echoes(
+    items: list[_NormalizedIssue],
+    onboarding_phase: str,
+) -> list[_NormalizedIssue]:
+    """In advisory mode: remove raw BMS fault echoes from the decision rail.
+
+    Cascade groups (is_group=True, member_count >= CASCADE_PROMOTE_THRESHOLD)
+    are retained — _enrich_cascade_summary has already promoted them to
+    source='ai' (SENTINEL intelligence).  Raw individual BMS fault rows are
+    excluded.  All phases other than 'advisory' pass through unchanged.
+    """
+    if onboarding_phase != "advisory":
+        return items
+
+    filtered: list[_NormalizedIssue] = []
+    for item in items:
+        source = item.issue.source
+        raw_type = item.dedupe_key.split("|")[-1] if "|" in item.dedupe_key else ""
+        is_group = item.issue.is_group
+        member_count = item.issue.member_count
+
+        # Promoted cascade intelligence — always keep
+        if is_group and member_count >= CASCADE_PROMOTE_THRESHOLD:
+            filtered.append(item)
+            continue
+
+        # Raw BMS fault echo — exclude from advisory decision rail
+        if source in FAULT_ECHO_SOURCES and raw_type in FAULT_ECHO_TYPES:
+            continue
+
+        # SENTINEL-generated intelligence (ML, AI, energy optimiser) — keep
+        if source in ADVISORY_ALLOWED_SOURCES:
+            filtered.append(item)
+            continue
+
+        # Non-BMS sources not covered above — keep
+        if source not in FAULT_ECHO_SOURCES:
+            filtered.append(item)
+
+    return filtered
+
+
 # ---------------------------------------------------------------------------
 # Processor
 # ---------------------------------------------------------------------------
@@ -231,6 +361,8 @@ class CockpitTableProcessor:
         *,
         bridge_last_updated: datetime | None = None,
         recommendations: list[dict[str, Any]] | None = None,
+        onboarding_phase: str = "supervised",
+        zone_count: int = 0,
     ) -> tuple[list[CockpitIssue], list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
         """Combine issue sources into a deduplicated, grouped, rail-limited feed.
 
@@ -241,6 +373,11 @@ class CockpitTableProcessor:
             audit_logs:        Audit-trail rows (pre-merged by the caller).
             selected_issue_id: ID to keep selected; falls back to top issue.
             recommendations:   AI recommendation rows (source = "ai", priority -1).
+            onboarding_phase:  Site onboarding phase; "advisory" activates the
+                               intelligence filter (Phase 225).
+            zone_count:        Known zone count for the site; used to cap CO2
+                               cascade display counts (BACnet alerts carry no
+                               zone_id, so sensor-point count ≠ zone count).
 
         Returns:
             (primary_issues, overflow_issues, source_statuses, audit_trail, selected_id)
@@ -255,8 +392,13 @@ class CockpitTableProcessor:
             normalized.extend(CockpitTableProcessor._to_normalized_issues(recommendations, source="ai", priority=-1))
 
         deduped = CockpitTableProcessor._dedupe(normalized)
+        # Phase 224 — cascade grouping
         grouped = _group_cascades(deduped)
-        primary_items, overflow_items = _apply_rail_limit(grouped)
+        # Phase 225 — enrich BACnet cascade groups into SENTINEL intelligence
+        enriched = [_enrich_cascade_summary(item, zone_count=zone_count) for item in grouped]
+        # Phase 225 — advisory mode filter: raw echoes out, interpreted insights in
+        filtered = _filter_advisory_echoes(enriched, onboarding_phase)
+        primary_items, overflow_items = _apply_rail_limit(filtered)
 
         selected = selected_issue_id
         if selected and selected not in {item.issue.id for item in primary_items}:
@@ -319,11 +461,62 @@ class CockpitTableProcessor:
         risk = str(entry.get("risk_level", "medium")).lower()
         severity = "critical" if risk in ("critical", "mission_critical") else "high" if risk == "high" else "medium"
         recommended_action = action.get("point") if isinstance(action, dict) else str(action)
+        action_type = entry.get("action_type", "optimization")
+
+        # Phase 227 — maintenance gap: single grouped issue for equipment cohort
+        meta = entry.get("metadata") or {}
+        is_gap = action_type == "maintenance_gap"
+        if is_gap:
+            member_count = meta.get("member_count", 0)
+            member_ids = meta.get("member_ids", [])
+            member_equipment_ids = meta.get("member_codes", [])
+            eq_type = meta.get("equipment_type", "equipment")
+            title = f"{eq_type.upper()} maintenance gap — {member_count} units"
+            summary = (
+                f"{member_count} {eq_type} units averaging health score {meta.get('avg_health_score', '?')} "
+                f"with no recorded maintenance history. "
+                f"Recommend priority inspection before next occupancy cycle."
+            )
+            return CockpitIssue(
+                id=str(entry.get("id", uuid4())),
+                title=title,
+                summary=summary,
+                severity=severity,
+                source="ai",
+                status="new",
+                opened_at=CockpitTableProcessor._parse_datetime(entry.get("timestamp")) or now,
+                updated_at=CockpitTableProcessor._parse_datetime(entry.get("timestamp")) or now,
+                sla_due_at=now + timedelta(hours=4),
+                stale=False,
+                impact_summary=f"Systemic {eq_type} degradation — {member_count} units affected",
+                cause_hypothesis=f"7 {eq_type} units at health_score <= 65 with no service history",
+                recommended_action="Priority inspection of all affected units",
+                confidence=float(entry.get("confidence_score") or 0.7),
+                confidence_label="Medium confidence",
+                issue_category="fault",
+                subsystem="hvac",
+                constraint_type="asset",
+                location=CockpitIssueLocation(
+                    zone_ids=[],
+                    asset_ids=member_ids[:1] if member_ids else [],
+                    floor_id=entry.get("floor_id"),
+                ),
+                evidence_refs=[
+                    CockpitIssueEvidenceRef(
+                        id=str(entry.get("id", "")), kind="recommendation", label=risk, source="ai"
+                    ),
+                ],
+                source_record_id=str(entry.get("id")),
+                is_group=True,
+                member_count=member_count,
+                member_ids=member_ids,
+                member_equipment_ids=member_equipment_ids,
+                group_type="maintenance_gap",
+            )
+
         return CockpitIssue(
             id=str(entry.get("id", uuid4())),
-            title=f"AI: {entry.get('action_type', 'optimization')} — {equipment_id}"
-            if equipment_id
-            else f"AI: {entry.get('action_type', 'optimization')}",
+            title=f"AI: {action_type} — {equipment_id}" if equipment_id else f"AI: {action_type}",
             summary=entry.get("reason") or entry.get("description") or "",
             severity=severity,
             source="ai",

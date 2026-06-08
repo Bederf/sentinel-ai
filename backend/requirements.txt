@@ -87,6 +87,7 @@ bcrypt>=4.2.0
 
 # Encryption (Phase 1b FSR Compliance - Cryptography)
 cryptography>=42.0.0  # AES-256 encryption for audit logs and PII at rest
+defusedxml>=0.7.1     # Secure XML parsing (XXE/bomb protection)
 
 # DXF File Parsing (Phase B: Digital Twin Builder)
 # AutoCAD/CAD drawing support for equipment extraction

@@ -273,6 +273,7 @@ class SentinelMLFeeder:
         equipment_states: dict[str, dict[str, Any]],
         simulated_time: datetime,
         data_source: str = "bridge_poll",
+        site_id: str = "",
     ) -> None:
         """Ingest one cycle of equipment sensor data (call once per poll/integration).
 
@@ -284,6 +285,7 @@ class SentinelMLFeeder:
             simulated_time: Current timestamp
             data_source: Tag for model filtering ("bridge_poll", "bms_event",
                          "inspection", "work_order_feedback")
+            site_id: Site code (e.g. ``"site-002"``) for module licensing gate.
         """
         for code, state in equipment_states.items():
             equip_type = state.get("type", "").lower()
@@ -293,6 +295,27 @@ class SentinelMLFeeder:
             readings = state.get("sensor_readings", {})
             if not readings:
                 continue
+
+            # Phase 226 — skip passive devices (DALI, meters, sensors) in ML pipeline
+            from app.config.health_config import get_scoreability
+
+            if not get_scoreability(equip_type).get("scoreable", False):
+                continue
+
+            # Licensing gate — skip ML processing for equipment types whose
+            # module is not licensed for this site
+            if site_id:
+                from app.models.module_registry import ModuleType as _ModuleType
+                from app.services.module_registry_service import module_registry as _module_registry
+                from app.services.simbiot.connection_policy import infer_module_from_equipment_type as _infer_module
+
+                mt = _infer_module(equip_type)
+                if (
+                    mt
+                    and mt not in (_ModuleType.KPI, _ModuleType.ML, _ModuleType.ASSETS)
+                    and not _module_registry.is_module_active(site_id, mt)
+                ):
+                    continue
 
             self._code_to_type[code] = equip_type
 

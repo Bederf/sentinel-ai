@@ -142,7 +142,7 @@ class TierRoutingEngine:
             site_phase = (
                 (phase_row.data[0].get("onboarding_phase") or "commissioning") if phase_row.data else "commissioning"
             )
-            if site_phase in ("commissioning", "shadow_live"):
+            if site_phase in ("commissioning", "shadow_live", "advisory"):
                 logger.info("Phase %s caps Tier 1 (advisory only) for %s", site_phase, recommendation.get("site_id"))
                 emit_decision_event(
                     "tier_routing.decided",

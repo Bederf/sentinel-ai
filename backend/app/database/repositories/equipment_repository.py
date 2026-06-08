@@ -196,6 +196,31 @@ class EquipmentRepository:
 
         return response.data
 
+    def get_maintenance_gap_candidates(self, site_uuid: str, health_threshold: int = 65) -> list[dict[str, Any]]:
+        """Get equipment with low health, no maintenance history, at a given site.
+
+        Phase 227 — identifies candidates for maintenance gap detection:
+        ``health_score <= threshold AND last_service IS NULL``.
+
+        Args:
+            site_uuid: Site UUID.
+            health_threshold: Maximum health score to include (default 65).
+
+        Returns:
+            List of equipment matching the gap criteria.
+        """
+        from app.config.health_config import get_scoreability
+
+        response = (
+            self.client.table("equipment")
+            .select("id, code, type, health_score, site_id, install_date, last_service")
+            .eq("site_id", site_uuid)
+            .lte("health_score", health_threshold)
+            .is_("last_service", "null")
+            .execute()
+        )
+        return [eq for eq in (response.data or []) if get_scoreability(eq.get("type", "")).get("scoreable", False)]
+
     def create(self, equipment_data: dict[str, Any]) -> dict[str, Any]:
         """Create new equipment.
 

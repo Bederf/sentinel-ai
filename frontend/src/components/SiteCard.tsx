@@ -119,6 +119,13 @@ export function SiteCard({
   const safeFraction =
     totalCount > 0 ? `${safeCount}/${totalCount}` : `${site.equipment_count}`;
 
+  const isBridgeDegraded =
+    site.bridge_connected === false &&
+    site.bridge_data_source !== undefined &&
+    site.bridge_data_source !== "none";
+
+  const effectiveStatus = isBridgeDegraded ? "degraded" : (site.status ?? "normal");
+
   const statusBorderColor: Record<string, string> = {
     normal:  "var(--color-sentinel-green)",
     warning: "var(--color-sentinel-amber)",
@@ -127,7 +134,7 @@ export function SiteCard({
     degraded:"var(--color-sentinel-amber)",
     at_risk: "var(--color-sentinel-red)",
   };
-  const borderColor = statusBorderColor[site.status ?? "normal"] ?? "var(--color-sentinel-border)";
+  const borderColor = statusBorderColor[effectiveStatus] ?? "var(--color-sentinel-border)";
 
   return (
     <div
@@ -135,18 +142,24 @@ export function SiteCard({
       tabIndex={onClick ? 0 : undefined}
       onClick={onClick ? () => onClick(site) : undefined}
       onKeyDown={onClick ? (e) => e.key === "Enter" && onClick(site) : undefined}
-      className={onClick ? "cursor-pointer hover:brightness-110 transition-all" : ""}
+      className={`relative overflow-hidden${onClick ? " cursor-pointer hover:brightness-110 transition-all" : ""}`}
       aria-label={`${site.name}${onClick ? ', click to view details' : ''}`}
       style={{
         background: "var(--color-sentinel-bg-panel)",
-        border: `1.5px solid ${borderColor}`,
+        border: `1px solid ${borderColor}`,
         borderRadius: "8px",
         padding: "16px",
+        paddingTop: "20px",
         display: "flex",
         flexDirection: "column",
         gap: "8px",
       }}
     >
+      {/* Status accent bar — thicker to match KPI card styling */}
+      <div
+        className="absolute top-0 left-0 right-0 h-1.5"
+        style={{ background: borderColor }}
+      />
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
@@ -165,7 +178,7 @@ export function SiteCard({
             </p>
           )}
         </div>
-        <StatusBadge status={site.status ?? "normal"} />
+        <StatusBadge status={effectiveStatus} />
       </div>
 
       {/* Type badge */}
@@ -262,7 +275,14 @@ export function SiteCard({
 
       {/* Bridge connection indicator */}
       {site.bridge_connected !== undefined && (
-        <div className="flex items-center gap-1.5">
+        <div
+          className="flex items-center gap-1.5"
+          title={
+            site.bridge_connected
+              ? "Live telemetry flowing from BMS protocol adapters"
+              : "No live telemetry from BMS bridge — alerts reflect last known state only. Site monitoring is degraded."
+          }
+        >
           {site.bridge_connected ? (
             <Wifi className="w-3.5 h-3.5" style={{ color: "var(--color-sentinel-green)" }} />
           ) : (

@@ -19,6 +19,29 @@ def normalize_site_id(site_id: str) -> str:
     return normalized
 
 
+def _clean_bacnet_id(loc_id: str) -> str:
+    """Convert BACnet object addresses to human-readable labels.
+
+    BACnet bridge alerts produce asset_ids like ``nc:10|obj:analogInput,8150``.
+    This extracts the object type and instance as a readable label
+    (e.g. ``Analog Input 8130``).  Equipment codes like ``S002-CHILLER-001``
+    are passed through unchanged.
+    """
+    import re as _re
+
+    if loc_id.startswith("nc:"):
+        parts = loc_id.split("|")
+        if len(parts) >= 2:
+            obj_part = parts[1]
+            if ":" in obj_part:
+                obj_spec = obj_part.split(":", 1)[1]
+                readable = _re.sub(r"([a-z])([A-Z])", r"\1 \2", obj_spec)
+                return readable.replace(",", " ").replace("_", " ").title()
+            return obj_part
+        return loc_id
+    return loc_id
+
+
 def _extract_asset_type(issue: CockpitIssue) -> str | None:
     asset_id = issue.location.asset_ids[0] if issue.location.asset_ids else None
     if not asset_id:
@@ -164,7 +187,8 @@ def _criticality_from_issue(issue: CockpitIssue) -> float:
 
 
 def _propagation_risk_from_issue(issue: CockpitIssue) -> float:
-    zone_count = len(issue.location.zone_ids)
+    # For cascade groups, member_count is the distinct zone count — more accurate than zone_ids on the rep
+    zone_count = issue.member_count if issue.is_group else len(issue.location.zone_ids)
     if issue.location.floor_id and zone_count >= 2:
         return 0.72
     if zone_count >= 3:
@@ -178,12 +202,13 @@ def _propagation_risk_from_issue(issue: CockpitIssue) -> float:
 
 def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperatingMode) -> NarrativeCandidate:
     affected_zones = [zone_id for zone_id in issue.location.zone_ids if zone_id]
-    epicenter = (
+    raw_epicenter = (
         issue.location.floor_id
         or (affected_zones[0] if affected_zones else None)
         or (issue.location.asset_ids[0] if issue.location.asset_ids else None)
         or "building"
     )
+    epicenter = _clean_bacnet_id(raw_epicenter)
 
     message = issue.impact_summary or issue.summary or issue.title
     action = issue.recommended_action or "Investigate the dominant building tension."
@@ -194,7 +219,7 @@ def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperating
         message=message,
         location=NarrativeLocation(
             epicenter=epicenter,
-            affected=affected_zones[1:] if epicenter in affected_zones else affected_zones,
+            affected=[_clean_bacnet_id(z) for z in (affected_zones[1:] if raw_epicenter in affected_zones else affected_zones)],
             propagation=_propagation_from_issue(issue),
         ),
         action=action,
@@ -396,7 +421,7 @@ def generate_narrative_candidates(
     service = issue_service or CockpitIssueFusionService()
 
     try:
-        issues, _statuses, _, _ = service.aggregate(site_id)
+        issues, *_ = service.aggregate(site_id)
     except Exception:
         issues = []
 

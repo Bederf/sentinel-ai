@@ -564,12 +564,32 @@ class AdapterHealthMonitor:
 
             # Equipment FK resolution (best-effort; NULL on miss)
             equipment_id: str | None = alarm.get("equipment_id") or alarm.get("equipment_code") or None
+            resolved_equipment_type: str | None = None
             if equipment_id:
                 try:
-                    eq_row = supabase.table("equipment").select("id").eq("code", equipment_id).maybe_single().execute()
-                    equipment_id = eq_row.data["id"] if eq_row.data else None
+                    eq_row = (
+                        supabase.table("equipment").select("id, type").eq("code", equipment_id).maybe_single().execute()
+                    )
+                    if eq_row.data:
+                        equipment_id = eq_row.data["id"]
+                        resolved_equipment_type = eq_row.data.get("type")
                 except Exception:
                     equipment_id = None
+
+            # Licensing gate — skip alerts for equipment types whose module is
+            # not licensed for this site (Platform modules always allowed)
+            if resolved_equipment_type and site_id:
+                from app.models.module_registry import ModuleType
+                from app.services.module_registry_service import module_registry
+                from app.services.simbiot.connection_policy import infer_module_from_equipment_type
+
+                mt = infer_module_from_equipment_type(resolved_equipment_type)
+                if (
+                    mt
+                    and mt not in (ModuleType.KPI, ModuleType.ML, ModuleType.ASSETS)
+                    and not module_registry.is_module_active(site_id, mt)
+                ):
+                    continue
 
             title, message = self._generate_alarm_description(alarm)
 

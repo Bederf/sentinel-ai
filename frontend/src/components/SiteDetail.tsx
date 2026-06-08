@@ -362,10 +362,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         }
 
         // Fetch alerts for this site
-        const { alerts: allAlerts, total: apiTotal } = await api.getAlerts();
-        const siteAlerts = allAlerts.filter((a) => a.site_id === siteId);
+        const { alerts: siteAlerts, total } = await api.getAlerts(siteId);
         setAlerts(siteAlerts.slice(0, 50));
-        setAlertsTotal(apiTotal);
+        setAlertsTotal(total);
 
         // Fetch predictions for this site
         const predictionsData = await api.getPredictions(siteId);
@@ -675,13 +674,15 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
     );
   }
 
-  // Calculate summary stats — status field tracks BMS comms, health_score tracks equipment condition
+  // Calculate summary stats — status field tracks BMS comms, health_score tracks mechanical equipment condition
   // Critical = health degradation (operational). Offline = comms loss (BMS not reporting, may be healthy).
-  const healthyEquipment = equipment.filter((e) => (e.status === "normal" || (e.status as string) === "online") && ((e.health_score ?? 100) >= 80)).length;
-  const warningEquipment = equipment.filter((e) => e.status === "warning" || ((e.health_score ?? 100) >= 60 && (e.health_score ?? 100) < 80)).length;
-  const criticalEquipment = equipment.filter((e) => (e.health_score ?? 100) < 60).length;
+  // Phase 226 — passive devices (DALI, meters, sensors) have health_score: null and are excluded.
+  const scorableEquipment = equipment.filter((e) => e.health_score != null);
+  const healthyEquipment = scorableEquipment.filter((e) => (e.status === "normal" || (e.status as string) === "online") && (e.health_score! >= 80)).length;
+  const warningEquipment = scorableEquipment.filter((e) => e.status === "warning" || (e.health_score! >= 60 && e.health_score! < 80)).length;
+  const criticalEquipment = scorableEquipment.filter((e) => e.health_score! < 60).length;
   const offlineEquipment = equipment.filter((e) => (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
-  const healthValues = equipment.map((e) => e.health_score ?? (e as any).health).filter((v) => typeof v === "number" && v > 0);
+  const healthValues = scorableEquipment.map((e) => e.health_score!).filter((v): v is number => typeof v === "number" && v > 0);
   const avgHealth = healthValues.length > 0
     ? Math.round(healthValues.reduce((sum, v) => sum + v, 0) / healthValues.length)
     : 0;
@@ -903,7 +904,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         />
       )}
 
-      {/* KPI Cards Row */}
+      {/* KPI Cards Row — only on overview tab to avoid duplication with module-specific sections */}
+      {activeMainTab === "overview" && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {visibleKpiCards.includes('kpi-equipment') && (
           <KPICard
@@ -939,6 +941,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
           />
         )}
       </div>
+      )}
 
       {/* Site Info Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

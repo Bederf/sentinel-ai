@@ -71,6 +71,8 @@ class CockpitIssueFusionService:
         if local_audit_entries:
             audit_logs = local_audit_entries + audit_logs
 
+        onboarding_phase = self._fetch_onboarding_phase(site_id)
+        zone_count = self._fetch_zone_count(site_id)
         bridge_last_updated = self._fetch_bridge_last_updated(site_id)
         return CockpitTableProcessor.fuse(
             alerts,
@@ -80,6 +82,8 @@ class CockpitIssueFusionService:
             selected_issue_id,
             bridge_last_updated=bridge_last_updated,
             recommendations=recommendations,
+            onboarding_phase=onboarding_phase,
+            zone_count=zone_count,
         )
 
     # ------------------------------------------------------------------
@@ -168,6 +172,40 @@ class CockpitIssueFusionService:
             if record.get("site_id") == site_id
             and datetime.fromisoformat(record.get("received_at")).replace(tzinfo=UTC) >= cutoff
         ]
+
+    def _fetch_zone_count(self, site_id: str) -> int:
+        """Return the number of zones for the site; 0 on any error."""
+        try:
+            client = self.alert_repo.client
+            if not client:
+                return 0
+            site_uuid = self.alert_repo._resolve_site_uuid(site_id)
+            rows = (
+                client.table("zones")
+                .select("id", count="exact")
+                .eq("site_id", site_uuid)
+                .execute()
+            )
+            return rows.count or 0
+        except Exception:
+            return 0
+
+    def _fetch_onboarding_phase(self, site_id: str) -> str:
+        """Return the site's onboarding_phase; defaults to 'supervised' on any error."""
+        try:
+            client = self.alert_repo.client
+            if not client:
+                return "supervised"
+            row = (
+                client.table("sites")
+                .select("onboarding_phase")
+                .eq("code", site_id)
+                .maybe_single()
+                .execute()
+            )
+            return (row.data or {}).get("onboarding_phase") or "supervised"
+        except Exception:
+            return "supervised"
 
     def _fetch_bridge_last_updated(self, site_id: str) -> datetime | None:
         if not settings.simbiot_api_url:

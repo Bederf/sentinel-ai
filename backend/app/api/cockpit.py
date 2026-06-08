@@ -32,10 +32,24 @@ from app.schemas.cockpit import (
     CockpitSourceStatus,
     IssueStatus,
 )
+from app.models.module_registry import ModuleType
 from app.services.cockpit_issue_fusion import CockpitIssueFusionService
+from app.services.module_registry_service import module_registry
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cockpit", tags=["cockpit"])
+
+# Subsystem → module gate: issues whose subsystem maps here are only shown
+# when the corresponding module is active for the site.
+# Subsystems not listed (general, occupancy) are always shown.
+_SUBSYSTEM_MODULE_GATE: dict[str, ModuleType] = {
+    "hvac": ModuleType.HVAC,
+    "power": ModuleType.ENERGY,
+    "lighting": ModuleType.LIGHTING,
+    "security": ModuleType.SECURITY,
+    "water": ModuleType.WATER,
+    "digital_twin": ModuleType.DIGITAL_TWIN,
+}
 
 # ---------------------------------------------------------------------------
 # Module-level stores (in-memory, cleared between test runs via fixture)
@@ -254,6 +268,16 @@ def _record_audit(
 # ---------------------------------------------------------------------------
 
 
+def _filter_by_active_modules(issues: list[CockpitIssue], site_id: str) -> list[CockpitIssue]:
+    """Drop issues whose subsystem maps to a module that is not active for the site."""
+    result = []
+    for issue in issues:
+        module_type = _SUBSYSTEM_MODULE_GATE.get(issue.subsystem or "")
+        if module_type is None or module_registry.is_module_active(site_id, module_type):
+            result.append(issue)
+    return result
+
+
 async def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
     """Build a CockpitDecisionPayload for a site, merging cached issue state."""
     phase = await _fetch_site_phase(site_id)
@@ -263,6 +287,10 @@ async def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
         return None
 
     issues, overflow_issues, source_statuses, _tensions, selected_id = cockpit_issue_service.aggregate(site_id)
+
+    # Drop issues from inactive/unlicensed modules
+    issues = _filter_by_active_modules(issues, site_id)
+    overflow_issues = _filter_by_active_modules(overflow_issues, site_id)
     if not issues:
         return None
 
@@ -274,6 +302,9 @@ async def _build_cockpit_payload(site_id: str) -> CockpitDecisionPayload | None:
     # Derive posture from phase
     posture_map = {"advisory": "advisory", "supervised": "supervised", "automatic": "autonomous"}
     posture = posture_map.get(phase, "advisory")
+
+    # Cache issues for the action endpoint — without this, POST .../action returns 404
+    _cache_site_issues(site_id, merged)
 
     return CockpitDecisionPayload(
         building_id=site_id,

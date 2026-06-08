@@ -54,6 +54,8 @@ export interface ModuleInstance {
   activated_at: string;
   health_score: number;
   last_telemetry?: string;
+  licensed?: boolean;
+  connected?: boolean;
 }
 
 export interface AIRecommendation {

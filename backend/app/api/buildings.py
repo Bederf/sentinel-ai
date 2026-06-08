@@ -1472,6 +1472,12 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
             status = eq.get("status", "normal")
             health = eq.get("health_score", 85)
 
+            # Phase 226 — passive devices get no health score
+            from app.config.health_config import get_scoreability
+
+            if not get_scoreability(eq_type).get("scoreable", False):
+                health = None
+
             # Override status if equipment has active alerts
             eq_uuid = eq.get("id")
             if eq_uuid and eq_uuid in alert_severity_map:

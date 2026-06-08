@@ -1829,8 +1829,67 @@ class BackgroundSchedulerService:
             at_risk = len([eq for eq in all_equipment if (eq.get("health_score") or 100) < 90])
             logger.info(f"Generating recommendations for {len(all_equipment)} equipment ({at_risk} at-risk)")
 
+            # Phase 227 — maintenance gap detection (runs once per eligible site)
+            from app.services.maintenance_gap_detector import detect_maintenance_gaps, build_gap_recommendation_id
+
+            gap_member_codes: set[str] = set()
+            for gap_site in generation_site_ids or []:
+                try:
+                    gaps = detect_maintenance_gaps(gap_site)
+                except Exception as e:
+                    logger.warning("Maintenance gap detection failed for %s: %s", gap_site, e)
+                    continue
+                for gap in gaps:
+                    gap_member_codes.update(gap.get("member_codes", []))
+                    try:
+                        rec_id = build_gap_recommendation_id(gap["site_id"], gap["equipment_type"])
+                        client.table("recommendations").upsert(
+                            {
+                                "id": rec_id,
+                                "site_id": gap["site_id"],
+                                "timestamp": datetime.utcnow().isoformat(),
+                                "action_type": "maintenance_gap",
+                                "risk_level": "medium",
+                                "target_equipment": f"{gap['equipment_type'].upper()}",
+                                "action": {"inspection": "priority"},
+                                "reason": (
+                                    f"{gap['member_count']} {gap['equipment_type']} units at "
+                                    f"health_score <= 65 with no recorded maintenance history."
+                                ),
+                                "expected_impact": {},
+                                "confidence": "medium",
+                                "confidence_score": 0.7,
+                                "profile": "maintenance_gap",
+                                "multi_objective_score": 0.0,
+                                "status": "pending",
+                                "requires_approval": True,
+                                "shadow_mode": False,
+                                "metadata": {
+                                    "equipment_type": gap["equipment_type"],
+                                    "member_count": gap["member_count"],
+                                    "member_ids": gap["member_ids"],
+                                    "member_codes": gap["member_codes"],
+                                    "avg_health_score": gap["avg_health_score"],
+                                    "detection": gap["detection"],
+                                },
+                            },
+                            on_conflict="id",
+                        ).execute()
+                        logger.info(
+                            "Maintenance gap: %d %s units at health %s (rec_id=%s)",
+                            gap["member_count"],
+                            gap["equipment_type"],
+                            gap["avg_health_score"],
+                            rec_id,
+                        )
+                    except Exception as e:
+                        logger.warning("Failed to persist gap recommendation: %s", e)
+
             generated = 0
             for eq in all_equipment:
+                # Skip equipment already covered by a maintenance gap recommendation
+                if eq.get("code") in gap_member_codes:
+                    continue
                 try:
                     health = eq.get("health_score") or 100
                     equipment_id = eq.get("id")
@@ -1854,6 +1913,23 @@ class BackgroundSchedulerService:
                             resolver_id = f"site-{site_code[1:]}"
 
                     is_shadow_site = resolver_id in shadow_site_ids
+
+                    # Licensing gate — skip recommendation generation for equipment
+                    # types whose module is not licensed for this site
+                    eq_type = eq.get("type", "").lower()
+                    if eq_type:
+                        from app.services.module_registry_service import module_registry as _module_registry
+                        from app.services.simbiot.connection_policy import (
+                            infer_module_from_equipment_type as _infer_module,
+                        )
+
+                        mt = _infer_module(eq_type)
+                        if (
+                            mt
+                            and mt not in (ModuleType.KPI, ModuleType.ML, ModuleType.ASSETS)
+                            and not _module_registry.is_module_active(resolver_id, mt)
+                        ):
+                            continue
 
                     # Get recent alerts for this equipment (last 30 days)
                     alerts_response = (
