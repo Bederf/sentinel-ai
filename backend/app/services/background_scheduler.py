@@ -992,6 +992,7 @@ class BackgroundSchedulerService:
                 try:
                     from app.config.settings import settings as _app_settings
                     from app.services.notification_service import NotificationService
+                    from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
 
                     _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
                         _app_settings, "sentry_fm_chat_id", None
@@ -1008,14 +1009,20 @@ class BackgroundSchedulerService:
                         _lines.append(f"  {_reason}")
                     if len(_recs) > 8:
                         _lines.append(f"… and {len(_recs) - 8} more")
+                    _lines.append("")
+                    _lines.append("Open dashboard to create work orders or approve:")
+                    _base_url = getattr(_app_settings, "app_base_url", "https://bms.sentinel-ai.co.za")
+                    _lines.append(f"{_base_url}/buildings/{_site_id}")
                     _combined = "\n".join(_lines)
-                    _svc = NotificationService()
-                    _send_result = _svc.send_certified(
-                        site_id=_site_id,
-                        recipient_telegram_id=str(_chat_id),
-                        title=f"SENTINEL Advisory — {len(_recs)} recommendations",
-                        message=_combined,
-                        reference_id=_site_id,
+
+                    _keyboard = InlineKeyboard(rows=[
+                        [InlineButton(label="✅ Acknowledged", callback_data=f"ack:combined:{_site_id}")],
+                    ])
+                    _sender = get_telegram_sender()
+                    _send_result = _sender.send_text(
+                        chat_id=str(_chat_id),
+                        text=f"<b>SENTINEL Advisory — {_site_id}</b>\n\n{_combined}",
+                        keyboard=_keyboard,
                     )
                     asyncio.run_coroutine_threadsafe(_send_result, self._main_loop).result(timeout=30)
                     logger.info("[NOTIFY] Combined advisory sent for %s (%d recs)", _site_id, len(_recs))
