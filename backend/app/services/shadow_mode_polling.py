@@ -976,6 +976,8 @@ class ShadowModePollingService:
                 equipment_states[code] = state
         # Merge DALI controller and power meter states from /points endpoint
         # (extracted in _sync_equipment_status and returned via points_result)
+        for code, state in points_result.get("vav_states", {}).items():
+            equipment_states[code] = state
         for code, state in points_result.get("dali_states", {}).items():
             equipment_states[code] = state
         for code, state in points_result.get("meter_states", {}).items():
@@ -1551,14 +1553,29 @@ class ShadowModePollingService:
             if not equip_status_map:
                 return result
 
-            # ── Extract DALI controller and power meter states for ML pipeline ──
+            # ── Extract equipment states from /points for ML pipeline ──
             # Bridge /points returns status + sensor readings per equipment code.
-            # Feed these to SentinelMLFeeder so DALI controllers and power meters
-            # are trained on alongside HVAC telemetry.
+            vav_states: dict[str, dict[str, Any]] = {}
             dali_states: dict[str, dict[str, Any]] = {}
             meter_states: dict[str, dict[str, Any]] = {}
             for code, info in equip_status_map.items():
-                if code.startswith(f"{self._site_prefix}-DALI-"):
+                if code.startswith(f"{self._site_prefix}-VAV-"):
+                    # VAV: zone_temp, damper_position, airflow from bridge
+                    vav_readings: dict[str, float] = {}
+                    if (zt := info.get("temperature")) is not None:
+                        vav_readings["zone_temp"] = float(zt)
+                    if (dp := info.get("damper_position")) is not None:
+                        vav_readings["damper_position"] = float(dp)
+                    if (af := info.get("flow") or info.get("airflow")) is not None:
+                        vav_readings["airflow_lps"] = float(af)
+                    if (st := info.get("supply_temp") or info.get("supply_air_temp")) is not None:
+                        vav_readings["supply_temp"] = float(st)
+                    if vav_readings:
+                        vav_states[code] = {
+                            "type": "vav",
+                            "sensor_readings": vav_readings,
+                        }
+                elif code.startswith(f"{self._site_prefix}-DALI-"):
                     # DALI controller: status + updated_at as sensor readings
                     dali_states[code] = {
                         "type": "dali",
@@ -1577,6 +1594,7 @@ class ShadowModePollingService:
                             "sensor_readings": readings,
                         }
 
+            result["vav_states"] = vav_states
             result["dali_states"] = dali_states
             result["meter_states"] = meter_states
 
