@@ -5671,7 +5671,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 from app.database.repositories.alert_repository import AlertRepository
 
                 alert_repo = AlertRepository()
-                all_alerts = await alert_repo.get_all(status="active", site_id=site_uuid)
+                all_alerts = alert_repo.get_all(status="active", site_id=site_uuid)
                 if all_alerts:
                     alert_count = len(all_alerts)
                     critical_alerts = [
