@@ -969,7 +969,7 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         except Exception as e:
             logger.warning("Advisory WO notification failed: %s", e)
 
-    # Email facilities desk
+    # Email technician
     await _email_facilities_desk(
         wo_code,
         f"AI Optimization: {target} — {point}",
@@ -977,6 +977,8 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         target,
         priority,
         description,
+        tech_name,
+        tech.get("email", "") if tech else "",
     )
 
 
@@ -1686,25 +1688,30 @@ async def _email_facilities_desk(
     location: str,
     priority: str,
     description: str,
+    technician_name: str = "",
+    technician_email: str = "",
 ) -> None:
-    """Send email to facilities desk when a complaint work order is created.
+    """Send email to the assigned technician when a work order is created.
 
     Uses the native SMTP notification service (workorder@sentinel-ai.co.za).
+    Falls back to facilities desk if no technician email is available.
     """
-    facilities_email = "facilities@sentinel-ai.co.za"
+    to_email = technician_email or "facilities@sentinel-ai.co.za"
+    to_name = technician_name or "Facilities Desk"
     subject = f"New Work Order: {wo_code} — {title}"
     body = (
-        f"New work order logged via Sentinel Staff Bot.\n\n"
+        f"Work order assigned.\n\n"
         f"WO Reference: {wo_code}\n"
         f"Issue: {title}\n"
         f"Category: {category}\n"
         f"Location: {location}\n"
         f"Priority: {priority.upper()}\n"
-        f"Status: OPEN (pending technician assignment)\n\n"
+        f"Assigned to: {to_name}\n"
+        f"Status: Scheduled\n\n"
         f"Description:\n{description}\n\n"
         f"---\n"
         f"SENTINEL BMS Intelligence\n"
-        f"Report: https://bms.sentinel-ai.co.za/work-orders/{wo_code}"
+        f"Dashboard: https://bms.sentinel-ai.co.za/work-orders/{wo_code}"
     )
 
     try:
@@ -1720,13 +1727,14 @@ async def _email_facilities_desk(
 
         notifier = WorkOrderNotifier()
         sent = await notifier._send_email_via_native_smtp(
-            to_email=facilities_email,
+            to_email=to_email,
             subject=subject,
             body=body,
+            technician_name=to_name,
         )
         if sent:
-            logger.info("[COMPLAINT-WO] Facilities email sent for %s", wo_code)
+            logger.info("[WO-EMAIL] Work order email sent to %s for %s", to_email, wo_code)
         else:
-            logger.warning("[COMPLAINT-WO] Facilities email returned False for %s", wo_code)
+            logger.warning("[WO-EMAIL] Email returned False for %s -> %s", wo_code, to_email)
     except Exception as e:
         logger.warning("[COMPLAINT-WO] Facilities email failed for %s: %s", wo_code, e)
