@@ -166,13 +166,6 @@ function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
-function setTokens(accessToken: string, refreshToken?: string): void {
-  setAccessToken(accessToken);
-  if (refreshToken) {
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  }
-}
-
 export function clearAuthStorage(): void {
   clearAccessToken();
   localStorage.removeItem(REFRESH_TOKEN_KEY);
@@ -187,7 +180,7 @@ function notifyAuthExpired(): void {
 
 function buildJsonAuthHeaders(token: string | null, headers?: HeadersInit): HeadersInit {
   // Convert HeadersInit to plain object and remove any existing Authorization
-  let safeHeaders: Record<string, string> = {};
+  const safeHeaders: Record<string, string> = {};
   if (headers) {
     if (headers instanceof Headers) {
       headers.forEach((value, key) => {
@@ -531,6 +524,7 @@ export interface BuildingEquipmentItem {
   health: number;
   location: string;
   site_id: string;
+  alert_count?: number;
   site_name: string;
   details: Record<string, unknown> & {
     install_date?: string;
@@ -1688,6 +1682,13 @@ export const api = {
    */
   async getSiteEquipment(siteId: string): Promise<BuildingEquipmentResponse> {
     return fetchApi<BuildingEquipmentResponse>(`/api/buildings/${siteId}/equipment`);
+  },
+
+  /**
+   * Get active alerts for a specific equipment item.
+   */
+  async getEquipmentAlerts(siteId: string, equipmentId: string): Promise<{ alerts: any[]; total_count: number; has_more: boolean }> {
+    return fetchApi(`/api/buildings/${siteId}/equipment/${encodeURIComponent(equipmentId)}/alerts`);
   },
 
   /**

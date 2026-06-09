@@ -34,14 +34,12 @@ import {
   Info,
   Wifi,
   Server,
-  ChevronDown,
   ChevronRight,
   Shield,
   ClipboardList,
 } from "lucide-react";
-import api, { createWorkOrder, getAccessToken, type ROISummaryResponse } from '@/lib/api';
+import api, { createWorkOrder } from '@/lib/api';
 import type {
-  Alert,
   Prediction,
   EnergyDataPoint,
   Device,
@@ -49,7 +47,7 @@ import type {
   CategoryStatus,
   EquipmentMetadata,
 } from '@/lib/api';
-import { formatDateTime, getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
+import { getTimezoneAbbreviation, isDifferentTimezone } from "../lib/timeFormat";
 import { KPICard } from "./KPICard";
 import { EnergyChart } from "./EnergyChart";
 import { PredictionCard } from "./PredictionCard";
@@ -71,7 +69,7 @@ import { ChatWidget } from "./ChatWidget";
 import { DEFAULT_KPI_CARDS, DEFAULT_SECTIONS } from "../lib/cardDefinitions";
 import { ArcadeView } from "./arcade/ArcadeView";
 import { OverviewCockpitHost } from "./cockpit/OverviewCockpitHost";
-import { BUILDING_TAB_ITEMS } from "../lib/navigation";
+
 import { TabBar } from "./TabBar";
 import { PageLoading } from "./PageLoading";
 import type { BuildingTabId } from "../lib/navigation";
@@ -175,7 +173,7 @@ interface Equipment extends BuildingEquipmentItem {
   last_maintenance?: string;
 }
 
-type TabType = "equipment" | "alerts" | "energy" | "predictions";
+type TabType = "equipment" | "energy" | "predictions";
 
 export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) {
   const [site, setSite] = useState<SiteDetailData | null>(null);
@@ -183,12 +181,10 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [equipmentCategories, setEquipmentCategories] = useState<Record<string, CategoryStatus>>({});
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertsTotal, setAlertsTotal] = useState<number>(0);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
   const [totalRiskExposure, setTotalRiskExposure] = useState<number>(0);
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
-  const [roiData, setRoiData] = useState<ROISummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("equipment");
@@ -213,6 +209,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [savingNotes, setSavingNotes] = useState(false);
   const [discovering, setDiscovering] = useState(false);
   const [metadataTab, setMetadataTab] = useState<"info" | "network" | "device" | "operating" | "notes">("info");
+  const [equipmentAlerts, setEquipmentAlerts] = useState<any[] | null>(null);
+  const [loadingEquipmentAlerts, setLoadingEquipmentAlerts] = useState(false);
   const [sitePhase, setSitePhase] = useState<OnboardingPhase>("shadow");
   const [liveBridgeConnected, setLiveBridgeConnected] = useState<boolean | null>(null);
   const [liveBridgeLastSync, setLiveBridgeLastSync] = useState<string | null>(null);
@@ -362,8 +360,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         }
 
         // Fetch alerts for this site
-        const { alerts: siteAlerts, total } = await api.getAlerts(siteId);
-        setAlerts(siteAlerts.slice(0, 50));
+        const { total } = await api.getAlerts(siteId);
         setAlertsTotal(total);
 
         // Fetch predictions for this site
@@ -383,14 +380,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         // Fetch energy data for this site
         const energyResponse = await api.getEnergy(siteId, 30);
         setEnergyData(energyResponse.data || []);
-
-        // Fetch ROI savings for this site
-        try {
-          const roi = await api.getROISummary(siteId);
-          setRoiData(roi);
-        } catch (e) {
-          console.warn("Could not load ROI summary:", e);
-        }
 
         // Fetch building config for cockpit floor configuration
         try {
@@ -487,35 +476,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
     }
   };
 
-  const getSeverityConfig = (severity: string) => {
-    switch (severity.toLowerCase()) {
-      case "critical":
-        return {
-          color: "var(--color-sentinel-red)",
-          bg: "rgba(220, 38, 38, 0.15)",
-          border: "rgba(220, 38, 38, 0.3)",
-        };
-      case "high":
-        return {
-          color: "var(--color-sentinel-amber)",
-          bg: "rgba(245, 158, 11, 0.15)",
-          border: "rgba(245, 158, 11, 0.3)",
-        };
-      case "medium":
-        return {
-          color: "var(--color-sentinel-amber)",
-          bg: "rgba(251, 191, 36, 0.15)",
-          border: "rgba(251, 191, 36, 0.3)",
-        };
-      default:
-        return {
-          color: "var(--color-sentinel-blue)",
-          bg: "rgba(59, 130, 246, 0.15)",
-          border: "rgba(59, 130, 246, 0.3)",
-        };
-    }
-  };
-
   // Reserved for future use:
   // const getHealthColor = (score: number) => {
   //   if (score >= thresholds.healthy) return "var(--color-sentinel-green)";
@@ -532,11 +492,14 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       setEquipmentMetadata(null);
       setMetadataTab("info");
       setEditingNotes(false);
+      setEquipmentAlerts(null);
+      setLoadingEquipmentAlerts(true);
 
-      // Fetch equipment controls and metadata in parallel
-      const [deviceResult, metadataResult] = await Promise.allSettled([
+      // Fetch equipment controls, metadata, and alerts in parallel
+      const [deviceResult, metadataResult, alertsResult] = await Promise.allSettled([
         api.getEquipmentControls(equip.id),
         api.getEquipmentMetadata(equip.id),
+        api.getEquipmentAlerts(siteId, equip.id),
       ]);
 
       if (deviceResult.status === "fulfilled") {
@@ -552,11 +515,18 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       } else {
         console.warn("Could not load equipment metadata:", metadataResult.reason);
       }
+
+      if (alertsResult.status === "fulfilled") {
+        setEquipmentAlerts(alertsResult.value.alerts);
+      } else {
+        setEquipmentAlerts([]);
+      }
     } catch (error) {
       console.error("Failed to load equipment details:", error);
     } finally {
       setLoadingDevice(false);
       setLoadingMetadata(false);
+      setLoadingEquipmentAlerts(false);
     }
   };
 
@@ -1132,7 +1102,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         >
           {[
             { id: "equipment" as TabType, label: "Equipment", icon: Cpu, count: equipment.length },
-            { id: "alerts" as TabType, label: "Alerts", icon: AlertTriangle, count: alertsTotal },
             { id: "energy" as TabType, label: "Energy", icon: Zap },
             { id: "predictions" as TabType, label: "Predictions", icon: TrendingUp, count: predictions.length },
           ].map((tab) => {
@@ -1420,7 +1389,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     <table className="w-full">
                       <thead>
                         <tr style={{ borderBottom: "1px solid var(--color-sentinel-border)" }}>
-                          {["Equipment", "Category", "Type", "Location", "Status", "Health"].map((header) => (
+                          {["Equipment", "Category", "Type", "Location", "Status", "Alerts", "Health"].map((header) => (
                             <th
                               key={header}
                               className="text-left py-3 px-4 text-xs font-medium uppercase tracking-wider"
@@ -1537,6 +1506,22 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                               )}
                             </td>
                             <td className="py-3 px-4">
+                              {(item as any).alert_count > 0 ? (
+                                <div
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium"
+                                  style={{
+                                    background: "rgba(220, 38, 38, 0.15)",
+                                    color: "var(--color-sentinel-red, #ef4444)",
+                                  }}
+                                >
+                                  <span className="h-2 w-2 rounded-full" style={{ background: "var(--color-sentinel-red, #ef4444)" }} />
+                                  {(item as any).alert_count}
+                                </div>
+                              ) : (
+                                <span className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>—</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
                               <div className="flex items-center gap-2">
                                 <div className="flex-1 max-w-[80px] h-2 rounded-full overflow-hidden" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
                                   <div
@@ -1559,74 +1544,6 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </div>
                 );
               })()}
-            </div>
-          )}
-
-          {/* Alerts Tab */}
-          {activeTab === "alerts" && (
-            <div>
-              <h3
-                className="text-lg font-semibold mb-4"
-                style={{ color: "var(--color-sentinel-text-primary)" }}
-              >
-                Active Alerts
-              </h3>
-
-              {alerts.length === 0 ? (
-                <div className="text-center py-12">
-                  <CheckCircle
-                    className="h-12 w-12 mx-auto mb-3"
-                    style={{ color: "var(--color-sentinel-green)" }}
-                  />
-                  <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    No active alerts for this site
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {alerts.map((alert) => {
-                    const severityConfig = getSeverityConfig(alert.severity);
-                    return (
-                      <div
-                        key={alert.id}
-                        className="rounded-md p-4"
-                        style={{
-                          background: severityConfig.bg,
-                          border: `1px solid ${severityConfig.border}`,
-                        }}
-                      >
-                        <div className="flex items-start gap-3">
-                          <AlertTriangle className="h-5 w-5 mt-0.5" style={{ color: severityConfig.color }} />
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between mb-2">
-                              <div>
-                                <p className="font-medium text-sm mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                                  {alert.message}
-                                </p>
-                                <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                                  {alert.equipment_name}
-                                </p>
-                              </div>
-                              <div
-                                className="px-2 py-1 rounded text-xs font-medium"
-                                style={{
-                                  background: severityConfig.bg,
-                                  color: severityConfig.color,
-                                }}
-                              >
-                                {alert.severity}
-                              </div>
-                            </div>
-                            <p className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>
-                              {formatDateTime(alert.created_at)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           )}
 
@@ -2318,15 +2235,26 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
                           {/* Related Alerts */}
                           {(() => {
-                            const eqAlerts = alerts.filter(a => a.equipment_id === selectedEquipment.id);
-                            return eqAlerts.length > 0 ? (
+                            if (loadingEquipmentAlerts) {
+                              return (
+                                <div>
+                                  <h4 className="text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: "var(--color-sentinel-amber)" }}>
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    Active Alerts
+                                  </h4>
+                                  <div className="text-xs" style={{ color: "var(--color-sentinel-text-disabled)" }}>Loading...</div>
+                                </div>
+                              );
+                            }
+                            const eqAlerts = equipmentAlerts; // from API
+                            return eqAlerts && eqAlerts.length > 0 ? (
                               <div>
                                 <h4 className="text-xs font-medium uppercase tracking-wider mb-2 flex items-center gap-1.5" style={{ color: "var(--color-sentinel-amber)" }}>
                                   <AlertTriangle className="h-3.5 w-3.5" />
                                   Active Alerts ({eqAlerts.length})
                                 </h4>
                                 <div className="space-y-2">
-                                  {eqAlerts.slice(0, 3).map(alert => (
+                                  {eqAlerts.slice(0, 5).map(alert => (
                                     <div
                                       key={alert.id}
                                       className="p-2 rounded-lg flex items-start gap-2"
@@ -2336,9 +2264,24 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                                       }}
                                     >
                                       <AlertCircle className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" style={{ color: alert.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)" }} />
-                                      <div>
-                                        <p className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{alert.message}</p>
-                                        <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-disabled)" }}>{new Date(alert.created_at).toLocaleString()}</p>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-start justify-between gap-2">
+                                          <p className="text-xs font-medium truncate" style={{ color: "var(--color-sentinel-text-primary)" }}>{alert.type_label}</p>
+                                          {alert.severity && (
+                                            <span
+                                              className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded"
+                                              style={{
+                                                background: alert.severity === "critical" ? "rgba(220, 38, 38, 0.2)" : "rgba(245, 158, 11, 0.2)",
+                                                color: alert.severity === "critical" ? "var(--color-sentinel-red)" : "var(--color-sentinel-amber)",
+                                              }}
+                                            >
+                                              {alert.severity}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-disabled)" }}>
+                                          {alert.event_at ? new Date(alert.event_at).toLocaleString() : new Date(alert.created_at).toLocaleString()}
+                                        </p>
                                       </div>
                                     </div>
                                   ))}

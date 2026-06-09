@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
@@ -11,12 +12,136 @@ from app.services.building_state_models import NarrativeCandidate, NarrativeLoca
 from app.services.cockpit_issue_fusion import CockpitIssueFusionService
 from app.services.site_operating_mode_service import SentinelOperatingMode
 
+logger = logging.getLogger(__name__)
+
+EQUIPMENT_CRITICALITY: dict[str, int] = {
+    "chiller": 10,
+    "cooling_tower": 9,
+    "ahu": 8,
+    "generator": 8,
+    "ups": 7,
+    "bess": 7,
+    "pump": 6,
+    "fcu": 5,
+    "vav": 4,
+    "inverter": 4,
+}
+
+
+def _resolve_epicenter_equipment(site_id: str) -> dict | None:
+    """
+    Find the highest-criticality registered equipment asset in warning/critical state.
+
+    Priority:
+      1. Scoreable equipment type with highest criticality weight
+      2. Lowest health_score (worst state) within same weight tier
+
+    Returns a dict with equipment_id, equipment_type, location, health_score
+    or None when no scoreable equipment is in warning/critical range.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    try:
+        sb = get_supabase_client()
+
+        site_row = sb.table("sites").select("id").eq("code", site_id).execute()
+        if not site_row.data:
+            return None
+        site_uuid = site_row.data[0]["id"]
+
+        result = (
+            sb.table("equipment")
+            .select("code, type, location, health_score, zone_key")
+            .eq("site_id", site_uuid)
+            .execute()
+        )
+    except Exception as exc:
+        logger.debug("Could not query equipment for epicenter resolution %s: %s", site_id, exc)
+        return None
+
+    if not result.data:
+        return None
+
+    scoreable = [
+        eq
+        for eq in result.data
+        if eq.get("type", "").lower() in EQUIPMENT_CRITICALITY
+        and isinstance(eq.get("health_score"), (int, float))
+        and eq["health_score"] <= 65
+    ]
+    if not scoreable:
+        return None
+
+    def _priority(eq: dict) -> tuple:
+        weight = EQUIPMENT_CRITICALITY.get(eq.get("type", "").lower(), 0)
+        health = eq.get("health_score") or 100
+        return (-weight, health)
+
+    best = sorted(scoreable, key=_priority)[0]
+    return {
+        "equipment_id": best.get("code", ""),
+        "equipment_type": (best.get("type") or "").upper(),
+        "location": best.get("location") or best.get("zone_key") or "",
+        "health_score": best.get("health_score"),
+    }
+
 
 def normalize_site_id(site_id: str) -> str:
     normalized = site_id.strip().lower().replace("_", "-")
     if normalized == "s002":
         return "site-002"
     return normalized
+
+
+def format_epicenter_label(equipment: dict | None, fallback: str = "") -> str:
+    """
+    Construct operator-readable epicenter label.
+    Format: {equipment_id} · {equipment_type} · {location}
+    Falls back gracefully at each level.
+    Never returns a raw UUID, BACnet object address, or dedupe key.
+    """
+    if not equipment:
+        return fallback or "Unknown location"
+
+    equipment_id = equipment.get("equipment_id") or equipment.get("id") or ""
+
+    raw_type = equipment.get("equipment_type") or equipment.get("type") or ""
+    equipment_type = raw_type.replace("_", " ").title()
+
+    location = (
+        equipment.get("location")
+        or equipment.get("zone_label")
+        or equipment.get("floor_label")
+        or equipment.get("zone")
+        or ""
+    )
+
+    parts = [p.strip() for p in [equipment_id, equipment_type, location] if p.strip()]
+
+    if not parts:
+        return fallback or "Unknown location"
+
+    return " · ".join(parts)
+
+
+def _format_bacnet_object(dedupe_key: str) -> str:
+    """
+    Last-resort formatting for BACnet object strings.
+    Turns 'nc:10|obj:analogInput,8130' into 'Analog Input 8130'.
+    Never returns raw internal key formats.
+    """
+    if not dedupe_key:
+        return "Unknown location"
+    import re
+
+    match = re.search(r"obj:([a-zA-Z]+),(\d+)", dedupe_key)
+    if match:
+        obj_type = re.sub(r"(?<!^)(?=[A-Z])", " ", match.group(1)).title()
+        return f"{obj_type} {match.group(2)}"
+    parts = dedupe_key.split("|")
+    if len(parts) >= 2:
+        return parts[-1].replace("-", " ").replace("_", " ").title()
+    return dedupe_key
 
 
 def _clean_bacnet_id(loc_id: str) -> str:
@@ -200,15 +325,54 @@ def _propagation_risk_from_issue(issue: CockpitIssue) -> float:
     return 0.2
 
 
-def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperatingMode) -> NarrativeCandidate:
+def _build_equipment_dict_from_issue(issue: CockpitIssue) -> dict | None:
+    """Build a minimal equipment dict from the issue's location data."""
+    asset_id = issue.location.asset_ids[0] if issue.location.asset_ids else None
+    if not asset_id:
+        return None
+    # Skip BACnet object addresses — not an equipment row
+    if asset_id.startswith("nc:"):
+        return None
+    # Build a meaningful equipment_type from the asset code
+    parts = asset_id.split("-")
+    equipment_type = parts[1].upper() if len(parts) >= 2 else ""
+    location = issue.location.floor_id or ""
+    if not location and issue.location.zone_ids:
+        zone = issue.location.zone_ids[0]
+        if zone.startswith("Zone-"):
+            floor_code = zone.split("-")[1] if len(zone.split("-")) >= 2 else ""
+            location = floor_code
+    return {
+        "equipment_id": asset_id,
+        "equipment_type": equipment_type,
+        "location": location,
+    }
+
+
+def _candidate_from_issue(
+    issue: CockpitIssue,
+    operating_mode: SentinelOperatingMode,
+    epicenter_equipment: dict | None = None,
+) -> NarrativeCandidate:
     affected_zones = [zone_id for zone_id in issue.location.zone_ids if zone_id]
-    raw_epicenter = (
+    epicenter_source = (
         issue.location.floor_id
         or (affected_zones[0] if affected_zones else None)
         or (issue.location.asset_ids[0] if issue.location.asset_ids else None)
         or "building"
     )
-    epicenter = _clean_bacnet_id(raw_epicenter)
+    if epicenter_equipment:
+        epicenter = format_epicenter_label(
+            epicenter_equipment,
+            fallback=epicenter_source,
+        )
+    else:
+        epicenter = format_epicenter_label(
+            _build_equipment_dict_from_issue(issue),
+            fallback=_format_bacnet_object(issue.location.asset_ids[0] if issue.location.asset_ids else ""),
+        )
+    if not epicenter or epicenter == "Unknown location":
+        epicenter = epicenter_source
 
     message = issue.impact_summary or issue.summary or issue.title
     action = issue.recommended_action or "Investigate the dominant building tension."
@@ -220,7 +384,8 @@ def _candidate_from_issue(issue: CockpitIssue, operating_mode: SentinelOperating
         location=NarrativeLocation(
             epicenter=epicenter,
             affected=[
-                _clean_bacnet_id(z) for z in (affected_zones[1:] if raw_epicenter in affected_zones else affected_zones)
+                _clean_bacnet_id(z)
+                for z in (affected_zones[1:] if epicenter_source in affected_zones else affected_zones)
             ],
             propagation=_propagation_from_issue(issue),
         ),
@@ -261,24 +426,28 @@ def _fallback_candidates_for_site(
     sustained_polls = t.get("sustained_polls", 0)
 
     cooling_drift_candidate: NarrativeCandidate | None = None
-    if basement_temp is not None and l0_avg_temp is not None:
-        if basement_temp > l0_avg_temp + 1.0 and sustained_polls >= 2:
-            cooling_drift_candidate = NarrativeCandidate(
-                candidate_id="comfort-s002-b1-upward-drift",
-                voice="comfort_stress",
-                message="Cooling drift is spreading upward from the basement plant.",
-                location=NarrativeLocation(
-                    epicenter="B1",
-                    affected=["L0", "L1"],
-                    propagation="upward",
-                ),
-                action="Prepare standby cooling.",
-                time_to_constraint_breach_min=18,
-                affected_occupants_est=42,
-                system_criticality=0.88,
-                propagation_risk=0.74,
-                eroding_margin=True,
-            )
+    if (
+        basement_temp is not None
+        and l0_avg_temp is not None
+        and basement_temp > l0_avg_temp + 1.0
+        and sustained_polls >= 2
+    ):
+        cooling_drift_candidate = NarrativeCandidate(
+            candidate_id="comfort-s002-b1-upward-drift",
+            voice="comfort_stress",
+            message="Cooling drift is spreading upward from the basement plant.",
+            location=NarrativeLocation(
+                epicenter="B1",
+                affected=["L0", "L1"],
+                propagation="upward",
+            ),
+            action="Prepare standby cooling.",
+            time_to_constraint_breach_min=18,
+            affected_occupants_est=42,
+            system_criticality=0.88,
+            propagation_risk=0.74,
+            eroding_margin=True,
+        )
 
     # ── chiller cycling gate ─────────────────────────────────────────────────
     # Fires when staging_state transitions > 2 in last 30 min (chiller starts/stops).
@@ -409,8 +578,11 @@ def _candidate_from_source_health(statuses: Iterable[CockpitSourceStatus]) -> Na
 def generate_narrative_candidates_from_issues(
     issues: Iterable[CockpitIssue],
     operating_mode: SentinelOperatingMode = "comfort",
+    epicenter_equipment: dict | None = None,
 ) -> list[NarrativeCandidate]:
-    candidates = [_candidate_from_issue(issue, operating_mode) for issue in issues]
+    candidates = [
+        _candidate_from_issue(issue, operating_mode, epicenter_equipment=epicenter_equipment) for issue in issues
+    ]
     return [candidate for candidate in candidates if candidate.spatially_grounded]
 
 
@@ -427,7 +599,10 @@ def generate_narrative_candidates(
     except Exception:
         issues = []
 
-    candidates = generate_narrative_candidates_from_issues(issues, operating_mode=operating_mode)
+    epicenter_equipment = _resolve_epicenter_equipment(site_id)
+    candidates = generate_narrative_candidates_from_issues(
+        issues, operating_mode=operating_mode, epicenter_equipment=epicenter_equipment
+    )
     if candidates:
         return candidates
 

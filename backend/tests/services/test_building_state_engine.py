@@ -244,19 +244,19 @@ def test_build_building_state_payload_defensively_caps_secondaries_to_two(monkey
 
     monkeypatch.setattr(
         "app.services.building_state_engine.generate_narrative_candidates",
-        lambda site_id, issue_service=None, operating_mode=None, telemetry=None: [comfort, *overflow_secondaries],
+        lambda site_id, issue_service=None, operating_mode=None, telemetry=None: [comfort, *overflow_secondaries],  # noqa: ARG005
     )
     monkeypatch.setattr(
         "app.services.building_state_engine.resolve_site_operating_mode",
-        lambda site_id: "comfort",
+        lambda site_id: "comfort",  # noqa: ARG005
     )
     monkeypatch.setattr(
         "app.services.building_state_engine.resolve_building_posture",
-        lambda candidates: "compensating",
+        lambda candidates: "compensating",  # noqa: ARG005
     )
     monkeypatch.setattr(
         "app.services.building_state_engine.select_dominant_narrative",
-        lambda posture, candidates: (comfort, overflow_secondaries),
+        lambda posture, candidates: (comfort, overflow_secondaries),  # noqa: ARG005
     )
 
     payload = build_building_state_payload("site-123")
@@ -308,7 +308,7 @@ def test_selector_returns_max_two_secondary_tensions():
 def test_building_state_payload_defensively_caps_secondary_tensions_to_two(monkeypatch):
     monkeypatch.setattr(
         "app.services.building_state_engine.generate_narrative_candidates",
-        lambda site_id, issue_service=None, operating_mode=None, telemetry=None: [
+        lambda site_id, issue_service=None, operating_mode=None, telemetry=None: [  # noqa: ARG005
             _candidate(
                 candidate_id="comfort-primary",
                 voice="comfort_stress",
@@ -321,12 +321,12 @@ def test_building_state_payload_defensively_caps_secondary_tensions_to_two(monke
     )
     monkeypatch.setattr(
         "app.services.building_state_engine.resolve_building_posture",
-        lambda candidates: "compensating",
+        lambda _candidates: "compensating",
     )
     monkeypatch.setattr(
         "app.services.building_state_engine.select_dominant_narrative",
-        lambda posture, candidates: (
-            candidates[0],
+        lambda _posture, _candidates: (
+            _candidates[0],
             [
                 _candidate(
                     candidate_id="secondary-1",
@@ -362,7 +362,7 @@ def test_building_state_payload_defensively_caps_secondary_tensions_to_two(monke
 def test_build_building_state_payload_returns_explicit_calm_for_unknown_site():
     class HealthyFusion:
         @staticmethod
-        def aggregate(site_id):
+        def aggregate(_site_id):
             return (
                 [],
                 [
@@ -464,14 +464,14 @@ def test_generate_narrative_candidates_uses_fused_issues_before_fallback():
     # Fused issues → alert-live-1 candidate (used before fallback).
     assert generated_from_alert[0].candidate_id == "alert-live-1"
     assert generated_from_alert[0].voice == "comfort_stress"
-    assert generated_from_alert[0].location.epicenter == "L2"
+    assert generated_from_alert[0].location.epicenter == "S002-CHILLER-B1-001 · Chiller · L2"
     assert generated_from_alert[0].time_to_constraint_breach_min is not None
 
 
 def test_generate_narrative_candidates_does_not_promote_source_health_to_primary_building_narrative():
     class DegradedFusion:
         @staticmethod
-        def aggregate(site_id):
+        def aggregate(_site_id):
             return (
                 [],
                 [
@@ -590,7 +590,7 @@ def test_asset_backed_issue_prefers_asset_stress_voice():
     )
 
     assert generated[0].voice == "asset_stress"
-    assert generated[0].location.epicenter == "B1"
+    assert generated[0].location.epicenter == "S002-CHILLER-B1-001 · Chiller · B1"
 
 
 def test_hvac_fault_biases_to_energy_pressure_in_cost_saving_mode():
@@ -776,7 +776,7 @@ def test_sla_due_at_drives_time_to_constraint_breach_when_present():
 def test_build_building_state_payload_does_not_report_calm_when_sources_are_unavailable():
     class UnavailableFusion:
         @staticmethod
-        def aggregate(site_id):
+        def aggregate(_site_id):
             return (
                 [],
                 [
@@ -803,3 +803,46 @@ def test_build_building_state_payload_does_not_report_calm_when_sources_are_unav
     assert payload.primary_narrative is not None
     assert payload.primary_narrative.voice == "operational_stability"
     assert payload.operator_guidance.mode == "watch"
+
+
+def test_epicenter_resolver_uses_correct_column_names():
+    """Schema assertion: _resolve_epicenter_equipment uses real Supabase column names.
+
+    The equipment table uses `type` and `code` — NOT `equipment_type` or `equipment_id`.
+    This test captures the .select() string to fail on column rename.
+    """
+    from unittest.mock import MagicMock, patch
+
+    mock_sb = MagicMock()
+    mock_sb.table.return_value.select.return_value.eq.return_value.execute.return_value.data = [{"id": "fake-uuid"}]
+
+    captured_selects: list[str] = []
+
+    def capture_select(columns: str) -> MagicMock:
+        captured_selects.append(columns)
+        result = MagicMock()
+        result.eq.return_value.execute.return_value.data = []
+        return result
+
+    # First call to .table() is for sites (returns working mock).
+    # Second call to .table() is for equipment (captures .select()).
+    mock_sb.table.side_effect = [
+        mock_sb.table.return_value,  # sites — uses default mock
+        MagicMock(select=capture_select),  # equipment — captures columns
+    ]
+
+    with patch("app.database.supabase_client.get_supabase_client", return_value=mock_sb):
+        from app.services.narrative_candidate_generator import _resolve_epicenter_equipment
+
+        _resolve_epicenter_equipment("site-002")
+
+    assert captured_selects, "No .select() call captured — equipment was never queried"
+    equip_select = captured_selects[0]
+    assert "type" in equip_select, (
+        f"Equipment query uses wrong column name. "
+        f"Got .select({equip_select!r}) — expected 'type' (not 'equipment_type')."
+    )
+    assert "code" in equip_select, (
+        f"Equipment query missing 'code' column. Got .select({equip_select!r}) — expected 'code' (not 'equipment_id')."
+    )
+    assert "health_score" in equip_select, f"Equipment query missing 'health_score'. Got .select({equip_select!r})."

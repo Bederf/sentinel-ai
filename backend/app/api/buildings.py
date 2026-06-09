@@ -1396,6 +1396,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
 
         # Cross-reference active alerts to derive equipment risk status
         alert_severity_map: dict[str, str] = {}
+        alert_count_map: dict[str, int] = {}
         try:
             from app.database.repositories.alert_repository import AlertRepository
 
@@ -1409,6 +1410,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     if existing != "critical":
                         if severity == "critical" or existing is None:
                             alert_severity_map[eq_uuid] = severity
+                    alert_count_map[eq_uuid] = alert_count_map.get(eq_uuid, 0) + 1
         except Exception as e:
             logger.debug(f"Alert cross-reference skipped: {e}")
 
@@ -1555,6 +1557,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                         "model": eq.get("model"),
                         "metadata": eq.get("metadata", {}),
                     },
+                    "alert_count": alert_count_map.get(eq.get("id", ""), 0),
                     "controllable": effective_controllable,
                     "control_state": (
                         "synced_capability"
@@ -2142,4 +2145,89 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
         "categories": categories,
         "equipment": equipment_list,
         "source": "json",
+    }
+
+
+_ALERT_TYPE_LABELS: dict[str, str] = {
+    "FAULT_STATE": "Fault detected",
+    "fault_state": "Fault detected",
+    "CHANGE_OF_STATE": "State change",
+    "change_of_state": "State change",
+    "OUT_OF_RANGE": "Out of range",
+    "out_of_range": "Out of range",
+    "UNSIGNED_RANGE": "Threshold exceeded",
+    "unsigned_range": "Threshold exceeded",
+    "CO2_HIGH": "CO2 elevated",
+    "co2_high": "CO2 elevated",
+}
+
+
+def _alert_type_label(raw: str | None) -> str:
+    if not raw:
+        return "Alert"
+    label = _ALERT_TYPE_LABELS.get(raw)
+    if label:
+        return label
+    return raw.replace("_", " ").title()
+
+
+_SEVERITY_ORDER = {"critical": 0, "high": 1, "warning": 2, "medium": 3, "low": 4, "info": 5}
+
+
+@router.get("/buildings/{site_id}/equipment/{equipment_id}/alerts")
+async def get_equipment_alerts(
+    site_id: str,
+    equipment_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> dict:
+    """
+    Get active alerts for a specific equipment item.
+
+    Returns active alerts ordered by severity DESC, event_at DESC.
+    Limited to 10 — if more exist, the response includes total_count.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    sb = get_supabase_client()
+
+    # Resolve site to UUID
+    site_row = sb.table("sites").select("id").eq("code", site_id).maybe_single().execute()
+    if not site_row.data:
+        raise HTTPException(status_code=404, detail=f"Site '{site_id}' not found")
+    site_uuid = site_row.data["id"]
+
+    # Resolve equipment code to UUID
+    equip_row = sb.table("equipment").select("id").eq("code", equipment_id).maybe_single().execute()
+    if not equip_row.data:
+        raise HTTPException(status_code=404, detail=f"Equipment '{equipment_id}' not found")
+    equip_uuid = equip_row.data["id"]
+
+    # Fetch active alerts
+    alert_columns = (
+        "id, title, message, severity, status, type, "
+        "site_id, equipment_id, created_at, updated_at, "
+        "acknowledged_by, acknowledged_at, "
+        "source, source_dedupe_key, lifecycle_state, last_seen_at, event_at"
+    )
+    result = (
+        sb.table("alerts")
+        .select(alert_columns)
+        .eq("equipment_id", equip_uuid)
+        .eq("site_id", site_uuid)
+        .eq("status", "active")
+        .order("severity", desc=True)
+        .order("event_at", desc=True)
+        .limit(10)
+        .execute()
+    )
+
+    alerts = result.data or []
+    for alert in alerts:
+        alert["type_label"] = _alert_type_label(alert.get("type"))
+        alert["event_at"] = alert.get("event_at") or alert.get("created_at")
+
+    return {
+        "alerts": alerts,
+        "total_count": len(alerts),
+        "has_more": False,
     }
