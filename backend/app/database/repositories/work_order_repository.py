@@ -102,6 +102,8 @@ class WorkOrderRepository:
                 payload["action_value"] = str(work_order["action_value"])
             if work_order.get("recommendation_id"):
                 payload["recommendation_id"] = work_order["recommendation_id"]
+            if work_order.get("notified_technician_telegram_id") is not None:
+                payload["notified_technician_telegram_id"] = work_order["notified_technician_telegram_id"]
 
             # Insert with retry on duplicate code collision (DB trigger generates code)
             max_retries = 3

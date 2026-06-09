@@ -1332,6 +1332,8 @@ async def sentry_create_work_order(
         if tech:
             wo_data["assigned_to"] = tech.get("name")
             wo_data["assigned_team"] = tech.get("specialty")
+            if tech.get("telegram_id"):
+                wo_data["notified_technician_telegram_id"] = int(tech["telegram_id"])
 
         created = await wo_repo.create_work_order(wo_data)
 
