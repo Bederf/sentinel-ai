@@ -5586,6 +5586,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             total_assets = 0
             site_uuid = None
             try:
+                from app.config.health_config import PASSIVE_TYPES
                 from app.database.supabase_client import get_supabase_client
 
                 sb = get_supabase_client()
@@ -5603,8 +5604,13 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                         .execute()
                     )
                     if resp.data:
-                        total_assets = len(resp.data)
                         for eq in resp.data:
+                            if eq.get("type") and str(eq.get("type", "")).lower() in PASSIVE_TYPES:
+                                logger.debug(
+                                    "[DIGEST] Skipping passive device: %s (%s)", eq.get("code"), eq.get("type")
+                                )
+                                continue
+                            total_assets += 1
                             hs = eq.get("health_score") or 100
                             if hs < 70:
                                 critical_assets.append(eq)
@@ -5636,10 +5642,10 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             try:
                 from app.services.csv_loader import WorkOrderData
 
-                site_wos = WorkOrderData.get_by_site(site_id) if site_id else WorkOrderData.load()
-                open_wo_count = sum(
-                    1 for wo in site_wos if str(wo.get("status", "")).lower() in ("open", "scheduled", "in_progress")
-                )
+                # CSV uses SITE-002 format (uppercase), not site-002
+                site_wo_id = site_id.upper() if site_id.lower().startswith("site-") else site_id
+                site_wos = WorkOrderData.get_by_site(site_wo_id) if site_id else WorkOrderData.load()
+                open_wo_count = sum(1 for wo in site_wos if not wo.get("completed_date") and not wo.get("closed_date"))
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch work orders: {e}")
 
@@ -5713,8 +5719,8 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             if alert_count > 0:
                 lines.append(f"*Active Alerts:* {alert_count} ({len(critical_alerts)} critical)")
                 for a in critical_alerts[:3]:
-                    msg = getattr(a, "message", "Alert")[:60]
-                    lines.append(f"  [{getattr(a, 'severity', '?').upper()}] {msg}")
+                    msg = a.get("message", "Alert")[:60]
+                    lines.append(f"  [{a.get('severity', '?').upper()}] {msg}")
             else:
                 lines.append("*Active Alerts:* 0")
 
