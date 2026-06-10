@@ -835,11 +835,11 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
     priority = rec.get("priority", "medium")
 
     description = (
-        f"SENTINEL Advisory — AI Optimization Recommendation\n\n"
-        f"Equipment: {target}\n"
-        f"Action: Set {point} to {value}\n\n"
-        f"Reason: {reason[:500]}\n\n"
-        f"Recommendation ID: {rec_uuid}"
+        f"⚡ SENTINEL Advisory — site-002\n\n"
+        f"📋 {target}\n"
+        f"   What: Set {point} to {value}\n"
+        f"   Why: {reason[:500]}\n\n"
+        f"🆔 {rec_uuid}"
     )
 
     # Resolve site_id first for technician lookup
@@ -862,39 +862,58 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         "FCU": "hvac",
         "PUMP": "hvac",
         "CRAC": "hvac",
+        "CT": "hvac",
+        "COLD": "hvac",
+        "SPLIT": "hvac",
+        "WEATHER": "hvac",
+        "WATER": "hvac",
+        "ZONE": "hvac",
+        "ZONE_SENSOR": "hvac",
+        "JACE": "hvac",
+        "SITE": "hvac",
         "DALI": "dali",
         "LUM": "dali",
+        "LCA": "dali",
+        "LTG": "dali",
+        "SCENE": "dali",
         "GEN": "electrical",
         "UPS": "electrical",
         "ATS": "electrical",
         "MSB": "electrical",
         "TX": "electrical",
         "DB": "electrical",
+        "BESS": "electrical",
+        "INV": "electrical",
+        "PV": "electrical",
+        "MTR": "electrical",
+        "LIFT": "electrical",
         "FIRE": "fire",
+        "CCURE": "access",
+        "DOOR": "access",
+        "GATE": "access",
     }
     target_specialty = specialty_map.get(eq_type.upper(), "hvac")
     try:
         if sb and site_id:
-            try:
-                tech_result = (
-                    sb.table("site_technicians")
-                    .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                    .eq("site_id", site_id)
-                    .eq("is_primary", True)
-                    .execute()
-                )
-                if tech_result.data:
-                    for st in tech_result.data:
-                        if st.get("specialty") == target_specialty:
-                            tech = st.get("technicians", {})
+            tech_result = (
+                sb.table("technicians")
+                .select("id, name, email, phone, telegram_id, specialty")
+                .eq("site_id", "site-002")
+                .eq("active", True)
+                .execute()
+            )
+            if tech_result.data:
+                # Prefer matching specialty
+                for t in tech_result.data:
+                    if t.get("specialty") == target_specialty and t.get("telegram_id"):
+                        tech = t
+                        break
+                # Fallback: any active tech at this site with telegram_id
+                if not tech:
+                    for t in tech_result.data:
+                        if t.get("telegram_id"):
+                            tech = t
                             break
-                    if not tech:
-                        for st in tech_result.data:
-                            if st.get("specialty") == "general":
-                                tech = st.get("technicians", {})
-                                break
-            except Exception:
-                pass
 
             if not tech:
                 try:

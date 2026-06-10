@@ -985,50 +985,14 @@ class BackgroundSchedulerService:
                     logger.error(f"Error analyzing site {site_id}: {e}")
                     error_count += 1
 
-            # ── Combined Telegram summary per site ──────────────────────────
+            # Advisory notifications are ai.advisory — Cockpit rail, not Telegram
             for _site_id, _recs in self._pending_advisories.items():
-                if not _recs:
-                    continue
-                try:
-                    from app.config.settings import settings as _app_settings
-                    from app.services.telegram_message_sender import InlineButton, InlineKeyboard, get_telegram_sender
-
-                    _chat_id = getattr(_app_settings, "telegram_alert_chat_id", None) or getattr(
-                        _app_settings, "sentry_fm_chat_id", None
+                if _recs:
+                    logger.debug(
+                        "[NOTIFICATION SUPPRESSED] ai.advisory severity=MEDIUM — Cockpit only (%s: %d recommendations)",
+                        _site_id,
+                        len(_recs),
                     )
-                    if not _chat_id:
-                        continue
-                    _lines = []
-                    for _r in _recs[:8]:
-                        _target = _r.target_equipment or ""
-                        _point = _r.action.get("point", "") if isinstance(_r.action, dict) else ""
-                        _val = _r.action.get("value", "") if isinstance(_r.action, dict) else ""
-                        _how = f"{_point} to {_val}" if _point else ""
-                        _why = _r.reason or ""
-                        _lines.append(f"📋 {_target}")
-                        if _how:
-                            _lines.append(f"   What: Set {_how}")
-                        _lines.append(f"   Why: {_why}")
-                        _lines.append("")
-                    if len(_recs) > 8:
-                        _lines.append(f"… and {len(_recs) - 8} more")
-                    _combined = "\n".join(_lines).strip()
-
-                    _keyboard = InlineKeyboard(
-                        rows=[
-                            [InlineButton(label="🛠 Create Work Order", callback_data=f"wo:advisory:{_site_id}")],
-                        ]
-                    )
-                    _sender = get_telegram_sender()
-                    _send_result = _sender.send_text(
-                        chat_id=str(_chat_id),
-                        text=f"<b>SENTINEL Advisory — {_site_id}</b>\n\n{_combined}",
-                        keyboard=_keyboard,
-                    )
-                    asyncio.run_coroutine_threadsafe(_send_result, self._main_loop).result(timeout=30)
-                    logger.info("[NOTIFY] Combined advisory sent for %s (%d recs)", _site_id, len(_recs))
-                except Exception as _notify_err:
-                    logger.warning("Failed to send combined Telegram advisory: %s", _notify_err)
 
             # Health engine disabled — data exists in equipment (health scores) and predictions tables.
             # Maintenance panel reads directly from those tables. No duplication needed.

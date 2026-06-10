@@ -1333,12 +1333,37 @@ async def sentry_create_work_order(
             wo_data["assigned_to"] = tech.get("name")
             wo_data["assigned_team"] = tech.get("specialty")
             if tech.get("telegram_id"):
-                wo_data["notified_technician_telegram_id"] = int(tech["telegram_id"])
+                wo_data["notified_technician_telegram_id"] = int(tech["telegram_id"])  # type: ignore[assignment]
 
         created = await wo_repo.create_work_order(wo_data)
 
         if not created:
             raise HTTPException(status_code=500, detail="Failed to create work order")
+
+        # Notify technician via Telegram (in-band, like /call-log)
+        try:
+            wo_notify_data: dict[str, Any] = {
+                "work_order_id": created.get("id"),
+                "work_order_code": created.get("code"),
+                "equipment_id": "00000000-0000-0000-0000-000000000001",
+                "site_id": "",
+                "zone_id": "",
+                "equipment_code": req.equipment_code,
+                "equipment_name": created.get("equipment_name", req.title),
+                "service_type": "callout",
+                "criticality": req.priority.upper(),
+                "problem_description": req.description,
+                "original_message": req.description,
+                "reported_by": req.created_by,
+            }
+            if tech:
+                wo_notify_data["technician_id"] = tech.get("telegram_id")
+                wo_notify_data["technician_name"] = tech.get("name", "Technician")
+                wo_notify_data["technician_email"] = tech.get("email", "")
+            technician_notified = await work_order_notifier.notify_technician(wo_notify_data)
+        except Exception as e:
+            logger.warning(f"Technician notification failed for WO {created.get('code')}: {e}")
+            technician_notified = False
 
         return {
             "success": True,
@@ -1349,6 +1374,7 @@ async def sentry_create_work_order(
             "assigned_to": wo_data.get("assigned_to"),
             "technician_email": tech.get("email") if tech else None,
             "technician_telegram_id": tech.get("telegram_id") if tech else None,
+            "technician_notified": technician_notified,
             "priority": req.priority,
             "status": "scheduled",
         }

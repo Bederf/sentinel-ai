@@ -279,7 +279,7 @@ class PredictionGeneratorService:
             for f in factors[:3]:
                 if isinstance(f, dict):
                     lines.append(f"• {f.get('factor', 'Unknown')}: {f.get('value', 'Unknown')}")
-        lines.extend(["", "-> Acknowledge to confirm review"])
+        lines.extend(["", "-> Review and take action"])
         return "\n".join(lines)
 
     async def _notify_prediction(
@@ -344,7 +344,6 @@ class PredictionGeneratorService:
                     sender = get_telegram_sender()
                     keyboard = InlineKeyboard(
                         rows=[
-                            [InlineButton(label="✅ Acknowledge", callback_data=f"pred_ack:{prediction['id']}")],
                             [InlineButton(label="🛠 Create Work Order", callback_data=f"pred_wo:{prediction['id']}")],
                         ]
                     )
