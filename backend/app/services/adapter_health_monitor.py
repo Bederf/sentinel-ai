@@ -288,7 +288,22 @@ class AdapterHealthMonitor:
             ).execute()
 
         except Exception as e:
-            logger.error(f"Failed to persist adapter health for {adapter_name}@{site_id}: {e}")
+            logger.error(f"Failed to persist adapter health for {adapter_name}@{site_id}: {e}", exc_info=True)
+            try:
+                supabase.table("adapter_health_current").upsert(
+                    {
+                        "site_id": site_id,
+                        "adapter_name": adapter_name,
+                        "adapter_type": adapter_type,
+                        "is_healthy": False,
+                        "last_check": now.isoformat(),
+                        "consecutive_failures": record.consecutive_failures,
+                        "error_message": f"persist_failed: {e!s}",
+                        "updated_at": now.isoformat(),
+                    }
+                ).execute()
+            except Exception as inner_e:
+                logger.error(f"Failed to write fallback health record for {adapter_name}@{site_id}: {inner_e}")
 
         # Alert logic — fire on Nth consecutive failure
         if record.consecutive_failures == _CONSECUTIVE_FAILURE_ALERT_THRESHOLD:
@@ -757,11 +772,25 @@ class AdapterHealthMonitor:
 
     @staticmethod
     def _get_monitored_sites(settings: Any) -> list[str]:
-        """Return list of site IDs that should be monitored."""
-        sites = ["site-002"]
-        if getattr(settings, "ENABLE_SITE001_SOURCE", False):
-            sites.append("site-001")
-        return sites
+        """Return list of site IDs that should be monitored.
+
+        Reads enabled bridge adapters from site_adapter_config so that
+        new sites (e.g. site-005) are automatically included without
+        code changes.
+        """
+        sites: list[str] = []
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            result = client.table("site_adapter_config").select("site_id").eq("enabled", True).execute()
+            sites = list({row["site_id"] for row in (result.data or [])})
+        except Exception:
+            logger.warning("Could not query site_adapter_config, falling back to site-002")
+            sites = ["site-002"]
+            if getattr(settings, "ENABLE_SITE001_SOURCE", False):
+                sites.append("site-001")
+        return sorted(sites)
 
     @staticmethod
     def _site_id_from_adapter(adapter: Any, _name: str, _settings: Any) -> str:

@@ -447,12 +447,16 @@ async def get_adapter_health(site_id: str):
     }
 
 
+_ADAPTER_HEALTH_STALE_SECONDS: float = 300.0  # 5 minutes
+
+
 def _format_adapter_rows(rows: list[dict]) -> list[dict]:
+    now = datetime.now(UTC)
     return [
         {
             "name": row["adapter_name"],
             "type": row["adapter_type"],
-            "is_healthy": row["is_healthy"],
+            "is_healthy": _resolve_adapter_health(row, now),
             "uptime_1h_percent": row.get("uptime_1h_percent"),
             "uptime_24h_percent": row.get("uptime_24h_percent"),
             "last_check": row["last_check"],
@@ -460,6 +464,25 @@ def _format_adapter_rows(rows: list[dict]) -> list[dict]:
         }
         for row in rows
     ]
+
+
+def _resolve_adapter_health(row: dict, now: datetime) -> bool:
+    """Return is_healthy, accounting for staleness.
+
+    A row whose last_check is older than the threshold is treated as
+    unhealthy even if the stored is_healthy flag is True — the check
+    is too old to trust.
+    """
+    last_check = row.get("last_check")
+    if last_check:
+        try:
+            check_dt = datetime.fromisoformat(last_check.replace("Z", "+00:00"))
+            age = (now - check_dt).total_seconds()
+            if age > _ADAPTER_HEALTH_STALE_SECONDS:
+                return False
+        except Exception:
+            pass
+    return bool(row.get("is_healthy", False))
 
 
 @router.get("/sites/{site_id}/adapter-health/history")

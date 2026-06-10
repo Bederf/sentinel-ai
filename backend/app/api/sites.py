@@ -1715,6 +1715,8 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
             "bridge_sync_error": None,
         }
 
+    HEALTH_STALE_THRESHOLD_SECONDS: float = 300.0  # 5 minutes
+
     # Valve open: check data source (only when needed)
     try:
         bridge_connected = False
@@ -1724,16 +1726,31 @@ def _get_bridge_status(sentinel_enabled: bool = True) -> dict:
 
         # ShadowModePollingService is the primary bridge data pipeline
         try:
+            from datetime import UTC, datetime
+
             from app.services.multi_site_polling_coordinator import get_multi_site_polling_coordinator
 
             coordinator = get_multi_site_polling_coordinator()
             shadow_status = coordinator.get_service_status("site-002")
             if shadow_status is not None:
                 if shadow_status.get("connected"):
-                    bridge_connected = True
-                    bridge_last_sync = shadow_status.get("last_poll")
-                    bridge_sync_error = None
-                    bridge_data_source = "remote_bridge"
+                    last_poll = shadow_status.get("last_poll")
+                    age_seconds = None
+                    if last_poll:
+                        try:
+                            poll_dt = datetime.fromisoformat(last_poll.replace("Z", "+00:00"))
+                            age_seconds = (datetime.now(UTC) - poll_dt).total_seconds()
+                        except Exception:
+                            pass
+                    if age_seconds is not None and age_seconds > HEALTH_STALE_THRESHOLD_SECONDS:
+                        bridge_connected = False
+                        bridge_sync_error = f"polling: status stale (last poll {int(age_seconds)}s ago)"
+                        bridge_data_source = "remote_bridge"
+                    else:
+                        bridge_connected = True
+                        bridge_last_sync = last_poll
+                        bridge_sync_error = None
+                        bridge_data_source = "remote_bridge"
                 else:
                     reason = shadow_status.get("reason", "not_polled")
                     bridge_sync_error = f"polling: {reason}"
