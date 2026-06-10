@@ -1055,51 +1055,6 @@ async def calculate_cost_impact(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# === Water work order endpoints ===
-
-
-@limiter.limit("30/minute")
-@router.post("/work-orders/from-alert/{alert_id}")
-async def create_work_order_from_water_alert(
-    request: Request,
-    alert_id: str,
-) -> dict:
-    """Create work order from a water leak alert.
-
-    Args:
-        alert_id: Alert ID to convert to work order
-
-    Returns:
-        Work order details with assignment
-    """
-    try:
-        alert_svc = get_water_alert_service()
-
-        # Retrieve alert
-        alerts = alert_svc.get_leak_alerts("", status="active")
-        alert = next((a for a in alerts if a.alert_id == alert_id), None)
-
-        if not alert:
-            raise HTTPException(status_code=404, detail=f"Alert not found: {alert_id}")
-
-        # Create work order
-        work_order = await alert_svc.create_work_order_from_alert(alert)
-
-        if not work_order:
-            raise HTTPException(status_code=500, detail="Failed to create work order")
-
-        # Send Sentry notification
-        await alert_svc.notify_sentry_water_alert(alert, work_order["work_order_id"])
-
-        return work_order
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Error creating work order from alert: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @limiter.limit("30/minute")
 @router.get("/work-orders/{work_order_id}")
 async def get_water_work_order_details(
