@@ -8,7 +8,6 @@ Wired into BackgroundSchedulerService via add_data_freshness_monitor_job().
 """
 
 import logging
-import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, ClassVar
@@ -324,84 +323,24 @@ class DataFreshnessMonitor:
     async def _send_unrecoverable_alert(
         self, site_id: str, data_source: str, age_seconds: int | None, target: int, breach_duration: int
     ) -> None:
-        """Send Telegram alert for UNRECOVERABLE breach (persisted > 10 min).
-
-        Routes via Sentry gateway's manager bot to notify that auto-recovery failed
-        and manual intervention is required.
-        """
-        try:
-            import httpx
-
-            bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("SENTRY_BOT_TOKEN", ""))
-            chat_id = os.environ.get("TELEGRAM_CHAT_ID", "8359288792")  # Manager operator chat ID
-
-            if not bot_token:
-                logger.warning("[FRESHNESS] TELEGRAM_BOT_TOKEN not set - skipping Telegram alert")
-                self._fallback_log(site_id, data_source, age_seconds, target, "No bot token configured")
-                return
-
-            minutes_down = breach_duration // 60
-
-            message = (
-                f"🚨 <b>SENTRY ALERT: Telemetry Unrecoverable</b>\n\n"
-                f"<b>Site:</b> {site_id}\n"
-                f"<b>Source:</b> {data_source}\n"
-                f"<b>Duration:</b> {minutes_down} minutes\n"
-                f"<b>Status:</b> Auto-recovery failed\n\n"
-                f"⚠️ System has been down for over 10 minutes and has NOT auto-recovered.\n\n"
-                f"🔧 <b>Action Required:</b> Check BMS backend and bridge connectivity immediately."
-            )
-
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                    json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
-                )
-                result = resp.json()
-                if not result.get("ok"):
-                    logger.warning(f"[FRESHNESS] Unrecoverable alert failed: {result}")
-                    self._fallback_log(site_id, data_source, age_seconds, target, result)
-                else:
-                    logger.info(f"[FRESHNESS] Unrecoverable alert sent to manager for {site_id}")
-
-        except Exception as e:
-            logger.warning(f"Failed to send unrecoverable alert: {e}")
-            self._fallback_log(site_id, data_source, age_seconds, target, str(e))
+        """Data freshness alerts are system-health — Cockpit only, not Telegram."""
+        logger.debug(
+            "[NOTIFICATION SUPPRESSED] system.health_check_failed severity=LOW — Cockpit only "
+            "(%s/%s breach_duration=%ds)",
+            site_id,
+            data_source,
+            breach_duration,
+        )
+        self._fallback_log(site_id, data_source, age_seconds, target, "Suppressed — Cockpit only")
 
     async def _send_recovery_notification(self, site_id: str, data_source: str, duration_seconds: int) -> None:
-        """Send Telegram notification when breach is resolved (auto-recovered)."""
-        try:
-            import httpx
-
-            bot_token = os.environ.get("TELEGRAM_BOT_TOKEN", os.environ.get("SENTRY_BOT_TOKEN", ""))
-            chat_id = os.environ.get("TELEGRAM_CHAT_ID", "8359288792")  # Manager operator chat ID
-
-            if not bot_token:
-                logger.warning("[FRESHNESS] TELEGRAM_BOT_TOKEN not set - skipping Telegram alert")
-                self._fallback_log(site_id, data_source, None, 0, "No bot token configured")
-                return
-
-            minutes = duration_seconds // 60
-
-            message = (
-                f"✅ <b>SENTRY: Telemetry Restored</b>\n\n"
-                f"<b>Site:</b> {site_id}\n"
-                f"<b>Source:</b> {data_source}\n"
-                f"<b>Duration:</b> {minutes} minutes\n\n"
-                f"System has auto-recovered and telemetry is flowing normally."
-            )
-
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.post(
-                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
-                    json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
-                )
-                result = resp.json()
-                if result.get("ok"):
-                    logger.info(f"[FRESHNESS] Recovery notification sent for {site_id}")
-
-        except Exception as e:
-            logger.warning(f"Failed to send recovery notification: {e}")
+        """Data freshness recovery notifications are system-health — Cockpit only, not Telegram."""
+        logger.debug(
+            "[NOTIFICATION SUPPRESSED] system.health_check_ok severity=LOW — Cockpit only (%s/%s duration=%ds)",
+            site_id,
+            data_source,
+            duration_seconds,
+        )
 
     def _fallback_log(self, site_id: str, data_source: str, age_seconds: int | None, target: int, error: Any) -> None:
         """Write failed alert to fallback file for manual recovery."""

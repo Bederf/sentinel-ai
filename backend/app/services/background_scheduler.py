@@ -999,7 +999,6 @@ class BackgroundSchedulerService:
                     if not _chat_id:
                         continue
                     _lines = []
-                    _rows = []
                     for _r in _recs[:8]:
                         _target = _r.target_equipment or ""
                         _point = _r.action.get("point", "") if isinstance(_r.action, dict) else ""
@@ -1011,16 +1010,15 @@ class BackgroundSchedulerService:
                             _lines.append(f"   What: Set {_how}")
                         _lines.append(f"   Why: {_why}")
                         _lines.append("")
-                        _rows.append([InlineButton(
-                            label=f"🔧 Work Order — {_target}",
-                            callback_data=f"wo:rec_id:{_r.id}",
-                        )])
                     if len(_recs) > 8:
                         _lines.append(f"… and {len(_recs) - 8} more")
                     _combined = "\n".join(_lines).strip()
 
-                    _rows.append([InlineButton(label="✅ Acknowledged", callback_data=f"ack:combined:{_site_id}")])
-                    _keyboard = InlineKeyboard(rows=_rows)
+                    _keyboard = InlineKeyboard(
+                        rows=[
+                            [InlineButton(label="🛠 Create Work Order", callback_data=f"wo:advisory:{_site_id}")],
+                        ]
+                    )
                     _sender = get_telegram_sender()
                     _send_result = _sender.send_text(
                         chat_id=str(_chat_id),
@@ -2339,7 +2337,7 @@ class BackgroundSchedulerService:
         return "\n".join(lines)
 
     def add_recommendation_digest_job(self):
-        """Send a recommendation digest to Telegram at 07:45 SAST Mon-Fri."""
+        """Send a recommendation digest to Telegram at 07:00 SAST Mon-Fri."""
         from apscheduler.triggers.cron import CronTrigger
 
         from app.services.background_scheduler import _run_recommendation_digest_sync
@@ -2349,13 +2347,13 @@ class BackgroundSchedulerService:
 
         self.scheduler.add_job(
             func=_run_recommendation_digest_sync,
-            trigger=CronTrigger(hour=5, minute=45, day_of_week="mon-fri"),
+            trigger=CronTrigger(hour=5, minute=0, day_of_week="mon-fri"),
             id="recommendation_digest",
-            name="Recommendation Digest (07:45 SAST)",
+            name="Recommendation Digest (07:00 SAST)",
             replace_existing=True,
             misfire_grace_time=3600,
         )
-        logger.info("recommendation_digest job registered — 07:45 SAST Mon-Fri")
+        logger.info("recommendation_digest job registered — 05:00 UTC (07:00 SAST) Mon-Fri")
 
     def add_daily_health_sweep_job(self):
         """Run a full equipment health sweep every weekday at 08:00 SAST.
@@ -5539,25 +5537,14 @@ def _run_daily_health_sweep_sync():
 
         logger.info(f"[HEALTH-SWEEP] Complete: {total_recs} total recommendations across {len(target_sites)} sites")
 
-        # Telegram notification if any recommendations generated
+        # Health sweep notifications are advisory-only — Cockpit rail, not Telegram
         if total_recs > 0:
-            try:
-                from app.config.settings import settings
-
-                chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
-                    settings, "sentry_fm_chat_id", None
-                )
-                if chat_id:
-                    from app.services.telegram_message_sender import get_telegram_sender
-
-                    sender = get_telegram_sender()
-                    body = (
-                        f"*SENTINEL Health Sweep*\n"
-                        f"{total_recs} recommendations generated across {len(target_sites)} active sites"
-                    )
-                    await sender.send_text(str(chat_id), body, parse_mode="Markdown")
-            except Exception as tf_err:
-                logger.warning(f"[HEALTH-SWEEP] Telegram notification failed: {tf_err}")
+            logger.debug(
+                "[NOTIFICATION SUPPRESSED] ai.advisory severity=LOW — Cockpit only "
+                "(%d recommendations across %d sites)",
+                total_recs,
+                len(target_sites),
+            )
 
     asyncio.run_coroutine_threadsafe(_sweep(), scheduler_service._main_loop).result(timeout=300)
 

@@ -592,28 +592,12 @@ class AiUsageTracker:
                 return
             self._today_cache["_cost_alert_sent"] = True
 
-            chat_id = getattr(settings, "cost_alert_telegram_chat_id", "") or getattr(
-                settings, "telegram_alert_chat_id", ""
+            logger.debug(
+                "[NOTIFICATION SUPPRESSED] ai.cost_alert severity=MEDIUM — Cockpit only "
+                "(R %.2f exceeds threshold R %.2f)",
+                total_zar,
+                threshold,
             )
-            bot_token = getattr(settings, "telegram_bot_token", "")
-            if not (chat_id and bot_token):
-                logger.warning("Cost alert threshold exceeded (R %.2f) but no Telegram config", total_zar)
-                return
-
-            import httpx
-
-            msg = (
-                f"⚠️ *SENTINEL Cost Alert*\n"
-                f"Daily spend: R {total_zar:.2f} (threshold: R {threshold:.2f})\n"
-                f"USD: ${total_usd:.4f}"
-            )
-            url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-            # Fire-and-forget sync call (we're already in a lock context)
-            try:
-                httpx.post(url, json={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=5.0)
-                logger.info("Cost alert sent: R %.2f exceeds threshold R %.2f", total_zar, threshold)
-            except Exception as exc:
-                logger.error("Failed to send cost alert: %s", exc)
         except Exception:
             pass  # Never let alert logic break tracking
 
