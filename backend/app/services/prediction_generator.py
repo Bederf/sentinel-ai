@@ -22,7 +22,6 @@ from app.services.prediction_taxonomy import (
     normalize_prediction_urgency,
     urgency_from_severity,
 )
-from app.services.workflow_triggers import get_trigger_engine
 
 logger = logging.getLogger(__name__)
 
@@ -165,34 +164,6 @@ class PredictionGeneratorService:
         except Exception:
             pass
         return 0.0
-
-    async def _trigger_prediction_work_order(self, equipment: dict[str, Any], prediction: dict[str, Any]) -> bool:
-        """
-        Trigger a PREDICTION_CRITICAL work order if conditions are met.
-
-        Conditions:
-          - failure_probability >= 65  OR  health_score < 50
-
-        Returns True if a work order was created/triggered, False otherwise.
-        """
-        try:
-            engine = get_trigger_engine()
-            result = await engine.on_prediction_critical(
-                equipment_id=equipment.get("id", ""),
-                prediction_id=str(prediction.get("id")),
-                prediction_code=prediction.get("code", ""),
-                health_score=equipment.get("health_score", 50),
-                probability_percent=prediction.get("probability_percent", 0),
-                equipment_code=equipment.get("code"),
-            )
-            logger.info(
-                f"Prediction critical trigger result for {equipment.get('id')}: "
-                f"success={result.success} action={result.action_taken}"
-            )
-            return result.success
-        except Exception as e:
-            logger.error(f"Prediction work order trigger failed: {e}")
-            return False
 
     def _get_prediction_severity(self, health_score: float, probability_percent: float) -> str:
         """Derive severity from health score and probability."""
@@ -530,20 +501,6 @@ class PredictionGeneratorService:
                     # Notify based on severity (all predictions, not just critical)
                     equipment_site_id = equipment.get("site_id")
                     await self._notify_prediction(prediction, equipment, equipment_site_id)
-
-                    # Auto-create work order for critical predictions
-                    probability = prediction.get("probability_percent", 0)
-                    health_score = equipment.get("health_score", 50)
-                    if probability >= 65 or health_score < 50:
-                        if self._is_maintenance_module_active(equipment_site_id):
-                            await self._trigger_prediction_work_order(equipment, prediction)
-                        else:
-                            logger.info(
-                                "Prediction work-order trigger gated off for site=%s equipment=%s "
-                                "(maintenance module inactive)",
-                                equipment_site_id,
-                                equipment.get("code") or equipment.get("id"),
-                            )
 
                 except Exception as e:
                     error_msg = f"Error generating prediction for {equipment.get('id')}: {e!s}"
