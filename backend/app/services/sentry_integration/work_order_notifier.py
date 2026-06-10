@@ -342,7 +342,7 @@ class WorkOrderNotifier:
                 tg_commands,
                 "",
                 "---",
-                "SENTINEL BMS Intelligence / Sentry",
+                f"{site_name} · Facilities Management",
             ]
         )
 
@@ -531,10 +531,10 @@ class WorkOrderNotifier:
         else:
             html += f"""      <p>When you have completed the inspection, type: <code>done #{wo_ref}</code></p>"""
 
-        html += """    </div>
+        html += f"""    </div>
   </div>
-  <div class="footer">
-    <p><span class="brand">SENTINEL BMS Intelligence</span> / Sentry</p>
+    <div class="footer">
+    <p><span class="brand">{site_name}</span> · Facilities Management</p>
     <p>This is an automated message from SENTINEL.</p>
   </div>
 </div>

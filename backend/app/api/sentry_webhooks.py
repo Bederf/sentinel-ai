@@ -43,6 +43,36 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/sentry", tags=["sentry"])
 
 
+def _derive_equipment_code_from_desk(desk_id: str, site_code: str = "site-002") -> str | None:
+    """Derive serving FCU equipment code from a desk number using zone encoding.
+
+    Zone encoding: asset IDs use format S{site_id}-FCU-{F}{ZZ} where
+    F = floor digit (0=Ground, 1=L1, 2=L2)
+    ZZ = zone number (01-05), derived from desk number range:
+    00-19=Zone1, 20-39=Zone2, 40-59=Zone3, 60-79=Zone4, 80-99=Zone5.
+    """
+    if not desk_id or not desk_id.strip():
+        return None
+    desk_id = desk_id.strip()
+    first_char = desk_id[0]
+    if first_char.isdigit():
+        floor_digit = int(first_char)
+    elif first_char.upper() == "G":
+        floor_digit = 0
+    else:
+        return None
+    try:
+        last_two = int(desk_id[-2:]) if len(desk_id) >= 2 else int(desk_id[-1])
+    except ValueError:
+        return None
+    zone_number = (last_two // 20) + 1
+    if zone_number < 1 or zone_number > 5:
+        return None
+    zone_code = f"{floor_digit}{zone_number:02d}"
+    site_prefix = site_code.replace("-", "").upper()
+    return f"{site_prefix}-FCU-{zone_code}"
+
+
 async def _transcribe_voice_note(voice_file_id: str) -> str | None:
     """Download a Telegram voice note and transcribe it via ElevenLabs STT.
 
@@ -1491,7 +1521,7 @@ async def sentry_call_log(
                         tech_result = (
                             sb.table("site_technicians")
                             .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                            .eq("site_id", site_id)
+                            .eq("site_id", resolved_site_uuid)
                             .eq("specialty", req.specialty)
                             .eq("is_primary", True)
                             .execute()
@@ -1504,7 +1534,7 @@ async def sentry_call_log(
                             tech_result = (
                                 sb.table("site_technicians")
                                 .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                                .eq("site_id", site_id)
+                                .eq("site_id", resolved_site_uuid)
                                 .eq("specialty", "general")
                                 .eq("is_primary", True)
                                 .execute()
@@ -1590,6 +1620,7 @@ async def sentry_call_log(
             "reported_by": req.reported_by,
             "reporter_phone": req.reporter_phone,
             "create_service_record": False,
+            "equipment_code": _derive_equipment_code_from_desk(req.desk_id, req.site_id) or "",
         }
         logger.info(f"Call-log invoking notify_technician with data={wo_notify_data}")
         try:
