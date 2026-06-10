@@ -640,7 +640,7 @@ class NotificationService:
                     "status": "scheduled",
                     "equipment_code": equipment_code,
                     "site_id": rec.site_id,
-                    "created_by": "SENTINEL_AI_RECOMMENDATION",
+                    "created_by": f"telegram:{requested_by_telegram_id}",
                     "milestone_status": "assigned",
                     "estimated_duration_hours": 1,
                     "assigned_to": assigned_to,
