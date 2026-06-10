@@ -803,15 +803,32 @@ async def startup_event(_: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"Shadow mode polling initialization failed: {e}", exc_info=True)
 
-        # BACnet discovery polling — detects equipment changes on site-002's BACnet network.
+        # BACnet discovery polling — register one job per enabled bridge adapter.
         # Queries the bridge object catalog every 6 hours and compares against
         # known equipment records. New/missing devices are logged for review.
+        # Uses the same dynamic site iteration pattern as the poll coordinator.
         try:
-            scheduler_service.add_bacnet_discovery_polling_job(
-                interval_seconds=21600,  # 6 hours
-                site_id="site-002",
+            from app.database.supabase_client import get_supabase_client
+
+            _sb_bacnet = get_supabase_client()
+            _bridge_sites = (
+                _sb_bacnet.table("site_adapter_config")
+                .select("site_id, connection_config")
+                .eq("protocol", "bridge")
+                .eq("enabled", True)
+                .execute()
             )
-            _logger.info("BACnet discovery polling initialized (6h interval)")
+            _bacnet_registered = 0
+            for _row in _bridge_sites.data or []:
+                _cfg = _row.get("connection_config", {})
+                if _cfg.get("base_url") and _cfg.get("token"):
+                    scheduler_service.add_bacnet_discovery_polling_job(
+                        interval_seconds=21600,  # 6 hours
+                        site_id=_row["site_id"],
+                    )
+                    _bacnet_registered += 1
+            if _bacnet_registered:
+                _logger.info("BACnet discovery polling initialized for %d site(s) (6h interval)", _bacnet_registered)
         except Exception as e:
             _logger.error(f"BACnet discovery polling initialization failed: {e}", exc_info=True)
 

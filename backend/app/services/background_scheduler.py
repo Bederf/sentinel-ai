@@ -5228,24 +5228,24 @@ class BackgroundSchedulerService:
         logger.info("rooms_email_intake_poll job registered — interval=%s min", interval_minutes)
 
     # -----------------------------------------------------------------
-    # BACnet Discovery Polling — detect equipment changes on site-002
+    # BACnet Discovery Polling — detect equipment changes per site
     # -----------------------------------------------------------------
 
     def add_bacnet_discovery_polling_job(self, interval_seconds: int = 21600, site_id: str = "site-002"):
         """Add a job to periodically discover BACnet devices and detect equipment changes.
 
-        Polls the bridge at 10.99.0.1:8080 for the BACnet object catalog, then
-        compares discovered equipment against known records in the database.
+        Polls the bridge's BACnet object catalog, then compares discovered
+        equipment against known records in the database.
         New devices, missing devices, and metadata changes are logged and tracked.
 
         Args:
             interval_seconds: How often to scan (default: 21600 = 6 hours)
             site_id: Site to scan (default: site-002)
         """
-        job_id = "bacnet_discovery_polling"
+        job_id = f"bacnet_discovery_polling_{site_id}"
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
-            logger.info("Removed existing BACnet discovery polling job")
+            logger.info("Removed existing BACnet discovery polling job for %s", site_id)
 
         first_run = datetime.now() + timedelta(minutes=15)  # give system time to settle
 
@@ -5270,22 +5270,47 @@ class BackgroundSchedulerService:
     def _run_bacnet_discovery(self, site_id: str = "site-002"):
         """Query the bridge for BACnet objects and detect equipment changes.
 
-        Fetches the full BACnet object catalog from the bridge at 10.99.0.1:8080,
-        extracts equipment IDs, and compares against known equipment in the DB.
+        Fetches the full BACnet object catalog from the bridge, extracts
+        equipment IDs, and compares against known equipment in the DB.
         Logs new, missing, or changed equipment.
+
+        Bridge URL and token are resolved dynamically from
+        site_adapter_config so that every enabled site is supported
+        without hardcoding.
         """
         try:
             import asyncio
-            import os
 
             import httpx
 
-            token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
-            if not token:
-                logger.warning("[BACNET-DISCOVERY] No bridge token configured — skipping")
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            rows = (
+                sb.table("site_adapter_config")
+                .select("connection_config")
+                .eq("site_id", site_id)
+                .eq("protocol", "bridge")
+                .limit(1)
+                .execute()
+            )
+            if not rows.data:
+                logger.warning("[BACNET-DISCOVERY] No bridge config in site_adapter_config for %s — skipping", site_id)
                 return
 
-            base_url = "http://10.99.0.1:8080"
+            config = rows.data[0]["connection_config"]
+            base_url = config.get("base_url")
+            token = config.get("token")
+
+            if not base_url or not token:
+                logger.warning(
+                    "[BACNET-DISCOVERY] Incomplete bridge config for %s (base_url=%s, token=%s) — skipping",
+                    site_id,
+                    "set" if base_url else "missing",
+                    "set" if token else "missing",
+                )
+                return
+
             headers = {"Authorization": f"Bearer {token}"}
 
             async def _fetch_objects() -> list[dict]:
