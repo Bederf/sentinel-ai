@@ -2579,10 +2579,7 @@ async def handle_telegram_callback(
         try:
             parts = payload.data.replace("#", "").split(" ", 1)
             wo_ref = parts[1] if len(parts) > 1 else payload.data
-            await sender.send_text(
-                chat_id=payload.chat_id,
-                text=f"Execute closeout procedure for work order {wo_ref}. Use the technician-closeout skill.",
-            )
+            await sender.send_text(chat_id=payload.chat_id, text=f"▶closeout {wo_ref}")
         except Exception as e:
             logger.error("Failed to dispatch closeout via Done button: %s", e)
         return {"success": True, "intent": "closeout", "method": "button_done"}
