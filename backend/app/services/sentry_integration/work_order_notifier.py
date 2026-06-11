@@ -859,7 +859,7 @@ class WorkOrderNotifier:
                     location = f"Desk {desk_id}"
                 elif zone_id:
                     location = zone_id
-            problem = work_order_data.get("problem_description", "") or work_order_data.get("original_message", "")
+            problem = work_order_data.get("original_message", "") or work_order_data.get("problem_description", "")
             problem = problem.strip()
 
             lines = [f"Work Order Created #{wo_ref}", f"Priority: {pri}"]
