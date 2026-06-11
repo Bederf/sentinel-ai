@@ -84,6 +84,8 @@ jobs:
           PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:55321
         ports:
           - 55321:3000
+        options: >-
+          --restart=always
 
     steps:
       - uses: actions/checkout@v4
@@ -100,9 +102,7 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install --upgrade pip setuptools wheel
-          pip install meson-python ninja pyproject-metadata
-          pip install --no-build-isolation -r requirements.txt
+          pip install -r requirements.txt
 
       - name: Generate test JWT for PostgREST auth
         id: jwt
