@@ -255,6 +255,7 @@ For temperature complaints without specific equipment, include items like:
 - Damper/valve position for the zone
 - Local FCU or VAV operation if applicable
 
+Use Celsius (°C) for all temperature references — this is a South African site.
 Return ONLY valid JSON, no other text."""
 
         try:
