@@ -84,9 +84,6 @@ jobs:
           PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:55321
         ports:
           - 55321:3000
-        depends_on:
-          postgres:
-            condition: service_healthy
 
     steps:
       - uses: actions/checkout@v4
@@ -120,6 +117,16 @@ jobs:
 
       - name: Install Postgres client tools
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Wait for PostgREST to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -s -o /dev/null -w '%{http_code}' http://localhost:55321/ 2>/dev/null | grep -q "200\|301\|404"; then
+              echo "PostgREST ready after ${i}s"
+              break
+            fi
+            sleep 1
+          done
 
       - name: Run migrations on test DB
         run: |
