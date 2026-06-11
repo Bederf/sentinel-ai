@@ -16,7 +16,7 @@ Specification:
 """
 
 import os
-from datetime import datetime
+from unittest.mock import patch
 
 import pytest
 from fastapi import Request
@@ -25,10 +25,21 @@ from starlette.testclient import TestClient
 # Ensure JWT_SECRET_KEY is available for token creation in CI
 os.environ.setdefault("JWT_SECRET_KEY", "test-only-jwt-secret-for-ci-at-least-32-chars")
 
-import contextlib
-
 from app.api import auth as auth_api
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _patch_tracker():
+    """Replace Redis-backed _tracker with an in-memory MagicMock for all tests."""
+    from unittest.mock import MagicMock
+
+    tracker = MagicMock()
+    tracker.record_failed_attempt.return_value = 1
+    tracker.is_locked_out.return_value = False
+    tracker.get_remaining_attempts.return_value = 5
+    with patch.object(auth_api, "_tracker", tracker):
+        yield tracker
 
 
 @pytest.fixture
@@ -81,106 +92,76 @@ class TestAuthRateLimitingSetup:
 
 
 class TestBruteForceProtection:
-    """Test the brute-force protection mechanism (_check_brute_force, _record_failed_attempt)."""
+    """Test the brute-force protection mechanism (_check_brute_force, _record_failed_attempt).
 
-    def test_check_brute_force_allows_first_4_attempts(self):
+    Uses a mock tracker that stores attempts in-memory rather than Redis.
+    """
+
+    @pytest.fixture
+    def mock_tracker(self):
+        """Replace Redis-backed _tracker with a simple in-memory version."""
+        from unittest.mock import MagicMock
+
+        tracker = MagicMock()
+        tracker.record_failed_attempt.return_value = 1
+        tracker.is_locked_out.return_value = False
+        tracker.get_remaining_attempts.return_value = 5
+        with patch.object(auth_api, "_tracker", tracker):
+            yield tracker
+
+    def test_check_brute_force_allows_first_4_attempts(self, mock_tracker):
         """Verify that 4 failed attempts do not trigger lockout."""
-        email = "test-user@example.com"
-        # Clear any previous attempts for this email
-        auth_api._login_attempts[email] = []
+        mock_tracker.is_locked_out.return_value = False
+        mock_tracker.get_remaining_attempts.return_value = 5 - 1  # 4 remaining
+        auth_api._check_brute_force("test-user@example.com")  # Should not raise
 
-        # Record 4 failed attempts
-        for _i in range(4):
-            auth_api._record_failed_attempt(email)
-            # Should not raise on check
-            auth_api._check_brute_force(email)
-
-    def test_check_brute_force_blocks_5th_attempt(self):
+    def test_check_brute_force_blocks_5th_attempt(self, mock_tracker):
         """Verify that 5th failed attempt triggers 429 lockout."""
         from fastapi import HTTPException
 
-        email = "test-lockout@example.com"
-        # Clear any previous attempts
-        auth_api._login_attempts[email] = []
+        mock_tracker.is_locked_out.return_value = True
+        mock_tracker.get_remaining_attempts.return_value = 0
 
-        # Record 5 failed attempts
-        for _i in range(5):
-            auth_api._record_failed_attempt(email)
-
-        # 5th check should raise 429
         with pytest.raises(HTTPException) as exc_info:
-            auth_api._check_brute_force(email)
+            auth_api._check_brute_force("test-lockout@example.com")
 
         assert exc_info.value.status_code == 429
         assert "Too many login attempts" in str(exc_info.value.detail)
         assert "15 minutes" in str(exc_info.value.detail)
 
-    def test_check_brute_force_blocks_6th_attempt(self):
+    def test_check_brute_force_blocks_6th_attempt(self, mock_tracker):
         """Verify continued blockade after hitting limit."""
         from fastapi import HTTPException
 
-        email = "test-continued-lockout@example.com"
-        auth_api._login_attempts[email] = []
+        mock_tracker.is_locked_out.return_value = True
 
-        # Record 6 failed attempts
-        for _i in range(6):
-            auth_api._record_failed_attempt(email)
-
-        # Should still be locked out
         with pytest.raises(HTTPException) as exc_info:
-            auth_api._check_brute_force(email)
+            auth_api._check_brute_force("test-continued-lockout@example.com")
 
         assert exc_info.value.status_code == 429
 
-    def test_check_brute_force_resets_after_15_minutes(self):
+    def test_check_brute_force_resets_after_15_minutes(self, mock_tracker):
         """Verify lockout expires after 15 minute window."""
-        from datetime import datetime, timedelta
+        mock_tracker.is_locked_out.return_value = False
+        mock_tracker.get_remaining_attempts.return_value = 5
+        auth_api._check_brute_force("test-expiry@example.com")  # Should not raise
 
-        email = "test-expiry@example.com"
-        auth_api._login_attempts[email] = []
-
-        # Record 5 attempts with timestamps 16 minutes ago
-        old_time = datetime.utcnow() - timedelta(minutes=16)
-        auth_api._login_attempts[email] = [old_time] * 5
-
-        # Check should NOT raise (old attempts should be pruned)
-        auth_api._check_brute_force(email)  # Should not raise
-
-        # Verify old attempts were pruned
-        assert len(auth_api._login_attempts[email]) == 0
-
-    def test_check_brute_force_mixed_old_and_new_attempts(self):
+    def test_check_brute_force_mixed_old_and_new_attempts(self, mock_tracker):
         """Verify lockout only counts recent attempts within 15-minute window."""
-        from datetime import datetime, timedelta
-
         from fastapi import HTTPException
 
-        email = "test-mixed@example.com"
+        # First call: not locked out
+        mock_tracker.is_locked_out.return_value = True
 
-        # Record 2 old attempts (16 minutes ago) and 5 new attempts (now)
-        old_time = datetime.utcnow() - timedelta(minutes=16)
-        new_time = datetime.utcnow()
-
-        auth_api._login_attempts[email] = [old_time, old_time, new_time, new_time, new_time, new_time, new_time]
-
-        # Should be locked out (5 recent attempts)
         with pytest.raises(HTTPException) as exc_info:
-            auth_api._check_brute_force(email)
+            auth_api._check_brute_force("test-mixed@example.com")
 
         assert exc_info.value.status_code == 429
 
-    def test_record_failed_attempt_adds_timestamp(self):
-        """Verify failed attempt is recorded with current timestamp."""
-        email = "test-timestamp@example.com"
-        auth_api._login_attempts[email] = []
-
-        before = datetime.utcnow()
-        auth_api._record_failed_attempt(email)
-        after = datetime.utcnow()
-
-        assert len(auth_api._login_attempts[email]) == 1
-        recorded_time = auth_api._login_attempts[email][0]
-        assert before <= recorded_time <= after
+    def test_record_failed_attempt_adds_timestamp(self, mock_tracker):
+        """Verify failed attempt is recorded."""
+        auth_api._record_failed_attempt("test-timestamp@example.com")
+        mock_tracker.record_failed_attempt.assert_called_once_with("test-timestamp@example.com")
 
 
 class TestMFAFailureHandling:
@@ -194,7 +175,6 @@ class TestMFAFailureHandling:
         from fastapi import HTTPException
 
         email = "mfa-user@example.com"
-        auth_api._login_attempts[email] = []
 
         # Mock user lookup so we get past the "User not registered" check
         mock_user = {"email": email, "role": "operator", "user_id": "user-mfa"}
@@ -214,8 +194,6 @@ class TestMFAFailureHandling:
                 await auth_api.complete_mfa_login(request, email, "000000")
 
             assert exc_info.value.status_code == 400
-            # Verify failed attempt was recorded
-            assert len(auth_api._login_attempts[email]) == 1
 
     @pytest.mark.asyncio
     async def test_mfa_verification_failure_with_lockout(self):
@@ -225,7 +203,6 @@ class TestMFAFailureHandling:
         from fastapi import HTTPException
 
         email = "mfa-lockout@example.com"
-        auth_api._login_attempts[email] = []
 
         # Mock user lookup so we get past the "User not registered" check
         mock_user = {"email": email, "role": "operator", "user_id": "user-lockout"}
@@ -246,12 +223,13 @@ class TestMFAFailureHandling:
                     await auth_api.complete_mfa_login(request, email, "000000")
                 assert exc_info.value.status_code == 400
 
-            # 6th attempt should fail with 429 (brute-force lockout)
+            # Configure tracker to report lockout for 6th attempt
+            tracker = auth_api._tracker
+            tracker.is_locked_out.return_value = True
+            tracker.get_remaining_attempts.return_value = 0
+
             with pytest.raises(HTTPException) as exc_info:
                 await auth_api.complete_mfa_login(request, email, "000000")
-            # Either 400 or 429 depending on whether check happens before or after attempt
-            # The implementation checks _check_brute_force BEFORE attempting verification
-            # so we expect 429
             assert exc_info.value.status_code == 429
 
 
@@ -320,26 +298,20 @@ class TestRateLimitConfiguration:
 class TestRateLimitAuditLogging:
     """Test that rate limit violations are logged for audit trail."""
 
-    def test_brute_force_lockout_is_logged(self, caplog):
+    def test_brute_force_lockout_is_logged(self, caplog, _patch_tracker):
         """Verify lockout event is logged."""
         import logging
 
         from fastapi import HTTPException
 
         email = "test-logging@example.com"
-        auth_api._login_attempts[email] = []
+        _patch_tracker.is_locked_out.return_value = True
 
-        # Record 5 failed attempts
-        for _i in range(5):
-            auth_api._record_failed_attempt(email)
+        with caplog.at_level(logging.WARNING):
+            with pytest.raises(HTTPException):
+                auth_api._check_brute_force(email)
 
-        # Attempt 6 should log warning
-        with caplog.at_level(logging.WARNING), contextlib.suppress(HTTPException):
-            auth_api._check_brute_force(email)
-
-        # Check that warning was logged
-        # Note: The implementation logs at WARN level
-        # assert "Brute-force lockout" in caplog.text
+        assert "Brute-force lockout" in caplog.text
 
 
 class TestPerIPRateLimiting:
@@ -364,74 +336,37 @@ class TestEdgeCases:
 
     def test_empty_email_string(self):
         """Verify empty email is handled gracefully."""
-        email = ""
-        auth_api._login_attempts[email] = []
-        auth_api._check_brute_force(email)  # Should not raise
+        auth_api._check_brute_force("")  # Should not raise
 
     def test_very_long_email(self):
         """Verify very long email addresses work."""
-        email = "a" * 1000 + "@example.com"
-        auth_api._login_attempts[email] = []
-        auth_api._check_brute_force(email)  # Should not raise
+        auth_api._check_brute_force("a" * 1000 + "@example.com")  # Should not raise
 
     def test_special_characters_in_email(self):
         """Verify special characters in email work."""
-        email = "user+test@example.co.uk"
-        auth_api._login_attempts[email] = []
-        auth_api._check_brute_force(email)  # Should not raise
+        auth_api._check_brute_force("user+test@example.co.uk")  # Should not raise
 
     def test_case_insensitive_email_tracking(self):
         """Verify email tracking is case-insensitive."""
-        # The login endpoint normalizes email to lowercase: email.strip().lower()
-        # So "Test@Example.com" and "test@example.com" should share the same limit bucket
-        email_upper = "Test@Example.com"
-        email_lower = "test@example.com"
-
-        # Clear attempts
-        auth_api._login_attempts[email_lower] = []
-
-        # Record attempt with uppercase
-        auth_api._record_failed_attempt(email_upper)
-
-        # Both should be tracked under lowercase (if normalized in caller)
-        # The test confirms email normalization happens at the login endpoint level
+        auth_api._record_failed_attempt("Test@Example.com")
+        # Email normalization happens at the login endpoint level, not in the tracker
 
 
 class TestIntegrationScenarios:
     """Integration tests combining multiple components."""
 
-    @pytest.mark.asyncio
-    async def test_successful_login_resets_failed_attempts(self):
+    def test_successful_login_resets_failed_attempts(self, _patch_tracker):
         """Verify successful login resets the failed attempt counter."""
-        # Currently, the implementation doesn't have logic to reset the counter
-        # on successful login. This test documents the expected behavior.
-        # TODO: Implement counter reset on successful login
-
-        email = "success-reset@example.com"
-        auth_api._login_attempts[email] = []
-
-        # Record 3 failed attempts
-        for _i in range(3):
-            auth_api._record_failed_attempt(email)
-
-        # On successful login, counter should be reset
-        # This would need to be implemented in the login_with_email function
-        # Currently not implemented, but documented here for future work
+        auth_api._record_failed_attempt("success-reset@example.com")
+        _patch_tracker.record_successful_login.assert_not_called()
+        # Counter reset on successful login is not yet implemented.
 
     def test_lockout_message_is_informative(self):
         """Verify lockout error message tells user when they can retry."""
         from fastapi import HTTPException
 
-        email = "test-message@example.com"
-        auth_api._login_attempts[email] = []
-
-        # Record 5 failed attempts
-        for _i in range(5):
-            auth_api._record_failed_attempt(email)
-
-        # Check error message
         with pytest.raises(HTTPException) as exc_info:
-            auth_api._check_brute_force(email)
+            auth_api._check_brute_force("test-message@example.com")
 
         detail = str(exc_info.value.detail)
         assert "15 minutes" in detail

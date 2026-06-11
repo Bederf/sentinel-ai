@@ -74,6 +74,20 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      postgrest:
+        image: postgrest/postgrest:v12
+        env:
+          PGRST_DB_URI: postgresql://postgres:postgres@postgres:5432/sentinel_test
+          PGRST_DB_SCHEMAS: public
+          PGRST_DB_ANON_ROLE: postgres
+          PGRST_JWT_SECRET: test-jwt-secret-for-ci
+          PGRST_OPENAPI_SERVER_PROXY_URI: http://localhost:55321
+        ports:
+          - 55321:3000
+        depends_on:
+          postgres:
+            condition: service_healthy
+
     steps:
       - uses: actions/checkout@v4
 
@@ -88,6 +102,31 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+
+      - name: Generate test JWT for PostgREST auth
+        id: jwt
+        run: |
+          python3 -c "
+          import hmac, hashlib, base64, json, time
+          header = base64.urlsafe_b64encode(json.dumps({'alg':'HS256','typ':'JWT'}).encode()).rstrip(b'=').decode()
+          payload = base64.urlsafe_b64encode(json.dumps({
+            'role': 'postgres',
+            'iat': int(time.time()),
+            'exp': int(time.time()) + 3600
+          }).encode()).rstrip(b'=').decode()
+          sig = base64.urlsafe_b64encode(hmac.new(b'test-jwt-secret-for-ci', f'{header}.{payload}'.encode(), hashlib.sha256).digest()).rstrip(b'=').decode()
+          print(f'jwt={header}.{payload}.{sig}')
+          " >> $GITHUB_OUTPUT
+
+      - name: Install Postgres client tools
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Run migrations on test DB
+        run: |
+          for f in ../supabase/migrations/*.sql; do
+            echo "Applying $f..."
+            psql "$DATABASE_URL" -f "$f" -q 2>&1 | tail -1
+          done
 
       - name: Check for circular imports
         run: pytest tests/test_import_cycles.py -v
@@ -105,6 +144,8 @@ jobs:
           JWT_SECRET_KEY: "test-only-jwt-secret-for-ci-at-least-32-chars"
           MODBUS_BESS_IP: ""
           DATABASE_URL: "postgresql://postgres:postgres@localhost:54322/sentinel_test"
+          SUPABASE_URL: "http://localhost:55321"
+          SUPABASE_SERVICE_ROLE_KEY: "${{ steps.jwt.outputs.jwt }}"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

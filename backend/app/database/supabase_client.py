@@ -28,9 +28,12 @@ def get_supabase_client():
     global _supabase_client
 
     if _supabase_client is None:
+        # In TESTING mode, try a real connection if credentials are available.
+        # Fall back to _DummySupabaseClient if no Supabase is configured.
         if os.getenv("TESTING", "").lower() == "true":
-            _supabase_client = _DummySupabaseClient()
-            return _supabase_client
+            if not settings.supabase_url or not settings.supabase_service_role_key:
+                _supabase_client = _DummySupabaseClient()
+                return _supabase_client
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
