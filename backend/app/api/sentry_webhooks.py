@@ -1132,7 +1132,6 @@ async def sentry_submit_inspection_result(
     inspection_measurements tables. Links to equipment and work order.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_result")
-    _require_operator_password(req.operator_password, endpoint_name="inspection_result")
 
     from app.database.repositories.inspection_repository import InspectionRepository
 
@@ -1867,12 +1866,171 @@ async def sentry_wo_status(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-class WoMilestoneRequest(BaseModel):
-    """Advance a work order's SLA milestone."""
+@router.get("/work-order/detail")
+async def sentry_work_order_detail(
+    code: str = Query(..., description="Work order code (e.g. WO-2026-0001)"),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Return full work order details including resolved equipment_code.
 
-    wo_code: str = Field(..., description="Work order code (e.g. WO-2026-0001)")
-    milestone: str = Field(..., description="New milestone: assigned|in_progress|resolved|verified")
-    notes: str = Field("", description="Technician notes for the work order")
+    Used by the technician closeout skill after `done #WO-XXXX`.
+    Joins equipment table to return equipment_code alongside WO fields.
+    Sentry-authenticated (bot-level), no JWT required.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="work_order_detail")
+
+    try:
+        from app.database.repositories.work_order_repository import WorkOrderRepository
+
+        wo_repo = WorkOrderRepository()
+        wo = await wo_repo.get_work_order_by_code(code)
+
+        if not wo:
+            return {"success": False, "found": False, "error": "Work order not found"}
+
+        # Resolve equipment_code from equipment_id if present
+        equipment_code = None
+        equipment_id = wo.get("equipment_id")
+        if equipment_id:
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb = get_supabase_client()
+                if sb:
+                    eq_result = sb.table("equipment").select("code").eq("id", equipment_id).limit(1).execute()
+                    if eq_result.data:
+                        equipment_code = eq_result.data[0].get("code")
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "found": True,
+            "work_order": wo,
+            "equipment_code": equipment_code,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Work order detail lookup failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ---------------------------------------------------------------------------
+# Inspection Session Persistence (Tier 3 checklist state recovery)
+# ---------------------------------------------------------------------------
+
+
+class InspectionSessionRequest(BaseModel):
+    """Upsert an in-progress inspection session for the closeout skill."""
+
+    wo_code: str = Field(..., description="Work order code")
+    telegram_user_id: str = Field(..., description="Technician Telegram user ID")
+    equipment_code: str | None = Field(None, description="Equipment code")
+    equipment_type: str | None = Field(None, description="Equipment type")
+    checklist_items: list[dict[str, Any]] = Field(default_factory=list, description="Checklist items")
+    responses: dict[str, Any] = Field(default_factory=dict, description="Per-item responses so far")
+    current_index: int = Field(0, description="0-based index of next unanswered item")
+
+
+class InspectionSessionResponse(BaseModel):
+    """Inspection session lookup response."""
+
+    success: bool
+    found: bool = False
+    session: dict[str, Any] | None = None
+
+
+@router.post("/inspection-session", status_code=status.HTTP_200_OK)
+async def upsert_inspection_session(
+    req: InspectionSessionRequest,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Persist inspection session state so progress survives openclaw restart.
+
+    Called after each answered checklist item. Upserts on (wo_code, telegram_user_id).
+    The closeout skill checks for an existing session on startup to resume mid-checklist.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_session")
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        if not sb:
+            return {"success": False, "error": "Supabase unavailable"}
+
+        payload = {
+            "wo_code": req.wo_code,
+            "telegram_user_id": req.telegram_user_id,
+            "equipment_code": req.equipment_code,
+            "equipment_type": req.equipment_type,
+            "checklist_items": req.checklist_items,
+            "responses": req.responses,
+            "current_index": req.current_index,
+            "status": "in_progress",
+            "updated_at": datetime.now(UTC).isoformat(),
+        }
+
+        # Upsert on unique constraint (wo_code, telegram_user_id)
+        result = (
+            sb.table("sentry_inspection_sessions").upsert(payload, on_conflict="wo_code, telegram_user_id").execute()
+        )
+
+        return {"success": True, "session_id": result.data[0]["id"] if result.data else None}
+
+    except Exception as e:
+        logger.error(f"Inspection session upsert failed: {e}")
+        return {"success": False, "error": str(e)}
+
+
+@router.get("/inspection-session", response_model=InspectionSessionResponse)
+async def get_inspection_session(
+    wo_code: str = Query(..., description="Work order code"),
+    telegram_user_id: str = Query(..., description="Technician Telegram user ID"),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Retrieve an existing inspection session for resume.
+
+    Returns the session if it exists and is in_progress. Completed or abandoned
+    sessions are returned with found=False so the closeout skill starts fresh.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_session")
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        if not sb:
+            return InspectionSessionResponse(success=False)
+
+        result = (
+            sb.table("sentry_inspection_sessions")
+            .select("*")
+            .eq("wo_code", wo_code)
+            .eq("telegram_user_id", telegram_user_id)
+            .execute()
+        )
+
+        if result.data and len(result.data) > 0:
+            session = result.data[0]
+            if session.get("status") == "in_progress":
+                return InspectionSessionResponse(success=True, found=True, session=session)
+
+        return InspectionSessionResponse(success=True, found=False)
+
+    except Exception as e:
+        logger.error(f"Inspection session lookup failed: {e}")
+        return InspectionSessionResponse(success=False)
+
+
+class WoMilestoneRequest(BaseModel):
+    """Request to advance a work order SLA milestone."""
+
+    wo_code: str = Field(..., description="Work order code (e.g., WO-2026-0001)")
+    milestone: str = Field(..., description="Target milestone: assigned|in_progress|resolved|verified")
+    notes: str = Field("", description="Technician notes / findings to append")
     outcome: str = Field("", description="Outcome: fixed|parts_needed|escalate (for logging/context)")
     operator_password: str | None = Field(None, description="SENTINEL operator password")
 
@@ -2029,7 +2187,6 @@ async def sentry_call_log_escalate(
     logged as an anomaly and the supervisor is notified.
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="call_log_escalate")
-    _require_operator_password(req.operator_password, endpoint_name="call_log_escalate")
 
     logger.warning(
         f"[CALL_LOG_ESCALATION] Unmatched complaint from "
@@ -2776,7 +2933,7 @@ async def check_onboarding_state(
 
 
 @router.post("/telegram/message")
-async def handle_telegram_message(
+async def handle_telegram_message_flow(
     payload: dict,
     x_sentry_secret: str | None = Header(None),
 ):
