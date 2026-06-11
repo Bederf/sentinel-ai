@@ -2107,16 +2107,6 @@ class OpenAIConnectorMCPServer:
             logger.warning(f"ComplaintHandler unavailable: {e}")
             return None
 
-    def _get_work_order_repo(self):
-        """Get WorkOrderRepository instance."""
-        try:
-            from app.database.repositories.work_order_repository import WorkOrderRepository
-
-            return WorkOrderRepository()
-        except Exception as e:
-            logger.warning(f"WorkOrderRepository unavailable: {e}")
-            return None
-
     async def submit_complaint(self, desk_id: str, complaint_type: str) -> dict[str, Any]:
         """Handle a comfort complaint from a desk user."""
         handler = self._get_complaint_handler()
@@ -2247,8 +2237,10 @@ class OpenAIConnectorMCPServer:
 
         try:
             site_code = self._get_site_code(site_id)
-            query = client.table("work_orders").select(
-                "id, code, title, priority, status, assigned_to, equipment_id, created_at"
+            query = (
+                client.table("work_orders")
+                .select("id, code, title, priority, status, assigned_to, equipment_id, created_at")
+                .eq("site_id", site_code)
             )
 
             if status != "all":
@@ -2281,14 +2273,28 @@ class OpenAIConnectorMCPServer:
 
     async def get_work_order(self, work_order_id: str) -> dict[str, Any]:
         """Get a specific work order by ID."""
-        repo = self._get_work_order_repo()
-        if not repo:
-            return {"error": "Work order service unavailable"}
+        client = _get_supabase_client()
+        if not client:
+            return {"error": "Supabase not available"}
 
         try:
-            result = await repo.get_work_order(work_order_id)
-            if result:
-                return result
+            result = client.table("work_orders").select("*").eq("id", work_order_id).limit(1).execute()
+            if result.data:
+                wo = result.data[0]
+                return {
+                    "id": wo.get("id"),
+                    "code": wo.get("code"),
+                    "title": wo.get("title"),
+                    "priority": wo.get("priority"),
+                    "status": wo.get("status"),
+                    "assigned_to": wo.get("assigned_to"),
+                    "site_id": wo.get("site_id"),
+                    "equipment_id": wo.get("equipment_id"),
+                    "description": wo.get("description"),
+                    "notes": wo.get("notes"),
+                    "created_at": wo.get("created_at"),
+                    "updated_at": wo.get("updated_at"),
+                }
             return {"error": f"Work order not found: {work_order_id}"}
         except Exception as e:
             logger.error(f"get_work_order failed: {e}")
