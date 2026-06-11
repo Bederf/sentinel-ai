@@ -75,7 +75,7 @@ jobs:
           --health-retries 5
 
       postgrest:
-        image: postgrest/postgrest:v12
+        image: postgrest/postgrest:latest
         env:
           PGRST_DB_URI: postgresql://postgres:postgres@postgres:5432/sentinel_test
           PGRST_DB_SCHEMAS: public
