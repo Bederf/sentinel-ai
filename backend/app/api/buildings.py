@@ -511,7 +511,10 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        result = client.table("buildings").select("*").eq("code", site_code).single().execute()
+        # Try sites table first (where PUT writes), fall back to buildings table
+        result = client.table("sites").select("*").eq("code", site_code).single().execute()
+        if not result.data:
+            result = client.table("buildings").select("*").eq("code", site_code).single().execute()
         if result.data:
             b = result.data
             # Map Supabase row → BuildingConfig shape the frontend expects
@@ -712,7 +715,7 @@ async def update_building_config(
         return {"status": "no_changes", "site_id": site_code}
 
     try:
-        client.table("sites").update(updates).eq("code", site_code).execute()
+        client.table("buildings").update(updates).eq("code", site_code).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update building config: {e}") from e
 

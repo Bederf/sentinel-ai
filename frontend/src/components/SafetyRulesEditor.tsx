@@ -37,6 +37,7 @@ export function SafetyRulesEditor({ onError, onSuccess, readOnly = false, siteId
   const [rules, setRules] = useState<SafetyRule[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRule, setExpandedRule] = useState<string | null>(null);
+  const [deviceTypeFilter, setDeviceTypeFilter] = useState("");
   const [editingRule, setEditingRule] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<SafetyRule>>({});
   const [isCreating, setIsCreating] = useState(false);
@@ -57,12 +58,12 @@ export function SafetyRulesEditor({ onError, onSuccess, readOnly = false, siteId
   useEffect(() => {
     loadRules();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteId]);
+  }, [siteId, deviceTypeFilter]);
 
   const loadRules = async () => {
     try {
       setLoading(true);
-      const response = await api.getSafetyRules(undefined, undefined, siteId);
+      const response = await api.getSafetyRules(deviceTypeFilter || undefined, undefined, siteId);
       setRules(response.rules);
     } catch (err) {
       onError?.("Failed to load safety rules");
@@ -408,11 +409,28 @@ export function SafetyRulesEditor({ onError, onSuccess, readOnly = false, siteId
 
   return (
     <div className="space-y-4">
-      {/* Header with Add button (hidden in read-only mode) */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-          {rules.length} rule{rules.length !== 1 ? "s" : ""} configured
-        </p>
+      {/* Header with filter, count, and Add button */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            {rules.length} rule{rules.length !== 1 ? "s" : ""} configured
+          </p>
+          <select
+            value={deviceTypeFilter}
+            onChange={(e) => setDeviceTypeFilter(e.target.value)}
+            className="px-2 py-1 rounded text-xs"
+            style={{
+              background: "var(--color-sentinel-bg-canvas)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
+            aria-label="Filter by device type"
+          >
+            {DEVICE_TYPES.map((d) => (
+              <option key={d.value} value={d.value}>{d.label}</option>
+            ))}
+          </select>
+        </div>
         {!readOnly && (
           <button
             onClick={() => setIsCreating(true)}

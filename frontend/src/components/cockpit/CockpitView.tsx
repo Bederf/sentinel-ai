@@ -147,7 +147,8 @@ function tonePalette(state: CockpitState): TonePalette {
   }
 }
 
-function modeLabel(mode: CockpitState['site']['mode']) {
+function modeLabel(mode: CockpitState['site']['mode'], onboardingPhase?: string) {
+  if (onboardingPhase === 'shadow') return 'Observing'
   if (mode === 'act_now') return 'Act Now'
   if (mode === 'intervene_soon') return 'Intervene Soon'
   if (mode === 'prepare') return 'Prepare'
@@ -703,7 +704,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
         onZoneClose?.()
       }
     }
-  }, [state.systemFilter, selectedZone?.zoneId])
+  }, [state.systemFilter, selectedZone, onZoneClose])
 
   useLayoutEffect(() => {
     if (!shellRef.current) return
@@ -771,7 +772,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
           <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
             <span>{summary}</span>
             <span className="text-slate-700">/</span>
-            <span className={palette.text}>{modeLabel(state.site.mode)}</span>
+            <span className={palette.text}>{modeLabel(state.site.mode, state.site.onboardingPhase)}</span>
           </div>
 
           <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -1023,7 +1024,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             </div>
             <div className="flex flex-wrap gap-2">
               <span className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300">
-                Mode: {modeLabel(state.site.mode)}
+                Mode: {modeLabel(state.site.mode, state.site.onboardingPhase)}
               </span>
               <span className="rounded-full border border-white/8 bg-white/[0.03] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-300">
                 Phase: {phaseLabel(state.site.onboardingPhase)}

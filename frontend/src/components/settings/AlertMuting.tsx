@@ -17,9 +17,10 @@ interface AlertMutingProps {
   onError?: (error: string) => void;
   onSuccess?: () => void;
   readOnly?: boolean;
+  embedded?: boolean;
 }
 
-export function AlertMuting({ siteId, onError, onSuccess, readOnly = false }: AlertMutingProps) {
+export function AlertMuting({ siteId, onError, onSuccess, readOnly = false, embedded = false }: AlertMutingProps) {
   const [mutes, setMutes] = useState<AlertMute[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
@@ -89,6 +90,70 @@ export function AlertMuting({ siteId, onError, onSuccess, readOnly = false }: Al
     color: "var(--color-sentinel-text-primary)",
   };
 
+  const mutingContent = (
+    <div className="space-y-3">
+      {showAdd && !readOnly && (
+        <div className="p-3 rounded-lg space-y-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Equipment Code</label>
+              <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="S002-CHILLER-B1-001" />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Reason</label>
+              <input type="text" value={newReason} onChange={(e) => setNewReason(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="Scheduled maintenance" />
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Duration (hours)</label>
+              <input type="number" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} min={1} max={720} />
+            </div>
+            <div className="flex items-end">
+              <button type="button" onClick={() => void handleMute()} disabled={!newCode.trim() || !newReason.trim()}
+                className="px-3 py-1.5 rounded text-xs font-medium"
+                style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)", border: "1px solid rgba(245, 158, 11, 0.3)", opacity: !newCode.trim() || !newReason.trim() ? 0.5 : 1 }}
+              >Mute</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading...</p>
+      ) : mutes.length === 0 ? (
+        <div className="text-center py-4">
+          <Volume2 className="h-6 w-6 mx-auto mb-2" style={{ color: "var(--color-sentinel-green)" }} />
+          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>No equipment currently muted</p>
+        </div>
+      ) : (
+        mutes.map((mute) => (
+          <div key={mute.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-mono font-medium" style={{ color: "var(--color-sentinel-amber)" }}>{mute.equipment_code}</span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
+                  {timeRemaining(mute.muted_until)} remaining
+                </span>
+              </div>
+              <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {mute.reason} — by {mute.muted_by}
+              </p>
+            </div>
+            {!readOnly && (
+              <button type="button" onClick={() => void handleUnmute(mute.equipment_code)}
+                className="px-2 py-1 rounded text-xs font-medium transition-colors hover:brightness-110"
+                style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(16, 185, 129, 0.3)" }}
+              >Unmute</button>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  );
+
+  if (embedded) {
+    return mutingContent;
+  }
+
   return (
     <div className="glass-panel flat overflow-hidden">
       <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
@@ -115,63 +180,8 @@ export function AlertMuting({ siteId, onError, onSuccess, readOnly = false }: Al
           )}
         </div>
       </div>
-
-      <div className="p-4 space-y-3">
-        {showAdd && !readOnly && (
-          <div className="p-3 rounded-lg space-y-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Equipment Code</label>
-                <input type="text" value={newCode} onChange={(e) => setNewCode(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="S002-CHILLER-B1-001" />
-              </div>
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Reason</label>
-                <input type="text" value={newReason} onChange={(e) => setNewReason(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} placeholder="Scheduled maintenance" />
-              </div>
-              <div>
-                <label className="block text-xs mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Duration (hours)</label>
-                <input type="number" value={newDuration} onChange={(e) => setNewDuration(e.target.value)} className="w-full rounded px-3 py-1.5 text-xs" style={inputStyle} min={1} max={720} />
-              </div>
-              <div className="flex items-end">
-                <button type="button" onClick={() => void handleMute()} disabled={!newCode.trim() || !newReason.trim()}
-                  className="px-3 py-1.5 rounded text-xs font-medium"
-                  style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)", border: "1px solid rgba(245, 158, 11, 0.3)", opacity: !newCode.trim() || !newReason.trim() ? 0.5 : 1 }}
-                >Mute</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {loading ? (
-          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading...</p>
-        ) : mutes.length === 0 ? (
-          <div className="text-center py-4">
-            <Volume2 className="h-6 w-6 mx-auto mb-2" style={{ color: "var(--color-sentinel-green)" }} />
-            <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>No equipment currently muted</p>
-          </div>
-        ) : (
-          mutes.map((mute) => (
-            <div key={mute.id} className="flex items-center justify-between p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono font-medium" style={{ color: "var(--color-sentinel-amber)" }}>{mute.equipment_code}</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
-                    {timeRemaining(mute.muted_until)} remaining
-                  </span>
-                </div>
-                <p className="text-xs mt-0.5" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  {mute.reason} — by {mute.muted_by}
-                </p>
-              </div>
-              {!readOnly && (
-                <button type="button" onClick={() => void handleUnmute(mute.equipment_code)}
-                  className="px-2 py-1 rounded text-xs font-medium transition-colors hover:brightness-110"
-                  style={{ background: "rgba(16, 185, 129, 0.15)", color: "var(--color-sentinel-green)", border: "1px solid rgba(16, 185, 129, 0.3)" }}
-                >Unmute</button>
-              )}
-            </div>
-          ))
-        )}
+      <div className="p-4">
+        {mutingContent}
       </div>
     </div>
   );

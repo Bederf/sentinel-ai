@@ -117,43 +117,18 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
   }, []);
 
   // Check safety status
-  const checkSafetyStatus = useCallback(async (_id: string, deviceOverride?: Device | null) => {
+  const checkSafetyStatus = useCallback(async (id: string, _deviceOverride?: Device | null) => {
     try {
-      // TODO: Integrate with safety API from Plan 6-02
-      // For now, simulate safety status based on device type
-      const device = deviceOverride ?? state.device;
-      if (!device) return;
-
-      let status: SafetyStatus = { status: "safe" };
-
-      // Simulate safety rules based on device metadata
-      if (device.metadata?.critical) {
-        status = {
-          status: "warning",
-          message: "Critical device - extra caution required",
-          rules: [
-            { rule: "Critical device protection", status: "warning" },
-            { rule: "Manual override allowed", status: "passed" },
-          ],
-        };
-      }
-
-      if (device.metadata?.life_safety) {
-        status = {
-          status: "blocked",
-          message: "Life safety device - control actions blocked",
-          rules: [
-            { rule: "Life safety protection", status: "failed" },
-            { rule: "Emergency override required", status: "failed" },
-          ],
-        };
-      }
-
-      setSafetyStatus(status);
+      const result = await api.getDeviceSafetyStatus(id);
+      setSafetyStatus({
+        status: result.overall_status === "alarm" ? "warning" : result.overall_status === "unknown" ? "safe" : result.overall_status,
+        message: result.overall_status === "blocked" ? "Control blocked by safety rules" : undefined,
+      });
     } catch (err) {
-      console.warn("Failed to check safety status:", err);
+      console.warn("Failed to check safety status, defaulting to safe:", err);
+      setSafetyStatus({ status: "safe" });
     }
-  }, [state.device]);
+  }, []);
 
   // Control device
   const controlDevice = useCallback(async (

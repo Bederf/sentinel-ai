@@ -1,7 +1,6 @@
-import { Monitor } from "lucide-react";
+import { AlertTriangle, Bell, Monitor } from "lucide-react";
 import type { View } from "../../lib/navigation";
 import { ThemeSwitcher } from "../ThemeSwitcher";
-import { AegisSettings } from "./AegisSettings";
 import { AiCostTracker } from "./AiCostTracker";
 import { AiRuntimePolicySettings } from "./AiRuntimePolicySettings";
 import { AlertMuting } from "./AlertMuting";
@@ -109,29 +108,91 @@ function SettingsSections({
         onSuccess={controller.handleSuccess}
       />
       <ThresholdSettingsSection key={`thresh-${controller.selectedSiteId}`} controller={controller} onError={onError} />
-      <NotificationSettingsPanel
-        key={`notif-${controller.selectedSiteId}`}
-        currentUserEmail={controller.currentUserEmail}
-        hasAuthenticatedSession={controller.hasSessionToken}
-        siteId={controller.selectedSiteId ?? undefined}
-        onError={onError}
-        onSuccess={controller.handleSuccess}
-      />
-      <ChannelStatusDashboard key={`channel-${controller.selectedSiteId}`} onError={onError} siteId={controller.selectedSiteId ?? undefined} />
-      <AlertRoutingRules
-        key={`routing-${controller.selectedSiteId}`}
-        siteId={controller.selectedSiteId ?? undefined}
-        onError={onError}
-        onSuccess={controller.handleSuccess}
-        readOnly={controller.readOnly}
-      />
-      <AlertMuting
-        key={`muting-${controller.selectedSiteId}`}
-        siteId={controller.selectedSiteId ?? undefined}
-        onError={onError}
-        onSuccess={controller.handleSuccess}
-        readOnly={controller.readOnly}
-      />
+      {/* Combined Notifications card */}
+      <div className="glass-panel flat overflow-hidden" key={`notif-card-${controller.selectedSiteId}`}>
+        <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(245, 158, 11, 0.15)", color: "var(--color-sentinel-amber)" }}>
+              <Bell className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Notifications</h2>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Multi-channel notification configuration, status, and bot preferences
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="p-4 space-y-6">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Channel Status
+            </h3>
+            <ChannelStatusDashboard key={`channel-${controller.selectedSiteId}`} embedded onError={onError} siteId={controller.selectedSiteId ?? undefined} />
+          </div>
+          <div style={{ height: "1px", background: "var(--color-sentinel-border)" }} />
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Configuration
+            </h3>
+            <NotificationSettingsPanel
+              key={`notif-${controller.selectedSiteId}`}
+              currentUserEmail={controller.currentUserEmail}
+              hasAuthenticatedSession={controller.hasSessionToken}
+              siteId={controller.selectedSiteId ?? undefined}
+              onError={onError}
+              onSuccess={controller.handleSuccess}
+              embedded
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Combined Alert Configuration card */}
+      <div className="glass-panel flat overflow-hidden" key={`alert-card-${controller.selectedSiteId}`}>
+        <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded" style={{ background: "rgba(220, 38, 38, 0.15)", color: "var(--color-sentinel-red)" }}>
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Alert Configuration</h2>
+              <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                Configure how alerts are routed and which equipment is muted
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="p-4 space-y-6">
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Routing Rules
+            </h3>
+            <AlertRoutingRules
+              key={`routing-${controller.selectedSiteId}`}
+              siteId={controller.selectedSiteId ?? undefined}
+              onError={onError}
+              onSuccess={controller.handleSuccess}
+              readOnly={controller.readOnly}
+              embedded
+            />
+          </div>
+          <div style={{ height: "1px", background: "var(--color-sentinel-border)" }} />
+          <div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              Equipment Muting
+            </h3>
+            <AlertMuting
+              key={`muting-${controller.selectedSiteId}`}
+              siteId={controller.selectedSiteId ?? undefined}
+              onError={onError}
+              onSuccess={controller.handleSuccess}
+              readOnly={controller.readOnly}
+              embedded
+            />
+          </div>
+        </div>
+      </div>
       <TechnicianRegistry
         key={`tech-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
@@ -146,14 +207,10 @@ function SettingsSections({
         onSuccess={controller.handleSuccess}
         readOnly={controller.readOnly}
       />
-      <AegisSettings
-        key={`aegis-${controller.selectedSiteId}`}
-        siteId={controller.selectedSiteId ?? undefined}
-        currentUserRole={controller.currentUserRole}
-        readOnly={controller.readOnly}
-        onError={onError}
-        onSuccess={controller.handleSuccess}
-      />
+      {/*
+        AegisSettings is rendered inside BuildingSystemsCard (SettingsModuleSections.tsx)
+        as a "BESS Control" subsection under Building Systems.
+      */}
       {controller.isModuleActive("space_optimization") ? (
         <SpaceOptimizationSettings
           key={`space-${controller.selectedSiteId}`}

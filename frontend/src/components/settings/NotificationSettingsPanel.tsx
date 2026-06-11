@@ -9,6 +9,7 @@ interface NotificationSettingsPanelProps {
   siteId?: string;
   onError?: (msg: string) => void;
   onSuccess?: () => void;
+  embedded?: boolean;
 }
 
 function NotificationPanelHeader({ detail }: { detail: string }) {
@@ -117,16 +118,24 @@ export const NotificationSettingsPanel = memo(function NotificationSettingsPanel
   siteId: _siteId,
   onError,
   onSuccess,
+  embedded = false,
 }: NotificationSettingsPanelProps) {
-  if (!hasAuthenticatedSession || !currentUserEmail) {
-    return <NotificationUnauthenticatedState />;
-  }
-
-  return (
+  const tabbedContent = (
     <NotificationTabbedContent
       currentUserEmail={currentUserEmail}
       onError={onError}
       onSuccess={onSuccess}
     />
   );
+
+  if (embedded) {
+    if (!hasAuthenticatedSession || !currentUserEmail) return null;
+    return tabbedContent;
+  }
+
+  if (!hasAuthenticatedSession || !currentUserEmail) {
+    return <NotificationUnauthenticatedState />;
+  }
+
+  return tabbedContent;
 });

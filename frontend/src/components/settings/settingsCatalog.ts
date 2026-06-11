@@ -82,13 +82,19 @@ export function getBuildingSystemCards(modules: ModuleDefinition[], controller?:
     }));
 }
 
+// Module types subsumed by another module (no standalone toggle needed).
+const SUBSUMED_MODULE_TYPES = new Set<ModuleType>([
+  "block_booking", // Subsumed by space_optimization
+]);
+
 export function getAddonToggleCards(modules: ModuleDefinition[]): FeatureToggleCard[] {
   return sortModules(modules)
     .filter((moduleDef) =>
       !moduleDef.mandatory &&
       !moduleDef.module_type.endsWith("_control") &&
       !PLATFORM_MODULE_TYPES.has(moduleDef.module_type) &&
-      !BUILDING_SYSTEM_MODULE_TYPES.has(moduleDef.module_type)
+      !BUILDING_SYSTEM_MODULE_TYPES.has(moduleDef.module_type) &&
+      !SUBSUMED_MODULE_TYPES.has(moduleDef.module_type)
     )
     .map((moduleDef) => ({
       id: `${moduleDef.module_type}-addon`,

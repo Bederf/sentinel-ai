@@ -14,9 +14,10 @@ interface ChannelStatus {
 interface ChannelStatusDashboardProps {
   siteId?: string;
   onError?: (error: string) => void;
+  embedded?: boolean;
 }
 
-export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStatusDashboardProps) {
+export function ChannelStatusDashboard({ siteId: _siteId, onError, embedded = false }: ChannelStatusDashboardProps) {
   const [channels, setChannels] = useState<ChannelStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [testing, setTesting] = useState<string | null>(null);
@@ -114,6 +115,51 @@ export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStat
     return { color: "var(--color-sentinel-text-secondary)", label: "Not configured" };
   };
 
+  const channelsContent = (
+    <div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {channels.map((ch) => {
+          const st = statusText(ch.status);
+          return (
+            <div key={ch.channel} className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{ch.channel}</span>
+                {statusIcon(ch.status)}
+              </div>
+              <p className="text-xs" style={{ color: st.color }}>{st.label}</p>
+              {ch.provider && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {ch.provider}
+                </p>
+              )}
+              {ch.message_count !== undefined && ch.message_count > 0 && (
+                <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {ch.message_count} messages sent
+                </p>
+              )}
+              {ch.status === "active" && (
+                <button
+                  type="button"
+                  onClick={() => void handleTest(ch.channel)}
+                  disabled={testing === ch.channel}
+                  className="mt-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors hover:brightness-110"
+                  style={{ background: "rgba(59, 130, 246, 0.1)", color: "var(--color-sentinel-blue)", border: "1px solid rgba(59, 130, 246, 0.2)" }}
+                >
+                  <Send className="h-2.5 w-2.5" />
+                  {testing === ch.channel ? "Sending..." : "Send Test"}
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return channelsContent;
+  }
+
   return (
     <div className="glass-panel flat overflow-hidden">
       <div className="p-4 border-b" style={{ borderColor: "var(--color-sentinel-border)" }}>
@@ -129,48 +175,10 @@ export function ChannelStatusDashboard({ siteId: _siteId, onError }: ChannelStat
           </div>
         </div>
       </div>
-
       <div className="p-4">
         {loading ? (
           <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>Loading channel status...</p>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {channels.map((ch) => {
-              const st = statusText(ch.status);
-              return (
-                <div key={ch.channel} className="p-3 rounded-lg" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>{ch.channel}</span>
-                    {statusIcon(ch.status)}
-                  </div>
-                  <p className="text-xs" style={{ color: st.color }}>{st.label}</p>
-                  {ch.provider && (
-                    <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      {ch.provider}
-                    </p>
-                  )}
-                  {ch.message_count !== undefined && ch.message_count > 0 && (
-                    <p className="text-[10px] mt-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                      {ch.message_count} messages sent
-                    </p>
-                  )}
-                  {ch.status === "active" && (
-                    <button
-                      type="button"
-                      onClick={() => void handleTest(ch.channel)}
-                      disabled={testing === ch.channel}
-                      className="mt-2 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-medium transition-colors hover:brightness-110"
-                      style={{ background: "rgba(59, 130, 246, 0.1)", color: "var(--color-sentinel-blue)", border: "1px solid rgba(59, 130, 246, 0.2)" }}
-                    >
-                      <Send className="h-2.5 w-2.5" />
-                      {testing === ch.channel ? "Sending..." : "Send Test"}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+        ) : channelsContent}
       </div>
     </div>
   );
