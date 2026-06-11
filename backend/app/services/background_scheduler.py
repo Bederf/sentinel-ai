@@ -985,14 +985,64 @@ class BackgroundSchedulerService:
                     logger.error(f"Error analyzing site {site_id}: {e}")
                     error_count += 1
 
-            # Advisory notifications are ai.advisory — Cockpit rail, not Telegram
-            for _site_id, _recs in self._pending_advisories.items():
-                if _recs:
-                    logger.debug(
-                        "[NOTIFICATION SUPPRESSED] ai.advisory severity=MEDIUM — Cockpit only (%s: %d recommendations)",
-                        _site_id,
-                        len(_recs),
+            # Send AI-OPT recommendations to FM Telegram — advisory mode
+            if self._pending_advisories:
+                import asyncio
+                from app.config.settings import settings
+                from app.services.telegram_message_sender import (
+                    InlineButton,
+                    InlineKeyboard,
+                    get_telegram_sender,
+                )
+
+                async def _send_advisories():
+                    sender = get_telegram_sender()
+                    chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
+                        settings, "sentry_fm_chat_id", None
                     )
+                    if not chat_id:
+                        logger.debug("[AI-OPT] No Telegram chat ID configured for advisory notifications")
+                        return
+
+                    for _site_id, _recs in self._pending_advisories.items():
+                        if not _recs:
+                            continue
+                        lines = ["*SENTINEL AI — Operational Advisory*"]
+                        lines.append(f"*Site:* {_site_id}")
+                        lines.append(f"*Recommendations:* {len(_recs)}")
+                        lines.append("")
+                        for r in _recs[:5]:
+                            equip = r.target_equipment or "Unknown"
+                            action_data = r.action or {}
+                            point = action_data.get("point", "parameter")
+                            val = action_data.get("value", "?")
+                            impact = r.expected_impact or {}
+                            savings = impact.get("cost_zar")
+                            savings_str = f" — R{savings:.2f}/h" if savings else ""
+                            lines.append(f"● *{equip}*: set {point} to {val}{savings_str}")
+                        if len(_recs) > 5:
+                            lines.append(f"  +{len(_recs) - 5} more")
+                        lines.append(f"\n_{_recs[0].reason[:200] if _recs and _recs[0].reason else ''}_")
+
+                        keyboard = InlineKeyboard(
+                            rows=[
+                                [
+                                    InlineButton(
+                                        label=f"🛠 Create WO — {r.target_equipment or 'Action'}",
+                                        callback_data=f"wo:rec_id:{r.id}",
+                                    )
+                                ]
+                                for r in _recs[:5]
+                            ]
+                        )
+                        await sender.send_text(str(chat_id), "\n".join(lines), parse_mode="Markdown", keyboard=keyboard)
+
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                try:
+                    loop.run_until_complete(_send_advisories())
+                finally:
+                    loop.close()
 
             # Health engine disabled — data exists in equipment (health scores) and predictions tables.
             # Maintenance panel reads directly from those tables. No duplication needed.
@@ -1544,6 +1594,98 @@ class BackgroundSchedulerService:
                 )
         except Exception as e:
             logger.error("Milestone deadline check failed: %s", e)
+
+    def add_wo_sla_breach_job(self, interval_seconds: int = 300):
+        """Check work order SLA deadlines every 5 minutes.
+
+        When a resolved WO passes its sla_deadline_at without being verified:
+        - Notify the manager bot (FM escalation)
+        - Re-notify the assigned technician via tech bot
+
+        Args:
+            interval_seconds: How often to check (default 300s = 5 min).
+        """
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        if self.scheduler.get_job("check_wo_sla_breaches"):
+            self.scheduler.remove_job("check_wo_sla_breaches")
+
+        self.scheduler.add_job(
+            func=self._check_wo_sla_breaches,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="check_wo_sla_breaches",
+            name="Check Work Order SLA Breaches (5 min)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("Added WO SLA breach job (every %ds)", interval_seconds)
+
+    def _check_wo_sla_breaches(self):
+        """Background job: find resolved WOs past SLA deadline, notify manager + tech."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            if not sb:
+                return
+
+            now = datetime.now(UTC).isoformat()
+            overdue = (
+                sb.table("work_orders")
+                .select("code, title, assigned_to, sla_deadline_at, created_by, site_id")
+                .eq("milestone_status", "resolved")
+                .lt("sla_deadline_at", now)
+                .execute()
+            )
+            if not overdue.data:
+                return
+
+            from app.config.settings import settings
+            from app.services.telegram_message_sender import TelegramMessageSender
+
+            mgr_token = settings.sentry_manager_bot_token
+            tech_token = settings.sentry_tech_bot_token
+
+            mgr_sender = TelegramMessageSender(mgr_token) if mgr_token else None
+            tech_sender = TelegramMessageSender(tech_token) if tech_token else None
+
+            for wo in overdue.data:
+                code = wo.get("code", "WO-???")
+                title = wo.get("title", "")
+                tech_name = wo.get("assigned_to", "Unknown")
+                deadline = wo.get("sla_deadline_at", "")
+
+                msg = (
+                    f"⚠️ SLA BREACH: {code}\n"
+                    f"{title}\n"
+                    f"Assigned to: {tech_name}\n"
+                    f"Deadline was: {deadline}\n"
+                    f"Resolution verification overdue."
+                )
+
+                # Notify manager (FM) via manager bot
+                if mgr_sender:
+                    try:
+                        asyncio.run_coroutine_threadsafe(mgr_sender.send_text(8359288792, msg), self._main_loop).result(
+                            timeout=10
+                        )
+                    except Exception as e:
+                        logger.warning("Manager SLA breach notify failed for %s: %s", code, e)
+
+                # Re-notify the technician via tech bot
+                if tech_sender:
+                    try:
+                        asyncio.run_coroutine_threadsafe(
+                            tech_sender.send_text(8359288792, msg), self._main_loop
+                        ).result(timeout=10)
+                    except Exception as e:
+                        logger.warning("Tech SLA breach notify failed for %s: %s", code, e)
+
+                logger.info("SLA breach notifications sent for %s", code)
+
+        except Exception as e:
+            logger.error("WO SLA breach check failed: %s", e)
 
     def add_recommendation_expiry_job(self, interval_seconds: int = 3600):
         """Add a job to expire stale recommendations and dedup duplicate noise.

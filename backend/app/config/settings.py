@@ -188,6 +188,7 @@ class Settings(BaseSettings):
     # Technician Telegram bot token (for direct work order notifications)
     sentry_client_bot_token: str = Field(default="", validation_alias="SENTRY_CLIENT_BOT_TOKEN")
     sentry_tech_bot_token: str = Field(default="", validation_alias="SENTRY_TECH_BOT_TOKEN")
+    sentry_manager_bot_token: str = Field(default="", validation_alias="SENTRY_MANAGER_BOT_TOKEN")
 
     # Prometheus metrics bearer token (required for /metrics endpoint — no auth bypass)
     # Prometheus must send: Authorization: Bearer <token>
