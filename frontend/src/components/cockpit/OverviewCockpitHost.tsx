@@ -132,10 +132,15 @@ function useBuildingStatePayload(siteId: string) {
   return { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading }
 }
 
-function useWaterTelemetry(siteId: string) {
+function useWaterTelemetry(siteId: string, onboardingPhase?: string) {
   const [waterTelemetry, setWaterTelemetry] = useState<WaterTelemetry | null>(null)
 
   useEffect(() => {
+    if (onboardingPhase === 'shadow') {
+      setWaterTelemetry(null)
+      return
+    }
+
     let mounted = true
     let timer: ReturnType<typeof setInterval> | null = null
 
@@ -185,7 +190,7 @@ function useWaterTelemetry(siteId: string) {
       mounted = false
       if (timer) clearInterval(timer)
     }
-  }, [siteId])
+  }, [siteId, onboardingPhase])
 
   return waterTelemetry
 }
@@ -363,7 +368,7 @@ export function OverviewCockpitHost({
 }: OverviewCockpitHostProps) {
   const { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading } = useBuildingStatePayload(siteId)
   const issuesPayload = useCockpitIssues(siteId)
-  const waterTelemetry = useWaterTelemetry(siteId)
+  const waterTelemetry = useWaterTelemetry(siteId, onboardingPhase)
   const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
   const [modelReadiness, setModelReadiness] = useState<ModelReadiness | null>(null)
 
