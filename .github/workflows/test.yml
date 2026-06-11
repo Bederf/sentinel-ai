@@ -101,6 +101,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install --upgrade pip setuptools wheel
+          pip install meson-python ninja pyproject-metadata
           pip install --no-build-isolation -r requirements.txt
 
       - name: Generate test JWT for PostgREST auth
