@@ -84,10 +84,12 @@ class ReporterLocationRepository:
                 result = query.order("updated_at", desc=True).limit(1).execute()
                 if result.data:
                     return result.data[0]
+                return None  # Supabase has no record — don't fall back to stale JSON
             except Exception as exc:
                 logger.debug("ReporterLocationRepository.get_latest Supabase failed: %s", exc)
+                return self._get_latest_json(norm_phone=norm_phone, telegram_id=telegram_id)
 
-        return self._get_latest_json(norm_phone=norm_phone, telegram_id=telegram_id)
+        return None
 
     def upsert(self, record: dict[str, Any]) -> dict[str, Any] | None:
         """Create/update latest memory by identity."""
