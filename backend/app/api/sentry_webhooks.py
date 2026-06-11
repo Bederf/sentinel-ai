@@ -2113,25 +2113,34 @@ async def advance_wo_milestone(
             if reporter_telegram_id:
                 try:
                     from app.services.telegram_message_sender import TelegramMessageSender
+                    from app.config.settings import settings
 
-                    staff_bot_token = (
-                        os.getenv("SENTRY_CLIENT_BOT_TOKEN") or "***TELEGRAM_BOT_TOKEN_REDACTED***"
-                    )
-                    sender = TelegramMessageSender(staff_bot_token)
-                    outcome_emoji = {
-                        "fixed": "✅",
-                        "parts_needed": "⏳",
-                        "escalate": "⚠️",
-                    }.get(req.outcome, "✅")
+                    # Route notification through the correct bot:
+                    # - call-log WOs → staff bot (reporter is a staff member)
+                    # - advisory/telegram WOs → manager bot (FM approved the rec)
+                    if "sentry:call_log:" in created_by:
+                        bot_token = settings.sentry_client_bot_token
+                    else:
+                        bot_token = settings.sentry_manager_bot_token or settings.sentry_client_bot_token
 
-                    label = "resolved" if req.milestone == "resolved" else "completed"
-                    notify_text = (
-                        f"{outcome_emoji} Work order {req.wo_code} {label}.\n"
-                        f"Technician notes: {req.notes or 'No additional notes.'}"
-                    )
-                    await sender.send_text(reporter_telegram_id, notify_text)
+                    sender = TelegramMessageSender(bot_token) if bot_token else None
+                    if not sender:
+                        logger.warning("No bot token available for reporter notification")
+                    else:
+                        outcome_emoji = {
+                            "fixed": "✅",
+                            "parts_needed": "⏳",
+                            "escalate": "⚠️",
+                        }.get(req.outcome, "✅")
+
+                        label = "resolved" if req.milestone == "resolved" else "completed"
+                        notify_text = (
+                            f"{outcome_emoji} Work order {req.wo_code} {label}.\n"
+                            f"Technician notes: {req.notes or 'No additional notes.'}"
+                        )
+                        await sender.send_text(reporter_telegram_id, notify_text)
                 except Exception as notify_err:
-                    logger.warning(f"Staff notification failed for WO {req.wo_code}: {notify_err}")
+                    logger.warning(f"Reporter notification failed for WO {req.wo_code}: {notify_err}")
 
         # If escalated, notify manager
         if req.outcome == "escalate":
