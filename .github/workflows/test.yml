@@ -54,10 +54,25 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
-    continue-on-error: true  # needs Supabase service container; tests that touch DB will fail without it
+    continue-on-error: true
     defaults:
       run:
         working-directory: ./backend
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: sentinel_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 54322:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
       - uses: actions/checkout@v4
@@ -89,6 +104,7 @@ jobs:
           DEMO_MODE: "false"
           JWT_SECRET_KEY: "test-only-jwt-secret-for-ci-at-least-32-chars"
           MODBUS_BESS_IP: ""
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:54322/sentinel_test"
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
