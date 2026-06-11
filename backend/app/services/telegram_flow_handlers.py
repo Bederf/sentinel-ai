@@ -938,7 +938,7 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         "description": description,
         "priority": priority,
         "status": "scheduled",
-        "created_by": "sentinel:telegram:advisory_wo",
+        "created_by": f"sentry:telegram:{chat_id}",
         "equipment_code": target,
         "recommendation_id": rec_uuid,
         "site_id": site_id or None,
