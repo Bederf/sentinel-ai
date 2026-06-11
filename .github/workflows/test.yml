@@ -102,7 +102,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install -r requirements.txt
+          pip install uv
+          uv pip install --system -r requirements.txt
 
       - name: Generate test JWT for PostgREST auth
         id: jwt
