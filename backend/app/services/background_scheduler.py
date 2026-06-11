@@ -5675,13 +5675,26 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 logger.warning(f"[DIGEST] Could not fetch work orders: {e}")
 
             # --- 4. Pending AI recommendations ---
+            # Advisory posture (Phase 225): morning digest is read-only. Only
+            # HIGH/CRITICAL optimisation recs justify waking the FM at 05:00 UTC
+            # (07:00 SAST). LOW/MEDIUM are noise. Inline advisory messages own
+            # the "Create WO" action — the digest does not carry Accept/Dismiss
+            # buttons (see Change 2 below in the send loop).
             ai_recs = []
             try:
+                from app.models.recommendation import ActionRiskLevel
+
                 svc = get_recommendation_service()
                 # Use site-002 format directly (matches DB column)
                 pending = await svc.get_pending_recommendations(site_id, limit=20)
                 ADVISORY_TYPES = {"ai_optimization"}
-                ai_recs = [r for r in pending if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES]
+                ALLOWED_RISK_LEVELS = {ActionRiskLevel.HIGH, ActionRiskLevel.CRITICAL}
+                ai_recs = [
+                    r
+                    for r in pending
+                    if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES
+                    and getattr(r, "risk_level", None) in ALLOWED_RISK_LEVELS
+                ]
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch recommendations: {e}")
 
@@ -5763,10 +5776,14 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 lines.append("*Savings this month:* No verified savings yet")
 
             # AI recommendations section
+            # Digest is read-only: per-rec messages carry no inline keyboard.
+            # The "Create WO" action lives on the inline advisory messages
+            # emitted during the day — not on a 07:00 SAST summary. Operators
+            # read the digest and either go to Cockpit or wait for the
+            # advisory to surface there.
             lines.append("")
             if ai_recs:
                 lines.append(f"*AI Recommendations:* {len(ai_recs)} pending approval")
-                from app.services.telegram_message_sender import InlineButton, InlineKeyboard
 
                 for rec in ai_recs[:5]:
                     eq = getattr(rec, "target_equipment", "?") or "?"
@@ -5774,17 +5791,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     sev = getattr(rec.risk_level, "value", None) if hasattr(rec, "risk_level") else None
                     sev = sev or getattr(rec, "risk_level", "info") or "info"
                     body = f"`{eq}` — {reason}\nSeverity: {sev}"
-                    rec_id = getattr(rec, "id", "") or ""
-                    keyboard = InlineKeyboard(
-                        rows=[
-                            [
-                                InlineButton(label="Accept", callback_data=f"rec:accept:{rec_id}"),
-                                InlineButton(label="Dismiss", callback_data=f"rec:dismiss:{rec_id}"),
-                                InlineButton(label="Open", callback_data=f"rec:open:{rec_id}"),
-                            ],
-                        ]
-                    )
-                    await sender.send_text(str(chat_id), body, keyboard=keyboard, parse_mode="Markdown")
+                    await sender.send_text(str(chat_id), body, parse_mode="Markdown")
             else:
                 lines.append("*AI Recommendations:* None pending")
 
