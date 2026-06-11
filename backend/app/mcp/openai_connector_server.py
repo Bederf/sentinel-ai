@@ -1286,7 +1286,11 @@ class OpenAIConnectorMCPServer:
                     priority = {"critical": "high", "high": "high", "medium": "medium", "low": "low"}.get(
                         risk_level, "medium"
                     )
-                    confidence = rec.get("confidence_score") or rec.get("confidence") or 0.5
+                    confidence = (
+                        rec.get("confidence_score")
+                        if rec.get("confidence_score") is not None
+                        else (rec.get("confidence") if rec.get("confidence") is not None else 0.5)
+                    )
                     # Extract projected saving from expected_impact
                     projected_saving_zar = None
                     if isinstance(ei, dict):
@@ -1445,6 +1449,25 @@ class OpenAIConnectorMCPServer:
 
             rec = rec_result.data[0]
 
+            # Cross-reference live equipment health
+            live_health = None
+            live_status = None
+            equipment_code = rec.get("target_equipment")
+            if equipment_code:
+                try:
+                    eq_result = (
+                        client.table("equipment")
+                        .select("health_score, status, updated_at")
+                        .eq("code", equipment_code)
+                        .limit(1)
+                        .execute()
+                    )
+                    if eq_result.data:
+                        live_health = eq_result.data[0].get("health_score")
+                        live_status = eq_result.data[0].get("status")
+                except Exception as e:
+                    logger.debug(f"Live health lookup failed for {equipment_code}: {e}")
+
             # Get predictions for the target equipment
             predictions = []
             try:
@@ -1474,8 +1497,8 @@ class OpenAIConnectorMCPServer:
 
             # Calculate confidence breakdown
             ml_score = rec.get("confidence_score", 0.0)
-            trust_weight = 0.8 if rec.get("source_type") == "ml_model" else 0.5
-            final_confidence = round(ml_score * trust_weight, 3)
+            source_type = rec.get("source_type", "unknown")
+            final_confidence = ml_score  # Raw score — trust_weight is governance metadata, not a penalty
 
             # Get predicted outcome from execution_result or expected_impact
             predicted_outcome = "unknown"
@@ -1492,11 +1515,17 @@ class OpenAIConnectorMCPServer:
                 "ml_model_used": rec.get("source", "unknown"),
                 "confidence_breakdown": {
                     "ml_score": ml_score,
-                    "trust_weight": trust_weight,
+                    "source_type": source_type,
                     "final": final_confidence,
+                    "note": "Raw confidence score. Trust weight is a governance phase indicator, not a score penalty.",
                 },
                 "predicted_outcome": predicted_outcome,
                 "execution_status": rec.get("status", "unknown"),
+                "live_equipment_health": {
+                    "health_score": live_health,
+                    "status": live_status,
+                    "note": "Current live value — may differ from snapshot at recommendation creation time",
+                },
             }
         except Exception as e:
             logger.error(f"trace_recommendation failed: {e}")
