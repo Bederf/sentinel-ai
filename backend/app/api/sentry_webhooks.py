@@ -2100,12 +2100,15 @@ async def advance_wo_milestone(
 
         # Notify staff if resolved or verified
         if req.milestone in ("resolved", "verified"):
-            # Extract reporter Telegram ID from created_by (format: sentry:call_log:{telegram_id})
+            # Extract reporter Telegram ID from created_by
+            # Formats: sentry:call_log:{id}, sentry:telegram:{id}, telegram:{id}
             reporter_telegram_id = None
             if "sentry:call_log:" in created_by:
                 reporter_telegram_id = created_by.split("sentry:call_log:")[-1].split(":")[0]
             elif "sentry:telegram:" in created_by:
                 reporter_telegram_id = created_by.split("sentry:telegram:")[-1].split(":")[0]
+            elif created_by.startswith("telegram:"):
+                reporter_telegram_id = created_by.split("telegram:")[-1].split(":")[0]
 
             if reporter_telegram_id:
                 try:
