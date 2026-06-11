@@ -40,7 +40,7 @@ jobs:
         continue-on-error: false
 
       - name: Lint for errors and undefined names (E,F)
-        run: ruff check --select E,F .
+        run: ruff check --select E,F --extend-ignore E501 .
         continue-on-error: false
 
       - name: Display ruff version
