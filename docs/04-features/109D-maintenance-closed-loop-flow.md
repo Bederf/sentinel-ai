@@ -27,10 +27,14 @@ Equipment state transitions to warning or critical health threshold.
 1. Create equipment alert.
 2. Generate work order with technician assignment → service record created → equipment status set to `maintenance`.
 3. Deliver WO reference to technician channels (mobile, email, bot).
-4. Technician executes work and submits evidence via `done #WO-XXXX` (`technician-closeout` skill).
-5. Stateful multi-step debrief collects evidence (photos, readings, notes).
-6. On completion: equipment status → `normal`; health score restored from service type + configured healthy threshold; alerts and predictions resolved.
-7. Emit closure event and recommendation refresh trigger.
+4. Technician taps "✅ Done" or sends `done #WO-XXXX` → backend routes via `▶closeout WO-XXXX` to bypass engine's built-in handler → LLM invokes `technician-closeout` skill with 3-tier branching.
+5. **3-tier closeout** based on WO data:
+   - **Tier 1** (no equipment_code): one question — "What did you do?" → close. No FM notification, reporter notified by backend.
+   - **Tier 2** (comfort complaint with equipment): two questions — "Was it resolved?" + optional temp reading → close. Same notification rules as Tier 1.
+   - **Tier 3** (equipment fault): full equipment-specific checklist (4-8 items), AI diagnosis, FM notification.
+6. Stateful multi-step debrief (Tier 3 only) collects evidence via inspection checklist, persisted to `sentry_inspection_sessions` table for resume on restart.
+7. On completion: equipment status → `normal`; health score restored from service type + configured healthy threshold; alerts and predictions resolved.
+8. Emit closure event and recommendation refresh trigger.
 
 ## Site-002 guided inspection scope (major-equipment-first)
 

@@ -4,7 +4,7 @@ type: "reference"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-06-11"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -21,11 +21,20 @@ estimated_read_time: 10
 
 Call log endpoints support the Sentry bot's general staff defect reporting workflow. Non-technical users (office workers, cleaners, security guards) report building issues via Telegram, WhatsApp, mobile app, or email. The bot classifies the complaint against a fixed taxonomy and creates an inspection work order.
 
-Five endpoints (3 original + 2 new):
+Six endpoints:
 
 1. **`POST /api/sentry/call-log`** — Create an inspection work order from a classified complaint
 2. **`POST /api/sentry/call-log/escalate`** — Escalate an unclassifiable complaint to the facilities supervisor
 3. **`GET /api/sentry/call-log/location-memory`** — Lookup last confirmed location for reporter prefill
+4. **`POST /api/sentry/call-log/location-memory`** — Save/update reporter location memory after a WO is created
+5. **`GET /api/sentry/work-order/detail`** — Full WO details including resolved equipment_code (for closeout branching)
+6. **`GET/POST /api/sentry/inspection-session`** — Persist/resume Tier 3 checklist state across restarts
+
+### Key implementation details (Phase 227):
+- **Equipment code gating**: `_derive_equipment_code_from_desk()` is only called when `specialty == "HVAC"` or `category in ("HVAC", "Air Conditioning")`. Lighting/plumbing WOs get empty equipment_code, routing closeout to Tier 1.
+- **Zone pass-through**: `call_log.py log` accepts optional `--zone`/`--floor` args from location memory. When provided, zone is NOT recomputed from desk number (fixes boundary cases like Desk 120).
+- **Location memory fix**: `ReporterLocationRepository.get_latest()` only falls back to JSON file on Supabase errors — empty Supabase results now return `found: false` (was leaking stale JSON records).
+- **Notification routing**: Call-log WOs notify technicians via `SENTRY_TECH_BOT_TOKEN` instead of the staff bot token, so WO cards arrive in the tech bot chat.
 
 ## POST /api/sentry/call-log
 

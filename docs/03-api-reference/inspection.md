@@ -4,7 +4,7 @@ type: "reference"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-06-11"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
