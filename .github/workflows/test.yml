@@ -103,7 +103,7 @@ jobs:
       - name: Install Python dependencies
         run: |
           pip install uv
-          uv pip install --system -r requirements.txt
+          uv pip install --system --index-strategy unsafe-best-match -r requirements.txt
 
       - name: Generate test JWT for PostgREST auth
         id: jwt
