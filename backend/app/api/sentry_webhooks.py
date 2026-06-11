@@ -2573,6 +2573,18 @@ async def handle_telegram_callback(
             return {"success": True, "intent": "rec_ack", "confirmed": True}
         return {"success": False, "error": "invalid_rec_callback"}
 
+    # Inline "✅ Done" button on WO notification card — route through LLM via "Closeout" text
+    # instead of echoing "done #WO-XXXX" which triggers the engine's built-in handler.
+    if payload.data.startswith("done #WO-") or payload.data.startswith("done #"):
+        try:
+            # Extract WO code: "done #WO-2026-0005" → "WO-2026-0005"
+            parts = payload.data.replace("#", "").split(" ", 1)
+            wo_ref = parts[1] if len(parts) > 1 else payload.data
+            await sender.send_text(chat_id=payload.chat_id, text=f"Closeout {wo_ref}")
+        except Exception as e:
+            logger.error("Failed to dispatch closeout via Done button: %s", e)
+        return {"success": True, "intent": "closeout", "method": "button_done"}
+
     # Classify and route
     from app.services.telegram_conversation_manager import get_conversation_manager
     from app.services.telegram_flow_handlers import route_to_handler
