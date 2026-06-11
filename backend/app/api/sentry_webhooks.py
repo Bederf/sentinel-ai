@@ -1543,15 +1543,13 @@ async def sentry_call_log(
                     except Exception:
                         pass  # site_technicians table may not exist
 
-                    # Last resort: any active technician with a Telegram ID,
-                    # excluding the reporter (never notify the complainant as the technician)
+                    # Last resort: any active technician with a Telegram ID
                     if not tech:
                         try:
                             tech_result = (
                                 sb.table("technicians")
                                 .select("id, name, email, phone, telegram_id")
                                 .eq("active", True)
-                                .neq("telegram_id", req.reporter_telegram_id)
                                 .execute()
                             )
                             # Filter to ones with telegram_id
