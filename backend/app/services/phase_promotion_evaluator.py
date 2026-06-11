@@ -401,15 +401,36 @@ class PhasePromotionEvaluator:
         #   connection: bool (True = connected)
         # Also accept legacy "ok" and string "online" for forward compat.
         if gate == "bridge_connected":
-            from app.services.simbiot_service import simbiot_service
+            import httpx
 
             try:
-                status = await simbiot_service.get_site_status(site_id)
-                connected = (
-                    status.get("status") in ("connected", "ok")
-                    or status.get("connection") is True
-                    or status.get("connection") == "online"
+                # Use per-site bridge token from site_adapter_config
+                cfg_rows = (
+                    client.table("site_adapter_config")
+                    .select("connection_config")
+                    .eq("site_id", site_id)
+                    .ilike("protocol", "%bridge%")
+                    .eq("enabled", True)
+                    .limit(1)
+                    .execute()
                 )
+                if cfg_rows.data:
+                    cc = cfg_rows.data[0]["connection_config"]
+                    base_url = cc.get("base_url", "")
+                    token = cc.get("token", "")
+                    resp = httpx.get(
+                        f"{base_url}/api/sites/{site_id}/health",
+                        headers={"Authorization": f"Bearer {token}"},
+                        timeout=15,
+                    )
+                    resp.raise_for_status()
+                    status = resp.json()
+                else:
+                    from app.services.simbiot_service import simbiot_service
+
+                    status = await simbiot_service.get_site_status(site_id)
+
+                connected = status.get("status") in ("connected", "ok") or status.get("site_available") is True
                 return GateResult(gate=gate, passed=connected, value=connected)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)

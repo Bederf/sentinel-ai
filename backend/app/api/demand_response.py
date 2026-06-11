@@ -20,7 +20,9 @@ async def get_curtailable_load(
         3,
         ge=1,
         le=5,
-        description="Minimum zone priority to include (1=critical, 5=lowest). Default P3+ means P3, P4, P5 zones only — never shed P1/P2",
+        description=(
+            "Minimum zone priority (1=critical, 5=lowest). Default P3+ means P3, P4, P5 only — never shed P1/P2"
+        ),
     ),
     include_zones: bool = Query(True, description="Include per-zone breakdown in response"),
 ):

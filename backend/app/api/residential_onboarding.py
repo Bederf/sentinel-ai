@@ -575,7 +575,7 @@ async def addon_register(request: AddonRegisterRequest) -> dict:
     }
 
 
-async def _ha_gateway_for_chat(chat_id: int) -> HomeAssistantGateway | None:
+async def _ha_gateway_for_chat(chat_id: int):
     """Look up HA site for chat_id, decrypt config, build and connect gateway."""
     from app.gateways.home_assistant import HomeAssistantGateway
 
@@ -600,6 +600,31 @@ async def _ha_gateway_for_chat(chat_id: int) -> HomeAssistantGateway | None:
     if not ok:
         return None
     return gateway
+
+
+async def _residential_status(chat_id: int) -> str:
+    """Return residential site connection status."""
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    rows = supabase.table("residential_sites").select("*").eq("chat_id", chat_id).limit(1).execute()
+    if not rows.data:
+        return "No residential site found.\n\nUse /connect to set up your home."
+
+    site = rows.data[0]
+    lines = [
+        f"🏠 Site: {site.get('display_name') or site.get('site_id', 'Unknown')}",
+        f"📡 MQTT: {'✅ Connected' if site.get('mqtt_connected') else '❌ Disconnected'}",
+    ]
+    if site.get("last_seen"):
+        lines.append(f"⏱ Last seen: {site['last_seen']}")
+    if site.get("ha_url"):
+        gateway = await _ha_gateway_for_chat(chat_id)
+        if gateway:
+            ha_status = "✅ Connected" if gateway.connected else "❌ Disconnected"
+            lines.append(f"🏡 Home Assistant: {ha_status}")
+            await gateway.disconnect()
+    return "\n".join(lines)
 
 
 async def _ha_control_list(chat_id: int) -> str:

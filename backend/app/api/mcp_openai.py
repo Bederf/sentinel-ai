@@ -534,7 +534,11 @@ async def well_known_openapi():
             "info": {
                 "title": "SENTINEL BMS MCP",
                 "version": "1.0.0",
-                "description": "SENTINEL Building Management Intelligence — live operational data for S002 (Sandton City Office Tower). S001 (Fairlands) is in commissioning.",
+                "description": (
+                    "SENTINEL Building Management Intelligence — "
+                    "live operational data for S002 (Sandton City Office Tower). "
+                    "S001 (Fairlands) is in commissioning."
+                ),
             },
             "servers": [{"url": "https://bms.sentinel-ai.co.za/api/mcp/openai"}],
             "paths": paths,
@@ -631,7 +635,10 @@ async def openapi_json():
             "info": {
                 "title": "SENTINEL BMS API",
                 "version": "1.0.0",
-                "description": "SENTINEL Building Management Intelligence Platform — live operational data for Sandton City Office Tower (site-002).",
+                "description": (
+                    "SENTINEL Building Management Intelligence Platform — "
+                    "live operational data for Sandton City Office Tower (site-002)."
+                ),
             },
             "servers": [{"url": "https://bms.sentinel-ai.co.za/api/mcp/openai"}],
             "paths": paths,

@@ -272,7 +272,10 @@ class SentinelDataSync:
                     logger.warning(f"[ML FEEDER] Could not persist ml_hours_ingested: {e}")
 
                 # 1a. Compute IF anomaly scores and inject into equipment_states.
-                anomaly_scores = self.ml_feeder.score_anomaly()
+                # Use persisted ml_hours_ingested from Supabase rather than the
+                # in-memory counter which resets to 0 on every restart.
+                ml_hours_for_scoring = int(persisted_hours) if persisted_hours > 0 else None
+                anomaly_scores = self.ml_feeder.score_anomaly(hours_ingested=ml_hours_for_scoring)
                 if anomaly_scores:
                     for code, score in anomaly_scores.items():
                         if code in equipment_states:
@@ -281,7 +284,7 @@ class SentinelDataSync:
 
                 # 1b. Compute LSTM-derived anomaly scores (requires 500h minimum).
                 # Written as a separate key so both signals coexist.
-                lstm_scores = self.ml_feeder.score_lstm_anomaly()
+                lstm_scores = self.ml_feeder.score_lstm_anomaly(hours_ingested=ml_hours_for_scoring)
                 if lstm_scores:
                     for code, score in lstm_scores.items():
                         if code in equipment_states:
@@ -289,7 +292,7 @@ class SentinelDataSync:
                     results["lstm_anomaly_scores_written"] = len(lstm_scores)
 
                 # 1c. Compute autoencoder-derived anomaly scores (if trained model available).
-                ae_scores = self.ml_feeder.score_autoencoder_anomaly()
+                ae_scores = self.ml_feeder.score_autoencoder_anomaly(hours_ingested=ml_hours_for_scoring)
                 if ae_scores:
                     for code, score in ae_scores.items():
                         if code in equipment_states:

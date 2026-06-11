@@ -104,9 +104,11 @@ class AdapterHealthMonitor:
             {site_id: {adapter_name: AdapterHealthRecord}}
         """
         from app.config.settings import settings
+        from app.database.supabase_client import get_supabase_client
         from app.services.device_abstraction import device_manager
         from app.services.shadow_mode_polling import get_shadow_mode_polling_service
 
+        supabase = get_supabase_client()
         results: dict[str, dict[str, AdapterHealthRecord]] = {}
 
         # 1) ShadowModePollingService per configured site
@@ -115,9 +117,34 @@ class AdapterHealthMonitor:
             results[site_id] = {}
             try:
                 shadow = get_shadow_mode_polling_service(site_id)
-                record = await self._check_shadow_bridge(site_id, shadow)
-                results[site_id]["shadow_bridge"] = record
-                await self._record_and_alert(site_id, "shadow_bridge", "shadow_bridge", record)
+
+                # Look up the bridge adapter's protocol + connection_config
+                # so the adapter_name matches and we use the per-site token.
+                bridge_cfg = (
+                    supabase.table("site_adapter_config")
+                    .select("protocol,connection_config")
+                    .eq("site_id", site_id)
+                    .ilike("protocol", "%bridge%")
+                    .eq("enabled", True)
+                    .limit(1)
+                    .execute()
+                )
+
+                if bridge_cfg.data:
+                    bridge_adapter_name = bridge_cfg.data[0]["protocol"]
+                    bridge_config = bridge_cfg.data[0].get("connection_config", {})
+                else:
+                    bridge_adapter_name = "shadow_bridge"
+                    bridge_config = {}
+
+                record = await self._check_shadow_bridge(
+                    site_id,
+                    shadow,
+                    adapter_name=bridge_adapter_name,
+                    bridge_config=bridge_config,
+                )
+                results[site_id][bridge_adapter_name] = record
+                await self._record_and_alert(site_id, bridge_adapter_name, "shadow_bridge", record)
             except Exception as e:
                 logger.exception(f"ShadowModePollingService check failed for {site_id}: {e}")
 
@@ -145,36 +172,56 @@ class AdapterHealthMonitor:
     # Per-adapter checks
     # ------------------------------------------------------------------
 
-    async def _check_shadow_bridge(self, site_id: str, shadow: Any) -> AdapterHealthRecord:
-        """Check ShadowModePollingService bridge connectivity.
+    async def _check_shadow_bridge(
+        self,
+        site_id: str,
+        shadow: Any,
+        adapter_name: str = "shadow_bridge",
+        bridge_config: dict | None = None,
+    ) -> AdapterHealthRecord:
+        """Check bridge connectivity via direct HTTP health probe.
 
-        Uses SIMBIOT's live health probe (actual HTTP request to bridge) rather
-        than ShadowModePollingService.status, which only reflects whether poll()
-        has ever been called — not whether the bridge is actually reachable now.
+        Uses the per-site bridge token from site_adapter_config.connection_config
+        rather than the global SIMBIOT_API_KEY, so auth works regardless of
+        which token the bridge was configured with.
         """
+        import httpx
+
         start = time.perf_counter()
         try:
-            from app.services.simbiot_service import simbiot_service
+            # Extract base_url + token from connection_config if available
+            base_url = (bridge_config or {}).get("base_url", "")
+            token = (bridge_config or {}).get("token", "")
 
-            simbiot_status = await simbiot_service.get_site_status(site_id)
+            if base_url and token:
+                resp = httpx.get(
+                    f"{base_url}/api/sites/{site_id}/health",
+                    headers={"Authorization": f"Bearer {token}"},
+                    timeout=15,
+                )
+                resp.raise_for_status()
+                status_data = resp.json()
+            else:
+                from app.services.simbiot_service import simbiot_service
+
+                status_data = await simbiot_service.get_site_status(site_id)
+
             latency_ms = (time.perf_counter() - start) * 1000
 
-            connected = (
-                simbiot_status.get("status") in ("connected", "ok") or simbiot_status.get("site_available") is True
-            )
+            connected = status_data.get("status") in ("connected", "ok") or status_data.get("site_available") is True
             is_healthy = connected
-            error_message = None if is_healthy else f"bridge unreachable: {simbiot_status.get('status', 'unknown')}"
+            error_message = None if is_healthy else f"bridge unreachable: {status_data.get('status', 'unknown')}"
             metadata = {
-                "site_available": simbiot_status.get("site_available"),
-                "telemetry_fresh": simbiot_status.get("telemetry_fresh"),
-                "last_telemetry_at": simbiot_status.get("last_telemetry_at"),
+                "site_available": status_data.get("site_available"),
+                "telemetry_fresh": status_data.get("telemetry_fresh"),
+                "last_telemetry_at": status_data.get("last_telemetry_at"),
             }
 
-            consecutive = await self._count_consecutive_failures(site_id, "shadow_bridge")
+            consecutive = await self._count_consecutive_failures(site_id, adapter_name)
 
             return AdapterHealthRecord(
                 site_id=site_id,
-                adapter_name="shadow_bridge",
+                adapter_name=adapter_name,
                 adapter_type="shadow_bridge",
                 is_healthy=is_healthy,
                 latency_ms=latency_ms,
@@ -185,11 +232,11 @@ class AdapterHealthMonitor:
         except Exception as e:
             return AdapterHealthRecord(
                 site_id=site_id,
-                adapter_name="shadow_bridge",
+                adapter_name=adapter_name,
                 adapter_type="shadow_bridge",
                 is_healthy=False,
                 latency_ms=(time.perf_counter() - start) * 1000,
-                consecutive_failures=await self._count_consecutive_failures(site_id, "shadow_bridge"),
+                consecutive_failures=await self._count_consecutive_failures(site_id, adapter_name),
                 error_message=str(e)[:200],
                 metadata={},
             )
@@ -269,7 +316,8 @@ class AdapterHealthMonitor:
                     "uptime_1h_percent": uptime_1h,
                     "uptime_24h_percent": uptime_24h,
                     "updated_at": now.isoformat(),
-                }
+                },
+                on_conflict="site_id,adapter_name",
             ).execute()
 
             # Insert history row (one per cycle)
@@ -300,7 +348,8 @@ class AdapterHealthMonitor:
                         "consecutive_failures": record.consecutive_failures,
                         "error_message": f"persist_failed: {e!s}",
                         "updated_at": now.isoformat(),
-                    }
+                    },
+                    on_conflict="site_id,adapter_name",
                 ).execute()
             except Exception as inner_e:
                 logger.error(f"Failed to write fallback health record for {adapter_name}@{site_id}: {inner_e}")
