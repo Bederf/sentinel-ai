@@ -1543,13 +1543,15 @@ async def sentry_call_log(
                     except Exception:
                         pass  # site_technicians table may not exist
 
-                    # Last resort: any active technician with a Telegram ID
+                    # Last resort: any active technician with a Telegram ID,
+                    # excluding the reporter (never notify the complainant as the technician)
                     if not tech:
                         try:
                             tech_result = (
                                 sb.table("technicians")
                                 .select("id, name, email, phone, telegram_id")
                                 .eq("active", True)
+                                .neq("telegram_id", req.reporter_telegram_id)
                                 .execute()
                             )
                             # Filter to ones with telegram_id
@@ -1619,7 +1621,10 @@ async def sentry_call_log(
             "reported_by": req.reported_by,
             "reporter_phone": req.reporter_phone,
             "create_service_record": False,
-            "equipment_code": _derive_equipment_code_from_desk(req.desk_id, req.site_id) or "",
+            "equipment_code": (_derive_equipment_code_from_desk(req.desk_id, req.site_id) or "")
+            if req.specialty in ("hvac", "HVAC")
+            or req.category in ("HVAC", "hvac", "Air Conditioning", "air conditioning")
+            else "",
         }
         logger.info(f"Call-log invoking notify_technician with data={wo_notify_data}")
         try:

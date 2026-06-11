@@ -827,9 +827,15 @@ class WorkOrderNotifier:
 
             from app.config.settings import settings
 
-            bot_token = settings.sentry_client_bot_token
+            # Call-log notifications route through the tech bot so the technician
+            # receives the WO alert in their tech-bot chat, not the staff bot.
+            is_callout = work_order_data.get("service_type") == "callout"
+            bot_token = settings.sentry_tech_bot_token if is_callout else settings.sentry_client_bot_token
             if not bot_token:
-                logger.warning("SENTRY_CLIENT_BOT_TOKEN not configured")
+                fallback = settings.sentry_client_bot_token
+                bot_token = fallback
+            if not bot_token:
+                logger.warning("No bot token configured for Telegram notifications")
                 return False
 
             wo_ref = (
