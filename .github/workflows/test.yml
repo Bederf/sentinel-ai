@@ -100,8 +100,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install --resolver=backtracking -r requirements.txt
+          pip install --upgrade pip setuptools wheel
+          pip install -r requirements.txt
 
       - name: Generate test JWT for PostgREST auth
         id: jwt
