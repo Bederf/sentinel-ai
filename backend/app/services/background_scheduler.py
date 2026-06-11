@@ -1622,7 +1622,7 @@ class BackgroundSchedulerService:
         logger.info("Added WO SLA breach job (every %ds)", interval_seconds)
 
     def _check_wo_sla_breaches(self):
-        """Background job: find resolved WOs past SLA deadline, notify manager + tech."""
+        """Background job: SLA reminders (1h before deadline) + breach (past deadline)."""
         try:
             from app.database.supabase_client import get_supabase_client
 
@@ -1630,41 +1630,66 @@ class BackgroundSchedulerService:
             if not sb:
                 return
 
-            now = datetime.now(UTC).isoformat()
-            overdue = (
-                sb.table("work_orders")
-                .select("code, title, assigned_to, sla_deadline_at, created_by, site_id")
-                .eq("milestone_status", "resolved")
-                .lt("sla_deadline_at", now)
-                .execute()
-            )
-            if not overdue.data:
-                return
+            now = datetime.now(UTC)
+            now_iso = now.isoformat()
+            remind_from = (now + timedelta(hours=1)).isoformat()
 
             from app.config.settings import settings
             from app.services.telegram_message_sender import TelegramMessageSender
 
-            mgr_token = settings.sentry_manager_bot_token
-            tech_token = settings.sentry_tech_bot_token
+            tech_sender = (
+                TelegramMessageSender(settings.sentry_tech_bot_token) if settings.sentry_tech_bot_token else None
+            )
+            mgr_sender = (
+                TelegramMessageSender(settings.sentry_manager_bot_token) if settings.sentry_manager_bot_token else None
+            )
 
-            mgr_sender = TelegramMessageSender(mgr_token) if mgr_token else None
-            tech_sender = TelegramMessageSender(tech_token) if tech_token else None
+            # --- Pre-deadline reminders (1 hour before) ---
+            reminding = (
+                sb.table("work_orders")
+                .select("code, title, assigned_to, sla_deadline_at, milestone_status")
+                .in_("milestone_status", ["assigned", "in_progress", "resolved"])
+                .gte("sla_deadline_at", now_iso)
+                .lte("sla_deadline_at", remind_from)
+                .execute()
+            )
+            for wo in reminding.data or []:
+                code = wo.get("code", "WO-???")
+                title = wo.get("title", "")
+                deadline = wo.get("sla_deadline_at", "")
+                milestone = wo.get("milestone_status", "unknown")
+                msg = f"⏰ SLA REMINDER: {code}\n{title}\nStatus: {milestone}\nDeadline: {deadline}\nDue within 1 hour."
+                if tech_sender:
+                    try:
+                        asyncio.run_coroutine_threadsafe(
+                            tech_sender.send_text(8359288792, msg), self._main_loop
+                        ).result(timeout=10)
+                        logger.info("SLA reminder sent for %s", code)
+                    except Exception as e:
+                        logger.warning("SLA reminder failed for %s: %s", code, e)
 
-            for wo in overdue.data:
+            # --- Post-deadline breaches ---
+            overdue = (
+                sb.table("work_orders")
+                .select("code, title, assigned_to, sla_deadline_at, milestone_status")
+                .in_("milestone_status", ["assigned", "in_progress", "resolved"])
+                .lt("sla_deadline_at", now_iso)
+                .execute()
+            )
+            for wo in overdue.data or []:
                 code = wo.get("code", "WO-???")
                 title = wo.get("title", "")
                 tech_name = wo.get("assigned_to", "Unknown")
                 deadline = wo.get("sla_deadline_at", "")
-
+                milestone = wo.get("milestone_status", "unknown")
                 msg = (
                     f"⚠️ SLA BREACH: {code}\n"
                     f"{title}\n"
                     f"Assigned to: {tech_name}\n"
+                    f"Status: {milestone}\n"
                     f"Deadline was: {deadline}\n"
-                    f"Resolution verification overdue."
+                    f"Action required."
                 )
-
-                # Notify manager (FM) via manager bot
                 if mgr_sender:
                     try:
                         asyncio.run_coroutine_threadsafe(mgr_sender.send_text(8359288792, msg), self._main_loop).result(
@@ -1672,8 +1697,6 @@ class BackgroundSchedulerService:
                         )
                     except Exception as e:
                         logger.warning("Manager SLA breach notify failed for %s: %s", code, e)
-
-                # Re-notify the technician via tech bot
                 if tech_sender:
                     try:
                         asyncio.run_coroutine_threadsafe(
@@ -1681,7 +1704,6 @@ class BackgroundSchedulerService:
                         ).result(timeout=10)
                     except Exception as e:
                         logger.warning("Tech SLA breach notify failed for %s: %s", code, e)
-
                 logger.info("SLA breach notifications sent for %s", code)
 
         except Exception as e:

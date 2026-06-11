@@ -349,6 +349,7 @@ async def startup_event(_: FastAPI) -> None:
 
     # Phase 207 SLA monitoring — milestone timer (fires every 5 min)
     scheduler_service.add_milestone_timer_job(interval_seconds=300)
+    scheduler_service.add_wo_sla_breach_job(interval_seconds=300)
 
     # Phase 207 fire pump compliance — daily check
     scheduler_service.add_fire_pump_compliance_job(interval_seconds=86400)
