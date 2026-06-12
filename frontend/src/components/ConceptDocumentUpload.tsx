@@ -14,7 +14,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Paperclip, Loader, X, Calendar, FileText, AlertCircle } from 'lucide-react';
-import { apiClient } from '@/lib/api/client';
+import { conceptDocumentsApi } from '@/lib/api/conceptDocuments';
+import type { ConceptDocumentFieldOptions } from '@/lib/api/conceptDocuments';
 
 // Trigger types that require a trigger_date (Vital records)
 const VITAL_TRIGGER_TYPES = new Set([
@@ -28,14 +29,6 @@ const VITAL_TRIGGER_TYPES = new Set([
   'Date Survey Issued',
   'Date of Incident',
 ]);
-
-interface FieldOptions {
-  discipline: string[];
-  document_type: string[];
-  frequency: string[];
-  trigger_type: string[];
-  notes: Record<string, string>;
-}
 
 interface ConceptDocumentUploadProps {
   siteId: string;
@@ -57,17 +50,17 @@ export function ConceptDocumentUpload({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  const [fieldOptions, setFieldOptions] = useState<FieldOptions | null>(null);
+  const [fieldOptions, setFieldOptions] = useState<ConceptDocumentFieldOptions | null>(null);
   const [loadingFields, setLoadingFields] = useState(false);
 
   // Form state — F1-F8
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [discipline, setDiscipline] = useState('');           // F2
-  const [documentType, setDocumentType] = useState('');       // F3
-  const [frequency, setFrequency] = useState('');             // F4
+  const [discipline, setDiscipline] = useState('');            // F2
+  const [documentType, setDocumentType] = useState('');        // F3
+  const [frequency, setFrequency] = useState('');              // F4
   const [documentCreationDate, setDocumentCreationDate] = useState(''); // F5 — no default (POPIA)
   const [triggerType, setTriggerType] = useState('Same as Document Creation Date'); // F6
-  const [triggerDate, setTriggerDate] = useState('');         // F6 date
+  const [triggerDate, setTriggerDate] = useState('');          // F6 date
 
   const isVitalRecord = VITAL_TRIGGER_TYPES.has(triggerType);
 
@@ -77,7 +70,7 @@ export function ConceptDocumentUpload({
     const fetchFields = async () => {
       setLoadingFields(true);
       try {
-        const data = await apiClient.get('/api/concept/documents/fields');
+        const data = await conceptDocumentsApi.getUploadFields();
         setFieldOptions(data);
       } catch {
         setError('Could not load document field options. Please try again.');
@@ -138,7 +131,7 @@ export function ConceptDocumentUpload({
     (!isVitalRecord || triggerDate);
 
   const handleUpload = async () => {
-    if (!isFormValid) {
+    if (!isFormValid || !selectedFile) {
       setError('Please complete all required fields before uploading.');
       return;
     }
@@ -146,22 +139,16 @@ export function ConceptDocumentUpload({
     setUploading(true);
     setError(null);
 
-    const metadata = {
-      site_id: siteId,
-      discipline,
-      document_type: documentType,
-      frequency,
-      document_creation_date: documentCreationDate,
-      trigger_type: triggerType,
-      trigger_date: isVitalRecord && triggerDate ? triggerDate : null,
-    };
-
-    const formData = new FormData();
-    formData.append('file', selectedFile!);
-    formData.append('metadata_json', JSON.stringify(metadata));
-
     try {
-      await apiClient.postFormData('/api/concept/documents/upload', formData);
+      await conceptDocumentsApi.uploadDocument(selectedFile, {
+        site_id: siteId,
+        discipline,
+        document_type: documentType,
+        frequency,
+        document_creation_date: documentCreationDate,
+        trigger_type: triggerType,
+        trigger_date: isVitalRecord && triggerDate ? triggerDate : null,
+      });
       setSuccess('Document uploaded successfully.');
       onUploadComplete?.();
       setTimeout(() => handleClosePanel(), 2000);
@@ -376,7 +363,7 @@ export function ConceptDocumentUpload({
                     </button>
                   </Field>
 
-                  {/* F7 note */}
+                  {/* F7 / F8 note */}
                   <p className="text-xs" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
                     Uploaded by is recorded automatically from your session.
                     Retention period is calculated from discipline + document type + frequency.
