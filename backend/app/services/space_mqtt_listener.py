@@ -234,8 +234,6 @@ class SpaceMqttListener:
                 client.username_pw_set(settings.space_mqtt_username, settings.space_mqtt_password)
 
             def _on_connect(client, _userdata, _flags, reason_code, _properties=None):
-                # reason_code is an int (MQTTConnellError) in paho-mqtt 1.x and 2.x
-                logger.warning("Space MQTT _on_connect fired: rc=%s", reason_code)
                 if reason_code == 0:
                     radar_topic = settings.space_mqtt_radar_topic
                     if radar_topic:
@@ -256,18 +254,21 @@ class SpaceMqttListener:
                     )
 
             def _on_disconnect(client, _userdata, rc, _properties=None):
-                logger.warning("Space MQTT _on_disconnect fired: rc=%s", rc)
-                if rc != 0 and self._enabled:
+                if rc != 0:
+                    logger.warning("Space MQTT _on_disconnect: rc=%s", rc)
+                    if self._enabled:
 
-                    def _scheduled_reconnect():
-                        logger.warning("Space MQTT scheduling reconnect in 5s...")
-                        time.sleep(5)
-                        try:
-                            client.reconnect()
-                        except Exception as exc:
-                            logger.error("Space MQTT reconnect failed: %s", exc)
+                        def _scheduled_reconnect():
+                            logger.warning("Space MQTT scheduling reconnect in 5s...")
+                            time.sleep(5)
+                            try:
+                                client.reconnect()
+                            except Exception as exc:
+                                logger.error("Space MQTT reconnect failed: %s", exc)
 
-                    threading.Thread(target=_scheduled_reconnect, daemon=True).start()
+                        threading.Thread(target=_scheduled_reconnect, daemon=True).start()
+                else:
+                    logger.info("Space MQTT _on_disconnect: rc=%s (clean)", rc)
 
             def _on_message(_client, _userdata, message):
                 logger.debug("Space MQTT _on_message fired: topic=%s", message.topic)

@@ -1739,6 +1739,13 @@ If no action needed, return empty recommendations array.
             next_entry = schedule[0]
             next_change = next_entry.get("start", "unknown") if isinstance(next_entry, dict) else str(next_entry)
 
+        # Dynamic health thresholds — site-aware, never hardcode
+        from app.services.health_threshold_service import get_health_thresholds
+
+        _thresholds = get_health_thresholds(site_id=None)
+        _health_healthy = _thresholds.get("healthy", 85)
+        _health_warning = _thresholds.get("warning", 65)
+
         intents = {
             "cost_saving": """
 ACTIVE PROFILE: COST SAVING
@@ -1750,7 +1757,8 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 - AHU running at >80% speed during mild outdoor conditions (<20°C)
 - BESS SOC < 40% before a peak tariff window (pre-charge opportunity)
 - BESS SOC > 85% during off-peak with peak window >2h away AND no loadshedding forecast in next 4h (preserve SOC for outage)
-- Chiller setpoint below 9°C during unoccupied hours — raise to 9°C minimum (freeze protection floor: never below the site-configured min, default 5°C)
+- Chiller setpoint below 9°C during unoccupied hours → raise to 9°C
+  (freeze protection floor: 5°C absolute minimum enforced by safety engine)
 - Any zone conditioning empty floor for >15 minutes (FCU running unnecessary)
 - Demand approaching NMD limit (current kW > 85% of NMD equivalent)
 - Peak tariff window starting within 90 minutes (pre-action opportunity)
@@ -1759,7 +1767,13 @@ Every recommendation must state ZAR saving using:
 - Energy: kW_saved × hours × current_tariff_rate
 - Demand: kVA_reduced × R155.50/kVA/month
 
-NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
+CHECKLIST ENFORCEMENT:
+If you return zero recommendations, your no_action_reasons MUST
+explicitly confirm each trigger condition above was checked and
+cite the actual telemetry value. "Building is optimal" is not acceptable.
+
+# cost_saving:
+Minimum confidence to recommend: 0.60
 """,
             "comfort": """
 ACTIVE PROFILE: COMFORT FIRST
@@ -1776,24 +1790,38 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 Comfort is non-negotiable. Energy cost is secondary.
 Do not recommend setpoint relaxation in occupied zones.
 
-NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
+CHECKLIST ENFORCEMENT:
+If you return zero recommendations, your no_action_reasons MUST
+explicitly confirm each trigger condition above was checked and
+cite the actual telemetry value. "Building is optimal" is not acceptable.
+
+# comfort:
+Minimum confidence to recommend: 0.55
 """,
-            "asset_preservation": """
+            "asset_preservation": f"""
 ACTIVE PROFILE: ASSET PRESERVATION
 Primary objective: Protect equipment health and extend service life.
 
 MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
-- Any equipment health score < 85% running at >70% capacity (reduce load)
+- Any equipment health score < {_health_healthy}% running at >70% capacity (reduce load)
 - AHU or chiller running continuously for >12 hours (cycling rest recommended)
 - Equipment in warning state running at full speed/capacity
-- Chiller starts/stops >4 times in past hour (cycling stress)
+- Chiller starts >4 times in past hour (compressor cycling stress —
+  safety engine minimum runtime: 5 min between starts)
+- VAV damper below 20% minimum airflow (ventilation safety floor)
 - Any pump or fan operating outside design flow range
 - BESS discharge depth >80% in a single cycle (battery degradation risk)
 
 Every recommendation must state the asset protection benefit:
 reduced wear, extended service interval, or deferred failure probability.
 
-NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
+CHECKLIST ENFORCEMENT:
+If you return zero recommendations, your no_action_reasons MUST
+explicitly confirm each trigger condition above was checked and
+cite the actual telemetry value. "Building is optimal" is not acceptable.
+
+# asset_preservation:
+Minimum confidence to recommend: 0.70
 """,
             "balanced": """
 ACTIVE PROFILE: BALANCED
@@ -1812,7 +1840,13 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 
 State both cost saving (ZAR) AND comfort impact (°C change) for each recommendation.
 
-NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
+CHECKLIST ENFORCEMENT:
+If you return zero recommendations, your no_action_reasons MUST
+explicitly confirm each trigger condition above was checked and
+cite the actual telemetry value. "Building is optimal" is not acceptable.
+
+# balanced:
+Minimum confidence to recommend: 0.65
 """,
         }
 
@@ -1835,13 +1869,6 @@ profile goal.
 
 One building assessment. One coordinated recommendation.
 Multiple adjustments if needed — but unified by a single insight.
-
-CONFIDENCE FLOOR — do not emit a recommendation with confidence below the active profile's floor:
-- COST_SAVING: minimum confidence 0.60 (cost rationale must be defensible)
-- COMFORT: minimum confidence 0.55 (comfort is time-sensitive, accept slightly lower)
-- ASSET_PRESERVATION: minimum confidence 0.70 (conservative — equipment risk is expensive)
-- BALANCED: minimum confidence 0.65
-If your analysis is below the floor for the active profile, return no recommendations and explain in `no_action_reasons`.
 """
 
         base_intent = intents.get(profile, intents["balanced"])

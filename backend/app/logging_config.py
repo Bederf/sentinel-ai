@@ -3,11 +3,13 @@
 Configures structured JSON file handlers for Promtail/Loki ingestion:
 - sentinel.audit    → /var/log/sentinel/security.log (security events)
 - sentinel.decisions → /var/log/sentinel/decisions.log (pipeline events)
+- Root logger → StreamHandler at configurable LOG_LEVEL (default: INFO)
 
 Falls back gracefully if /var/log/sentinel/ is not writable (e.g., local dev).
 """
 
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
@@ -31,17 +33,28 @@ def setup_logging() -> None:
     _setup_file_handler(
         logger_name="sentinel.audit",
         filename=log_dir / "security.log",
-        max_bytes=5 * 1024 * 1024,  # 5 MB  ← dev-appropriate cap
-        backup_count=3,  # 3 backups = 15 MB total per logger
+        max_bytes=5 * 1024 * 1024,
+        backup_count=3,
     )
 
     # sentinel.decisions → decisions.log
     _setup_file_handler(
         logger_name="sentinel.decisions",
         filename=log_dir / "decisions.log",
-        max_bytes=5 * 1024 * 1024,  # 5 MB  ← dev-appropriate cap
-        backup_count=3,  # 3 backups = 15 MB total per logger
+        max_bytes=5 * 1024 * 1024,
+        backup_count=3,
     )
+
+    # Root logger — configurable level, streams to stdout
+    root_log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+    _handler = logging.StreamHandler()
+    _handler.setLevel(getattr(logging, root_log_level, logging.INFO))
+    _handler.setFormatter(logging.Formatter("%(levelname)s:%(name)s:%(message)s"))
+    root_logger = logging.getLogger()
+    if not any(isinstance(h, logging.StreamHandler) for h in root_logger.handlers):
+        root_logger.addHandler(_handler)
+    root_logger.setLevel(getattr(logging, root_log_level, logging.INFO))
+    logging.getLogger(__name__).info("Root logger configured at %s via StreamHandler", root_log_level)
 
 
 def _get_writable_log_dir() -> Path | None:

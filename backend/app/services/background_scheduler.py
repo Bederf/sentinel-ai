@@ -404,7 +404,7 @@ class BackgroundSchedulerService:
             if elapsed < self._optimization_real_interval:
                 return
         self._last_optimization_sim_time = datetime.now()
-        logger.warning("[AI-OPT] Live site site-002 — running real-time optimization (30min interval)")
+        logger.info("[AI-OPT] Live site site-002 — running real-time optimization (30min interval)")
 
         self._run_optimization_analysis()
 
@@ -459,7 +459,7 @@ class BackgroundSchedulerService:
             logger.debug("Running periodic optimization analysis...")
 
             # Live site — HVAC comfort recs are allowed 24/7 per user mandate
-            logger.warning("[AI-OPT] Live site site-002 — HVAC comfort recs ACTIVE 24/7")
+            logger.info("[AI-OPT] Live site site-002 — HVAC comfort recs ACTIVE 24/7")
 
             from app.core.site_resolver import get_registered_site_ids
             from app.database.repositories.recommendation_repository import (
@@ -680,12 +680,10 @@ class BackgroundSchedulerService:
                         logger.warning(f"[GATE] Could not load urgent work orders: {_wo_err}")
 
                     recs_len = len(optimization_result.recommendations)
-                    logger.warning(
-                        "[AI-OPT DEBUG] recs count=%d, recs=%s", recs_len, optimization_result.recommendations
-                    )
+                    logger.info("[AI-OPT DEBUG] recs count=%d, recs=%s", recs_len, optimization_result.recommendations)
 
                     if not optimization_result.recommendations:
-                        logger.warning(f"[AI-OPT] {site_id}: 0 recommendations (building at optimal)")
+                        logger.info(f"[AI-OPT] {site_id}: 0 recommendations (building at optimal)")
                         continue
 
                     # Validate recommendations
@@ -797,6 +795,7 @@ class BackgroundSchedulerService:
                             timeout=30
                         )
                         created_count += 1
+                        existing_maint_keys.add(dedup_key)
 
                     if not control_recs:
                         logger.info(f"[AI-OPT] {site_id}: all recs were maintenance, skipping validation")
@@ -826,8 +825,8 @@ class BackgroundSchedulerService:
                     allowed_count = sum(
                         1 for vr in validation.get("validation_results", []) if vr.get("allowed", False)
                     )
-                    logger.warning("[AI-OPT DEBUG] validation allowed_keys count=%d", allowed_count)
-                    logger.warning(f"[AI-OPT DEBUG] validation results={validation.get('validation_results', [])}")
+                    logger.info("[AI-OPT DEBUG] validation allowed_keys count=%d", allowed_count)
+                    logger.info(f"[AI-OPT DEBUG] validation results={validation.get('validation_results', [])}")
 
                     # Build set of individually-allowed recommendations
                     # (top-level "allowed" is an AND — one failure blocks all)
@@ -890,7 +889,7 @@ class BackgroundSchedulerService:
                         if not rec_action_type:
                             rec_action_type = "ai_optimization"
 
-                        logger.warning(
+                        logger.info(
                             "[AI-OPT DEBUG] Processing rec: equipment=%s, action_type=%r, point=%r",
                             equipment_id,
                             rec_action_type,
@@ -3209,6 +3208,58 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.debug(f"Telegram session cleanup: {e}")
 
+    def add_notification_queue_job(self, interval_seconds: int = 10):
+        """
+        Add a job to process the notification queue.
+
+        Phase 228: Decouples CLI execution from API response time.
+        Picks up pending notifications and sends them via sentry CLI.
+        """
+        if self.scheduler.get_job("process_notification_queue"):
+            self.scheduler.remove_job("process_notification_queue")
+            logger.info("Removed existing notification queue job")
+
+        self.scheduler.add_job(
+            func=self._process_notification_queue,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="process_notification_queue",
+            name="Process Notification Queue",
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info(f"Added notification queue job with {interval_seconds}s interval")
+
+    @track_job_metrics("process_notification_queue")
+    def _process_notification_queue(self):
+        """Process pending notification queue entries."""
+        try:
+            from app.api.metrics import sentinel_notification_queue_depth
+            from app.services.sentry_integration.alert_notifier import alert_notifier
+
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(self._run_queue_worker(alert_notifier), self._main_loop)
+                sent, failed = future.result(timeout=180)
+            else:
+                logger.warning("Main event loop not available, skipping notification queue")
+                sent, failed = 0, 0
+
+            if sent > 0 or failed > 0:
+                logger.info("Notification queue: %d sent, %d failed", sent, failed)
+
+            # Report queue depth for monitoring
+            try:
+                depth = alert_notifier._queue_service.depth()
+                sentinel_notification_queue_depth.set(depth)
+            except Exception:
+                pass
+
+        except Exception as e:
+            logger.error("Failed to process notification queue: %s", e)
+
+    async def _run_queue_worker(self, alert_notifier):
+        """Run the queue worker in the main event loop."""
+        return await alert_notifier.process_queue()
+
     def add_fire_pump_compliance_job(self, interval_seconds: int = 86400) -> None:
         """
         Add a daily job to check fire pump compliance and emit overdue alerts.
@@ -4271,7 +4322,7 @@ class BackgroundSchedulerService:
         from app.services.health_snapshot_service import HealthSnapshotService
 
         site_repo = SiteRepository()
-        sites = site_repo.get_all()
+        sites = await site_repo.get_all()
 
         if not sites:
             logger.debug("[HEALTH-SNAP] No registered sites found")
@@ -5792,7 +5843,7 @@ def _run_daily_health_sweep_sync():
 
         # Get sites in onboarding phases that need active monitoring
         active_phases = ["advisory", "supervised"]
-        all_sites = repo.get_all()
+        all_sites = await repo.get_all()
         target_sites = [s for s in all_sites if s.get("onboarding_phase", "").lower() in active_phases]
 
         if not target_sites:
@@ -5969,7 +6020,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 from app.database.repositories.alert_repository import AlertRepository
 
                 alert_repo = AlertRepository()
-                all_alerts = alert_repo.get_all(status="active", site_id=site_uuid)
+                all_alerts = await alert_repo.get_all(status="active", site_id=site_uuid)
                 if all_alerts:
                     alert_count = len(all_alerts)
                     critical_alerts = [

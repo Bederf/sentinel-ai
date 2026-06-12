@@ -113,6 +113,7 @@ class RoomsEmailIntakeService:
 
         try:
             from app.api.block_bookings import BookingEmailRequest
+            from app.models.booking_record import BlockBookingConfig
             from app.services.block_booking_detector.booking_store import get_booking_store
             from app.services.block_booking_detector.email_parser import (
                 extract_cancelled_room,
@@ -145,7 +146,8 @@ class RoomsEmailIntakeService:
 
             if record:
                 store.save_booking(record)
-                alerts = detect_overlaps(record, store)
+                config = BlockBookingConfig(site_id=request.site_id)
+                alerts = detect_overlaps(request.site_id, [record], config, store)
                 for alert in alerts:
                     notify_result = send_block_booking_alert(alert, store)
                     store.save_block_booking_alert(alert, notify_result)
