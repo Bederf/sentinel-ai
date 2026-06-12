@@ -14,9 +14,10 @@ Site-scoped routing is enforced at query time via technician.site_id.
 
 from __future__ import annotations
 
+import hmac
 import logging
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from app.config.settings import settings
@@ -192,17 +193,19 @@ class TelegramUpdate(BaseModel):
 
 
 async def verify_telegram_signature(request: Request, bot_token: str | None = None) -> bool:
-    """Verify request came from our Telegram bot using HMAC signature."""
-    if not bot_token:
-        bot_token = settings.telegram_bot_token
-    if not bot_token:
+    """Verify request came from Telegram via the X-Telegram-Bot-Api-Secret-Token header.
+
+    Fails closed: if TELEGRAM_SECRET_TOKEN is not configured, all requests are
+    rejected. The webhook must be registered with setWebhook(secret_token=...)
+    using the same value before this endpoint will accept traffic.
+    """
+    expected = settings.telegram_secret_token
+    if not expected:
+        logger.error("TELEGRAM_SECRET_TOKEN not configured — rejecting webhook request")
         return False
 
-    # Telegram signs requests using HMAC-SHA256 of bot token + body + timestamp
-    # For simplicity we verify via the X-Telegram-Bot-Api-Secret-Token header (recommended approach)
-    secret_token = request.headers.get("x-telegram-bot-api-secret-token")
-    expected = settings.telegram_secret_token or "dev-secret"  # Configure separate secret
-    return secret_token == expected
+    secret_token = request.headers.get("x-telegram-bot-api-secret-token") or ""
+    return hmac.compare_digest(secret_token, expected)
 
 
 @router.post("/webhook")
@@ -216,6 +219,9 @@ async def telegram_webhook(request: Request):
     if not settings.telegram_bot_token:
         logger.warning("telegram_bot_token not configured — ignoring webhook")
         return {"ok": True}
+
+    if not await verify_telegram_signature(request):
+        raise HTTPException(status_code=403, detail="Invalid webhook secret")
 
     try:
         body = await request.json()
@@ -257,6 +263,40 @@ async def telegram_webhook(request: Request):
 
             sender = get_telegram_sender()
             await _handle_create_wo_from_rec(chat_id, rec_uuid, sender)
+            return {"ok": True}
+
+        # Handle "Approve" button on supervised mode advisory notifications
+        if data.startswith("approve:rec_id:"):
+            rec_uuid = data.split(":")[-1]
+            from app.database.repositories.recommendation_repository import RecommendationRepository
+            from app.services.approval_service import get_approval_service
+            from app.services.telegram_message_sender import get_telegram_sender
+
+            sender = get_telegram_sender()
+            repo = RecommendationRepository()
+            rec = await repo.get_by_id(rec_uuid)
+            if not rec:
+                await sender.send_text(chat_id, "Recommendation not found.")
+                return {"ok": True}
+
+            approval_svc = get_approval_service()
+            result = await approval_svc.execute_approval(
+                recommendation_id=rec_uuid,
+                approved_by=f"telegram:{chat_id}",
+                approval_notes="Approved via Telegram advisory notification",
+            )
+
+            equip = rec.target_equipment or "Equipment"
+            if result.success:
+                msg = (
+                    f"✅ *Approved — {equip}*\n"
+                    f"Adjustment applied automatically via BACnet.\n"
+                    f"Outcome will be verified in ~30 minutes."
+                )
+            else:
+                msg = f"❌ *Approval failed — {equip}*\n{result.error_message or 'Unknown error'}"
+
+            await sender.send_text(chat_id, msg, parse_mode="Markdown")
             return {"ok": True}
 
         # Handle menu navigation buttons from inline keyboards

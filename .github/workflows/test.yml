@@ -10,7 +10,6 @@ jobs:
   frontend-tests:
     name: Frontend Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: ./frontend
@@ -55,7 +54,6 @@ jobs:
   backend-tests:
     name: Backend Tests
     runs-on: ubuntu-latest
-    continue-on-error: true
     defaults:
       run:
         working-directory: ./backend
@@ -72,16 +70,23 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest pytest-asyncio pytest-cov pytest-mock
-          pip install -r requirements.txt 2>/dev/null || true
+          pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout
+          pip install -r requirements.txt 2>/dev/null || pip install -r requirements.txt --ignore-requires-python 2>/dev/null || true
 
       - name: Check for circular imports
         run: |
-          python -m pytest tests/test_import_cycles.py -v || echo "SKIP: import check requires full deps"
+          python -m pytest tests/test_import_cycles.py -v
 
       - name: Run unit tests
+        # Excludes: integration (needs live Supabase), performance/slow (resource-heavy)
+        # These are run separately in the nightly integration pipeline.
         run: |
-          python -m pytest tests/ -v --cov=app --cov-report=xml --cov-report=html || echo "SKIP: tests require full deps"
+          python -m pytest tests/ \
+            -m "not integration and not performance and not slow" \
+            --ignore=tests/integration \
+            --ignore=tests/load \
+            -v --cov=app --cov-report=xml --cov-report=html \
+            --timeout=30
         env:
           TESTING: "true"
           JWT_SECRET_KEY: "test-only-jwt-secret-for-ci-at-least-32-chars"

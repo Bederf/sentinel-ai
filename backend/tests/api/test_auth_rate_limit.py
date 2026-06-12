@@ -238,7 +238,15 @@ class TestLoginEndpointRateLimiting:
 
     def test_login_allows_valid_user(self, client):
         """Verify valid user login succeeds."""
-        response = client.post("/api/auth/login", params={"email": "admin@sentinel.bms"})
+        user = {
+            "user_id": "test-admin-id",
+            "email": "admin@sentinel.bms",
+            "full_name": "Admin User",
+            "role": "admin",
+            "is_active": True,
+        }
+        with patch.object(auth_api._user_repo, "get_user_by_email", return_value=user):
+            response = client.post("/api/auth/login", params={"email": "admin@sentinel.bms"})
         assert response.status_code in [200, 429]  # 200 success, 429 if hit rate limit
         if response.status_code == 200:
             data = response.json()
@@ -361,10 +369,11 @@ class TestIntegrationScenarios:
         _patch_tracker.record_successful_login.assert_not_called()
         # Counter reset on successful login is not yet implemented.
 
-    def test_lockout_message_is_informative(self):
+    def test_lockout_message_is_informative(self, _patch_tracker):
         """Verify lockout error message tells user when they can retry."""
         from fastapi import HTTPException
 
+        _patch_tracker.is_locked_out.return_value = True
         with pytest.raises(HTTPException) as exc_info:
             auth_api._check_brute_force("test-message@example.com")
 

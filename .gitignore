@@ -35,6 +35,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.supabase-real
+*.env.supabase-real
 # Encrypted secrets ARE safe to commit
 !*.env.enc
 !.env.*.enc
