@@ -1,12 +1,18 @@
 """
 Concept Evolution CAFM Integration API
 
-Exposes Concept job card and asset data for health/condition assessment.
+Exposes Concept job card and asset data for health/condition assessment,
+and provides the controlled document upload endpoint (F1-F8 enforced).
 """
 
+from __future__ import annotations
+
 import json
+from datetime import date
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from pydantic import BaseModel, Field, model_validator
 
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
@@ -15,6 +21,323 @@ from app.services.simbiot_service import simbiot_service
 
 router = APIRouter(prefix="/api/concept", tags=["concept-cafm"])
 
+# ---------------------------------------------------------------------------
+# F1-F8 Controlled field values
+# Source: Concept MRI Controlled Fields Register v1.0 — March 2026
+# ---------------------------------------------------------------------------
+
+DISCIPLINE_VALUES = Literal[
+    "Electrical",
+    "Mechanical / HVAC",
+    "Plumbing",
+    "Fire Equipment",
+    "Fire Detection",
+    "Lifts & Escalators",
+    "Structural",
+    "Civil",
+    "Environmental",
+    "Health & Safety",
+    "Contracts & Legal",
+    "Project Management",
+    "General / Administration",
+]
+
+DOCUMENT_TYPE_VALUES = Literal[
+    "Checklist",
+    "Service Report",
+    "Test Result",
+    "Certificate",
+    "Warranty / Guarantee",
+    "Compliance Report",
+    "Register",
+    "Drawing / Plan",
+    "Contract / Agreement",
+    "Permit / Licence",
+    "Incident Report",
+    "Meeting Minutes",
+    "Photograph / Evidence",
+    "Other",
+]
+
+FREQUENCY_VALUES = Literal[
+    "Daily",
+    "Weekly",
+    "Monthly",
+    "Biannual (6-monthly)",
+    "Annual",
+    "2-Yearly",
+    "3-Yearly",
+    "Once-off / Ad hoc",
+    "Project-based",
+]
+
+TRIGGER_TYPE_VALUES = Literal[
+    "Same as Document Creation Date",
+    "Certificate / Permit Expiry Date",
+    "Equipment Decommission Date",
+    "Building Demolition / Disposal Date",
+    "Lease Termination Date",
+    "Installation Decommission Date",
+    "Vessel Decommission Date",
+    "Tank Decommission Date",
+    "Date Survey Issued",
+    "Date of Incident",
+]
+
+# Trigger types that require a trigger_date — Vital records only
+VITAL_TRIGGER_TYPES: set[str] = {
+    "Certificate / Permit Expiry Date",
+    "Equipment Decommission Date",
+    "Building Demolition / Disposal Date",
+    "Lease Termination Date",
+    "Installation Decommission Date",
+    "Vessel Decommission Date",
+    "Tank Decommission Date",
+    "Date Survey Issued",
+    "Date of Incident",
+}
+
+
+class ConceptDocumentUploadMetadata(BaseModel):
+    """
+    F1-F8 controlled upload fields — Concept MRI Controlled Fields Register v1.0.
+
+    All mandatory fields must be provided. The chat UI collects these
+    conversationally via dropdowns before submitting the upload.
+
+    F7 (uploaded_by) is auto-populated from the authenticated user session.
+    F8 (retention_period) is auto-calculated server-side — not submitted by the user.
+    """
+
+    # F1 — Site ID (SENTINEL canonical identifier, not the Concept building name)
+    site_id: str = Field(..., description="SENTINEL site_id e.g. site-002")
+
+    # F2 — Discipline
+    discipline: DISCIPLINE_VALUES = Field(
+        ..., description="Technical discipline — F2 controlled dropdown"
+    )
+
+    # F3 — Document Type
+    document_type: DOCUMENT_TYPE_VALUES = Field(
+        ..., description="Document classification — F3 controlled dropdown"
+    )
+
+    # F4 — Frequency
+    frequency: FREQUENCY_VALUES = Field(
+        ..., description="Inspection / service frequency — F4 controlled dropdown"
+    )
+
+    # F5 — Document Creation Date (actual activity date, NOT upload timestamp)
+    document_creation_date: date = Field(
+        ...,
+        description=(
+            "Date the activity occurred — F5. "
+            "This is the retention clock start. Must not default to today."
+        ),
+    )
+
+    # F6 — Trigger Type + Trigger Date (Vital records only)
+    trigger_type: TRIGGER_TYPE_VALUES = Field(
+        default="Same as Document Creation Date",
+        description="Retention trigger type — F6",
+    )
+    trigger_date: date | None = Field(
+        default=None,
+        description=(
+            "Required when trigger_type is a lifecycle-event (Vital records). "
+            "Leave null when trigger_type is 'Same as Document Creation Date'."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_trigger_date(self) -> ConceptDocumentUploadMetadata:
+        """Trigger date is required for Vital records."""
+        if self.trigger_type in VITAL_TRIGGER_TYPES and self.trigger_date is None:
+            raise ValueError(
+                f"trigger_date is required when trigger_type is '{self.trigger_type}'. "
+                "This is a Vital record — the retention clock starts on a future lifecycle event."
+            )
+        return self
+
+
+# ---------------------------------------------------------------------------
+# Dropdown fields endpoint — chat UI fetches this to build the form
+# ---------------------------------------------------------------------------
+
+@router.get("/documents/fields")
+async def get_document_upload_fields():
+    """
+    Return approved dropdown values for the document upload form (F1-F8).
+
+    The chat UI calls this to build the conversational upload flow.
+    Values are sourced from the Concept MRI Controlled Fields Register v1.0.
+    """
+    return {
+        "discipline": [
+            "Electrical",
+            "Mechanical / HVAC",
+            "Plumbing",
+            "Fire Equipment",
+            "Fire Detection",
+            "Lifts & Escalators",
+            "Structural",
+            "Civil",
+            "Environmental",
+            "Health & Safety",
+            "Contracts & Legal",
+            "Project Management",
+            "General / Administration",
+        ],
+        "document_type": [
+            "Checklist",
+            "Service Report",
+            "Test Result",
+            "Certificate",
+            "Warranty / Guarantee",
+            "Compliance Report",
+            "Register",
+            "Drawing / Plan",
+            "Contract / Agreement",
+            "Permit / Licence",
+            "Incident Report",
+            "Meeting Minutes",
+            "Photograph / Evidence",
+            "Other",
+        ],
+        "frequency": [
+            "Daily",
+            "Weekly",
+            "Monthly",
+            "Biannual (6-monthly)",
+            "Annual",
+            "2-Yearly",
+            "3-Yearly",
+            "Once-off / Ad hoc",
+            "Project-based",
+        ],
+        "trigger_type": [
+            "Same as Document Creation Date",
+            "Certificate / Permit Expiry Date",
+            "Equipment Decommission Date",
+            "Building Demolition / Disposal Date",
+            "Lease Termination Date",
+            "Installation Decommission Date",
+            "Vessel Decommission Date",
+            "Tank Decommission Date",
+            "Date Survey Issued",
+            "Date of Incident",
+        ],
+        "vital_trigger_types": sorted(VITAL_TRIGGER_TYPES),
+        "notes": {
+            "document_creation_date": (
+                "The actual date the activity occurred — inspection date, "
+                "service completion date, test date. NOT the upload date."
+            ),
+            "trigger_date": (
+                "Only required for Vital records (lifecycle-event trigger types). "
+                "Leave blank for standard operational records."
+            ),
+            "uploaded_by": "Auto-populated from your logged-in account. No manual entry.",
+            "retention_period": "Auto-calculated from discipline + document_type + frequency.",
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Document upload — F1-F8 enforced
+# ---------------------------------------------------------------------------
+
+@router.post("/documents/upload")
+async def upload_concept_document(
+    file: UploadFile = File(...),
+    metadata_json: str = Form(..., description="ConceptDocumentUploadMetadata as JSON string"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+):
+    """
+    Upload a document with mandatory F1-F8 controlled fields.
+
+    The chat UI collects all fields conversationally before calling this endpoint.
+    metadata_json must be a valid ConceptDocumentUploadMetadata JSON object.
+
+    F7 (uploaded_by) is injected server-side from the authenticated session.
+    F8 (retention_period) is calculated server-side — not accepted from the client.
+    """
+    # Parse and validate against controlled schema
+    try:
+        raw = json.loads(metadata_json)
+        metadata = ConceptDocumentUploadMetadata.model_validate(raw)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Document metadata failed validation: {exc}",
+        ) from exc
+
+    # Build full payload — F7 injected here, F8 calculated here
+    payload = {
+        "site_id": metadata.site_id,
+        "discipline": metadata.discipline,
+        "document_type": metadata.document_type,
+        "frequency": metadata.frequency,
+        "document_creation_date": metadata.document_creation_date.isoformat(),
+        "trigger_type": metadata.trigger_type,
+        "trigger_date": metadata.trigger_date.isoformat() if metadata.trigger_date else None,
+        # F7 — auto from session, no manual entry
+        "uploaded_by_user_id": auth.user_id,
+        # F8 — server-side calculation placeholder
+        # TODO: wire to retention rule engine once confirmed feasible with Concept vendor
+        "retention_period": _calculate_retention(
+            discipline=metadata.discipline,
+            document_type=metadata.document_type,
+            frequency=metadata.frequency,
+        ),
+    }
+
+    file_bytes = await file.read()
+    try:
+        result = await simbiot_service.upload_document(
+            file_bytes=file_bytes,
+            filename=file.filename or "upload.bin",
+            site_id=metadata.site_id,
+            metadata=payload,
+        )
+        return {"status": "ok", "site_id": metadata.site_id, "result": result}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Concept upload failed: {exc}") from exc
+
+
+def _calculate_retention(discipline: str, document_type: str, frequency: str) -> str:
+    """
+    Derive retention period from discipline + document_type + frequency.
+    Source: Concept MRI Controlled Fields Register — Retention Rules sheet.
+
+    Returns a human-readable string. Full rule engine pending vendor confirmation
+    of auto-calculation feasibility in Concept (action A4).
+    """
+    if document_type == "Compliance Report" and discipline == "Health & Safety":
+        return "40 years from date survey issued"
+
+    if document_type in {"Certificate", "Warranty / Guarantee", "Permit / Licence"}:
+        return "Lifecycle event + 5 years (Vital record)"
+
+    if document_type in {"Drawing / Plan", "Contract / Agreement"}:
+        return "Building demolition / lease termination + 10 years (Vital record)"
+
+    if frequency == "Weekly":
+        return "3 years"
+
+    if frequency == "2-Yearly":
+        return "10 years"
+
+    if document_type == "Incident Report":
+        return "5 years from date of incident"
+
+    # Default for most operational records
+    return "5 years"
+
+
+# ---------------------------------------------------------------------------
+# Existing endpoints — unchanged
+# ---------------------------------------------------------------------------
 
 @router.get("/health")
 async def get_integration_health():
@@ -24,40 +347,8 @@ async def get_integration_health():
         "job_cards_loaded": len(concept_loader.job_cards),
         "assets_loaded": len(concept_loader.assets),
         "data_source": "concept_evolution",
-        "last_sync": "2026-01-29T00:00:00Z",  # Would be actual sync time
+        "last_sync": "2026-01-29T00:00:00Z",
     }
-
-
-@router.post("/documents/upload")
-async def upload_concept_document(
-    file: UploadFile = File(...),
-    site_id: str = Form(...),
-    metadata_json: str = Form("{}"),
-    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
-):
-    """Upload a document to site-network Concept storage."""
-    try:
-        metadata = json.loads(metadata_json or "{}")
-        if not isinstance(metadata, dict):
-            raise ValueError("metadata_json must be a JSON object")
-    except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Invalid metadata_json: {exc}") from exc
-
-    payload = {
-        **metadata,
-        "uploaded_by_user_id": auth.user_id,
-    }
-    file_bytes = await file.read()
-    try:
-        result = await simbiot_service.upload_document(
-            file_bytes=file_bytes,
-            filename=file.filename or "upload.bin",
-            site_id=site_id,
-            metadata=payload,
-        )
-        return {"status": "ok", "site_id": site_id, "result": result}
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Concept upload failed: {exc}") from exc
 
 
 @router.get("/assets")
@@ -146,16 +437,10 @@ async def get_asset(asset_code: str):
 
 @router.get("/assets/{asset_code}/health")
 async def get_asset_health(asset_code: str):
-    """
-    Get comprehensive health assessment for an asset.
-
-    Combines condition score, work order history, PPM compliance,
-    age factors, and technician warnings into a single health score.
-    """
+    """Get comprehensive health assessment for an asset."""
     health = concept_loader.calculate_health_score(asset_code)
     if "error" in health:
         raise HTTPException(status_code=404, detail=health["error"])
-
     return health
 
 
@@ -166,8 +451,6 @@ async def get_asset_job_cards(
 ):
     """Get job card history for an asset."""
     job_cards = concept_loader.get_job_cards_for_asset(asset_code)
-
-    # Sort by logged date descending
     job_cards.sort(key=lambda x: x.logged_date or "", reverse=True)
 
     return {
@@ -226,7 +509,6 @@ async def get_job_cards(
     if warnings_only:
         job_cards = [jc for jc in job_cards if jc.has_warning_flags]
 
-    # Sort by logged date descending
     job_cards.sort(key=lambda x: x.logged_date or "", reverse=True)
 
     return {
@@ -253,14 +535,8 @@ async def get_job_cards(
 
 @router.get("/at-risk")
 async def get_assets_at_risk():
-    """
-    Get all assets with health score below 60.
-
-    These assets need attention based on condition, repeat calls,
-    age, and technician warnings.
-    """
+    """Get all assets with health score below 60."""
     at_risk = concept_loader.get_assets_at_risk()
-
     return {"total_at_risk": len(at_risk), "assets": at_risk}
 
 
@@ -268,10 +544,8 @@ async def get_assets_at_risk():
 async def get_site_summary(site_code: str):
     """Get health summary for all assets in a building."""
     summary = concept_loader.get_site_summary(site_code)
-
     if "error" in summary:
         raise HTTPException(status_code=404, detail=summary["error"])
-
     return summary
 
 
@@ -281,7 +555,6 @@ async def get_concept_stats():
     job_cards = concept_loader.job_cards
     assets = concept_loader.assets
 
-    # Calculate stats
     total_cost = sum(jc.total_cost for jc in job_cards)
     repeat_calls = len([jc for jc in job_cards if jc.repeat_call])
     sla_failures = len([jc for jc in job_cards if not jc.sla_met])
@@ -289,14 +562,12 @@ async def get_concept_stats():
     poor_condition = len([a for a in assets if a.condition_score < 50])
     beyond_life = len([a for a in assets if a.is_beyond_life])
 
-    # Cost by category
-    cost_by_category = {}
+    cost_by_category: dict[str, float] = {}
     for jc in job_cards:
         cat = jc.asset_category
         cost_by_category[cat] = cost_by_category.get(cat, 0) + jc.total_cost
 
-    # Priority distribution
-    priority_dist = {}
+    priority_dist: dict[str, int] = {}
     for jc in job_cards:
         priority_dist[jc.priority] = priority_dist.get(jc.priority, 0) + 1
 
