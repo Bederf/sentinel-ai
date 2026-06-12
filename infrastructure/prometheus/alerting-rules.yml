@@ -206,6 +206,39 @@ groups:
           action: "Review label cardinality - plan for aggregation at 50+ sites."
 
   # ─────────────────────────────────────────────────────────────────────────────
+  # SCHEDULER HEALTH (Background Job Monitoring)
+  # ─────────────────────────────────────────────────────────────────────────────
+  - name: scheduler-health
+    interval: 60s
+    rules:
+      - alert: SchedulerJobSlow
+        expr: |
+          (
+            rate(sentinel_scheduler_job_duration_seconds_sum[15m])
+            /
+            rate(sentinel_scheduler_job_duration_seconds_count[15m])
+          ) > 300
+        for: 5m
+        labels:
+          severity: warning
+          category: system-health
+        annotations:
+          summary: "Scheduler job {{ $labels.job_name }} running slow"
+          description: "Job {{ $labels.job_name }} average duration {{ $value | humanizeDuration }} over 15min (threshold: 5m)."
+          action: "Check backend logs: sudo journalctl -u sentinel-backend | grep {{ $labels.job_name }}"
+
+      - alert: SchedulerJobStuck
+        expr: time() - sentinel_scheduler_job_duration_seconds_created > 1800
+        for: 5m
+        labels:
+          severity: warning
+          category: system-health
+        annotations:
+          summary: "Scheduler job {{ $labels.job_name }} stopped reporting"
+          description: "Job {{ $labels.job_name }} last ran {{ $value | humanizeDuration }} ago. Possible stuck or crashed job."
+          action: "Restart backend or check scheduler thread health."
+
+  # ─────────────────────────────────────────────────────────────────────────────
   # BRIDGE HEALTH (Dead Man's Switch)
   # ─────────────────────────────────────────────────────────────────────────────
   - name: bridge-health
