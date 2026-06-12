@@ -5881,7 +5881,7 @@ def _run_daily_health_sweep_sync():
                         from app.database.repositories.recommendation_repository import RecommendationRepository
 
                         repo_rec = RecommendationRepository()
-                        repo_rec.create(recommendation)
+                        await repo_rec.create(recommendation)
                     except Exception as rec_err:
                         logger.warning(f"[HEALTH-SWEEP] Failed to persist rec for {rec.get('equipment_id')}: {rec_err}")
                 total_recs += len(recs)

@@ -3,13 +3,14 @@
 import logging
 from typing import Any
 
+from app.database.repositories.base import SupabaseRepository
 from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.cache_service import cache
 
 logger = logging.getLogger(__name__)
 
 
-class RecommendationRepository:
+class RecommendationRepository(SupabaseRepository):
     """Repository for recommendation database operations."""
 
     _COLUMNS = (
@@ -46,22 +47,6 @@ class RecommendationRepository:
         "source",
         "source_type",
     }
-
-    def __init__(self):
-        self._client = None
-
-    @property
-    def client(self):
-        """Lazy load Supabase client."""
-        if self._client is None:
-            try:
-                from app.database.supabase_client import get_supabase_client
-
-                self._client = get_supabase_client()
-            except Exception as e:
-                logger.warning("Failed to get Supabase client for recommendations: %s", e)
-                self._client = None
-        return self._client
 
     def _filter_supabase_payload(self, rec_dict: dict[str, Any]) -> dict[str, Any]:
         """Drop model-only keys that do not exist in the live recommendations table."""
@@ -131,12 +116,13 @@ class RecommendationRepository:
         if exact:
             return token
 
-        if not self.client:
+        client = await self.get_client()
+        if not client:
             return ""
 
         try:
-            result = (
-                self.client.table("recommendations")
+            result = await (
+                client.table("recommendations")
                 .select("id,timestamp")
                 .order("timestamp", desc=True)
                 .limit(1000)
@@ -152,11 +138,12 @@ class RecommendationRepository:
 
     async def _supabase_insert(self, rec_dict: dict[str, Any]) -> dict[str, Any] | None:
         """Insert recommendation to Supabase."""
-        if not self.client:
+        client = await self.get_client()
+        if not client:
             return None
         try:
             payload = self._filter_supabase_payload(rec_dict)
-            result = self.client.table("recommendations").insert(payload).execute()
+            result = await client.table("recommendations").insert(payload).execute()
             if result.data and len(result.data) > 0:
                 cache.delete_pattern("recommendations:*")
                 return result.data[0]
@@ -167,10 +154,11 @@ class RecommendationRepository:
 
     async def _supabase_get(self, rec_id: str) -> dict[str, Any] | None:
         """Get recommendation from Supabase."""
-        if not self.client:
+        client = await self.get_client()
+        if not client:
             return None
         try:
-            result = self.client.table("recommendations").select(self._COLUMNS).eq("id", rec_id).execute()
+            result = await client.table("recommendations").select(self._COLUMNS).eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 return result.data[0]
             return None
@@ -185,16 +173,17 @@ class RecommendationRepository:
         limit: int,
     ) -> list[dict[str, Any]]:
         """Query recommendations from Supabase by status."""
-        if not self.client:
+        client = await self.get_client()
+        if not client:
             return []
         try:
-            result = (
-                self.client.table("recommendations")
+            result = await (
+                client.table("recommendations")
                 .select("*")
                 .eq("site_id", site_id)
                 .eq("status", status.value)
-                .eq("action_type", "ai_optimization")  # AI optimization recs only
-                .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
+                .eq("action_type", "ai_optimization")
+                .eq("shadow_mode", False)
                 .order("risk_level", desc=True)
                 .order("timestamp", desc=True)
                 .limit(limit)
@@ -207,11 +196,12 @@ class RecommendationRepository:
 
     async def _supabase_update(self, rec_id: str, rec_dict: dict[str, Any]) -> dict[str, Any] | None:
         """Update recommendation in Supabase."""
-        if not self.client:
+        client = await self.get_client()
+        if not client:
             return None
         try:
             payload = self._filter_supabase_payload(rec_dict)
-            result = self.client.table("recommendations").update(payload).eq("id", rec_id).execute()
+            result = await client.table("recommendations").update(payload).eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 cache.delete_pattern("recommendations:*")
                 return result.data[0]
@@ -228,16 +218,17 @@ class RecommendationRepository:
         limit: int,
     ) -> list[dict[str, Any]]:
         """Query historical recommendations from Supabase with filters."""
-        if not self.client:
+        client = await self.get_client()
+        if not client:
             return []
         try:
             query = (
-                self.client.table("recommendations")
+                client.table("recommendations")
                 .select("*")
                 .eq("site_id", site_id)
-                .eq("action_type", "ai_optimization")  # AI optimization recs only
+                .eq("action_type", "ai_optimization")
                 .neq("status", "pending")
-                .eq("shadow_mode", False)  # Exclude shadow-mode recs from UI
+                .eq("shadow_mode", False)
                 .order("timestamp", desc=True)
                 .limit(limit)
             )
@@ -245,7 +236,7 @@ class RecommendationRepository:
                 query = query.eq("status", status_filter)
             if risk_level_filter:
                 query = query.eq("risk_level", risk_level_filter)
-            result = query.execute()
+            result = await query.execute()
             return result.data or []
         except Exception as e:
             logger.error("Supabase history query failed: %s", e)
