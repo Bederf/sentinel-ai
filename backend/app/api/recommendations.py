@@ -14,9 +14,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from app.database.repositories.site_repository import SiteRepository
-from app.middleware.auth_middleware import require_site_access
+from app.middleware.auth_middleware import require_auth, require_site_access
 from app.middleware.rate_limiter import limiter
-from app.models.auth import AuthContext
+from app.models.auth import AuthContext, AuthLevel
 from app.services.recommendation_service import get_recommendation_service
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
@@ -178,7 +178,11 @@ async def get_recommendation_history(
 
 @limiter.limit("15/minute")
 @router.post("")
-async def create_recommendation(req: Request, request: CreateRecommendationRequest):
+async def create_recommendation(
+    req: Request,
+    request: CreateRecommendationRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
     """Create a new recommendation.
 
     The recommendation will be auto-executed or placed in approval queue
@@ -252,6 +256,7 @@ async def approve_recommendation(
     rec_id: str,
     request: Request,
     body: ApproveRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
 ):
     """Approve recommendation (Tier 2).
 
@@ -348,6 +353,7 @@ async def reject_recommendation(
     rec_id: str,
     request: Request,
     body: RejectRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
 ):
     """Reject recommendation (Tier 2).
 

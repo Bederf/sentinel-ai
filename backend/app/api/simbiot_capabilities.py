@@ -8,9 +8,11 @@ from __future__ import annotations
 
 import contextlib
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.site_resolver import get_registered_site_ids
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 from app.services.simbiot import BmsConnectionConfig, create_bms_adapter
 from app.services.simbiot_capability_sync_service import sync_site_capabilities_to_supabase
 
@@ -152,6 +154,7 @@ async def sync_site_capabilities(
 async def sync_all_registered_sites_capabilities(
     bms_vendor: str = Query("bacnet", description="BMS vendor/adapter alias"),
     commissioning: bool = Query(True, description="Allow onboarding-time capability discovery"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
 ) -> dict:
     """Backfill all registered sites using currently configured adapter defaults."""
     site_ids = get_registered_site_ids()

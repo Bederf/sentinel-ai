@@ -136,31 +136,30 @@ class WorkOrderEscalationRequest(BaseModel):
     notes: str | None = None  # Additional escalation notes
 
 
-@router.get("/work-orders", response_model=list[WorkOrderResponse])
+@router.get("/work-orders", response_model=list[dict])
 async def get_work_orders(
     site_id: str | None = Query(None, description="Filter by site ID"),
-    asset_id: str | None = Query(None, description="Filter by asset ID"),
     priority: str | None = Query(None, description="Filter by priority"),
-    repeat_only: bool = Query(False, description="Show only repeat calls"),
+    status: str | None = Query(None, description="Filter by status"),
     limit: int = Query(50, description="Maximum number of results"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
 ):
-    """Get work orders with optional filters."""
-    work_orders = WorkOrderData.load()
+    """Get work orders from Supabase with optional filters."""
+    from app.database.repositories.work_order_repository import get_work_order_repository
 
-    # Apply filters
-    if site_id:
-        work_orders = [wo for wo in work_orders if wo["site_id"] == site_id]
-    if asset_id:
-        work_orders = [wo for wo in work_orders if wo["asset_id"] == asset_id]
-    if priority:
-        work_orders = [wo for wo in work_orders if wo["priority"] == priority]
-    if repeat_only:
-        work_orders = [wo for wo in work_orders if wo["repeat_call"]]
+    try:
+        repo = get_work_order_repository()
+        work_orders = await repo.get_all_work_orders(limit=limit, status=status)
 
-    # Sort by date (most recent first)
-    work_orders.sort(key=lambda x: x["reported_date"] or datetime.min, reverse=True)
+        if site_id:
+            work_orders = [wo for wo in work_orders if wo.get("site_id") == site_id]
+        if priority:
+            work_orders = [wo for wo in work_orders if wo.get("priority") == priority]
 
-    return work_orders[:limit]
+        return work_orders
+    except Exception as e:
+        logger.error(f"Failed to list work orders: {e!s}")
+        raise HTTPException(status_code=500, detail="Failed to retrieve work orders")
 
 
 # ============================================================================

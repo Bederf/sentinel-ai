@@ -12,9 +12,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
+from app.middleware.auth_middleware import require_auth
+from app.models.auth import AuthContext, AuthLevel
 from app.services.site_adapter_manager import SiteAdapterManager
 from app.services.site_creation_service import SiteCreationService
 
@@ -43,7 +45,10 @@ router = APIRouter(prefix="/api/simbiot", tags=["simbiot"])
 
 
 @router.post("/sites")
-async def create_site(request: CreateSiteRequest):
+async def create_site(
+    request: CreateSiteRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
     """
     Create a new site with auto-generated or manual site code.
 
@@ -130,6 +135,7 @@ async def save_adapter_config(
     config: dict[str, Any],
     enabled: bool = True,
     poll_interval_seconds: int = Query(default=300, ge=60, le=3600),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
 ):
     """
     Save or update BMS adapter connection config for a site.
