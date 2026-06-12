@@ -216,6 +216,41 @@ sentinel_metrics_last_updated_timestamp = Gauge(
 )
 
 # ---------------------------------------------------------------------------
+# Scheduler job observability (Phase 226.1.3 — unknown scheduler risk)
+# ---------------------------------------------------------------------------
+
+# 16d. Scheduler job duration histogram
+sentinel_scheduler_job_duration_seconds = Histogram(
+    "sentinel_scheduler_job_duration_seconds",
+    "Duration of background scheduler job execution",
+    labelnames=["job_name"],
+    buckets=(0.1, 0.5, 1, 2, 5, 10, 30, 60, 120, 300),
+    registry=REGISTRY,
+)
+
+# 16e. Scheduler job error counter
+sentinel_scheduler_job_errors_total = Counter(
+    "sentinel_scheduler_job_errors_total",
+    "Total scheduler job errors",
+    labelnames=["job_name"],
+    registry=REGISTRY,
+)
+
+# 16f. Supabase call duration histogram (feeds async-blocking risk signal)
+sentinel_supabase_call_duration_seconds = Histogram(
+    "sentinel_supabase_call_duration_seconds",
+    "Duration of Supabase client calls",
+    labelnames=["table", "op"],
+    buckets=(0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5),
+    registry=REGISTRY,
+)
+
+# Short aliases for internal use (e.g. decorators, tests)
+SCHEDULER_JOB_DURATION = sentinel_scheduler_job_duration_seconds
+SCHEDULER_JOB_ERRORS = sentinel_scheduler_job_errors_total
+SUPABASE_CALL_DURATION = sentinel_supabase_call_duration_seconds
+
+# ---------------------------------------------------------------------------
 # FM / Media Wall metrics (Phase 144 — Building Intelligence Dashboard)
 # ---------------------------------------------------------------------------
 

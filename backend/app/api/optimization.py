@@ -311,6 +311,12 @@ async def get_optimization_status(
             derived_status = "error"
         elif onboarding_phase in ("commissioning", "shadow_live"):
             derived_status = "learning"
+        elif onboarding_phase == "supervised":
+            derived_status = "supervised"
+        elif onboarding_phase == "automatic":
+            derived_status = "automatic"
+        elif onboarding_phase == "advisory":
+            derived_status = "advisory"
         else:
             derived_status = "active"
 

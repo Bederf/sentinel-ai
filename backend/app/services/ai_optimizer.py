@@ -1739,7 +1739,7 @@ If no action needed, return empty recommendations array.
             next_entry = schedule[0]
             next_change = next_entry.get("start", "unknown") if isinstance(next_entry, dict) else str(next_entry)
 
-        PROFILE_INTENTS = {
+        intents = {
             "cost_saving": """
 ACTIVE PROFILE: COST SAVING
 Primary objective: Minimise energy spend and demand charges.
@@ -1749,8 +1749,8 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 - Outdoor temp within 6°C of indoor setpoint (free cooling opportunity)
 - AHU running at >80% speed during mild outdoor conditions (<20°C)
 - BESS SOC < 40% before a peak tariff window (pre-charge opportunity)
-- BESS SOC > 85% during off-peak with peak window >2h away (discharge opportunity)
-- Chiller setpoint below 8°C during unoccupied hours (setback opportunity)
+- BESS SOC > 85% during off-peak with peak window >2h away AND no loadshedding forecast in next 4h (preserve SOC for outage)
+- Chiller setpoint below 9°C during unoccupied hours — raise to 9°C minimum (freeze protection floor: never below the site-configured min, default 5°C)
 - Any zone conditioning empty floor for >15 minutes (FCU running unnecessary)
 - Demand approaching NMD limit (current kW > 85% of NMD equivalent)
 - Peak tariff window starting within 90 minutes (pre-action opportunity)
@@ -1758,6 +1758,8 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 Every recommendation must state ZAR saving using:
 - Energy: kW_saved × hours × current_tariff_rate
 - Demand: kVA_reduced × R155.50/kVA/month
+
+NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
 """,
             "comfort": """
 ACTIVE PROFILE: COMFORT FIRST
@@ -1773,6 +1775,8 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 
 Comfort is non-negotiable. Energy cost is secondary.
 Do not recommend setpoint relaxation in occupied zones.
+
+NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
 """,
             "asset_preservation": """
 ACTIVE PROFILE: ASSET PRESERVATION
@@ -1788,6 +1792,8 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 
 Every recommendation must state the asset protection benefit:
 reduced wear, extended service interval, or deferred failure probability.
+
+NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
 """,
             "balanced": """
 ACTIVE PROFILE: BALANCED
@@ -1805,106 +1811,8 @@ MANDATORY ACTION TRIGGERS — recommend when ANY of these are true:
 - Any equipment in warning state running at full load
 
 State both cost saving (ZAR) AND comfort impact (°C change) for each recommendation.
-""",
-        }
 
-        base_intent = PROFILE_INTENTS.get(profile, PROFILE_INTENTS["balanced"])
-        tariff_line = f"\nCurrent TOU: R{current_rate}/kWh ({band.upper()}) — next change: {next_change}\n"
-        return f"""
-{"=" * 60}
-LAYER 1 — ACTIVE GOAL
-{"=" * 60}
-{base_intent}
-{tariff_line}
-"""
-        intents = {
-            "cost_saving": """
-## INTENT: Cost Minimisation
-**Goal:** Reduce energy spend, especially during peak and standard TOU periods.
-**Primary lever:** HVAC (typically 50-80% of site load), followed by lighting and BESS dispatch.
-
-### TRIGGER CONDITIONS — ALWAYS act when these are met:
-- HVAC > 75% of site load during standard/peak tariff → recommend HVAC optimisation
-- HVAC > 85% of site load at any time → recommend urgent load shift or setpoint relaxation
-- Current tariff is peak period and HVAC > 50% → recommend immediate setpoint relaxation
-- BESS SOC > 80% during off-peak → dispatch opportunity (sell to grid or shift to peak)
-- Demand charge accruing (> 80% of NMD) → recommend load shedding
-- Zone temps within 1°C of occupied setpoint → free cooling / setpoint relaxation opportunity
-- Outdoor temp within 5°C of zone setpoint → direct airside economiser opportunity
-
-### Suppress action only when:
-- Building is unoccupied AND HVAC is already at setback setpoints
-- All TOU periods are off-peak AND site load < 40% of baseline
-- Active fault/invalid data prevents confident recommendation
-
-### Comfort guardrail:
-Comfort may be relaxed within safe bounds. Do not exceed ±2°C from occupied setpoint without flagging as critical.
-""",
-            "comfort": """
-## INTENT: Occupant Comfort
-**Goal:** Maintain tight environmental conditions for occupant wellbeing.
-**Primary lever:** HVAC setpoints, zone-level overrides, IAQ management.
-
-### TRIGGER CONDITIONS — ALWAYS act when these are met:
-- Zone temp > 25°C during occupied hours → recommend cooling setpoint reduction
-- Zone temp < 20°C during occupied hours → recommend heating setpoint increase
-- Zone humidity > 65% during occupied hours → recommend dehumidification
-- Zone CO2 > 900 ppm (IAQ threshold) → recommend outdoor air damper increase
-- Any zone > 1.5°C outside setpoint during peak occupancy → urgent setpoint correction
-- VAV box zone temp variance > 3°C across floors → recommend rebalancing
-
-### Suppress action only when:
-- Zone is within ±0.5°C of setpoint AND CO2 < 800 ppm AND humidity < 60%
-- Building is unoccupied (switch to setback mode instead)
-- Outdoor conditions exceed HVAC capacity (heat wave, extreme humidity)
-
-### Cost guardrail:
-Energy cost is secondary to comfort. Recommend setpoint changes without hesitation during occupied hours.
-""",
-            "asset_preservation": """
-## INTENT: Equipment Longevity
-**Goal:** Reduce unnecessary runtime, prevent premature failure, flag degraded equipment.
-**Primary lever:** Runtime optimisation, staging, sequencing, degraded equipment bypass.
-
-### TRIGGER CONDITIONS — ALWAYS act when these are met:
-- Any equipment > 85% running hours vs design life → recommend runtime reduction
-- Compressor starts > 8/hour on any AHU → recommend staging review
-- Supply temp > 7°C from setpoint on any chiller → recommend service call
-- Motor current > 110% of nameplate → recommend inspection
-- Bearing temp > 80°C or rising trend on any rotating equipment → recommend immediate service
-- Oil pressure below manufacturer spec → recommend urgent service
-- Equipment in manual override for > 4 hours → recommend returning to auto
-
-### Suppress action only when:
-- Equipment is operating within 90% of design parameters
-- Building is unoccupied AND no degraded equipment is in critical state
-
-### Cost guardrail:
-Cost is context only. Always flag equipment outside safe parameters, regardless of energy impact.
-""",
-            "balanced": """
-## INTENT: Balanced (Cost + Comfort + Asset Health)
-**Goal:** Equal weighting of efficiency, occupant comfort, and equipment longevity.
-**Primary lever:** Actions that improve multiple dimensions simultaneously.
-
-### TRIGGER CONDITIONS — ALWAYS act when these are met:
-- HVAC > 75% of site load during standard/peak tariff → HVAC optimisation
-- Zone temp > 1°C outside setpoint during occupied hours → setpoint correction
-- Zone humidity > 65% or CO2 > 900 ppm during occupied hours → IAQ management
-- Any equipment > 90% design load → asset review
-- BESS SOC > 80% during off-peak → dispatch opportunity
-- Demand > 80% of NMD → load management
-- Zone temps within 1°C of setpoint AND HVAC < 60% → free cooling opportunity
-
-### Suppress action only when:
-- ALL trigger conditions are false (building is genuinely optimal)
-- Invalid sensor data prevents confident assessment
-
-### Priority when multiple triggers fire:
-1. Safety/compliance (IAQ, extreme temps, equipment fault)
-2. Cost (peak tariff avoidance)
-3. Comfort (occupied hours)
-4. Asset health (degraded equipment runtime)
+NO-ACTION CHECKLIST: if you return zero recommendations, your `no_action_reasons` in Layer 5 MUST list every trigger above that you checked, citing the actual telemetry value that caused it to fail.
 """,
         }
 
@@ -1927,8 +1835,29 @@ profile goal.
 
 One building assessment. One coordinated recommendation.
 Multiple adjustments if needed — but unified by a single insight.
+
+CONFIDENCE FLOOR — do not emit a recommendation with confidence below the active profile's floor:
+- COST_SAVING: minimum confidence 0.60 (cost rationale must be defensible)
+- COMFORT: minimum confidence 0.55 (comfort is time-sensitive, accept slightly lower)
+- ASSET_PRESERVATION: minimum confidence 0.70 (conservative — equipment risk is expensive)
+- BALANCED: minimum confidence 0.65
+If your analysis is below the floor for the active profile, return no recommendations and explain in `no_action_reasons`.
 """
-        return intents.get(profile, intents["balanced"])
+
+        base_intent = intents.get(profile, intents["balanced"])
+
+        # Enriched tariff/time context — uses per-site tariff config from energy_prices
+        peak_hours = energy_prices.get("peak_hours", [])
+        weekday_only = energy_prices.get("weekday_only", True)
+        is_weekend = datetime.now().weekday() >= 5 if weekday_only else False
+        peak_hours_str = ", ".join(str(h) for h in peak_hours) if peak_hours else "not configured"
+        tariff_line = (
+            f"\nCurrent TOU: R{current_rate}/kWh ({band.upper()}) — next change: {next_change}\n"
+            f"Peak hours: {peak_hours_str}\n"
+            f"Weekend/holiday: {'YES — all hours off-peak' if is_weekend else 'NO — weekday schedule active'}\n"
+        )
+
+        return f"{base_intent}\n{tariff_line}"
 
     def _format_pattern_context(
         self,
@@ -2011,21 +1940,24 @@ Records available: {ipmvp.get("records_available", 0)}""")
             "solar_control": "BESS dispatch, solar optimisation, arbitrage",
             "water_control": "Valve scheduling, pressure management",
         }
-        BASE_MODULES = {"hvac_control", "energy_control", "lighting_control", "water_control"}
-
-        # Base modules: always active at sites that have the equipment
+        # All control add-ons are paid licensing. The LLM must see accurate status for each
+        # so it does not recommend a write that the site cannot execute. Parser-level filtering
+        # drops recs whose required control add-on is not in active_modules.
         active = [f"\u2705 {desc} ({mod} active)" for mod, desc in perms.items() if mod in active_modules]
-        # Add-on modules: only flag as unavailable if site lacks the equipment (not suppressed)
-        inactive_addons = [
-            f"\u274c {desc} ({mod} not available at this site \u2014 equipment not installed)"
+        inactive = [
+            f"\u274c {desc} ({mod} not licensed at this site \u2014 recs requiring this module will be dropped at parse time)"
             for mod, desc in perms.items()
-            if mod not in active_modules and mod not in BASE_MODULES
+            if mod not in active_modules
         ]
 
-        sections = ["ACTIVE CONTROL MODULES:"]
-        sections.append("\n".join(active) if active else "No modules active \u2014 advisory mode only")
-        if inactive_addons:
-            sections.append("\nEQUIPMENT NOT INSTALLED at this site:\n" + "\n".join(inactive_addons))
+        sections = [
+            "ACTIVE CONTROL MODULES (control add-ons are paid; required to execute setpoint / scene / dispatch recommendations):"
+        ]
+        sections.append(
+            "\n".join(active) if active else "No control add-ons licensed \u2014 all recommendations are advisory-only"
+        )
+        if inactive:
+            sections.append("\nUNLICENSED CONTROL ADD-ONS:\n" + "\n".join(inactive))
 
         sections.append("""
 

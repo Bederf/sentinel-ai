@@ -96,6 +96,16 @@ groups:
           note: "This metric tracks Stage 1 (TierRoutingEngine) recommendations. For Stage 2 execution status, check parasite_decisions table."
           runbook_url: "https://wiki.sentinel-ai.co.za/runbooks/credit-exhaustion"
 
+      - alert: SchedulerJobSlow
+        expr: histogram_quantile(0.95, sum by (le, job_name) (rate(sentinel_scheduler_job_duration_seconds_bucket[5m]))) > 30
+        for: 5m
+        labels:
+          severity: warning
+          category: scheduler
+        annotations:
+          summary: "Scheduler job {{ $labels.job_name }} P95 > 30s"
+          description: "Job {{ $labels.job_name }} has been running slowly for 5 minutes. Check logs and consider rate limit or async conversion."
+
   # ─────────────────────────────────────────────────────────────────────────────
   # WARNING: Security & Access Control (Response within 30 min)
   # ─────────────────────────────────────────────────────────────────────────────

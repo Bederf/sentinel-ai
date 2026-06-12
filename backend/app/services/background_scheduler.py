@@ -8,8 +8,10 @@ Handles periodic background tasks such as:
 """
 
 import asyncio
+import functools
 import logging
 import os
+import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -25,6 +27,65 @@ from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
 EXPIRY_HOURS = 24  # Expire pending recommendations older than 24 hours
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Phase 226.1.3 — Scheduler job observability decorators
+# ---------------------------------------------------------------------------
+
+
+def track_job_metrics(job_name: str):
+    """Decorator: record duration + error count for a scheduler job.
+
+    Use on the underlying job function passed to scheduler.add_job(func=...).
+    Metrics: sentinel_scheduler_job_duration_seconds{job_name=...} (Histogram),
+             sentinel_scheduler_job_errors_total{job_name=...} (Counter).
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            from app.api.metrics import SCHEDULER_JOB_DURATION, SCHEDULER_JOB_ERRORS
+
+            start = time.perf_counter()
+            try:
+                result = func(*args, **kwargs)
+                return result
+            except Exception:
+                SCHEDULER_JOB_ERRORS.labels(job_name=job_name).inc()
+                raise
+            finally:
+                duration = time.perf_counter() - start
+                SCHEDULER_JOB_DURATION.labels(job_name=job_name).observe(duration)
+
+        return wrapper
+
+    return decorator
+
+
+def track_supabase_call(table: str, op: str):
+    """Decorator: record duration of a Supabase client call.
+
+    Records to sentinel_supabase_call_duration_seconds{table=..., op=...}.
+    Helper only — DO NOT apply broadly in Phase 226.1.3 (deferred to
+    Phase 226.3.2 async DB migration).
+    """
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            from app.api.metrics import SUPABASE_CALL_DURATION
+
+            start = time.perf_counter()
+            try:
+                return func(*args, **kwargs)
+            finally:
+                duration = time.perf_counter() - start
+                SUPABASE_CALL_DURATION.labels(table=table, op=op).observe(duration)
+
+        return wrapper
+
+    return decorator
 
 
 def _normalize_value_for_dedup(value: Any) -> str:
@@ -130,6 +191,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added demo data job with {interval_seconds}s interval")
 
+    @track_job_metrics("generate_demo_audit_data")
     def _generate_demo_audit_data(self):
         """Wrapper to generate demo audit data (runs in background)."""
         try:
@@ -331,6 +393,7 @@ class BackgroundSchedulerService:
             f"(first run at {first_run.strftime('%H:%M:%S')})"
         )
 
+    @track_job_metrics("run_optimization_analysis")
     def _run_optimization_analysis_gated(self):
         """Real-time gate — runs every 30 minutes for live sites.
 
@@ -479,7 +542,8 @@ class BackgroundSchedulerService:
                                 if data.get("security", {}).get("entries", 0) > 100
                                 else 10
                             )
-                            current_tariff = "peak" if 7 <= datetime.now().hour < 10 else "off_peak"
+                            h = datetime.now().hour
+                            current_tariff = "peak" if (7 <= h < 10) or (17 <= h < 20) else "off_peak"
                             is_occupied = datetime.now().weekday() < 5 and 7 <= datetime.now().hour < 18
 
                             prev = self._last_conditions.get(site_id, {})
@@ -520,6 +584,18 @@ class BackgroundSchedulerService:
                             if not changed and is_occupied and not prev_occupied:
                                 logger.info("[AI-OPT] Building entered occupied hours — triggering cycle")
                                 changed = True
+
+                            # 6. Force refresh every 6 hours to prevent indefinite gate lock
+                            if not changed and self._last_optimization_sim_time is not None:
+                                hours_since_analysis = (
+                                    datetime.now() - self._last_optimization_sim_time
+                                ).total_seconds() / 3600
+                                if hours_since_analysis >= 6:
+                                    logger.info(
+                                        "[AI-OPT] Force refresh — %d hours since last analysis",
+                                        int(hours_since_analysis),
+                                    )
+                                    changed = True
 
                             # Store current conditions
                             self._last_conditions[site_id] = {
@@ -1007,8 +1083,14 @@ class BackgroundSchedulerService:
                     for _site_id, _recs in self._pending_advisories.items():
                         if not _recs:
                             continue
+
+                        from app.models.onboarding_phase import effective_phase
+
+                        phase = await effective_phase(_site_id)
+
                         lines = ["*SENTINEL AI — Operational Advisory*"]
                         lines.append(f"*Site:* {_site_id}")
+                        lines.append(f"*Mode:* {phase}")
                         lines.append(f"*Recommendations:* {len(_recs)}")
                         lines.append("")
                         for r in _recs[:5]:
@@ -1024,17 +1106,30 @@ class BackgroundSchedulerService:
                             lines.append(f"  +{len(_recs) - 5} more")
                         lines.append(f"\n_{_recs[0].reason[:200] if _recs and _recs[0].reason else ''}_")
 
-                        keyboard = InlineKeyboard(
-                            rows=[
-                                [
-                                    InlineButton(
-                                        label=f"🛠 Create WO — {r.target_equipment or 'Action'}",
-                                        callback_data=f"wo:rec_id:{r.id}",
-                                    )
+                        if phase == "supervised":
+                            keyboard = InlineKeyboard(
+                                rows=[
+                                    [
+                                        InlineButton(
+                                            label=f"✅ Approve — {r.target_equipment or 'Action'}",
+                                            callback_data=f"approve:rec_id:{r.id}",
+                                        )
+                                    ]
+                                    for r in _recs[:5]
                                 ]
-                                for r in _recs[:5]
-                            ]
-                        )
+                            )
+                        else:
+                            keyboard = InlineKeyboard(
+                                rows=[
+                                    [
+                                        InlineButton(
+                                            label=f"🛠 Create WO — {r.target_equipment or 'Action'}",
+                                            callback_data=f"wo:rec_id:{r.id}",
+                                        )
+                                    ]
+                                    for r in _recs[:5]
+                                ]
+                            )
                         await sender.send_text(str(chat_id), "\n".join(lines), parse_mode="Markdown", keyboard=keyboard)
 
                 loop = asyncio.new_event_loop()
@@ -1321,6 +1416,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added prediction generation job with {interval_seconds}s interval")
 
+    @track_job_metrics("generate_predictions")
     def _run_prediction_generation(self):
         """
         Wrapper to run prediction generation (runs in background).
@@ -1413,6 +1509,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("outcome_verification")
     def _run_outcome_verification(self):
         """Process pending outcome verifications for executed recommendations."""
         try:
@@ -1474,6 +1571,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("recommendation_processing")
     def _run_recommendation_processing(self):
         """Process pending recommendations through the recommendation graph."""
         try:
@@ -1571,6 +1669,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added milestone timer job (every %ds)", interval_seconds)
 
+    @track_job_metrics("check_recommendation_milestone_timers")
     def _check_milestone_deadlines(self):
         """Background job: check SLA breaches and escalate."""
         try:
@@ -1621,6 +1720,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added WO SLA breach job (every %ds)", interval_seconds)
 
+    @track_job_metrics("check_wo_sla_breaches")
     def _check_wo_sla_breaches(self):
         """Background job: SLA reminders (1h before deadline) + breach (past deadline)."""
         try:
@@ -1741,6 +1841,7 @@ class BackgroundSchedulerService:
             interval_seconds,
         )
 
+    @track_job_metrics("recommendation_expiry")
     def _run_recommendation_expiry(self):
         """Sync wrapper for async recommendation expiry."""
         try:
@@ -1756,6 +1857,7 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Recommendation expiry job failed: %s", e)
 
+    @track_job_metrics("orphan_alert_cleanup")
     def _run_orphan_alert_cleanup_sync(self):
         """Sync wrapper for orphan alert cleanup."""
         try:
@@ -1908,6 +2010,7 @@ class BackgroundSchedulerService:
 
         return expired_total, dedup_total
 
+    @track_job_metrics("generate_recommendations")
     def _run_recommendation_generation_gated(self):
         """Real-time gate — runs every 30 minutes for live sites.
 
@@ -2584,6 +2687,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added demand coordination job with {interval_seconds}s interval")
 
+    @track_job_metrics("demand_aware_coordination")
     def _run_demand_aware_coordination(self):
         """
         Run demand-aware coordination for all sites.
@@ -2722,6 +2826,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added drift detection job with {interval_seconds}s interval (monitors for data/model drift)")
 
+    @track_job_metrics("drift_detection_monitor")
     def _run_drift_detection(self):
         """
         Check for data/model drift and trigger retraining if thresholds exceeded.
@@ -2770,6 +2875,7 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run drift detection check: {e}", exc_info=True)
 
+    @track_job_metrics("auto_retrain_stale_models")
     def _run_ml_retraining(self):
         """
         Check for stale ML models and trigger retraining if needed.
@@ -2850,6 +2956,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added M&V verification job with {interval_seconds}s interval")
 
+    @track_job_metrics("mv_verification")
     def _run_mv_verifications(self):
         """Execute pending M&V verifications whose measurement window has elapsed."""
         try:
@@ -2888,6 +2995,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added feedback scoring refresh job with {interval_seconds}s interval")
 
+    @track_job_metrics("feedback_scoring_refresh")
     def _run_feedback_scoring_refresh(self):
         """Refresh module score multipliers from latest verified outcomes."""
         try:
@@ -2939,6 +3047,7 @@ class BackgroundSchedulerService:
             cooldown_hours,
         )
 
+    @track_job_metrics("feedback_retraining_trigger")
     def _run_feedback_retraining(self):
         """Trigger retraining when module outcome success drops below threshold."""
         try:
@@ -3057,6 +3166,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added Sentry notification job with {interval_seconds}s interval")
 
+    @track_job_metrics("process_sentry_notifications")
     def _process_sentry_notifications(self):
         """Process pending Sentry notifications directly (no HTTP self-call)."""
         try:
@@ -3119,6 +3229,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added fire pump compliance job ({interval_seconds}s interval)")
 
+    @track_job_metrics("check_fire_pump_compliance")
     def _check_fire_pump_compliance(self) -> None:
         """Check all sites for overdue fire pump inspections and emit alerts."""
         try:
@@ -3181,6 +3292,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added integration sync job with {interval_seconds}s interval")
 
+    @track_job_metrics("integration_sync")
     def _run_integration_sync(self):
         """
         Update last_sync_at on all active log sources and create sync job records.
@@ -3235,6 +3347,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added POPIA retention enforcement job with %ss interval", interval_seconds)
 
+    @track_job_metrics("popia_retention_enforcement")
     def _run_popia_retention_enforcement(self):
         """Execute POPIA retention enforcement and log summary."""
         try:
@@ -3286,6 +3399,7 @@ class BackgroundSchedulerService:
             interval_seconds,
         )
 
+    @track_job_metrics("supabase_retention_enforcement")
     def _run_supabase_retention_enforcement(self):
         """Execute Supabase table retention enforcement and log summary."""
         # Direct SQL fallback — reliable even when REST API auth fails
@@ -3381,6 +3495,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added tier1->tier2 aggregation job (daily 00:00 UTC)")
 
+    @track_job_metrics("tier1_to_tier2_aggregation")
     def _run_tier1_to_tier2_aggregation(self) -> None:
         """Execute tier1->tier2 raw-to-hourly telemetry aggregation."""
         try:
@@ -3413,6 +3528,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added tier2->tier3 aggregation job (weekly Sun 01:00 UTC)")
 
+    @track_job_metrics("tier2_to_tier3_aggregation")
     def _run_tier2_to_tier3_aggregation(self) -> None:
         """Execute tier2->tier3 hourly-to-daily telemetry aggregation."""
         try:
@@ -3453,6 +3569,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added MIP dispatch optimize job with {interval_seconds}s interval")
 
+    @track_job_metrics("mip_dispatch_optimize")
     def _run_mip_dispatch_optimize(self):
         """Run MIP dispatch optimization for all registered sites."""
         try:
@@ -3531,6 +3648,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added load forecast job with {interval_seconds}s interval")
 
+    @track_job_metrics("load_forecast")
     def _run_load_forecast(self):
         """Refresh 15-min load forecast for all registered sites."""
         try:
@@ -3597,6 +3715,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added phase promotion evaluator job (every {interval_hours}h, coalesce=True)")
 
+    @track_job_metrics("phase_promotion")
     def _run_phase_promotion(self):
         """Sync wrapper: run phase promotion evaluation on main event loop."""
         try:
@@ -3623,6 +3742,7 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Phase promotion evaluation failed: %s", e, exc_info=True)
 
+    @track_job_metrics("site_mode_policy_dry_run")
     def _run_site_mode_policy_dry_run(self, site_id: str):
         """Sync wrapper: evaluate site mode policy on main loop and log result."""
         try:
@@ -3696,6 +3816,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added AEGIS cycle job for {site_id} with {interval_seconds}s interval")
 
+    @track_job_metrics("aegis_cycle")
     def _run_aegis_cycle(self, site_id: str):
         """Sync wrapper for async run_aegis_cycle."""
         try:
@@ -3749,6 +3870,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added AEGIS evidence collector job for {site_id} with {interval_seconds}s interval")
 
+    @track_job_metrics("aegis_evidence_collector")
     def _run_aegis_evidence_collector(self, site_id: str):
         """Sync wrapper for async evidence collector."""
         try:
@@ -4020,6 +4142,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added occupancy control job for {site_id} with {interval_seconds}s interval")
 
+    @track_job_metrics("occupancy_control")
     def _run_occupancy_control(self, site_id: str):
         """Sync wrapper for async occupancy control cycle."""
         try:
@@ -4073,6 +4196,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added health snapshot job with {interval_seconds}s interval")
 
+    @track_job_metrics("health_snapshot")
     def _run_health_snapshot(self):
         """Sync wrapper for async health snapshot storage."""
         try:
@@ -4126,6 +4250,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("equipment_health_snapshot")
     def _run_equipment_health_snapshot(self):
         """Sync wrapper for async equipment health snapshot recompute."""
         try:
@@ -4215,6 +4340,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added baseline capture job ({interval_minutes}min interval)")
 
+    @track_job_metrics("baseline_capture")
     def _run_baseline_capture(self):
         """Sync wrapper for async baseline capture."""
         try:
@@ -4263,6 +4389,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added adapter health monitor job with {interval_seconds}s interval")
 
+    @track_job_metrics("adapter_health_monitor")
     def _run_adapter_health_monitor(self):
         """Sync wrapper for async adapter health monitoring."""
         try:
@@ -4285,6 +4412,7 @@ class BackgroundSchedulerService:
         await monitor.run_health_cycle()
         logger.debug("Adapter health monitor cycle completed")
 
+    @track_job_metrics("error_auto_resolve")
     def _run_error_auto_resolve(self):
         """Sync wrapper for async error auto-resolution."""
         try:
@@ -4342,6 +4470,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Added data freshness monitor job with {interval_seconds}s interval")
 
+    @track_job_metrics("data_freshness_monitor")
     def _run_data_freshness_monitor(self):
         """Sync wrapper for async data freshness monitoring."""
         try:
@@ -4414,6 +4543,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added monthly SLO report email job (1st 02:10 SAST)")
 
+    @track_job_metrics("slo_monthly_report")
     def _send_monthly_slo_report(self):
         """Sync wrapper for monthly SLO report email."""
         try:
@@ -4500,6 +4630,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("event_intelligence")
     def _run_event_intelligence(self):
         """Sync wrapper for async event intelligence evaluation."""
         try:
@@ -4569,6 +4700,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added space sensor health job for %s (%ds interval)", site_id, interval_seconds)
 
+    @track_job_metrics("space_sensor_health")
     def _run_space_sensor_health(self, site_id: str = "FLN02"):
         """Sync wrapper for async sensor health check."""
         try:
@@ -4604,6 +4736,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added ghost-room monitor job (%ds interval)", interval_seconds)
 
+    @track_job_metrics("ghost_room_monitor")
     def _run_ghost_room_monitor(self):
         """Sync wrapper for the async ghost-room booking scan."""
         try:
@@ -4637,6 +4770,7 @@ class BackgroundSchedulerService:
         )
         logger.info(f"Focus overstay check scheduled every {interval_seconds}s")
 
+    @track_job_metrics("focus_overstay_check")
     def _run_focus_overstay_check(self):
         try:
             import asyncio
@@ -4710,6 +4844,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added focus relay reconcile job (%ds interval)", interval_seconds)
 
+    @track_job_metrics("focus_relay_reconcile")
     def _run_focus_relay_reconcile(self):
         """Run focus-room relay cooldown reconciliation."""
         try:
@@ -4743,6 +4878,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added DB archival job (%ds interval)", interval_seconds)
 
+    @track_job_metrics("db_archival")
     def _run_db_archival(self):
         """Run database archival for old resolved records."""
         try:
@@ -4776,6 +4912,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added daily AI cost report job (23:55)")
 
+    @track_job_metrics("ai_cost_daily_report")
     def _send_ai_cost_report(self):
         """Send the daily AI cost report email."""
         try:
@@ -4811,6 +4948,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added LLM judge evaluation job (top of every hour)")
 
+    @track_job_metrics("llm_judge_evaluation")
     def _run_llm_judge_evaluation(self):
         """Run LLM judge evaluation and emit Prometheus gauge."""
         try:
@@ -4862,6 +5000,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added Outlook calendar polling job (%d min interval)", interval_minutes)
 
+    @track_job_metrics("outlook_calendar_poll")
     def _run_outlook_calendar_poll(self):
         """Run the Outlook calendar poll (sync wrapper for async service)."""
         try:
@@ -4914,6 +5053,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added Graph subscription renewal job (every %d hour(s))", interval_hours)
 
+    @track_job_metrics("graph_subscription_renewal")
     def _run_graph_subscription_renewal(self):
         """Run the Graph subscription renewal (sync wrapper for async service)."""
         try:
@@ -4966,6 +5106,7 @@ class BackgroundSchedulerService:
         )
         logger.info("Added Graph credential rotation check job (every %d hour(s))", interval_hours)
 
+    @track_job_metrics("graph_credential_rotation_check")
     def _run_graph_credential_rotation_check(self):
         """Check credential age and alert if rotation is overdue."""
         try:
@@ -5053,6 +5194,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("shadow_mode_polling")
     def _run_shadow_mode_polling(self):
         """Poll all enabled bridge sites and feed to ML pipeline.
 
@@ -5115,6 +5257,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("document_mri_sync")
     def _run_document_mri_sync(self):
         """Sync documents from MRI Concept API. Runs synchronously via APScheduler."""
         try:
@@ -5170,6 +5313,7 @@ class BackgroundSchedulerService:
         )
         logger.info("IPMVP data sync job registered — interval=%s hours", interval_hours)
 
+    @track_job_metrics("ipmvp_sync")
     def _run_ipmvp_sync(self):
         """Run IPMVP data sync in a new event loop."""
         import asyncio
@@ -5235,6 +5379,7 @@ class BackgroundSchedulerService:
         )
         logger.info("financial_roi_generation job registered — interval=%ds", interval_seconds)
 
+    @track_job_metrics("financial_roi_generation")
     def _run_financial_roi(self):
         """Generate and persist financial ROI recommendations for all eligible sites."""
         import asyncio
@@ -5431,6 +5576,7 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @track_job_metrics("bacnet_discovery")
     def _run_bacnet_discovery(self, site_id: str = "site-002"):
         """Query the bridge for BACnet objects and detect equipment changes.
 
@@ -5570,6 +5716,7 @@ class BackgroundSchedulerService:
 
 
 # Sync wrapper — APScheduler passes sync functions to job executors
+@track_job_metrics("compiler_worker")
 def _run_compiler_worker_sync():
     """Sync wrapper — runs the CompilerWorker directly (it's a sync method)."""
     import logging
@@ -5587,6 +5734,7 @@ def _run_compiler_worker_sync():
         raise
 
 
+@track_job_metrics("email_intake_poll")
 def _run_email_intake_poll():
     """Sync wrapper — runs the EmailIntakeService.poll() in a sync context."""
     import logging
@@ -5605,6 +5753,7 @@ def _run_email_intake_poll():
         logger.error("[EmailIntake] poll runner failed: %s", exc, exc_info=True)
 
 
+@track_job_metrics("rooms_email_intake_poll")
 def _run_rooms_email_intake_poll():
     """Sync wrapper — runs the RoomsEmailIntakeService.poll()."""
     import logging
@@ -5623,6 +5772,7 @@ def _run_rooms_email_intake_poll():
         logger.error("[RoomsEmail] poll runner failed: %s", exc, exc_info=True)
 
 
+@track_job_metrics("daily_health_sweep")
 def _run_daily_health_sweep_sync():
     """Sync wrapper for daily health sweep — evaluates sites for promotion gates.
 
@@ -5702,6 +5852,7 @@ def _run_daily_health_sweep_sync():
     asyncio.run_coroutine_threadsafe(_sweep(), scheduler_service._main_loop).result(timeout=300)
 
 
+@track_job_metrics("rag_doc_sync")
 def _run_rag_doc_sync():
     """Incrementally sync changed system docs to the RAG vector store.
 
@@ -5735,6 +5886,7 @@ def _run_rag_doc_sync():
         logger.error("[RAG-SYNC] Documentation sync failed: %s", e)
 
 
+@track_job_metrics("recommendation_digest")
 def _run_recommendation_digest_sync(site_id: str = "site-002"):
     """Send morning building digest to FM Telegram — health, alerts, work orders, AI recommendations."""
     import asyncio
