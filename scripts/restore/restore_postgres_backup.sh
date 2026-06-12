@@ -35,43 +35,69 @@ TARGET_PGPASSWORD="${TARGET_PGPASSWORD:-postgres}"
 TARGET_DATABASE="${TARGET_DATABASE:-sentinel_backup}"
 RESTORE_RESET_DB="${RESTORE_RESET_DB:-true}"
 RESTORE_VERIFY_EXTENSIONS="${RESTORE_VERIFY_EXTENSIONS:-true}"
+RESTORE_DOCKER_CONTAINER="${RESTORE_DOCKER_CONTAINER:-}"  # set to use docker exec for pg_restore (e.g. sentinel-postgres-backup-db)
 export PGPASSWORD="${TARGET_PGPASSWORD}"
 
-for tool in psql pg_restore createdb dropdb; do
-  if ! command -v "${tool}" >/dev/null 2>&1; then
-    echo "Required tool '${tool}' is not installed or not on PATH." >&2
-    exit 1
-  fi
-done
+# Determine which pg_restore to use (host binary vs Docker container)
+if [[ -n "${RESTORE_DOCKER_CONTAINER}" ]]; then
+  PG_RESTORE="docker exec -i ${RESTORE_DOCKER_CONTAINER} pg_restore"
+  PSQL="docker exec -i ${RESTORE_DOCKER_CONTAINER} psql"
+  CREATEDB="docker exec ${RESTORE_DOCKER_CONTAINER} createdb"
+  DROPDB="docker exec ${RESTORE_DOCKER_CONTAINER} dropdb"
+else
+  for tool in psql pg_restore createdb dropdb; do
+    if ! command -v "${tool}" >/dev/null 2>&1; then
+      echo "Required tool '${tool}' is not installed or not on PATH." >&2
+      exit 1
+    fi
+  done
+  PG_RESTORE="pg_restore"
+  PSQL="psql"
+  CREATEDB="createdb"
+  DROPDB="dropdb"
+fi
 
 echo "Restoring backup from: ${BACKUP_DIR}"
 echo "Target Postgres: ${TARGET_PGHOST}:${TARGET_PGPORT}"
 echo "Target database: ${TARGET_DATABASE}"
 
 if [[ "${RESTORE_RESET_DB}" == "true" ]]; then
-  dropdb \
-    --if-exists \
-    --host="${TARGET_PGHOST}" \
-    --port="${TARGET_PGPORT}" \
-    --username="${TARGET_PGUSER}" \
-    "${TARGET_DATABASE}"
+  if [[ -n "${RESTORE_DOCKER_CONTAINER}" ]]; then
+    ${DROPDB} "${TARGET_DATABASE}" 2>/dev/null || true
+  else
+    ${DROPDB} \
+      --if-exists \
+      --host="${TARGET_PGHOST}" \
+      --port="${TARGET_PGPORT}" \
+      --username="${TARGET_PGUSER}" \
+      "${TARGET_DATABASE}"
+  fi
 fi
 
-createdb \
-  --host="${TARGET_PGHOST}" \
-  --port="${TARGET_PGPORT}" \
-  --username="${TARGET_PGUSER}" \
-  "${TARGET_DATABASE}" \
-  2>/dev/null || true
-
-if [[ -f "${BACKUP_DIR}/globals.sql" ]]; then
-  psql \
+if [[ -n "${RESTORE_DOCKER_CONTAINER}" ]]; then
+  ${CREATEDB} "${TARGET_DATABASE}" 2>/dev/null || true
+else
+  ${CREATEDB} \
     --host="${TARGET_PGHOST}" \
     --port="${TARGET_PGPORT}" \
     --username="${TARGET_PGUSER}" \
-    --dbname=postgres \
-    --file="${BACKUP_DIR}/globals.sql" \
-    >/dev/null
+    "${TARGET_DATABASE}" \
+    2>/dev/null || true
+fi
+
+if [[ -f "${BACKUP_DIR}/globals.sql" ]]; then
+  if [[ -n "${RESTORE_DOCKER_CONTAINER}" ]]; then
+    # Pipe globals.sql into the container's psql
+    cat "${BACKUP_DIR}/globals.sql" | ${PSQL} -U "${TARGET_PGUSER}" -d postgres >/dev/null 2>&1 || true
+  else
+    ${PSQL} \
+      --host="${TARGET_PGHOST}" \
+      --port="${TARGET_PGPORT}" \
+      --username="${TARGET_PGUSER}" \
+      --dbname=postgres \
+      --file="${BACKUP_DIR}/globals.sql" \
+      >/dev/null 2>&1 || true
+  fi
 fi
 
 IFS=',' read -r -a DATABASES <<< "${DATABASES:-postgres}"
@@ -86,16 +112,24 @@ for db in "${DATABASES[@]}"; do
   fi
 
   echo "Restoring ${dump_file} into ${TARGET_DATABASE}"
-  pg_restore \
-    --host="${TARGET_PGHOST}" \
-    --port="${TARGET_PGPORT}" \
-    --username="${TARGET_PGUSER}" \
-    --dbname="${TARGET_DATABASE}" \
-    --clean \
-    --if-exists \
-    --no-owner \
-    --no-privileges \
-    "${dump_file}"
+  if [[ -n "${RESTORE_DOCKER_CONTAINER}" ]]; then
+    # File-based restore: copy dump into container first
+    container_tmp="/tmp/$(basename ${dump_file})"
+    docker cp "${dump_file}" "${RESTORE_DOCKER_CONTAINER}:${container_tmp}"
+    ${PG_RESTORE} -U "${TARGET_PGUSER}" -d "${TARGET_DATABASE}" --clean --if-exists --no-owner --no-privileges "${container_tmp}"
+    docker exec "${RESTORE_DOCKER_CONTAINER}" rm -f "${container_tmp}"
+  else
+    ${PG_RESTORE} \
+      --host="${TARGET_PGHOST}" \
+      --port="${TARGET_PGPORT}" \
+      --username="${TARGET_PGUSER}" \
+      --dbname="${TARGET_DATABASE}" \
+      --clean \
+      --if-exists \
+      --no-owner \
+      --no-privileges \
+      "${dump_file}"
+  fi
 done
 
 if [[ "${RESTORE_VERIFY_EXTENSIONS}" == "true" && -n "${REQUIRED_EXTENSIONS:-}" ]]; then
@@ -103,18 +137,26 @@ if [[ "${RESTORE_VERIFY_EXTENSIONS}" == "true" && -n "${REQUIRED_EXTENSIONS:-}" 
   for ext in "${REQUIRED[@]}"; do
     ext="$(echo "${ext}" | xargs)"
     [[ -z "${ext}" ]] && continue
-    psql \
-      --host="${TARGET_PGHOST}" \
-      --port="${TARGET_PGPORT}" \
-      --username="${TARGET_PGUSER}" \
-      --dbname="${TARGET_DATABASE}" \
-      --tuples-only \
-      --no-align \
-      --command="SELECT extname FROM pg_extension WHERE extname = '${ext}';" \
-      | grep -qx "${ext}" || {
+    cmd="SELECT extname FROM pg_extension WHERE extname = '${ext}';"
+    if [[ -n "${RESTORE_DOCKER_CONTAINER}" ]]; then
+      echo "${cmd}" | ${PSQL} -U "${TARGET_PGUSER}" -d "${TARGET_DATABASE}" -t --no-align 2>/dev/null | grep -qx "${ext}" || {
         echo "Required extension missing after restore: ${ext}" >&2
         exit 1
       }
+    else
+      ${PSQL} \
+        --host="${TARGET_PGHOST}" \
+        --port="${TARGET_PGPORT}" \
+        --username="${TARGET_PGUSER}" \
+        --dbname="${TARGET_DATABASE}" \
+        --tuples-only \
+        --no-align \
+        --command="${cmd}" \
+        | grep -qx "${ext}" || {
+          echo "Required extension missing after restore: ${ext}" >&2
+          exit 1
+        }
+    fi
   done
 fi
 

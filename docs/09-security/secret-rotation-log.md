@@ -12,7 +12,9 @@
 | ADMIN_PIN_HASH | 2026-06-12 | Rotated via `bcrypt.hashpw()`. New PIN: `198104`. Old hash replaced in `/etc/sentinel/secrets.env`. |
 | BRIDGE_API_TOKEN | 2026-06-12 | Rotated via `secrets.token_hex(32)`. New: `3016b935...`. Old value replaced in `/etc/sentinel/secrets.env`. |
 | HOME_BOT_WEBHOOK_SECRET | 2026-06-12 | Rotated via `secrets.token_hex(32)`. New: `8cff7b3d...`. Old value replaced in `/etc/sentinel/secrets.env`. |
-| ELEVENLABS_API_KEY (inline cleanup) | 2026-06-12 | Removed inline `Environment="ELEVENLABS_API_KEY=..."` and `Environment="ELEVENLABS_TTS_ENABLED=true"` from `/etc/systemd/system/sentinel-backend.service`. `ELEVENLABS_TTS_ENABLED` moved to `/etc/sentinel/backend.env`. Service now reads both values from EnvironmentFiles. Key value NOT YET ROTATED — old key still in `secrets.env` pending ElevenLabs dashboard rotation. |
+| ELEVENLABS_API_KEY (inline cleanup) | 2026-06-12 | Removed inline `Environment="ELEVENLABS_API_KEY=..."` and `Environment="ELEVENLABS_TTS_ENABLED=true"` from `/etc/systemd/system/sentinel-backend.service`. `ELEVENLABS_TTS_ENABLED` moved to `/etc/sentinel/backend.env`. Service now reads both values from EnvironmentFiles. |
+| **Phase 226.1.4 — Secret rotation (on-server)** | 2026-06-12 | ADMIN_PIN_HASH, BRIDGE_API_TOKEN, HOME_BOT_WEBHOOK_SECRET, ELEVENLABS_API_KEY, and all Telegram bot tokens (SENTRY_BOT_API_KEY, SENTRY_CLIENT_BOT_TOKEN, SENTRY_TECH_BOT_TOKEN, SENTINEL_HOME_BOT_TOKEN, SENTRY_MANAGER_BOT_TOKEN) rotated. ElevenLabs key replaced with value provided by user via ElevenLabs dashboard. |
+| **Phase 226.3 — Restore drill** | 2026-06-12 | Full DR drill passed. Nightly encrypted backup restored into standby container (sentinel-postgres-backup-db, port 55432). Row counts match: sites=5, work_orders=7, audit_log=29863, recommendations=90845. Restore script fixed to use Docker container's pg_restore (v17) since host has only v15 clients. |
 
 ## Secret Inventory (current locations)
 
@@ -43,14 +45,8 @@ No historical findings. `gitleaks detect --source . --log-opts="--all"` scanned 
 
 | Secret | Provider | Action | Prep Status |
 |--------|----------|--------|-------------|
-| ELEVENLABS_API_KEY | ElevenLabs dashboard | Generate new key → replace value in `/etc/sentinel/secrets.env` → restart | Inline removed from systemd; `secrets.env` ready |
 | SUPABASE_SERVICE_ROLE_KEY | Supabase dashboard | Rotate → copy new value → `sudo sed -i 's/^SUPABASE_SERVICE_ROLE_KEY=.*$/SUPABASE_SERVICE_ROLE_KEY=<new>/' /etc/sentinel/secrets.env` → restart | `secrets.env` ready |
 | SUPABASE_KEY (anon) | Supabase dashboard (same project) | Same as above | `secrets.env` ready |
-| SENTINEL_HOME_BOT_TOKEN | BotFather → `/revoke` → `/token` | Replace in `secrets.env` → restart | `secrets.env` ready |
-| SENTRY_BOT_API_KEY | BotFather → Sentry Bot 1 | Replace in `secrets.env` → restart | `secrets.env` ready |
-| SENTRY_CLIENT_BOT_TOKEN | BotFather → Sentry Bot 2 | Replace in `secrets.env` → restart | `secrets.env` ready |
-| SENTRY_TECH_BOT_TOKEN | BotFather → Sentry Bot 3 | Replace in `secrets.env` → restart | `secrets.env` ready |
-| SENTRY_MANAGER_BOT_TOKEN | BotFather → Sentry Bot 4 | Replace in `secrets.env` → restart | `secrets.env` ready |
 | SMTP_PASSWORD | Email provider dashboard | Replace in `secrets.env` → restart | `secrets.env` ready |
 
 **Post-rotation command**:
@@ -70,6 +66,11 @@ Then verify: `curl -fsS http://localhost:9095/api/health | jq .`
 - [x] gitleaks run shows zero active findings
 - [x] Historical findings either rotated or documented as false positive
 - [x] Blind spot (ELEVENLABS_API_KEY in systemd) documented
-- [ ] ELEVENLABS_API_KEY rotated and systemd unit updated
+- [x] ELEVENLABS_API_KEY rotated and systemd unit updated
+- [x] All Telegram bot tokens rotated
+- [x] Secrets migrated to EnvironmentFiles (no inline secrets in systemd units)
+- [x] Offsite backup via age+SCP operational (2.5GB encrypted, 14d/56d/180d retention)
+- [x] Restore drill passed (standby DB, row counts match)
+- [ ] Migration 050 (RLS) applied to Supabase
 - [ ] GitHub Actions secrets audited
 - [ ] Server `.env*` files audited
