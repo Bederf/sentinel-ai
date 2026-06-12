@@ -303,7 +303,33 @@ CREATE POLICY audit_log_delete_service ON audit_log
 
 
 -- ==============================================================================
--- PART 7: COMMENTS
+-- PART 7: TABLE-LEVEL GRANTS (needed for RLS to take effect)
+-- ==============================================================================
+--
+-- RLS policies are evaluated only when the user has table-level access.
+-- In Supabase, the `authenticator` role SET ROLEs to `authenticated` or `anon`
+-- for user-facing requests. These roles must have SELECT/INSERT/UPDATE/DELETE
+-- on the tables, otherwise the RLS policy never fires (user gets "permission
+-- denied" before RLS is checked).
+--
+-- These GRANTs are safe to re-run. Supabase default grants may already cover
+-- some of these, but explicit grants here ensure the migration is self-contained.
+
+-- Recommendations: authenticated can CRUD, anon can read
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE recommendations TO authenticated;
+GRANT SELECT ON TABLE recommendations TO anon;
+
+-- Work orders: authenticated can CRUD, anon can read
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE work_orders TO authenticated;
+GRANT SELECT ON TABLE work_orders TO anon;
+
+-- Audit log: authenticated and anon can read (writes are service-role only)
+GRANT SELECT ON TABLE public.audit_log TO authenticated;
+GRANT SELECT ON TABLE public.audit_log TO anon;
+
+
+-- ==============================================================================
+-- PART 8: COMMENTS
 -- ==============================================================================
 
 COMMENT ON POLICY recommendations_select_site_scoped ON recommendations
@@ -347,7 +373,7 @@ COMMENT ON COLUMN mfa_secrets.site_id
 
 
 -- ==============================================================================
--- PART 8: VERIFICATION (run manually after applying)
+-- PART 9: VERIFICATION (run manually after applying)
 -- ==============================================================================
 --
 -- 1. Confirm RLS is enabled and policies exist:
@@ -395,7 +421,7 @@ COMMENT ON COLUMN mfa_secrets.site_id
 
 
 -- ==============================================================================
--- ROLLBACK (manual — not run automatically)
+-- PART 10: ROLLBACK (manual — not run automatically)
 -- ==============================================================================
 --
 -- DROP POLICY IF EXISTS recommendations_select_site_scoped ON recommendations;
