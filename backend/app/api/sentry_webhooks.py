@@ -2053,6 +2053,27 @@ class WoMilestoneResponse(BaseModel):
     status: str = ""
 
 
+@router.get("/technician")
+async def get_technician_by_telegram(
+    telegram_id: str = Query(..., description="Technician's Telegram user ID"),
+    x_sentry_secret: str | None = Header(None),
+) -> dict:
+    """Look up a technician record by Telegram user ID.
+
+    Used by Sentry bot during inspection closeout to resolve the display name
+    of the person sending the message. Returns name or null — caller falls back
+    to the raw telegram_id if no record is found.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="technician_lookup")
+    from app.database.repositories.technician_repository import get_technician_repository
+
+    repo = get_technician_repository()
+    tech = await repo.get_technician_by_telegram_id(telegram_id)
+    if not tech:
+        return {"found": False, "name": None, "telegram_id": telegram_id}
+    return {"found": True, "name": tech.get("name"), "telegram_id": telegram_id}
+
+
 @router.patch("/wo-milestone", response_model=WoMilestoneResponse)
 async def advance_wo_milestone(
     req: WoMilestoneRequest,
