@@ -2053,6 +2053,53 @@ class WoMilestoneResponse(BaseModel):
     status: str = ""
 
 
+@router.get("/bot-state")
+async def get_bot_state(
+    key: str = Query(..., description="State key (e.g. 'optimization-check', 'health-alert')"),
+    x_sentry_secret: str | None = Header(None),
+) -> dict:
+    """Fetch persisted bot tool state by key.
+
+    Used by bms_optimization_check.py and sentinel_health_alert.py to restore
+    deduplication state across restarts.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="bot_state_get")
+    from app.database.supabase_client import get_async_supabase_client
+
+    client = await get_async_supabase_client()
+    result = await client.table("sentry_bot_state").select("value").eq("key", key).maybe_single().execute()
+    if not result.data:
+        return {"found": False, "key": key, "value": None}
+    return {"found": True, "key": key, "value": result.data["value"]}
+
+
+@router.post("/bot-state", status_code=200)
+async def set_bot_state(
+    request: Request,
+    x_sentry_secret: str | None = Header(None),
+) -> dict:
+    """Upsert persisted bot tool state.
+
+    Body: {"key": str, "value": any JSON-serialisable object}
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="bot_state_set")
+    body = await request.json()
+    key = body.get("key")
+    value = body.get("value")
+    if not key:
+        raise HTTPException(status_code=422, detail="key is required")
+
+    from app.database.supabase_client import get_async_supabase_client
+
+    client = await get_async_supabase_client()
+    await (
+        client.table("sentry_bot_state")
+        .upsert({"key": key, "value": value, "updated_at": "now()"}, on_conflict="key")
+        .execute()
+    )
+    return {"status": "ok", "key": key}
+
+
 @router.get("/technician")
 async def get_technician_by_telegram(
     telegram_id: str = Query(..., description="Technician's Telegram user ID"),
