@@ -3056,3 +3056,102 @@ async def handle_telegram_message_flow(
 @router.post("/telegram/webhook/home")
 async def handle_home_bot_webhook(request: Request):
     return JSONResponse(content={"status": "ok"})
+
+
+# ---------------------------------------------------------------------------
+# Phase 227: SENTRY-MULTISITE — Site-scoped bot user provisioning
+# ---------------------------------------------------------------------------
+
+
+class BotUserCreate(BaseModel):
+    telegram_id: int
+    site_id: str
+    bot_role: str = Field(..., pattern="^(manager|technician|staff)$")
+    display_name: str | None = None
+    email: str | None = None
+    created_by: int | None = None
+
+
+@router.get("/bot-users/{telegram_id}/sites")
+async def get_bot_user_sites(
+    telegram_id: int,
+    bot_role: str = Query(..., pattern="^(manager|technician|staff)$"),
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Return the list of sites this telegram user can access for the given role.
+
+    Returns empty list on miss (fail-closed contract for downstream tools).
+    """
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="bot-users-sites")
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("bot_users")
+        .select("site_id, active")
+        .eq("telegram_id", telegram_id)
+        .eq("bot_role", bot_role)
+        .eq("active", True)
+        .execute()
+    )
+    sites = sorted({row["site_id"] for row in (result.data or []) if row.get("active")})
+    return {
+        "telegram_id": telegram_id,
+        "bot_role": bot_role,
+        "sites": sites,
+        "active": bool(sites),
+    }
+
+
+@router.post("/bot-users", status_code=status.HTTP_201_CREATED)
+async def create_bot_user(
+    data: BotUserCreate,
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Provision a new bot_user row. Idempotent via UNIQUE(telegram_id, site_id, bot_role)."""
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="bot-users-create")
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    now = datetime.now(UTC).isoformat()
+    payload = {
+        "telegram_id": data.telegram_id,
+        "site_id": data.site_id,
+        "bot_role": data.bot_role,
+        "display_name": data.display_name,
+        "email": data.email,
+        "active": True,
+        "created_at": now,
+        "created_by": data.created_by,
+    }
+    result = supabase.table("bot_users").upsert(payload, on_conflict="telegram_id,site_id,bot_role").execute()
+    return {"success": True, "row": (result.data or [None])[0]}
+
+
+@router.delete("/bot-users/{telegram_id}")
+async def deactivate_bot_user(
+    telegram_id: int,
+    site_id: str = Query(...),
+    bot_role: str = Query(..., pattern="^(manager|technician|staff)$"),
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
+):
+    """Soft-delete a bot_user row — sets active=False. Never hard delete."""
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="bot-users-delete")
+
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("bot_users")
+        .update({"active": False})
+        .eq("telegram_id", telegram_id)
+        .eq("site_id", site_id)
+        .eq("bot_role", bot_role)
+        .execute()
+    )
+    return {"success": True, "deactivated": len(result.data or [])}
