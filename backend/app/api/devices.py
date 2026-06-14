@@ -177,15 +177,22 @@ def _transform_equipment_to_device(eq_data: dict) -> dict | None:
         # Transform points to device format
         transformed_points = {}
         for point_name, point_data in eq_data.get("points", {}).items():
+            bacnet_type = point_data.get("object_type")
+            bacnet_instance = point_data.get("instance")
             transformed_points[point_name] = {
                 "name": point_name,
-                "point_type": _map_point_type(point_data.get("object_type", "analogValue")),
+                "point_type": _map_point_type(bacnet_type or "analogValue"),
                 "description": point_data.get("description", f"{point_name} point"),
                 "unit": point_data.get("unit", ""),
                 "default_value": point_data.get("default_value"),
                 "writable": point_data.get("writable", False),
                 "min_value": point_data.get("min_value"),
                 "max_value": point_data.get("max_value"),
+                "metadata": {
+                    "bacnet_object_type": bacnet_type,
+                    "bacnet_instance": bacnet_instance,
+                    "bacnet_ref": point_data.get("bacnet_ref"),
+                },
             }
 
         # Build device data structure

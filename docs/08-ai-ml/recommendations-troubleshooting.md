@@ -2,9 +2,9 @@
 title: "Recommendations System Troubleshooting Guide"
 type: "operational"
 status: "complete"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-02-11"
-updated: "2026-02-11"
+updated: "2026-06-14"
 author: "Sentinel Development Team"
 tags: ["troubleshooting", "recommendations", "debugging", "operations"]
 related: ["./background-recommendation-generation.md", "../03-api-reference/recommendations-api.md"]
@@ -385,6 +385,78 @@ curl http://localhost:9095/api/work-orders \
    - Verify equipment types match ML model registry entries
 
 **Related:** See [ML Context Injection](ai-recommendation-system.md#ml-context-injection-phase-132) and [ML Data Architecture](../02-architecture/ML-DATA-ARCHITECTURE.md)
+
+### Issue 8: "Approve endpoint returns BACnet metadata error"
+
+**Symptom:** `POST /api/optimization/approve` returns HTTP 200 but `results[].success=false`
+with `error: "Point setpoint missing BACnet metadata (bacnet_object_type, bacnet_instance)"`
+
+**Root Cause (fixed 2026-06-14):** `_transform_equipment_to_device` in `backend/app/api/devices.py`
+was dropping the `object_type` and `instance` fields from equipment JSON when building
+`DevicePoint` objects. The BACnet adapter reads these from `point.metadata`, so every
+approve write would fail regardless of device or point.
+
+**Fix applied:** The transform now populates `point.metadata["bacnet_object_type"]` and
+`point.metadata["bacnet_instance"]` from the equipment JSON. A backend restart is required
+after this fix for the DeviceManager to reinitialize with correct point metadata.
+
+**Verify fix is active:**
+```bash
+# Restart backend to reload device points
+sudo systemctl restart sentinel-backend.service
+
+# Wait 30s, then check a known-good approve
+curl -X POST http://localhost:9095/api/optimization/approve \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"recommendation_id": "...", "site_id": "site-002", "setpoints_to_apply": [...]}'
+# results[0].success should now be true
+```
+
+**If error persists after restart:** The equipment JSON is missing `object_type` or `instance`
+on the point. Check `backend/app/data/sites/site-002/equipment/{device}.json`:
+```bash
+cat backend/app/data/sites/site-002/equipment/S002-FCU-001.json | jq '.points.setpoint'
+# Must have object_type and instance fields
+```
+
+---
+
+### Issue 9: "Telegram advisory button expired before operator could approve"
+
+**Symptom:** Operator receives Telegram advisory, taps Approve hours later, gets
+`status=expired` or the recommendation is no longer pending.
+
+**Background:** Each time the AI optimizer runs (every 30 min), it generates a new
+setpoint rec for the same device+point. Without supersession, the prior rec stays
+`pending` in the DB even as newer recs pile up. The background expiry job
+(`EXPIRY_HOURS=24`) would then dedup-expire old pending recs in bulk, which could
+race with an in-flight approve attempt.
+
+**Fix applied (2026-06-14):** `expire_superseded_setpoints()` is now called in the
+`POST /optimization/analyze` G1 persist step, immediately before inserting each new
+setpoint rec. All prior `pending` recs for the same `site_id + target_equipment +
+action.point` are expired atomically. This means only the most recently generated rec
+is ever pending — the one the Telegram bot was called on when the advisory fired.
+
+**Operator workflow (corrected):** When the Telegram advisory fires, the Sentry bot
+holds the `recommendation_id` from the freshest rec. Older recs for the same device+point
+are already expired. Approving within 24h of the advisory fire time will always find a
+live `pending` rec.
+
+**If approval still fails with `status=expired`:** The rec was superseded by a newer
+analysis cycle before approval. Check when the rec was generated vs. when approve was
+attempted:
+```sql
+SELECT id, status, timestamp, target_equipment, action->>'point' as point
+FROM recommendations
+WHERE site_id = 'site-002'
+  AND target_equipment = 'S002-FCU-001'
+  AND action->>'point' = 'setpoint'
+ORDER BY timestamp DESC
+LIMIT 5;
+-- Most recent pending row is the approachable one
+```
 
 ---
 

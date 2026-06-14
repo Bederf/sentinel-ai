@@ -2,9 +2,9 @@
 title: "Device Abstraction Layer Deep Dive"
 type: "architecture"
 status: "approved"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-01-30"
-updated: "2026-01-30"
+updated: "2026-06-14"
 author: "Sentinel Development Team"
 tags: ["architecture", "device-abstraction", "protocols", "bms"]
 related: ["system-overview.md", "NAMING_CONVENTIONS.md", "../07-integrations/bacnet-integration.md"]
@@ -204,12 +204,16 @@ class BACnetAdapter(DeviceAdapter):
         """Read BACnet object property."""
         point = self.device.points[point_name]
 
+        # BACnet addressing comes from point.metadata, not top-level fields
+        bacnet_type = point.metadata.get("bacnet_object_type")
+        bacnet_instance = point.metadata.get("bacnet_instance")
+
         # BACnet read property
         value = await self.bacnet_client.read_property(
             address=self.device.address,
-            object_type=point.bacnet_object_type,
-            object_instance=point.bacnet_instance,
-            property_id=point.bacnet_property
+            object_type=bacnet_type,
+            object_instance=bacnet_instance,
+            property_id="presentValue"
         )
 
         return DeviceValue(
@@ -626,9 +630,12 @@ async def test_bacnet_adapter_read():
         points={
             "chw_supply_temp": DevicePoint(
                 name="chw_supply_temp",
-                bacnet_object_type="analogInput",
-                bacnet_instance=0,
-                bacnet_property="presentValue"
+                point_type=PointType.ANALOG_INPUT,
+                metadata={
+                    "bacnet_object_type": "analogInput",
+                    "bacnet_instance": 0,
+                    "bacnet_ref": "S001-CHILLER-B1-001.chw_supply_temp",
+                },
             )
         }
     )
@@ -703,6 +710,65 @@ device = await device_manager.get_device(device_id)
 
 # Subsequent calls return cached device
 device = await device_manager.get_device(device_id)
+```
+
+## Equipment Loading at Startup
+
+On startup, `DeviceManager` is populated from equipment JSON files in
+`backend/app/data/sites/{site_id}/equipment/`. Each JSON file is transformed
+into the device model by `_transform_equipment_to_device` (`backend/app/api/devices.py`).
+
+### Equipment JSON Format
+
+```json
+{
+  "id": "S002-AHU-B01",
+  "protocol": "bacnet",
+  "points": {
+    "setpoint": {
+      "object_type": "analogOutput",
+      "instance": 1005,
+      "bacnet_ref": "S002-AHU-B1-001.setpoint",
+      "writable": true,
+      "unit": ""
+    }
+  }
+}
+```
+
+### DevicePoint Metadata Contract
+
+`_transform_equipment_to_device` maps the JSON's `object_type` and `instance`
+fields into `DevicePoint.metadata` so adapters can resolve BACnet addresses:
+
+```python
+DevicePoint(
+    name="setpoint",
+    point_type=PointType.ANALOG_OUTPUT,
+    writable=True,
+    metadata={
+        "bacnet_object_type": "analogOutput",  # from JSON object_type
+        "bacnet_instance": 1005,               # from JSON instance
+        "bacnet_ref": "S002-AHU-B1-001.setpoint",
+    },
+)
+```
+
+**Critical invariant:** `NiagaraBACnetAdapter._protocol_write` and `_protocol_read`
+read `point.metadata["bacnet_object_type"]` and `point.metadata["bacnet_instance"]`
+to resolve the BACnet address. If either is `None`, the write raises `ValueError`
+before touching the wire. Always ensure the equipment JSON includes `object_type`
+and `instance` on every writable point.
+
+### Startup Flow
+
+```
+app_lifespan → startup_event() [events.py]
+    └─ devices_startup() [api/devices.py]
+        ├─ load_equipment_from_buildings()   # scans data/sites/*/equipment/*.json
+        │   └─ _transform_equipment_to_device()  # sets point.metadata BACnet keys
+        └─ device_manager.add_device()       # creates NiagaraBACnetAdapter per device
+            └─ adapter.connect()             # BACnet handshake (non-blocking on fail)
 ```
 
 ## Related Documentation

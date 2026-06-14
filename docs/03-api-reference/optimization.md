@@ -4,7 +4,7 @@ type: "reference"
 status: "draft"
 version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-05-17"
+updated: "2026-06-14"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -130,6 +130,26 @@ When `optimization_routing_enforced=True`:
 - **Shadow mode** (default, `optimization_routing_enforced=False`): Routing decisions are computed and logged but do not change existing behavior. Auto-apply uses legacy `site_mode` logic.
 - **Enforce mode** (`optimization_routing_enforced=True`): Routing decisions control auto-apply and approval paths. Only tier3+safety-passed items are auto-applied.
 
+## Setpoint Recommendation Supersession
+
+Every `POST /optimization/analyze` call generates new setpoint recs and persists them
+via the G1 insert step. Before inserting each new rec, the system calls
+`expire_superseded_setpoints()` which expires all existing `pending` recs for the same
+`site_id + target_equipment + action.point` combination.
+
+**Why this matters for supervised mode:** The Sentry bot dispatches a Telegram advisory
+that carries a specific `recommendation_id`. If the optimizer ran again before the operator
+approved, the prior ID would still be `pending` and the approve call would land on a stale
+value. Supersession ensures only the freshest rec per device+point is ever `pending`.
+
+**What is superseded:** Only `pending` recs with an identical `target_equipment` +
+`action->>'point'` key. Recs for different points on the same device, or recs of type
+`maintenance`, are not touched.
+
+**Background expiry:** A separate job (`recommendation_expiry`, every 6h) expires pending
+recs older than 24h and deduplicates noisy duplicates (keeps top-3 per action type).
+Supersession happens at insert time, expiry cleans up any stragglers.
+
 ## ML Context Injection (Phase 132)
 
 When `POST /optimization/analyze` is called, the AI Optimizer now gathers ML model outputs before building Claude's prompt. This bridges trained ML models (20 active) with Claude's recommendation engine.
@@ -210,7 +230,7 @@ If 3 predictions exist:
 
 ### Client Conversation
 
-**Peter Marshall asks:** "How did you arrive at R2.6M?"
+**the client asks:** "How did you arrive at R2.6M?"
 
 **Response:** "That's the sum of potential losses from 3 ML-flagged equipment risks. It includes replacement costs, downtime estimates, and energy penalties. If SENTINEL's preventive recommendations are actioned — scheduling the chiller bearing inspection, replacing the AHU belt, clearing the pump intake — those losses are avoided. The number updates daily as new predictions arrive and existing ones are resolved."
 

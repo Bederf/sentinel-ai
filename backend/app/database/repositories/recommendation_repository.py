@@ -194,6 +194,39 @@ class RecommendationRepository(SupabaseRepository):
             logger.error("Supabase query failed: %s", e)
             return []
 
+    async def expire_superseded_setpoints(self, site_id: str, target_equipment: str, point_name: str) -> int:
+        """Expire all pending setpoint recs for equipment+point, superseded by a new one.
+
+        Called before creating a new ai_optimization rec so stale Telegram advisories
+        can't be approved after the value has already been updated.
+        """
+        client = await self.get_client()
+        if not client:
+            return 0
+        try:
+            result = await (
+                client.table("recommendations")
+                .update({"status": "expired"})
+                .eq("site_id", site_id)
+                .eq("target_equipment", target_equipment)
+                .eq("status", "pending")
+                .filter("action->>point", "eq", point_name)
+                .execute()
+            )
+            count = len(result.data or [])
+            if count:
+                cache.delete_pattern("recommendations:*")
+                logger.info(
+                    "[REC-SUPERSEDE] Expired %d stale pending recs for %s/%s",
+                    count,
+                    target_equipment,
+                    point_name,
+                )
+            return count
+        except Exception as e:
+            logger.warning("expire_superseded_setpoints failed for %s/%s: %s", target_equipment, point_name, e)
+            return 0
+
     async def _supabase_update(self, rec_id: str, rec_dict: dict[str, Any]) -> dict[str, Any] | None:
         """Update recommendation in Supabase."""
         client = await self.get_client()

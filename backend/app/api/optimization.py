@@ -499,14 +499,14 @@ def _raise_controls_module_required(site_id: str) -> None:
     )
 
 
-def load_sites():
+async def load_sites():
     """Load sites from Supabase only — Phase 183 Supabase-only model."""
     if settings.use_json_storage:
         return []
 
     try:
         repo = SiteRepository()
-        buildings = repo.get_all()
+        buildings = await repo.get_all()
         if buildings:
             sites = []
             for b in buildings:
@@ -531,7 +531,7 @@ def load_sites():
         return []
 
 
-def save_sites(sites: list[dict[str, Any]]):
+async def save_sites(sites: list[dict[str, Any]]):
     """Save sites to Supabase only — Phase 183 Supabase-only model."""
     if settings.use_json_storage:
         return
@@ -548,7 +548,7 @@ def save_sites(sites: list[dict[str, Any]]):
                 "last_optimization": site.get("last_optimization"),
                 "optimization_history": site.get("optimization_history", []),
             }
-            repo.update(site_id, update_data)
+            await repo.update(site_id, update_data)
         return
     except Exception as e:
         logger.error(f"Failed to save sites to Supabase: {e}")
@@ -593,7 +593,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
         cross_system_count = len(rec_dict.get("cross_system_recommendations", []) or [])
 
         # Update site status
-        sites = load_sites() or []
+        sites = await load_sites() or []
         site = next((s for s in sites if s.get("id") == request.site_id), None)
 
         # Check if site is in automatic mode (auto-apply without human approval)
@@ -681,6 +681,9 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
                 correlation_id=_correlation_id,
             )
             try:
+                # Supersede stale pending recs for same equipment+point before inserting
+                if _rec_obj.target_equipment and point:
+                    await _rec_repo.expire_superseded_setpoints(request.site_id, _rec_obj.target_equipment, point)
                 _rec_obj = await _rec_repo.create(_rec_obj)
             except Exception as _persist_err:
                 logger.warning(
@@ -956,7 +959,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
             if len(site["optimization_history"]) > 50:
                 site["optimization_history"] = site["optimization_history"][-50:]
 
-            save_sites(sites)
+            await save_sites(sites)
 
         return attach_ai_provenance(
             {
@@ -1096,7 +1099,7 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
 
         # --- Routing tier validation (Phase 82-03) ---
         # Load routing details from the last recommendation stored on the site
-        sites = load_sites() or []
+        sites = await load_sites() or []
         site = next((s for s in sites if s.get("id") == body.site_id), None)
         last_recommendation = {}
         if site:
@@ -1355,7 +1358,7 @@ async def approve_optimization(request: Request, body: ApproveRequest = Body(...
                 )
                 site["optimization_history"].append(history_entry.to_dict())
 
-            save_sites(sites)
+            await save_sites(sites)
 
         return {
             "success": approval_success,
@@ -1510,7 +1513,7 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> dict[str,
     """
     try:
         site_repo = SiteRepository()
-        site = site_repo.get_by_id(site_id)
+        site = await site_repo.get_by_id(site_id)
 
         if not site:
             raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
@@ -1536,7 +1539,7 @@ async def toggle_optimization(site_id: str, request: ToggleRequest) -> dict[str,
             site["last_recommendation"] = None
 
         # Update in Supabase
-        site_repo.update(
+        await site_repo.update(
             site_id,
             {
                 "optimization_enabled": request.enabled,
