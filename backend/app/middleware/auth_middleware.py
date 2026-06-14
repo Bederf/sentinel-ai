@@ -550,6 +550,24 @@ async def _authenticate_request(request: Request) -> AuthContext | None:
         logger.warning("Auth failure: invalid Sentry bot API key from ip=%s path=%s", source_ip, request.url.path)
         return None
 
+    # Try internal service key (X-Internal-Service header — service-to-service only)
+    internal_key = request.headers.get("X-Internal-Service", "")
+    if internal_key and settings.internal_service_key and settings.internal_service_key != "sentinel-internal":
+        if hmac.compare_digest(internal_key, settings.internal_service_key):
+            auth_ctx = AuthContext(
+                user_id="svc:phase-promoter",
+                role=SentinelRole.OPERATOR,
+                auth_method="internal_service_key",
+                source_ip=source_ip,
+                email="phase-promoter@sentinel.local",
+                scopes=["phase:promote"],
+                metadata={"description": "internal_service_key"},
+            )
+            logger.debug("Auth success: user=svc:phase-promoter method=internal_service_key ip=%s", source_ip)
+            return auth_ctx
+        logger.warning("Auth failure: invalid internal service key from ip=%s path=%s", source_ip, request.url.path)
+        return None
+
     # Try API key
     api_key = _extract_api_key(request)
     if api_key:
