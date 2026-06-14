@@ -23,32 +23,26 @@ class TestEffectivePhaseModuleOverride:
 
     @pytest.mark.asyncio
     async def test_effective_phase_uses_module_override(self, monkeypatch):
-        """effective_phase returns module override when site_modules has one."""
+        """effective_phase returns module override when site_modules has phase_override set."""
 
-        class FakeQuery:
-            def __init__(self, data):
-                self._data = data
+        def _make_async_chain(data):
+            chain = MagicMock()
+            chain.select.return_value = chain
+            chain.eq.return_value = chain
+            result = MagicMock()
+            result.data = data
+            chain.execute = AsyncMock(return_value=result)
+            return chain
 
-            def select(self, *_a, **_kw):
-                return self
-
-            def eq(self, *_a, **_kw):
-                return self
-
-            def execute(self):
-                result = MagicMock()
-                result.data = self._data
-                return result
-
-        class FakeSupabase:
+        class FakeAsyncSupabase:
             def table(self, name: str):
                 if name == "site_modules":
-                    return FakeQuery([{"phase_override": "supervised"}])
-                return FakeQuery([{"onboarding_phase": "shadow"}])
+                    return _make_async_chain([{"phase_override": "supervised"}])
+                return _make_async_chain([{"onboarding_phase": "shadow"}])
 
         monkeypatch.setattr(
-            "app.database.supabase_client.get_supabase_client",
-            lambda: FakeSupabase(),
+            "app.database.supabase_client.get_async_supabase_client",
+            AsyncMock(return_value=FakeAsyncSupabase()),
         )
 
         from app.models.onboarding_phase import effective_phase
@@ -60,31 +54,24 @@ class TestEffectivePhaseModuleOverride:
     async def test_effective_phase_falls_back_to_site(self, monkeypatch):
         """effective_phase uses site-level phase when module override is None."""
 
-        class FakeQuery:
-            def __init__(self, data):
-                self._data = data
+        def _make_async_chain(data):
+            chain = MagicMock()
+            chain.select.return_value = chain
+            chain.eq.return_value = chain
+            result = MagicMock()
+            result.data = data
+            chain.execute = AsyncMock(return_value=result)
+            return chain
 
-            def select(self, *_a, **_kw):
-                return self
-
-            def eq(self, *_a, **_kw):
-                return self
-
-            def execute(self):
-                result = MagicMock()
-                result.data = self._data
-                return result
-
-        class FakeSupabase:
+        class FakeAsyncSupabase:
             def table(self, name: str):
                 if name == "site_modules":
-                    # phase_override is None → fall through
-                    return FakeQuery([{"phase_override": None}])
-                return FakeQuery([{"onboarding_phase": "advisory"}])
+                    return _make_async_chain([{"phase_override": None}])
+                return _make_async_chain([{"onboarding_phase": "advisory"}])
 
         monkeypatch.setattr(
-            "app.database.supabase_client.get_supabase_client",
-            lambda: FakeSupabase(),
+            "app.database.supabase_client.get_async_supabase_client",
+            AsyncMock(return_value=FakeAsyncSupabase()),
         )
 
         from app.models.onboarding_phase import effective_phase
@@ -96,28 +83,22 @@ class TestEffectivePhaseModuleOverride:
     async def test_effective_phase_falls_back_to_site_no_module_type(self, monkeypatch):
         """effective_phase uses site-level phase when no module_type provided."""
 
-        class FakeQuery:
-            def __init__(self, data):
-                self._data = data
+        def _make_async_chain(data):
+            chain = MagicMock()
+            chain.select.return_value = chain
+            chain.eq.return_value = chain
+            result = MagicMock()
+            result.data = data
+            chain.execute = AsyncMock(return_value=result)
+            return chain
 
-            def select(self, *_a, **_kw):
-                return self
-
-            def eq(self, *_a, **_kw):
-                return self
-
-            def execute(self):
-                result = MagicMock()
-                result.data = self._data
-                return result
-
-        class FakeSupabase:
-            def table(self, name: str):
-                return FakeQuery([{"onboarding_phase": "supervised"}])
+        class FakeAsyncSupabase:
+            def table(self, _name: str):
+                return _make_async_chain([{"onboarding_phase": "supervised"}])
 
         monkeypatch.setattr(
-            "app.database.supabase_client.get_supabase_client",
-            lambda: FakeSupabase(),
+            "app.database.supabase_client.get_async_supabase_client",
+            AsyncMock(return_value=FakeAsyncSupabase()),
         )
 
         from app.models.onboarding_phase import effective_phase
@@ -129,11 +110,11 @@ class TestEffectivePhaseModuleOverride:
     async def test_effective_phase_defaults_to_shadow_on_exception(self, monkeypatch):
         """effective_phase returns 'shadow' when Supabase raises an exception."""
 
-        def raise_error():
+        async def raise_error():
             raise ConnectionError("Supabase unreachable")
 
         monkeypatch.setattr(
-            "app.database.supabase_client.get_supabase_client",
+            "app.database.supabase_client.get_async_supabase_client",
             raise_error,
         )
 
@@ -146,28 +127,22 @@ class TestEffectivePhaseModuleOverride:
     async def test_effective_phase_defaults_to_shadow_on_empty_site(self, monkeypatch):
         """effective_phase returns 'shadow' when site row is missing."""
 
-        class FakeQuery:
-            def __init__(self):
-                pass
+        def _make_async_chain(data):
+            chain = MagicMock()
+            chain.select.return_value = chain
+            chain.eq.return_value = chain
+            result = MagicMock()
+            result.data = data
+            chain.execute = AsyncMock(return_value=result)
+            return chain
 
-            def select(self, *_a, **_kw):
-                return self
-
-            def eq(self, *_a, **_kw):
-                return self
-
-            def execute(self):
-                result = MagicMock()
-                result.data = []  # No site found
-                return result
-
-        class FakeSupabase:
+        class FakeAsyncSupabase:
             def table(self, _name: str):
-                return FakeQuery()
+                return _make_async_chain([])
 
         monkeypatch.setattr(
-            "app.database.supabase_client.get_supabase_client",
-            lambda: FakeSupabase(),
+            "app.database.supabase_client.get_async_supabase_client",
+            AsyncMock(return_value=FakeAsyncSupabase()),
         )
 
         from app.models.onboarding_phase import effective_phase
@@ -179,31 +154,24 @@ class TestEffectivePhaseModuleOverride:
     async def test_effective_phase_module_override_empty_returns_site_phase(self, monkeypatch):
         """phase_override='' (empty string) falls through to site-level phase."""
 
-        class FakeQuery:
-            def __init__(self, data):
-                self._data = data
+        def _make_async_chain(data):
+            chain = MagicMock()
+            chain.select.return_value = chain
+            chain.eq.return_value = chain
+            result = MagicMock()
+            result.data = data
+            chain.execute = AsyncMock(return_value=result)
+            return chain
 
-            def select(self, *_a, **_kw):
-                return self
-
-            def eq(self, *_a, **_kw):
-                return self
-
-            def execute(self):
-                result = MagicMock()
-                result.data = self._data
-                return result
-
-        class FakeSupabase:
+        class FakeAsyncSupabase:
             def table(self, name: str):
                 if name == "site_modules":
-                    # Empty string is falsy → fall through
-                    return FakeQuery([{"phase_override": ""}])
-                return FakeQuery([{"onboarding_phase": "auto"}])
+                    return _make_async_chain([{"phase_override": ""}])
+                return _make_async_chain([{"onboarding_phase": "auto"}])
 
         monkeypatch.setattr(
-            "app.database.supabase_client.get_supabase_client",
-            lambda: FakeSupabase(),
+            "app.database.supabase_client.get_async_supabase_client",
+            AsyncMock(return_value=FakeAsyncSupabase()),
         )
 
         from app.models.onboarding_phase import effective_phase

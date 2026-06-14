@@ -63,10 +63,8 @@ class PhasePromotionEvaluator:
             "target": "supervised",
             "gates": [
                 "ml_hours_ingested >= 500",
-                "time_in_advisory_days >= 30",
-                "recommendations_generated >= 50",
+                "recommendations_acknowledged >= 3",
                 "no_safety_violations_30d",
-                "bridge_connected_uptime_pct >= 0.90",
             ],
         },
         "supervised": {
@@ -83,7 +81,17 @@ class PhasePromotionEvaluator:
     }
 
     def __init__(self):
-        pass
+        self._internal_key: str | None = None
+        self._backend_url: str | None = None
+
+    async def _ensure_config(self) -> None:
+        """Load internal service key and backend URL from settings (idempotent)."""
+        if self._internal_key and self._backend_url:
+            return
+        from app.config.settings import settings
+
+        self._internal_key = getattr(settings, "internal_service_key", "") or ""
+        self._backend_url = getattr(settings, "backend_base_url", "http://127.0.0.1:9095") or "http://127.0.0.1:9095"
 
     async def evaluate_all_sites(self) -> list[PromotionResult]:
         """Evaluate every site for promotion eligibility. Called by scheduler."""
@@ -115,13 +123,14 @@ class PhasePromotionEvaluator:
         return results
 
     async def evaluate_site(self, site_id: str, current_phase: str) -> PromotionResult:
-        """Check all gates for a site's current phase and surface readiness.
+        """Check all gates and auto-promote via the PATCH /api/sites/{site_id}/phase endpoint.
 
-        Commissioning → shadow_live auto-promotes when gates pass (data quality
-        gate protects against data floods). Higher phases require human approval.
+        All phases auto-promote via the API (not direct DB writes) so that audit
+        logs record changed_by="phase_promotion_evaluator" instead of "system".
         """
-        from app.config.settings import settings
-        from supabase import create_client
+        import json
+
+        import httpx
 
         gates_config = self.PROMOTION_GATES.get(current_phase)
         if not gates_config:
@@ -134,35 +143,40 @@ class PhasePromotionEvaluator:
         all_passed = all(g.passed for g in gate_results)
 
         if all_passed:
-            # Commissioning → shadow_live: auto-promote (data quality gates protect pipeline)
-            if current_phase == "commissioning":
-                target = gates_config["target"]
-                try:
-                    client = create_client(settings.supabase_url, settings.supabase_service_role_key)
-                    client.table("sites").update({"onboarding_phase": target}).eq("code", site_id).execute()
-                    logger.info("Auto-promoted %s: commissioning → %s (data quality gates passed)", site_id, target)
-                    return PromotionResult(
-                        eligible=True,
-                        promoted=True,
-                        from_phase=current_phase,
-                        to_phase=target,
-                        reason="gate_auto_promoted_data_quality_verified",
-                        gates=gate_results,
-                    )
-                except Exception as e:
-                    logger.error("Auto-promotion failed for %s: %s", site_id, e)
-                    return PromotionResult(eligible=True, promoted=False, reason=str(e), gates=gate_results)
-
-            # Higher phases: set ready flag for human decision
-            await self._set_ready_flag(site_id, current_phase, gates_config["target"], gate_results)
-            return PromotionResult(
-                eligible=True,
-                promoted=False,
-                from_phase=current_phase,
-                to_phase=gates_config["target"],
-                reason="gates_passed_ready_for_human_decision",
-                gates=gate_results,
+            target = gates_config["target"]
+            await self._ensure_config()
+            reason_payload = json.dumps(
+                {
+                    "trigger": "auto_promotion",
+                    "from_phase": current_phase,
+                    "gate_results": [g.to_dict() for g in gate_results],
+                }
             )
+            try:
+                async with httpx.AsyncClient() as client:
+                    resp = await client.patch(
+                        f"{self._backend_url}/api/sites/{site_id}/phase",
+                        json={
+                            "phase": target,
+                            "changed_by": "phase_promotion_evaluator",
+                            "reason": reason_payload,
+                        },
+                        headers={"X-Internal-Service": self._internal_key or ""},
+                        timeout=30,
+                    )
+                    resp.raise_for_status()
+                logger.info("Auto-promoted %s: %s → %s (all gates passed)", site_id, current_phase, target)
+                await self._notify_promoted(site_id, current_phase, target, gate_results)
+                return PromotionResult(
+                    eligible=True,
+                    promoted=True,
+                    from_phase=current_phase,
+                    to_phase=target,
+                    gates=gate_results,
+                )
+            except Exception as e:
+                logger.error("Auto-promotion API call failed for %s: %s", site_id, e)
+                return PromotionResult(eligible=True, promoted=False, reason=str(e), gates=gate_results)
 
         return PromotionResult(eligible=False, gates=gate_results)
 
@@ -201,14 +215,14 @@ class PhasePromotionEvaluator:
 
         await self._notify_ready(site_id, from_phase, to_phase, gate_results)
 
-    async def _notify_ready(
+    async def _notify_promoted(
         self,
         site_id: str,
         from_phase: str,
         to_phase: str,
         gate_results: list[GateResult],
     ) -> None:
-        """Send Telegram alert that a site is ready for human-led phase promotion."""
+        """Send Telegram alert that a site was auto-promoted."""
         ml_hours = 0.0
         for g in gate_results:
             if g.gate.startswith("ml_hours_ingested") and isinstance(g.value, (int, float)):
@@ -219,21 +233,20 @@ class PhasePromotionEvaluator:
             from app.models.notification import AlertLevel
             from app.services.notification_service import notification_service
 
-            title = f"SENTINEL Phase Ready — {site_id.upper()}"
+            title = f"SENTINEL Phase Promotion — {site_id.upper()}"
             body = (
-                f"Ready to advance: {from_phase} → {to_phase}\n"
-                f"All Trust Ladder gates have passed.\n"
-                f"ML hours ingested: {ml_hours:.0f}h\n"
-                f"Flip the phase in SENTINEL Settings when ready."
+                f"Auto-promoted: {from_phase} → {to_phase}\n"
+                f"All Trust Ladder gates passed.\n"
+                f"ML hours ingested: {ml_hours:.0f}h"
             )
             await notification_service.send_alert_direct(
                 title=title,
                 body=body,
                 alert_level=AlertLevel.INFO,
             )
-            logger.info("Readiness notification sent for %s", site_id)
+            logger.info("Promotion notification sent for %s", site_id)
         except Exception as e:
-            logger.warning("Readiness notification failed for %s: %s", site_id, e)
+            logger.warning("Promotion notification failed for %s: %s", site_id, e)
 
     async def _evaluate_gates(
         self,

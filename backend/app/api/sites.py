@@ -468,7 +468,7 @@ class SiteListResponse(BaseModel):
     sites: list[SiteResponse]
 
 
-def get_sites_from_supabase(
+async def get_sites_from_supabase(
     region: str | None = None,
     site_type: str | None = None,
     user_email: str | None = None,
@@ -487,11 +487,11 @@ def get_sites_from_supabase(
 
         # Filter by user access if auth context provided
         if user_email and user_role:
-            buildings = repo.get_all_for_user(
+            buildings = await repo.get_all_for_user(
                 user_email=user_email, user_role=user_role, region=region, site_type=site_type
             )
         else:
-            buildings = repo.get_all(region=region, site_type=site_type)
+            buildings = await repo.get_all(region=region, site_type=site_type)
 
         if not buildings:
             return [], False
@@ -545,14 +545,14 @@ def get_sites_from_supabase(
         return [], False
 
 
-def get_site_from_supabase(site_id: str) -> tuple[dict | None, bool]:
+async def get_site_from_supabase(site_id: str) -> tuple[dict | None, bool]:
     """Try to get a single site from Supabase. Returns (site, success)."""
     if settings.use_json_storage:
         return None, False
 
     try:
         repo = SiteRepository()
-        building = repo.get_by_id(site_id)
+        building = await repo.get_by_id(site_id)
 
         if not building:
             return None, True  # Success but not found
@@ -601,7 +601,7 @@ async def list_sites(
     user_role = auth.role
 
     # Try Supabase first (with user filtering)
-    sites, success = get_sites_from_supabase(
+    sites, success = await get_sites_from_supabase(
         region=region, site_type=site_type, user_email=user_email, user_role=user_role
     )
 
@@ -1496,7 +1496,11 @@ def _save_phase_state(state: dict) -> None:
 
 
 @router.patch("/sites/{site_id}/phase", response_model=PhaseUpdateResponse)
-async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseUpdateResponse:
+async def update_site_phase(
+    site_id: str,
+    request: PhaseUpdateRequest,
+    auth: AuthContext = Depends(require_site_access("site_id", auth_level=AuthLevel.OPERATOR)),
+) -> PhaseUpdateResponse:
     """Set the onboarding phase for a site.
 
     Progresses SENTINEL's trust-building model:
@@ -1615,10 +1619,8 @@ async def update_site_phase(site_id: str, request: PhaseUpdateRequest) -> PhaseU
                     "site_id": site_id,
                     "from_phase": previous_phase,
                     "to_phase": requested,
-                    "changed_by": request.changed_by
-                    if hasattr(request, "changed_by") and request.changed_by
-                    else "system",
-                    "reason": request.reason if hasattr(request, "reason") else None,
+                    "changed_by": auth.email or (request.changed_by if request.changed_by else "system"),
+                    "reason": request.reason,
                 }
             )
             .execute()
@@ -1814,7 +1816,7 @@ async def get_site(
     bridge_status = _get_bridge_status(sentinel_enabled=sentinel_enabled)
 
     # Try Supabase first
-    site, success = get_site_from_supabase(site_id)
+    site, success = await get_site_from_supabase(site_id)
 
     if success:
         if site:
@@ -1956,7 +1958,7 @@ async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
     for site_id in unique_site_ids:
         try:
             # Try Supabase first
-            site, success = get_site_from_supabase(site_id)
+            site, success = await get_site_from_supabase(site_id)
 
             if success and site:
                 status = calculate_site_status_from_equipment(site.get("equipment_status"))

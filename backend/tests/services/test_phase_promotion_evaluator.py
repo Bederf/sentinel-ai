@@ -37,6 +37,10 @@ def _make_table_chain(data: list | None = None, count: int = 0):
     chain.neq.return_value = chain
     chain.gte.return_value = chain
     chain.is_.return_value = chain
+    chain.ilike.return_value = chain
+    chain.in_.return_value = chain
+    chain.filter.return_value = chain
+    chain.order.return_value = chain
     chain.limit.return_value = chain
     result = MagicMock()
     result.data = data or []
