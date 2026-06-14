@@ -37,9 +37,7 @@ def _require_sentry_email_secret(
     endpoint_name: str = "email_intake",
 ) -> None:
     """Validate webhook secret with fail-closed behaviour in live mode."""
-    configured_secret = (
-        os.getenv("SENTRY_EMAIL_WEBHOOK_SECRET", "") or os.getenv("SENTRY_WEBHOOK_SECRET", "") or ""
-    ).strip()
+    configured_secret = (settings.sentry_webhook_secret or os.getenv("SENTRY_EMAIL_WEBHOOK_SECRET", "") or "").strip()
 
     if not configured_secret:
         if getattr(settings, "is_live_mode", False):
@@ -48,7 +46,7 @@ def _require_sentry_email_secret(
         return  # Allow in simulation mode
 
     if not provided_secret or not hmac.compare_digest(provided_secret, configured_secret):
-        raise HTTPException(status_code=403, detail="Unauthorized")
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # ── Request Model (from n8n layers 1-3 only) ─────────────────────
@@ -291,7 +289,7 @@ async def _enrich_with_bms(
         wo_repo = WorkOrderRepository()
 
         # Step 1: Resolve site_id (code like "site-002") to site UUID
-        site = site_repo.get_by_id(site_id)
+        site = await site_repo.get_by_id(site_id)
         if not site:
             logger.warning(f"Site {site_id} not found in database")
             return bms_context
@@ -299,7 +297,7 @@ async def _enrich_with_bms(
         site_uuid = site.get("id")
 
         # Step 2: Get active alerts for this site
-        active_alerts = alert_repo.get_active_by_site(site_uuid)
+        active_alerts = await alert_repo.get_active_by_site(site_uuid)
         if active_alerts:
             # Filter by floor if provided
             alerts_for_floor = []

@@ -190,6 +190,20 @@ async def require_mcp_auth(request: Request) -> AuthContext:
                 detail="Invalid MCP authentication token",
             )
 
+    # Demo mode: allow localhost callers without a token
+    if settings.demo_mode and source_ip in _LOCALHOST_IPS:
+        demo_ctx = AuthContext(
+            user_id="demo-user",
+            role=SentinelRole.OPERATOR,
+            auth_method="demo_mode",
+            source_ip=source_ip,
+            email="demo@sentinel.local",
+            scopes=["operator:all"],
+            metadata={"demo_mode": True},
+        )
+        logger.debug("MCP auth via demo_mode localhost bypass: ip=%s", source_ip)
+        return demo_ctx
+
     # No valid credentials
     if not settings.mcp_auth_token:
         logger.error("MCP_AUTH_TOKEN not configured — MCP SSE endpoint unavailable")

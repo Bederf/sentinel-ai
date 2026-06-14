@@ -76,8 +76,11 @@ async def test_refresh_rotation_blacklists_old_refresh_token(monkeypatch):
     body = auth_api.RefreshTokenRequest(refresh_token="old-refresh-token")
     result = await auth_api.refresh_access_token(_make_request(), body)
 
-    assert result["access_token"].startswith("access-token-")
-    assert result["refresh_token"].startswith("refresh-token-")
+    import json
+
+    result_data = json.loads(result.body)
+    assert result_data["access_token"].startswith("access-token-")
+    assert result_data["refresh_token"].startswith("refresh-token-")
     assert blacklisted
     assert blacklisted[0][0] == "old-refresh-jti"
     assert blacklisted[0][1] > 0
@@ -128,7 +131,10 @@ async def test_logout_blacklists_access_and_refresh(monkeypatch):
 
     result = await auth_api.logout(request, refresh_token="refresh-token")
 
-    assert result["message"] == "Logged out successfully"
+    import json
+
+    result_data = json.loads(result.body)
+    assert result_data["message"] == "Logged out successfully"
     assert len(calls) == 2
     assert {call[0] for call in calls} == {"access-jti", "refresh-jti"}
 
