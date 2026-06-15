@@ -1,93 +1,140 @@
 # bacnet_device_id — S002 Operator Hand-off
 
 **Status:** Blocks supervised setpoint writes (Telegram approve → live BACnet write).
-**Last updated:** 2026-06-14.
+**Last updated:** 2026-06-14 (revised for Desigo CC).
 
 ---
 
-## What is this
+## Context: how SENTINEL reaches your equipment
 
 SENTINEL is now in **supervised** mode on site-002 (since 2026-06-11). Approve buttons on
-Telegram advisories drive live setpoint writes through the Niagara JACE BACnet controllers.
+Telegram advisories drive live setpoint writes that travel:
 
-To write a setpoint, SENTINEL needs the **BACnet device instance number** for each JACE
-controller — the address used to reach the physical controller on the BACnet/IP network.
-This is the number you see in tools like `Yabe`, `BACnetScan`, or in the Niagara station
-under the device's "Device Object" property.
+```
+Telegram approve
+  → SENTINEL backend
+  → BACnet/IP write (BAC0 client)
+  → your BACnet network
+  → field device (PXC/PXM panel, VAV controller, FCU controller, etc.)
+```
 
-SENTINEL does not know these numbers. They must be set by the site operator.
+SENTINEL does **not** use Desigo CC's REST API. It uses standard **BACnet/IP**. So we need
+the **BACnet device instance number** for every BACnet-speaking device on site-002's
+network — not the Desigo CC object designation, and not the Desigo CC automation station
+name.
+
+This applies regardless of which front-end manages the system (Desigo CC, Niagara, BACnet
+only). The transport is BACnet/IP either way.
 
 ---
 
-## What you need to give us
+## What we need
 
-**Three numbers** — one per Niagara JACE on site-002:
+**A list of `{equipment_code} → {BACnet device instance number}` pairs** for every BACnet
+device on the site-002 BACnet network. Each piece of equipment in SENTINEL's catalog
+(`S002-AHU-B01`, `S002-FCU-001`, `S002-CHILLER-R001`, etc.) is reachable as exactly one
+BACnet device.
 
-| Niagara station | Likely covers | Where to find the number |
-|-----------------|---------------|--------------------------|
-| JACE 1 (nc:18) | B1 plant — AHU, CHILLER, CT, PUMP, GEN, UPS, MTR | Niagara → station → device → Device Object → Instance |
-| JACE 2 (nc:10) | L1 floor — FCU, VAV, LUM, DALI | same |
-| JACE 3 (nc:15) | L2 floor — FCU, VAV, LUM | same |
+Easiest approach: do a **BACnet Who-Is scan** and return the mapping table.
 
-If your JACE names or zones don't match the table above, that's fine — what matters is
-which physical JACE each setpoint write must reach.
+### Option A — Give us the scan output
 
-**Format:** a positive integer (e.g. `180001`, `100001`).
+From any machine on the site-002 BACnet VLAN, run a BACnet discovery tool. Yabe (BACnet
+Explorer) is the simplest:
+
+1. Install Yabe (Windows) or `BAC0` (Python: `pip install BAC0`) on a laptop on the BACnet
+   network
+2. Run a Who-Is scan
+3. Export the device list as CSV / JSON
+4. For each device, look up its `object_name` (or vendor/description) and match it to
+   SENTINEL equipment codes (`S002-AHU-B01` etc.)
+5. Send us the table:
+
+   ```csv
+   bacnet_device_instance,equipment_code,vendor,description
+   180001,S002-AHU-B01,Siemens,PXC automation station basement
+   180002,S002-CHILLER-001,Siemens,Chiller 1 controller
+   ...
+   ```
+
+   If `object_name` already matches `S002-AHU-B01` etc., the mapping is trivial.
+
+### Option B — Give us only the automation station instances
+
+If the PXC/PXM panels proxy BACnet to the field devices, we may only need the **automation
+station** (PXC) device instance, and the field devices share that number with different
+object instances. In that case:
+
+- 1 number per PXC/PXM (typically 3–5 numbers for the whole site)
+- Confirm whether the field-level FCUs/VAVs/valves are reachable on BACnet directly or
+  proxied through the PXC
+
+**Tell us which option applies** when you send the data back.
+
+---
+
+## How to find the numbers in Desigo CC
+
+If you don't have a BACnet scanner handy, the Desigo CC Management Console also exposes
+device instance numbers:
+
+1. Open Desigo CC → **System Management** → **Devices**
+2. Filter by **Protocol = BACnet**
+3. The **Device Instance** column shows the BACnet device instance number
+4. The **Object Name** (or **Description**) is the human-readable label that should match
+   our equipment code
+
+Export the filtered list and send it over.
 
 ---
 
 ## How the numbers get applied
 
-Once you have the three numbers, send them to the SENTINEL team. We run:
+Once you send the mapping, we run:
 
 ```bash
 cd /opt/bms-intelligence/backend
-# 1. Update the 3 numbers in scripts/populate_bacnet_device_ids.py
-#    (BACNET_DEVICE_MAP at the top of the file)
+# 1. Update BACNET_DEVICE_MAP (or a CSV ingest step) at the top of:
 $EDITOR scripts/populate_bacnet_device_ids.py
 
 # 2. Preview which files will change
 source venv/bin/activate
 PYTHONPATH=. python3 scripts/populate_bacnet_device_ids.py --dry-run
 
-# 3. Apply the change
+# 3. Apply
 PYTHONPATH=. python3 scripts/populate_bacnet_device_ids.py --apply
 
-# 4. Verify
+# 4. Verify via the production transform
 PYTHONPATH=. python3 scripts/populate_bacnet_device_ids.py --verify
 
-# 5. Restart the backend so DeviceManager reloads the corrected metadata
+# 5. Restart the backend so DeviceManager reloads
 sudo systemctl restart sentinel-backend
 # Wait 30s before polling /api/health
 ```
 
 After step 5, the next Telegram approve on a S002 advisory will attempt a live BACnet write.
-Watch `/var/log/sentinel/backend.log` for `"BACnet write succeeded"` on the recommended
-equipment.
+Watch `/var/log/sentinel/backend.log` for `"BACnet write succeeded"`.
 
 ---
 
-## What if a JACE is in a different zone
+## What if a JACE/panel is in a different zone
 
-If the JACE→zone mapping in the table above is wrong, edit the `JACE_TO_PREFIX` block at
-the top of `scripts/populate_bacnet_device_ids.py`. The script will only update files whose
-name contains one of the configured prefixes for that JACE. Run `--dry-run` first to see
-the planned assignment before applying.
+If the equipment→controller mapping in the heuristic doesn't match your site layout, edit
+the `JACE_TO_PREFIX` block (or a CSV) at the top of `scripts/populate_bacnet_device_ids.py`.
+The script only updates equipment whose name contains one of the configured prefixes for
+that controller. Run `--dry-run` first.
+
+The cleanest fix is to give us the **per-equipment mapping** (Option A above) and skip the
+prefix heuristic entirely.
 
 ---
 
 ## Sanity check (optional)
 
-If you have access to a BACnet browser on the same VLAN:
-
-```bash
-# Discover all BACnet devices on the network
-bacnet-discover  # or use Yabe / a BACnet/IP scanner tool
-# Look for the 3 device instance numbers you gave us — they should be online
-```
-
-If the numbers don't show up in a Who-Is scan, the SENTINEL write will time out and the
-recommendation will be marked `write_failed` in the audit log.
+If you can do a Who-Is scan from the SENTINEL backend's network, the numbers should be
+visible to the BAC0 client. Failure mode is: numbers are on a separate VLAN or behind a
+BACnet router we can't reach — the write will time out and the recommendation will be
+marked `write_failed` in the audit log.
 
 ---
 
@@ -95,5 +142,6 @@ recommendation will be marked `write_failed` in the audit log.
 
 - SENTINEL memory: `~/.claude/projects/-opt-bms-intelligence/memory/bacnet-device-id-population.md`
 - Script: `backend/scripts/populate_bacnet_device_ids.py`
-- Adapter source: `backend/app/services/niagara/bacnet_adapter.py:110` (`bacnet_device_id` property)
+- Adapter contract: `backend/app/services/niagara/bacnet_adapter.py:110` (reads `device.metadata["bacnet_device_id"]`)
+- Transport: `backend/app/services/niagara/bacnet_client.py` (generic BAC0, not Niagara-specific despite the name)
 - S002 supervised phase (verified write chain pre-gap): `~/.claude/.../memory/s002-supervised-phase-2026-06-13.md`
