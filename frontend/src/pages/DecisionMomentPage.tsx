@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { CheckCircle, AlertTriangle, XCircle, X } from "lucide-react";
+import { CheckCircle, AlertTriangle, XCircle } from "lucide-react";
 
 import { UrgencyBar } from "../components/crisis/UrgencyBar";
 import { AdvisoryModeGuide } from "../components/AdvisoryModeGuide";
@@ -89,7 +89,7 @@ function ZoneChips({ zoneIds }: { zoneIds: string[] }) {
   );
 }
 
-export function DecisionMomentPage({ payload, onDismiss, siteId: _siteId }: DecisionMomentPageProps) {
+export function DecisionMomentPage({ payload, onDismiss: _onDismiss, siteId: _siteId }: DecisionMomentPageProps) {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {

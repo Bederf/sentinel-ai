@@ -5,7 +5,6 @@
  * Building tabs: All site-specific views, module-gated, shown inside SiteDetail
  */
 
-import { TrendingUp } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,

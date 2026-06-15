@@ -21,13 +21,6 @@ function normalizeSiteId(siteId: string): string {
   return siteId;
 }
 
-function authHeaders(): Record<string, string> {
-  // Note: authorizedFetch handles auth internally via in-memory access token
-  return {
-    "Content-Type": "application/json",
-  };
-}
-
 async function fetchJson<T>(endpoint: string): Promise<T> {
   try {
     const res = await authorizedFetch(`${API_BASE_URL}${endpoint}`, {

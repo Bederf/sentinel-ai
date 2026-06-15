@@ -5,7 +5,7 @@
  * Domain tabs: delegate to existing sub-panel components (migrated separately).
  */
 
-import { useState, useContext, type ReactNode } from "react";
+import { useState, useContext } from "react";
 import {
   ShieldCheck,
   AlertTriangle,

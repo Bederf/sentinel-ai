@@ -1,11 +1,9 @@
 import { apiFetch, ApiError } from './fetchClient';
-/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Options for batch aggregator factory
  */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore - T is part of the generic interface signature
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export interface BatchAggregatorOptions<T> {
   /** API endpoint to POST batched IDs to */
   endpoint?: string;

@@ -284,11 +284,9 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
   }, [energyFilterSiteId, selectedDays, buildingsList, autoSelectSiteId]);
 
   // Calculate site status counts for KPI
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore - Site type mismatch from legacy api.ts
+  // @ts-expect-error - Site type mismatch from legacy api.ts
   const _normalSites = buildingsList.filter((s: Site) => s.status === "normal").length;
-  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-  // @ts-ignore - Site type mismatch from legacy api.ts
+  // @ts-expect-error - Site type mismatch from legacy api.ts
   const warningSites = buildingsList.filter((s: Site) =>
     s.status === "warning" ||
     s.status === "critical" ||
@@ -590,8 +588,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
             />
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 p-4">
-              {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-              {/* @ts-ignore - JSX.Element vs Element type mismatch */}
+              {/* @ts-expect-error - JSX.Element vs Element type mismatch */}
               {visibleSites.map((site: Site, _index: number) => {
                 return (
                   <div key={site.id} className="relative">
@@ -669,8 +666,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                       }}
                     >
                       <option value="">All Sites</option>
-                      {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
-                      {/* @ts-ignore - JSX.Element vs Element type mismatch */}
+                      {/* @ts-expect-error - JSX.Element vs Element type mismatch */}
                       {buildingsList.map((site: Site, _index: number) => (
                         <option key={site.id} value={site.id}>
                           {site.name}

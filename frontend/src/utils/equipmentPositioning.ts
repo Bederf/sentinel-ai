@@ -261,7 +261,7 @@ export function distributeEquipmentInZone(
  * Make zone bounds for a single zone strip within a floor.
  * Zones are laid out in ZONE_STRIP_COUNT columns × auto rows grid.
  */
-function makeZoneBounds(zoneIndex: number, maxZones: number): ZoneBounds {
+function makeZoneBounds(zoneIndex: number, _maxZones: number): ZoneBounds {
   const stripsX = ZONE_STRIP_COUNT;
   const stripWidth = (BUILDING_MAX_X - BUILDING_MIN_X) / stripsX;
   const stripIndex = (zoneIndex - 1) % stripsX;

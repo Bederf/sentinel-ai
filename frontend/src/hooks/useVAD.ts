@@ -53,7 +53,7 @@ export function useVAD(options: UseVADOptions = {}): UseVADReturn {
   const {
     onSpeechEnd,
     onSpeechStart,
-    silenceThresholdMs = 1500,
+    _silenceThresholdMs = 1500,
     model = "v5",
   } = options;
 

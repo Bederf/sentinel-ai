@@ -185,7 +185,7 @@ export function useSpeechRecognition(
       setError("Failed to start speech recognition");
       setIsListening(false);
     }
-  }, [language]);
+  }, [language, continuousMode]);
 
   const stopListening = useCallback(() => {
     if (recognitionRef.current) {

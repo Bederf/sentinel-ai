@@ -11,7 +11,6 @@
  */
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import api from "@/lib/api";
 
 interface UseVoicePipelineOptions {
   /** Called with final transcript when speech segment ends (VAD silence) */
