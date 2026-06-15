@@ -243,6 +243,14 @@ def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
                 f"Likely root cause: fresh air supply disruption. "
                 f"Inspect AHUs and cooling plant."
             )
+            recommended_action = None
+        elif raw_type == "health":
+            group_title = f"Health — {count} equipment"
+            group_summary = (
+                f"{count} equipment units are in the health warning band (65-84), below the healthy threshold. "
+                f"Health scorer is running; scores should diversify as live telemetry and maintenance evidence accumulate."
+            )
+            recommended_action = "Review the affected equipment cohort and prioritize assets trending toward critical."
         else:
             type_label = raw_type.replace("_", " ").title()
             group_title = f"{type_label} — {count} equipment"
@@ -250,6 +258,7 @@ def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
                 f"{count} equipment units reporting {raw_type.replace('_', ' ')}. "
                 f"Review affected equipment and upstream systems."
             )
+            recommended_action = None
 
         sla_values = [m.issue.sla_due_at for m in members if m.issue.sla_due_at]
         member_asset_ids = [m.issue.location.asset_ids[0] for m in members if m.issue.location.asset_ids]
@@ -262,6 +271,7 @@ def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
                     update={
                         "title": group_title,
                         "summary": group_summary,
+                        "recommended_action": recommended_action,
                         "sla_due_at": min(sla_values) if sla_values else None,
                         "is_group": True,
                         "member_count": count,

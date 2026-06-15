@@ -43,6 +43,33 @@ def _alert(
     }
 
 
+def _bacnet_alert(
+    id: str,
+    *,
+    equipment_id: str | None = None,
+    zone_id: str | None = None,
+    type_: str = "change_of_state",
+    source_dedupe_key: str = "nc:10|obj:analogInput,8060",
+) -> dict:
+    now = datetime.now(UTC)
+    alert = {
+        "id": id,
+        "severity": "critical",
+        "status": "new",
+        "equipment_id": equipment_id,
+        "site_id": "S002",
+        "updated_at": now.isoformat(),
+        "created_at": now.isoformat(),
+        "type": type_,
+        "title": f"BACnet alert {id}",
+        "source": "bacnet_bridge",
+        "source_dedupe_key": source_dedupe_key,
+    }
+    if zone_id:
+        alert["zone_id"] = zone_id
+    return alert
+
+
 def _audit(id: str = "au1", action: str = "acknowledge", user_id: str = "u1") -> dict:
     return {
         "id": id,
@@ -173,6 +200,127 @@ class TestDedupe:
         assert len(issues) == 1
         # BMS (priority 0) wins over intake (priority 1)
         assert issues[0].source == "bms"
+
+
+# ---------------------------------------------------------------------------
+# BACnet bridge echo filtering
+# ---------------------------------------------------------------------------
+
+
+class TestBacnetBridgeEchoFiltering:
+    def test_unmapped_bacnet_fault_echoes_removed_from_primary_and_overflow(self):
+        alerts = [
+            _bacnet_alert("bac-1", source_dedupe_key="nc:10|obj:analogInput,8060"),
+            _bacnet_alert("bac-2", type_="unsigned_range", source_dedupe_key="nc:10|obj:analogInput,8061"),
+            _alert("real-1", severity="high", equipment_id="S002-FCU-204", site_id="S002", type_="fcu_fault"),
+        ]
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+
+        assert [issue.id for issue in primary] == ["real-1"]
+        assert overflow == []
+        assert selected == "real-1"
+
+    def test_unmapped_generic_bacnet_fault_echoes_removed(self):
+        alerts = [
+            _bacnet_alert(
+                "bac-generic",
+                type_="fault",
+                source_dedupe_key="nc:18|obj:binaryInput,2245",
+            ),
+            _alert("real-1", severity="high", equipment_id="S002-FCU-204", site_id="S002", type_="fcu_fault"),
+        ]
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+
+        assert [issue.id for issue in primary] == ["real-1"]
+        assert overflow == []
+        assert selected == "real-1"
+
+    def test_equipment_grounded_bacnet_fault_echo_remains(self):
+        alerts = [
+            _bacnet_alert(
+                "bac-grounded",
+                equipment_id="S002-CT-B01",
+                source_dedupe_key="nc:10|obj:binaryInput,57",
+            )
+        ]
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+
+        assert [issue.id for issue in primary] == ["bac-grounded"]
+        assert primary[0].location.asset_ids == ["S002-CT-B01"]
+        assert overflow == []
+        assert selected == "bac-grounded"
+
+    def test_zone_grounded_bacnet_fault_echo_remains(self):
+        alerts = [
+            _bacnet_alert(
+                "bac-zone",
+                zone_id="S002-ZONE-B1",
+                type_="unsigned_range",
+                source_dedupe_key="nc:10|obj:analogInput,8062",
+            )
+        ]
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+
+        assert [issue.id for issue in primary] == ["bac-zone"]
+        assert primary[0].location.zone_ids == ["S002-ZONE-B1"]
+        assert overflow == []
+        assert selected == "bac-zone"
+
+    def test_ai_recommendation_remains_when_unmapped_bacnet_echo_filtered(self):
+        alerts = [_bacnet_alert("bac-1")]
+        recommendations = [
+            {
+                "id": "rec-1",
+                "target_equipment": "S002-CT-B01",
+                "risk_level": "high",
+                "action_type": "optimization",
+                "reason": "Cooling tower trend requires review.",
+                "confidence_score": 0.82,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+        ]
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(
+            alerts,
+            [],
+            [],
+            [],
+            None,
+            recommendations=recommendations,
+        )
+
+        assert [issue.id for issue in primary] == ["rec-1"]
+        assert primary[0].source == "ai"
+        assert overflow == []
+        assert selected == "rec-1"
+
+
+# ---------------------------------------------------------------------------
+# Health grouping
+# ---------------------------------------------------------------------------
+
+
+class TestHealthGrouping:
+    def test_health_group_uses_operator_summary(self):
+        alerts = [
+            _alert(f"health-{idx}", severity="warning", equipment_id=f"S002-FCU-{idx}", site_id="S002", type_="health")
+            for idx in range(3)
+        ]
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(alerts, [], [], [], None)
+
+        assert overflow == []
+        assert selected == primary[0].id
+        assert primary[0].title == "Health — 3 equipment"
+        assert "health warning band" in primary[0].summary
+        assert "scores should diversify" in primary[0].summary
+        assert primary[0].recommended_action == (
+            "Review the affected equipment cohort and prioritize assets trending toward critical."
+        )
 
 
 # ---------------------------------------------------------------------------
