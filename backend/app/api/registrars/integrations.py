@@ -12,6 +12,7 @@ from app.api import (
     energy_centre,
     generators,
     integration,
+    knx,
     lighting,
     niagara,
     niagara_bacnet,
@@ -29,6 +30,9 @@ def register_integrations_routers(app: FastAPI) -> None:
     app.include_router(niagara.router, tags=["niagara-obix"])
     app.include_router(niagara_bacnet.router, tags=["niagara-bacnet"])
     app.include_router(niagara_discovery.router, tags=["niagara-discovery"])
+
+    # KNX integration
+    app.include_router(knx.router, tags=["knx"])
 
     # Lighting integration
     app.include_router(lighting.router, tags=["lighting"])
