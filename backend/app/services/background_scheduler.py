@@ -998,6 +998,7 @@ class BackgroundSchedulerService:
                             status=RecommendationStatus.PENDING,
                             requires_approval=True,
                             shadow_mode=(current_stage == "shadow_live"),
+                            point_resolution=rec_dict.get("point_resolution"),
                             metadata={
                                 "group_recommendation": is_grouped,
                                 "affected_equipment": affected,
@@ -1768,10 +1769,12 @@ class BackgroundSchedulerService:
                         logger.warning("SLA reminder failed for %s: %s", code, e)
 
             # --- Post-deadline breaches ---
+            # "resolved" is excluded — a completed WO that passed its deadline
+            # is not a breach; the SLA was met at resolution time.
             overdue = (
                 sb.table("work_orders")
                 .select("code, title, assigned_to, sla_deadline_at, milestone_status")
-                .in_("milestone_status", ["assigned", "in_progress", "resolved"])
+                .in_("milestone_status", ["assigned", "in_progress"])
                 .lt("sla_deadline_at", now_iso)
                 .execute()
             )
