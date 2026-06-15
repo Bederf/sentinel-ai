@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useCallback, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import gsap from 'gsap'
 
 const HOLD_DURATIONS: Record<'advisory' | 'supervised', number> = {
@@ -9,19 +9,52 @@ const HOLD_DURATIONS: Record<'advisory' | 'supervised', number> = {
 
 export function useHoldToConfirm(
   progressRef: React.RefObject<HTMLElement | null>,
-  onConfirm: () => void,
+  onConfirm: () => void | Promise<void>,
   mode: 'advisory' | 'supervised' = 'advisory',
 ) {
   const tlRef = useRef<gsap.core.Timeline | null>(null)
+  const feedbackTlRef = useRef<gsap.core.Timeline | null>(null)
   const confirmedRef = useRef(false)
+  const confirmingRef = useRef(false)
+  const mountedRef = useRef(true)
+  const [isHolding, setIsHolding] = useState(false)
+  const [isConfirming, setIsConfirming] = useState(false)
+
+  const resetProgress = useCallback((duration = 0.24) => {
+    const el = progressRef.current
+    if (!el) return
+
+    gsap.killTweensOf(el)
+    gsap.to(el, {
+      scaleX: 0,
+      backgroundColor: 'var(--color-sentinel-amber)',
+      duration,
+      ease: 'power1.out',
+      transformOrigin: 'left center',
+    })
+  }, [progressRef])
+
+  useEffect(() => {
+    mountedRef.current = true
+    const el = progressRef.current
+    return () => {
+      mountedRef.current = false
+      tlRef.current?.kill()
+      feedbackTlRef.current?.kill()
+      if (el) gsap.killTweensOf(el)
+    }
+  }, [progressRef])
 
   const onPressStart = useCallback(() => {
     const el = progressRef.current
-    if (!el) return
+    if (!el || confirmingRef.current) return
     confirmedRef.current = false
+    setIsHolding(true)
 
     // Kill any previous timeline and reset position
     tlRef.current?.kill()
+    feedbackTlRef.current?.kill()
+    gsap.killTweensOf(el)
     gsap.set(el, { scaleX: 0, backgroundColor: 'var(--color-sentinel-amber)', transformOrigin: 'left center' })
 
     const duration = HOLD_DURATIONS[mode]
@@ -43,46 +76,57 @@ export function useHoldToConfirm(
       duration * 0.35, // start slightly before 50%
     )
 
-    // Phase 3: on complete — red flash → green → confirm
+    // Phase 3: on complete — red flash → green → confirm → reset
     tlRef.current.call(() => {
-      if (!progressRef.current) return
-      gsap.timeline()
-        .to(progressRef.current, { backgroundColor: 'var(--color-sentinel-red)', duration: 0.12, ease: 'none' })
-        .to(progressRef.current, { backgroundColor: 'var(--color-sentinel-green)', duration: 0.2, ease: 'power1.out' })
+      const target = progressRef.current
+      if (!target || confirmingRef.current) return
+
+      confirmedRef.current = true
+      confirmingRef.current = true
+      setIsHolding(false)
+      setIsConfirming(true)
+
+      feedbackTlRef.current?.kill()
+      feedbackTlRef.current = gsap.timeline()
+        .to(target, { backgroundColor: 'var(--color-sentinel-red)', duration: 0.12, ease: 'none' })
+        .to(target, { backgroundColor: 'var(--color-sentinel-green)', duration: 0.2, ease: 'power1.out' })
         .call(() => {
-          confirmedRef.current = true
-          onConfirm()
+          Promise.resolve(onConfirm())
+            .catch(() => {
+              // The caller owns error reporting; keep the hold control reusable.
+            })
+            .finally(() => {
+              if (!mountedRef.current) return
+              confirmingRef.current = false
+              confirmedRef.current = false
+              setIsConfirming(false)
+              resetProgress()
+            })
         })
     })
-  }, [progressRef, onConfirm, mode])
+  }, [progressRef, onConfirm, mode, resetProgress])
 
   const onPressEnd = useCallback(() => {
-    if (confirmedRef.current) return // already confirmed — don't cancel
+    setIsHolding(false)
+    if (confirmedRef.current || confirmingRef.current) return // already confirmed — don't cancel
     tlRef.current?.kill()
+    tlRef.current = null
 
     // Snap back — decisive cancel with physical feel
-    if (progressRef.current) {
-      gsap.to(progressRef.current, {
-        scaleX: 0,
-        backgroundColor: 'var(--color-sentinel-amber)', // reset to amber
-        duration: 0.32,
-        ease: 'back.out(1.4)',
-        transformOrigin: 'left center',
-      })
-    }
-  }, [progressRef])
+    resetProgress(0.32)
+  }, [resetProgress])
 
-  return { onPressStart, onPressEnd }
+  return { onPressStart, onPressEnd, isHolding, isConfirming }
 }
 
 interface SupervisedConfirmBarProps {
-  onConfirm: () => void
+  onConfirm: () => void | Promise<void>
   mode?: 'advisory' | 'supervised'
 }
 
 export function SupervisedConfirmBar({ onConfirm, mode = 'advisory' }: SupervisedConfirmBarProps) {
   const progressRef = useRef<HTMLDivElement | null>(null)
-  const { onPressStart, onPressEnd } = useHoldToConfirm(progressRef, onConfirm, mode)
+  const { onPressStart, onPressEnd, isHolding, isConfirming } = useHoldToConfirm(progressRef, onConfirm, mode)
 
   const label = mode === 'supervised'
     ? 'Hold to approve SENTINEL action'
@@ -98,17 +142,45 @@ export function SupervisedConfirmBar({ onConfirm, mode = 'advisory' }: Supervise
 
   return (
     <div
-      className={`mt-4 cursor-pointer select-none rounded-md border ${borderColor} ${bgColor} px-4 py-4`}
-      onPointerDown={onPressStart}
-      onPointerUp={onPressEnd}
-      onPointerLeave={onPressEnd}
+      className={`mt-4 select-none rounded-md border ${borderColor} ${bgColor} px-4 py-4 ${isConfirming ? 'cursor-wait opacity-80' : 'cursor-pointer'}`}
+      onPointerDown={(event) => {
+        if (isConfirming) return
+        event.currentTarget.setPointerCapture?.(event.pointerId)
+        onPressStart()
+      }}
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
+        onPressEnd()
+      }}
+      onPointerCancel={onPressEnd}
+      onLostPointerCapture={onPressEnd}
       role="button"
       aria-label={label}
+      aria-busy={isConfirming}
+      aria-disabled={isConfirming}
+      tabIndex={0}
+      onKeyDown={(event) => {
+        if (event.repeat) return
+        if (event.key === ' ' || event.key === 'Enter') {
+          event.preventDefault()
+          onPressStart()
+        }
+      }}
+      onKeyUp={(event) => {
+        if (event.key === ' ' || event.key === 'Enter') {
+          event.preventDefault()
+          onPressEnd()
+        }
+      }}
     >
-      <div className="text-sm font-semibold text-amber-200">{label}</div>
+      <div className="text-sm font-semibold text-amber-200">
+        {isConfirming ? 'Approving SENTINEL action...' : isHolding ? 'Keep holding...' : label}
+      </div>
       {mode === 'supervised' && (
         <div className="mt-1 text-[11px] text-amber-400/70">
-          {HOLD_DURATIONS.supervised}s hold — SENTINEL will execute on release
+          {HOLD_DURATIONS.supervised}s hold — SENTINEL will execute after hold completes
         </div>
       )}
       <div className="mt-3 h-[3px] overflow-hidden rounded-full bg-amber-500/20">
