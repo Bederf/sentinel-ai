@@ -18,7 +18,7 @@ class RecommendationRepository(SupabaseRepository):
         "action, reason, expected_impact, confidence, confidence_score, profile, "
         "multi_objective_score, status, requires_approval, approval_status, "
         "approved_by, approved_at, approval_reason, executed_at, execution_result, "
-        "rejection_reason, source, source_type"
+        "rejection_reason, source, source_type, point_resolution"
     )
     _WRITE_COLUMNS = {
         "id",
@@ -46,6 +46,7 @@ class RecommendationRepository(SupabaseRepository):
         "shadow_mode",
         "source",
         "source_type",
+        "point_resolution",
     }
 
     def _filter_supabase_payload(self, rec_dict: dict[str, Any]) -> dict[str, Any]:

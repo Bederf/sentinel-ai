@@ -130,6 +130,11 @@ class Recommendation:
     is_cluster_alert: bool = False  # True if equipment has >= 3 occurrences in 90-day window
     cluster_count: int = 1  # Running count of occurrences in sliding window
 
+    # Point resolution audit trail (populated by AI optimizer resolution pass)
+    point_resolution: dict | None = (
+        None  # JSONB provenance: {raw, resolved, method, confidence, unit_raw, unit_resolved, note, resolved_at}
+    )
+
     def get_numeric_confidence(self) -> float:
         """Return numeric confidence, converting string if needed.
 
@@ -203,6 +208,7 @@ class Recommendation:
             "is_cluster_alert": self.is_cluster_alert,
             "cluster_count": self.cluster_count,
             "correlation_id": self.correlation_id,
+            "point_resolution": self.point_resolution,
         }
 
     @classmethod
@@ -327,4 +333,5 @@ class Recommendation:
             # Cluster detection metadata
             is_cluster_alert=data.get("is_cluster_alert", False),
             cluster_count=data.get("cluster_count", 1),
+            point_resolution=data.get("point_resolution"),
         )

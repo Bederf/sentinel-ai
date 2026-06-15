@@ -2469,6 +2469,28 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 logger.debug(
                     f"[RESOLVE] Starting resolution loop for {len(normalised_recommendations)} normalised recs"
                 )
+                # Load equipment points for point-name resolution
+                points_index: dict[str, set[str]] = {}
+                try:
+                    from app.database.repositories.equipment_repository import EquipmentRepository
+                    from app.database.supabase_client import get_supabase_client
+
+                    sb_resolve = get_supabase_client()
+                    site_resp_resolve = sb_resolve.table("sites").select("id").eq("code", site_id).limit(1).execute()
+                    eq_repo_resolve = EquipmentRepository()
+                    if site_resp_resolve.data:
+                        site_uuid_resolve = site_resp_resolve.data[0]["id"]
+                        all_eq_resolve = eq_repo_resolve.get_all(site_id=site_uuid_resolve)
+                    else:
+                        all_eq_resolve = eq_repo_resolve.get_all()
+                    points_index = {
+                        eq.get("code", ""): set(eq.get("operating_data", {}).keys())
+                        for eq in all_eq_resolve
+                        if eq.get("code")
+                    }
+                except Exception as e:
+                    logger.warning(f"[RESOLVE] Failed to load points_index: {e}")
+
                 for i, r in enumerate(normalised_recommendations):
                     raw_code = r.get("target_equipment", "")
                     logger.debug(f"[RESOLVE]   Rec {i + 1}: raw_code='{raw_code}'")
@@ -2478,6 +2500,42 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                             if valid_code != raw_code:
                                 logger.info(f"[AI-OPT] Equipment code corrected: {raw_code} → {valid_code}")
                             r["target_equipment"] = valid_code
+                            # NEW: resolve point name
+                            action = r.get("action", {})
+                            raw_point = action.get("point", "")
+                            raw_value = action.get("value")
+                            if raw_point:
+                                resolved_point, provenance = await self._resolve_point_name(
+                                    raw_point, valid_code, points_index, raw_value=raw_value
+                                )
+                                r["point_resolution"] = provenance
+                                if resolved_point is None:
+                                    logger.warning(
+                                        f"[AI-OPT] Dropping rec {i + 1} ({valid_code}): "
+                                        f"unresolvable point '{raw_point}' "
+                                        f"({provenance.get('note', '')})"
+                                    )
+                                    action["point"] = None
+                                    r["action"] = action
+                                else:
+                                    if resolved_point != raw_point:
+                                        logger.info(
+                                            f"[AI-OPT] Point name corrected: {raw_point} → {resolved_point} "
+                                            f"(on {valid_code}) [{provenance.get('confidence', '?')}]"
+                                        )
+                                    action["point"] = resolved_point
+                                    r["action"] = action
+                            else:
+                                r["point_resolution"] = {
+                                    "raw": None,
+                                    "resolved": None,
+                                    "method": "none",
+                                    "confidence": "none",
+                                    "unit_raw": None,
+                                    "unit_resolved": None,
+                                    "note": "rec has no action.point",
+                                    "resolved_at": datetime.now(UTC).isoformat(),
+                                }
                             resolved.append(r)
                             logger.debug(f"[RESOLVE]   Rec {i + 1}: ✅ resolved to {valid_code}")
                         else:
@@ -3174,6 +3232,213 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             return 3  # Default priority
 
         return sorted(recommendations, key=get_priority)
+
+    # ── Point Name Resolution ──────────────────────────────────────────────
+    # Alias table: AI-generated point names → canonical point names
+    # These apply across all equipment types unless overridden per-type below.
+    _POINT_ALIASES: dict[str, str] = {
+        "indoor_temp": "temperature",
+        "fan_speed_pct": "fan_speed",
+        "damper_position_pct": "valve_position",
+        "supply_setpoint": "setpoint",
+        "cooling_setpoint": "cooling_setpoint",
+        "zone_cooling_setpoint": "cooling_setpoint",
+        "chilled_water_setpoint": "setpoint",
+        "humidity_setpoint": "humidity_setpoint",
+        "room_temp_setpoint": "setpoint",
+        "chw_supply_temp_sp": "setpoint",
+        "chws_setpoint": "setpoint",
+        "ac_power": "power",
+        "active_power": "power",
+        "total_power": "power",
+        "efficiency": "efficiency",
+        "zone_setpoint": "setpoint",
+    }
+
+    _DROPPED_POINTS: set[str] = {
+        "chwr_setpoint",
+        "chw_return_temp_sp",
+        "return_setpoint",
+    }
+
+    _EQUIPMENT_POINT_ALIASES: dict[str, dict[str, str]] = {
+        "vav": {
+            "zone_setpoint": "temperature_setpoint",
+        },
+    }
+
+    # Suffixes to strip for fuzzy matching (in priority order)
+    _FUZZY_SUFFIXES: list[tuple[str, str | None]] = [
+        ("_pct", None),
+        ("_temp", None),
+        ("_sp", None),
+        ("temp_", None),
+        ("_setpoint", None),
+    ]
+
+    async def _resolve_point_name(
+        self,
+        raw_point_name: str,
+        equipment_code: str,
+        equipment_points: dict[str, set[str]],
+        raw_value: Any = None,
+    ) -> tuple[str | None, dict]:
+        """Resolve an AI-generated point name to a canonical point name.
+
+        Uses a three-strategy cascade: exact match → alias table → fuzzy.
+        Always returns a full provenance dict for audit persistence.
+
+        Args:
+            raw_point_name: The point name as generated by the AI (e.g. "chws_setpoint")
+            equipment_code: The resolved equipment code (e.g. "S002-CHILLER-B01")
+            equipment_points: Mapping of equipment_code → set of valid point names
+            raw_value: The value to write (stub for future unit validation)
+
+        Returns:
+            Tuple of (resolved_point_name or None, provenance_dict)
+        """
+        now_iso = datetime.now(UTC).isoformat()
+        available = equipment_points.get(equipment_code, set())
+        raw_lower = raw_point_name.lower().strip()
+
+        if not available:
+            provenance = {
+                "raw": raw_point_name,
+                "resolved": None,
+                "method": "none",
+                "confidence": "dropped",
+                "unit_raw": None,
+                "unit_resolved": None,
+                "note": "equipment has no points",
+                "resolved_at": now_iso,
+            }
+            return (None, provenance)
+
+        # Strategy 0: Check dropped list first
+        if raw_lower in self._DROPPED_POINTS:
+            provenance = {
+                "raw": raw_point_name,
+                "resolved": None,
+                "method": "dropped",
+                "confidence": "dropped",
+                "unit_raw": None,
+                "unit_resolved": None,
+                "note": f"point '{raw_point_name}' is in the dropped list",
+                "resolved_at": now_iso,
+            }
+            return (None, provenance)
+
+        # Derive equipment type from code (e.g. "S002-CHILLER-B01" → "chiller")
+        eq_type = self._extract_equipment_type(equipment_code)
+
+        # Strategy 1: Exact match
+        if raw_lower in available:
+            provenance = {
+                "raw": raw_point_name,
+                "resolved": raw_lower,
+                "method": "exact",
+                "confidence": "exact",
+                "unit_raw": None,
+                "unit_resolved": None,
+                "note": "direct match on equipment point name",
+                "resolved_at": now_iso,
+            }
+            return (raw_lower, provenance)
+
+        # Strategy 2: Equipment-type-specific alias
+        type_aliases = self._EQUIPMENT_POINT_ALIASES.get(eq_type, {})
+        if raw_lower in type_aliases:
+            candidate = type_aliases[raw_lower]
+            if candidate in available:
+                provenance = {
+                    "raw": raw_point_name,
+                    "resolved": candidate,
+                    "method": "alias_table",
+                    "confidence": "alias",
+                    "unit_raw": None,
+                    "unit_resolved": None,
+                    "note": f"type-specific alias: {eq_type} maps {raw_point_name} → {candidate}",
+                    "resolved_at": now_iso,
+                }
+                return (candidate, provenance)
+
+        # Strategy 3: Global alias table
+        if raw_lower in self._POINT_ALIASES:
+            candidate = self._POINT_ALIASES[raw_lower]
+            if candidate in available:
+                provenance = {
+                    "raw": raw_point_name,
+                    "resolved": candidate,
+                    "method": "alias_table",
+                    "confidence": "alias",
+                    "unit_raw": None,
+                    "unit_resolved": None,
+                    "note": f"global alias: {raw_point_name} → {candidate}",
+                    "resolved_at": now_iso,
+                }
+                return (candidate, provenance)
+
+        # Strategy 4: Fuzzy match — strip common suffixes
+        stripped = raw_lower
+        for suffix, _replacement in self._FUZZY_SUFFIXES:
+            if suffix.startswith("_"):
+                if stripped.endswith(suffix):
+                    stripped = stripped[: -len(suffix)]
+                    break
+            elif suffix.endswith("_"):
+                if stripped.startswith(suffix):
+                    stripped = stripped[len(suffix) :]
+                    break
+
+        if stripped != raw_lower:
+            fuzzy_matches = [p for p in available if p == stripped or p.startswith(stripped) or stripped.startswith(p)]
+            if len(fuzzy_matches) == 0:
+                note = f"fuzzy match failed: '{raw_point_name}' (stripped to '{stripped}') not found in available points: {sorted(available)}"
+            elif len(fuzzy_matches) == 1:
+                provenance = {
+                    "raw": raw_point_name,
+                    "resolved": fuzzy_matches[0],
+                    "method": "fuzzy",
+                    "confidence": "fuzzy",
+                    "unit_raw": None,
+                    "unit_resolved": None,
+                    "note": f"fuzzy match: '{raw_point_name}' → '{fuzzy_matches[0]}' (stripped '{stripped}')",
+                    "resolved_at": now_iso,
+                }
+                return (fuzzy_matches[0], provenance)
+            else:
+                note = (
+                    f"ambiguous fuzzy match: '{raw_point_name}' (stripped '{stripped}') "
+                    f"matches multiple: {fuzzy_matches}"
+                )
+        else:
+            note = f"no match found: '{raw_point_name}' not in available points: {sorted(available)}"
+
+        provenance = {
+            "raw": raw_point_name,
+            "resolved": None,
+            "method": "none" if stripped == raw_lower else "fuzzy",
+            "confidence": "dropped",
+            "unit_raw": None,
+            "unit_resolved": None,
+            "note": note,
+            "resolved_at": now_iso,
+        }
+        return (None, provenance)
+
+    def _extract_equipment_type(self, equipment_code: str) -> str:
+        """Extract equipment type from an equipment code.
+
+        E.g. "S002-CHILLER-B01" → "chiller"
+             "S002-AHU-B01" → "ahu"
+             "S002-VAV-101" → "vav"
+        """
+        import re
+
+        match = re.match(r"^S\d+-(\w+)", equipment_code)
+        if match:
+            return match.group(1).lower()
+        return ""
 
     async def _resolve_equipment_code(
         self,
