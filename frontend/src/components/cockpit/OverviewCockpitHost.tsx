@@ -482,7 +482,7 @@ export function OverviewCockpitHost({
     const equipmentWarnings: EquipmentWarningInput[] = (equipment ?? [])
       .filter((eq) => {
         const type = (eq.equipment_type || eq.type || '').toLowerCase()
-        return eq.health_score < ht && activeTypeSet.has(type)
+        return (eq.health_score ?? 100) < ht && activeTypeSet.has(type)
       })
       .map((eq) => {
         let floorId = ''
@@ -498,7 +498,7 @@ export function OverviewCockpitHost({
           equipment_type: eq.equipment_type,
           floor_id: floorId,
           health_score: eq.health_score,
-          health_state: eq.health_score >= ct ? 'degraded' : 'critical',
+          health_state: (eq.health_score ?? 100) >= ct ? 'degraded' : 'critical',
           zone_id: zoneKey,
         }
       })

@@ -251,15 +251,16 @@ function buildQueue(state: CockpitState): QueueItem[] {
   }
 
   // Equipment warnings from health thresholding — surface in signal queue only when
-  // an active operational narrative exists. When the building is Stable, equipment
-  // health is informational (visible in the equipment tab), not a queue-driver.
-  if (state.primaryMetric.value !== 'Stable' && state.equipmentWarnings.length > 0) {
+  // no dominant narrative exists AND an active operational narrative exists. When the
+  // building is Stable, equipment health is informational (visible in the equipment tab),
+  // not a queue-driver. When a dominant narrative exists, it takes priority.
+  if (state.primaryMetric.value !== 'Stable' && !hasDominantNarrative(state) && state.equipmentWarnings.length > 0) {
     return state.equipmentWarnings.slice(0, 3).map((eq, index) => ({
       severity: eq.healthState === 'critical' ? 'Critical' : 'Escalating' as const,
       title: `${eq.equipmentCode} · ${eq.equipmentType}`,
       cause: eq.faultType
-        ? `${eq.faultType} · Health score ${eq.healthScore}/100`
-        : `Health score ${eq.healthScore}/100 · Floor ${eq.floorId}`,
+        ? `${eq.faultType} · Health score ${eq.healthScore ?? 'N/A'}/100`
+        : `Health score ${eq.healthScore ?? 'N/A'}/100 · Floor ${eq.floorId}`,
       impact: index === 0
         ? state.decision.summary
         : state.primaryMetric.value === 'Stable'
@@ -312,7 +313,7 @@ function buildForecast(state: CockpitState) {
 
   // Modules value: equipment warnings only under active narrative, else show risks or stable
   let modulesValue: string
-  if (state.primaryMetric.value !== 'Stable' && state.equipmentWarnings.length > 0) {
+  if (state.primaryMetric.value !== 'Stable' && !hasDominantNarrative(state) && state.equipmentWarnings.length > 0) {
     const top = state.equipmentWarnings[0]
     const others = state.equipmentWarnings.length - 1
     const equipLabel = `${top.equipmentCode} · ${top.equipmentType}`
@@ -494,9 +495,9 @@ function ZoneEquipmentPanel({
   const { healthy, warning, critical } = state.thresholds.health
 
   const zoneSeverity = useMemo(() => {
-    const hasCritical = equipmentInZone.some((eq) => eq.healthScore < critical)
+    const hasCritical = equipmentInZone.some((eq) => (eq.healthScore ?? 100) < critical)
     const hasWarning = equipmentInZone.some(
-      (eq) => (eq.healthScore >= critical && eq.healthScore < warning) || eq.faultType,
+      (eq) => ((eq.healthScore ?? 100) >= critical && (eq.healthScore ?? 100) < warning) || eq.faultType,
     )
     if (hasCritical) return { label: 'Critical', cls: 'text-red-300 border-red-400/30 bg-red-400/10' }
     if (hasWarning) return { label: 'Warning', cls: 'text-amber-300 border-amber-400/30 bg-amber-400/10' }
