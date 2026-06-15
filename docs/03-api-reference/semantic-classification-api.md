@@ -184,7 +184,7 @@ List all tags in the semantic dictionary with their metadata.
       "rule_count": 4
     }
   ],
-  "total": 47
+  "total": 62
 }
 ```
 

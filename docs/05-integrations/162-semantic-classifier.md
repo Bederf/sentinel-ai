@@ -69,19 +69,21 @@ classifications from reaching the human review queue.
 
 ## Semantic dictionary
 
-The dictionary lives at `backend/app/data/simbiot/semantic_dictionary.json` and contains **47 tags**
-across eight equipment domains:
+The dictionary lives at `backend/app/data/simbiot/semantic_dictionary.json` and contains **62 tags** (grew from 47 on 2026-06-15 when 15 template-referenced tags were added) across eight equipment domains:
 
 | Domain | Count | Examples |
 |--------|-------|---------|
-| HVAC | 15 | `supply_air_temperature_sensor`, `chw_valve_position_actuator` |
-| Lighting | 5 | `dali_dimming_level_actuator`, `occupancy_sensor` |
-| Energy | 8 | `active_power_meter`, `power_factor_meter` |
-| Fire | 5 | `smoke_detector`, `suppression_system_status` |
-| Water | 2 | `cold_water_flow_meter`, `hot_water_temperature_sensor` |
-| Security | 4 | `access_control_door_status`, `cctv_motion_trigger` |
-| Solar/BESS | 3 | `solar_irradiance_sensor`, `bess_state_of_charge` |
-| IAQ / building-wide | 5 | `co2_concentration_sensor`, `ambient_temperature_sensor` |
+| Domain | Count | Examples |
+|--------|-------|---------|
+| HVAC | 38 | `supply_air_temperature_sensor`, `fan_status`, `compressor_status`, `cooling_command` |
+| Lighting | 4 | `lighting_dimmer_command`, `lighting_occupancy_sensor`, `lighting_on_off_command`, `lighting_level_sensor` |
+| Energy | 6 | `active_power_meter`, `power_factor_meter`, `generator_run_status` |
+| Fire | 3 | `fire_alarm_status`, `fire_suppression_command`, `smoke_damper_status` |
+| Water | 2 | `water_flow_meter`, `water_consumption_meter` |
+| Security | 2 | `access_door_status`, `access_lock_command` |
+| Solar/BESS | 2 | `solar_inverter_output_power`, `bess_state_of_charge` |
+| IAQ / building-wide | 3 | `co2_sensor`, `relative_humidity_sensor`, `cctv_camera_status` |
+| UPS / ATS / Safety | 3 | `ups_battery_status`, `ups_bypass_status`, `emergency_stop_status` |
 
 Each tag entry specifies:
 - `safety_class` — `LOW`, `MEDIUM`, or `HIGH` (gates control actions downstream)
@@ -169,7 +171,7 @@ Both tags being assigned to the same physical point triggers a `TAG_CONFLICT` er
 
 | File | Purpose |
 |------|---------|
-| `backend/app/data/simbiot/semantic_dictionary.json` | Canonical 47-tag dictionary |
+| `backend/app/data/simbiot/semantic_dictionary.json` | Canonical 62-tag dictionary (v1.1, 2026-06-15) |
 | `backend/app/models/semantic_tag.py` | `SemanticTag`, `EvidenceSource`, `SafetyClass` Pydantic models |
 | `backend/app/services/simbiot/semantic_dictionary.py` | `SemanticDictionaryService` |
 | `backend/app/models/point_classification.py` | `PointClassification`, `EvidenceRecord`, `BatchClassificationResult` |

@@ -81,7 +81,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[IPMVP M&V API](03-api-reference/ipmvp-api.md)** - IPMVP 2022 Option C (Whole Facility) and Option A (Retrofit Isolation) reporting, OLS baseline regression, CV(RMSE)% uncertainty, load shedding exclusion (Sprint 2)
 - **[Demand Response API](03-api-reference/demand-response-api.md)** - Real-time curtailable HVAC load signal for BESS controllers and DR aggregators, DDMP compatible (Phase 211)
 - **[Alert Routing API](03-api-reference/buildings.md)** - Configurable alert routing rules, equipment muting, channel status (Phase 159)
-- **[Semantic Classification API](03-api-reference/semantic-classification-api.md)** - Classify BACnet/DALI points against 47-tag Haystack dictionary, batch equipment classification, tag dictionary inspection (Phase 162)
+- **[Semantic Classification API](03-api-reference/semantic-classification-api.md)** - Classify BACnet/DALI points against 62-tag Haystack dictionary, batch equipment classification, tag dictionary inspection (Phase 162)
 
 ### ✨ Features
 
