@@ -121,6 +121,59 @@ def _time_bucket(dt: datetime) -> int:
     return int(dt.timestamp() // (_CASCADE_WINDOW_MINUTES * 60))
 
 
+def _is_synthetic_bacnet_asset_id(asset_id: str) -> bool:
+    """Return true for BACnet COV object keys used as synthetic asset ids."""
+    return asset_id.startswith("nc:") and "|obj:" in asset_id
+
+
+def _filter_unmapped_bacnet_echoes(
+    items: list[_NormalizedIssue],
+) -> list[_NormalizedIssue]:
+    """Remove BACnet fault alerts with no real equipment or zone grounding.
+
+    Applies to all phases. Unmapped bacnet_bridge fault alerts use
+    source_dedupe_key values such as ``nc:10|obj:analogInput,8060`` as
+    synthetic asset ids so the 3D layer can still reason about them. Those keys
+    are not equipment grounding for issue triage, so raw fault echoes with only
+    synthetic BACnet object ids are dropped before cascade grouping.
+
+    Promoted cascade groups are always retained because they carry SENTINEL
+    intelligence derived from the raw rows. BMS alerts with real equipment_id or
+    zone_id pass through unchanged.
+    """
+    filtered: list[_NormalizedIssue] = []
+    for item in items:
+        if item.issue.is_group and (item.issue.member_count or 0) >= CASCADE_PROMOTE_THRESHOLD:
+            filtered.append(item)
+            continue
+
+        if item.issue.source != "bms":
+            filtered.append(item)
+            continue
+
+        has_real_equipment = any(
+            asset_id and not _is_synthetic_bacnet_asset_id(asset_id) for asset_id in item.issue.location.asset_ids
+        )
+        has_zone = bool(item.issue.location.zone_ids)
+        if has_real_equipment or has_zone:
+            filtered.append(item)
+            continue
+
+        has_synthetic_bacnet_asset = any(
+            asset_id and _is_synthetic_bacnet_asset_id(asset_id) for asset_id in item.issue.location.asset_ids
+        )
+        raw_type = item.dedupe_key.split("|")[-1] if "|" in item.dedupe_key else ""
+        is_known_fault_echo = raw_type in FAULT_ECHO_TYPES
+        is_generic_bacnet_fault_echo = raw_type == "fault" and has_synthetic_bacnet_asset
+        if not is_known_fault_echo and not is_generic_bacnet_fault_echo:
+            filtered.append(item)
+            continue
+
+        # Unmapped BACnet echo; do not feed the decision rail or overflow.
+
+    return filtered
+
+
 def _group_cascades(items: list[_NormalizedIssue]) -> list[_NormalizedIssue]:
     """Collapse same-type, same-severity, co-incident issues into group records.
 
@@ -366,6 +419,10 @@ class CockpitTableProcessor:
     ) -> tuple[list[CockpitIssue], list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
         """Combine issue sources into a deduplicated, grouped, rail-limited feed.
 
+        Pipeline order:
+            normalize → dedupe → filter-unmapped-echoes → cascade-group →
+            enrich-cascade → advisory-filter → rail-limit
+
         Args:
             alerts:            BMS alert rows (source = "bms", priority 0).
             intakes:           Email intake rows (source = "intake", priority 1).
@@ -392,8 +449,10 @@ class CockpitTableProcessor:
             normalized.extend(CockpitTableProcessor._to_normalized_issues(recommendations, source="ai", priority=-1))
 
         deduped = CockpitTableProcessor._dedupe(normalized)
+        # Phase 226 — drop unmapped BACnet echoes before cascade grouping
+        echo_filtered = _filter_unmapped_bacnet_echoes(deduped)
         # Phase 224 — cascade grouping
-        grouped = _group_cascades(deduped)
+        grouped = _group_cascades(echo_filtered)
         # Phase 225 — enrich BACnet cascade groups into SENTINEL intelligence
         enriched = [_enrich_cascade_summary(item, zone_count=zone_count) for item in grouped]
         # Phase 225 — advisory mode filter: raw echoes out, interpreted insights in
