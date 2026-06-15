@@ -59,9 +59,9 @@ class TestBaselineAlignment:
         """25% deviation = 50 (100 - 2*25)."""
         assert calc.calculate_baseline_alignment(25) == 50.0
 
-    def test_none_returns_neutral(self, calc):
-        """None (no baseline) returns 50 neutral score."""
-        assert calc.calculate_baseline_alignment(None) == 50.0
+    def test_none_returns_healthy_floor(self, calc):
+        """None (no baseline comparison available) returns 85 healthy-floor score."""
+        assert calc.calculate_baseline_alignment(None) == 85.0
 
     def test_large_deviation_clamps_to_zero(self, calc):
         """Very large deviation clamps to 0."""

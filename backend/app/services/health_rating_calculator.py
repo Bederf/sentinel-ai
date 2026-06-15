@@ -62,13 +62,16 @@ class HealthRatingCalculator:
 
         Args:
             deviation_percent: Maximum deviation % from baseline (0-100+).
-                If None (no baseline), returns 50.0 as a neutral score.
+                If None (no baseline comparison available), returns 85.0 as a
+                healthy-floor score. A missing baseline comparison reflects an
+                unavailable feature, not an unknown equipment state, so healthy
+                equipment should not be penalised with a neutral 50.0.
 
         Returns:
             Score in [0, 100]. Lower deviation = higher score.
         """
         if deviation_percent is None:
-            return 50.0
+            return 85.0
         return _clamp(100 - 2 * deviation_percent)
 
     # ------------------------------------------------------------------
@@ -506,12 +509,12 @@ class HealthRatingCalculator:
             from app.database.repositories.baseline_repository import BaselineRepository
 
             repo = BaselineRepository()
-            comparisons = await repo.get_comparisons(
+            comparisons = await repo.get_recent_comparisons(
                 equipment_id=equipment_id,
-                hours=24,
+                limit=10,
             )
             if comparisons:
-                deviations = [c.get("max_deviation_percent", 0) or 0 for c in comparisons]
+                deviations = [c.max_deviation_percent or 0 for c in comparisons]
                 return max(deviations) if deviations else None
         except Exception as e:
             logger.debug(f"Could not get baseline deviation for {equipment_id}: {e}")
