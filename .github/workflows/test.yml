@@ -68,14 +68,20 @@ jobs:
           cache: 'pip'
           cache-dependency-path: backend/requirements.txt
 
+      - name: Install system dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libcairo2-dev
+
       - name: Install dependencies
         run: |
           pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout
-          pip install -r requirements.txt 2>/dev/null || pip install -r requirements.txt --ignore-requires-python 2>/dev/null || true
+          pip install -r requirements.txt --no-build-isolation 2>/dev/null || pip install -r requirements.txt --no-build-isolation --no-deps 2>/dev/null || true
 
       - name: Check for circular imports
         run: |
           python -m pytest tests/test_import_cycles.py -v
+        env:
+          POPIA_MODE: "development"
+          CONSENT_HASH_SALT: "test-consent-salt-for-ci-at-least-32-chars-long"
 
       - name: Run unit tests
         # Excludes: integration (needs live Supabase), performance/slow (resource-heavy)
@@ -130,7 +136,7 @@ jobs:
         run: |
           cd backend
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt --no-build-isolation 2>/dev/null || pip install -r requirements.txt --no-build-isolation --no-deps 2>/dev/null || true
           uvicorn app.main:app --host 0.0.0.0 --port 9095 &
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
