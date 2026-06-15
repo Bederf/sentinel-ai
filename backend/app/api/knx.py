@@ -11,7 +11,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, File, HTTPException, UploadFile
 
-from app.core.auth import require_site_access
+from app.middleware.auth_middleware import require_site_access
 from app.services.device_abstraction import device_manager
 from app.services.knx.knx_client import SUPPORTED_DPT_TYPES
 from app.services.knx.knx_discovery_service import (

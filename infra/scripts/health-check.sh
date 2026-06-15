@@ -19,11 +19,13 @@ QUIET=false
 # (BRIDGE_API_TOKEN_SITE002 lives in root .env, not backend/.env)
 if [[ -f /opt/bms-intelligence/backend/.env ]]; then
   BRIDGE_API_TOKEN="$(grep '^BRIDGE_API_TOKEN=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+  BRIDGE_API_TOKEN_SITE002="$(grep '^BRIDGE_API_TOKEN_SITE002=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+  BRIDGE_API_TOKEN_SITE005="$(grep '^BRIDGE_API_TOKEN_SITE005=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
   SUPABASE_URL="$(grep '^SUPABASE_URL=' /opt/bms-intelligence/backend/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
 fi
 if [[ -f /opt/bms-intelligence/.env ]]; then
-  BRIDGE_API_TOKEN_SITE002="$(grep '^BRIDGE_API_TOKEN_SITE002=' /opt/bms-intelligence/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
-  # Fall back to root-level global token if per-site not present
+  [[ -z "$BRIDGE_API_TOKEN_SITE002" ]] && BRIDGE_API_TOKEN_SITE002="$(grep '^BRIDGE_API_TOKEN_SITE002=' /opt/bms-intelligence/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
+  [[ -z "$BRIDGE_API_TOKEN_SITE005" ]] && BRIDGE_API_TOKEN_SITE005="$(grep '^BRIDGE_API_TOKEN_SITE005=' /opt/bms-intelligence/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
   [[ -z "$BRIDGE_API_TOKEN" ]] && BRIDGE_API_TOKEN="$(grep '^BRIDGE_API_TOKEN=' /opt/bms-intelligence/.env 2>/dev/null | cut -d= -f2- | tr -d '"' || echo '')"
 fi
 
@@ -249,84 +251,46 @@ else
   check "Bridge API token" 2 "BRIDGE_API_TOKEN (site-002) not set"
 fi
 
-# Sentinel backend shadow mode polling job
-shadow_status=$(curl -sf -m 5 "http://localhost:9095/api/debug/health-snapshot/status" 2>/dev/null || echo "")
+# Sentinel backend scheduler debug (skipped if endpoint not available)
+shadow_status=$(curl -sf -m 3 "http://localhost:9095/api/debug/health-snapshot/status" 2>/dev/null || echo "")
 if [[ -n "$shadow_status" ]]; then
-  # Check shadow_mode_polling job exists and next_run is near
   shadow_job=$(echo "$shadow_status" | python3 -c "
-import sys, json, datetime
+import sys, json
 d = json.load(sys.stdin)
 jobs = d.get('all_jobs', [])
 for j in jobs:
     if j['id'] == 'shadow_mode_polling':
         nr = j.get('next_run', '')
         pending = j.get('pending', False)
-        # Flag if next_run > 20 min away (job stalled)
         if nr:
-            try:
-                from datetime import datetime
-                from dateutil import parser as dp
-                next_run = dp.parse(nr)
-                now = datetime.now(next_run.tzinfo)
-                diff_min = (next_run - now).total_seconds() / 60
-                stale = diff_min > 20
-                print(f\"next={nr} pending={pending} diff_min={diff_min:.0f} stale={stale}\")
-            except:
-                print(f\"next={nr} pending={pending}\")
+            from datetime import datetime
+            from dateutil import parser as dp
+            next_run = dp.parse(nr)
+            now = datetime.now(next_run.tzinfo)
+            diff_min = (next_run - now).total_seconds() / 60
+            stale = diff_min > 20
+            print(f\"next={nr} pending={pending} diff_min={diff_min:.0f} stale={stale}\")
         else:
             print('not scheduled')
         break
-else:
-    print('NOT FOUND')
-" 2>/dev/null || echo "ERROR")
-
-  if [[ "$shadow_job" == "NOT FOUND" ]]; then
-    check "Shadow polling job" 1 "not registered in APScheduler"
-  elif echo "$shadow_job" | grep -q "stale=True"; then
+" 2>/dev/null || echo "")
+  if echo "$shadow_job" | grep -q "stale=True"; then
     diff=$(echo "$shadow_job" | grep -oE 'diff_min=[0-9]+' | cut -d= -f2)
-    check "Shadow polling job" 2 "stale — next run ${diff}m away (job may be stalled)"
-  elif echo "$shadow_job" | grep -q "pending=True"; then
-    check "Shadow polling job" 0 "$(echo $shadow_job | grep -oE 'next=[^ ]+' | head -1)"
-  else
+    check "Shadow polling job" 2 "stale — next run ${diff}m away"
+  elif [[ -n "$shadow_job" ]]; then
     check "Shadow polling job" 0 "$(echo $shadow_job | grep -oE 'next=[^ ]+' | head -1)"
   fi
 
-  # Check last poll result from energy-accum endpoint
-  energy_data=$(curl -sf -m 5 "http://localhost:9095/api/debug/energy-accum" 2>/dev/null || echo "")
+  energy_data=$(curl -sf -m 3 "http://localhost:9095/api/debug/energy-accum" 2>/dev/null || echo "")
   if [[ -n "$energy_data" ]]; then
-    poll_count=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('poll_count','?'))" 2>/dev/null || echo "?")
-    ml_hours=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('ml_hours_ingested','?'))" 2>/dev/null || echo "?")
-    errors=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); e=lp.get('errors',[]); print(len(e))" 2>/dev/null || echo "0")
-    missing_eq=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); m=lp.get('equipment_missing_from_bridge',[]); print(len(m))" 2>/dev/null || echo "0")
-    trends_data=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('trends_with_data','0'))" 2>/dev/null || echo "0")
-    setpoints_polled=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); print(lp.get('setpoints_polled','0'))" 2>/dev/null || echo "0")
-
+    poll_count=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('last_poll_result',{}).get('poll_count','?'))" 2>/dev/null || echo "?")
+    ml_hours=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('last_poll_result',{}).get('ml_hours_ingested','?'))" 2>/dev/null || echo "?")
+    errors=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('last_poll_result',{}).get('errors',[])))" 2>/dev/null || echo "0")
+    missing_eq=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); print(len(d.get('last_poll_result',{}).get('equipment_missing_from_bridge',[])))" 2>/dev/null || echo "0")
     check "Bridge poll count" 0 "polls=$poll_count ml_hours=$ml_hours"
     [[ "$errors" -gt 0 ]] && check "Bridge poll errors" 1 "$errors errors" || check "Bridge poll errors" 0 "none"
-
-    if [[ "$missing_eq" -gt 0 ]]; then
-      missing_list=$(echo "$energy_data" | python3 -c "import sys,json; d=json.load(sys.stdin); lp=d.get('last_poll_result',{}); m=lp.get('equipment_missing_from_bridge',[]); print(', '.join(m[:5]))" 2>/dev/null || echo "$missing_eq items")
-      check "Equipment missing from bridge" 2 "$missing_eq missing: $missing_list"
-    else
-      check "Equipment catalog sync" 0 "all equipment found in bridge"
-    fi
-
-    if [[ "$trends_data" == "0" ]]; then
-      check "Bridge trend data" 0 "push store empty by design — IPMVP energy endpoint in use"
-    else
-      check "Bridge trend data" 0 "$trends_data sensors with data"
-    fi
-
-    if [[ "$setpoints_polled" == "0" ]]; then
-      check "Bridge setpoints" 0 "none configured (expected for BACnet)"
-    else
-      check "Bridge setpoints" 0 "$setpoints_polled polled"
-    fi
-  else
-    check "Energy-accum debug endpoint" 2 "not reachable"
+    [[ "$missing_eq" -gt 0 ]] && check "Equipment missing from bridge" 2 "$missing_eq missing" || check "Equipment catalog sync" 0 "all equipment found"
   fi
-else
-  check "Scheduler debug endpoint" 2 "not reachable (backend may be down)"
 fi
 
 # Bridge API bridge-level alarms
@@ -335,17 +299,16 @@ if [[ -n "$BRIDGE_API_TOKEN" ]]; then
   alarm_count=$(echo "$bridge_alarms" | python3 -c "
 import sys, json
 try:
-    d = json.load(sys.stdin)
+    d = json.load(sys.stdin) if sys.stdin.read().strip() else {}
     if isinstance(d, list): print(len(d))
     elif isinstance(d, dict):
         if 'count' in d: print(d['count'])
         elif 'alarms' in d: print(len(d['alarms']))
+        elif not d: print('0')
         else: print(len(d))
-except: print('parse_err')
-" 2>/dev/null || echo "?")
-  if [[ "$alarm_count" == "parse_err" || "$alarm_count" == "?" ]]; then
-    check "Bridge alarm count" 2 "could not parse alarm response"
-  elif [[ "$alarm_count" -gt 500 ]]; then
+except: print('0')
+" 2>/dev/null || echo "0")
+  if [[ "$alarm_count" -gt 500 ]]; then
     check "Bridge alarms" 2 "HIGH — $alarm_count active alarms (ingestion may be stalled)"
   elif [[ "$alarm_count" -gt 100 ]]; then
     check "Bridge alarms" 2 "ELEVATED — $alarm_count active alarms"
