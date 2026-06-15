@@ -1,137 +1,114 @@
-# SIMBIOT Concept Evolution Connector
+# Sentinel AI
 
-> **The integration module that connects SENTINEL to MRI Evolution (Concept Evolution) via the FSI Public API.**
-
-Part of the **SIMBIOT integration layer** — *"The connector that makes SENTINEL work with anything."*
-
----
+Smart building operations platform powered by AI. Complements existing BMS (BACnet, Modbus, Desigo, Niagara) with predictive analytics, automated fault detection, and intelligent work order generation.
 
 ## Architecture
 
 ```
-SENTINEL AI Engine
-       │
-       │ Anomaly / Request
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│              SIMBIOT MODULE                               │
-│                                                           │
-│  ┌─────────────────────────────────────────────────────┐ │
-│  │         concept_connector  ◄── THIS MODULE           │ │
-│  │                                                       │ │
-│  │  ┌──────────┐  ┌─────────────┐  ┌────────────────┐  │ │
-│  │  │  Auth    │  │ Rate Limit  │  │ Circuit Break  │  │ │
-│  │  │  (JWT)   │  │ (200/min)   │  │ (5→queue)      │  │ │
-│  │  └────┬─────┘  └──────┬──────┘  └───────┬────────┘  │ │
-│  │       └───────────────┼─────────────────┘            │ │
-│  │                       ▼                               │ │
-│  │              FSI Public API                           │ │
-│  │         developer.fsiservices.com                     │ │
-│  │                                                       │ │
-│  │  POST /token          → JWT (7-day expiry)           │ │
-│  │  POST /workorder/v1   → Create work order            │ │
-│  │  GET  /workorder/v1/x → Poll status                  │ │
-│  │  GET  /asset/v1       → Sync asset register          │ │
-│  └─────────────────────────────────────────────────────┘ │
-│                                                           │
-│  Other SIMBIOT connectors:                               │
-│  ├─ bms_connector (BACnet/Modbus/OPC-UA)                │
-│  ├─ file_connector (CSV/Excel/JSON)                     │
-│  └─ messenger_connector (WhatsApp/Telegram)             │
-└─────────────────────────────────────────────────────────┘
-       │
-       │ Work Order (with SENTINEL diagnostics)
-       ▼
-┌─────────────────────────────────────────────────────────┐
-│                 MRI EVOLUTION                             │
-│                                                           │
-│  Helpdesk → SLA Engine → FSI GO (iPad) → Technician    │
-└─────────────────────────────────────────────────────────┘
-```
-
-## What It Does
-
-| Flow | Description |
-|------|-------------|
-| **Anomaly → Work Order** | SENTINEL AI detects BMS anomaly → connector creates WO in MRI Evolution with full diagnostic report |
-| **WhatsApp → Work Order** | Occupant messages via WhatsApp → SENTINEL NLP classifies → connector creates structured WO |
-| **Status Polling** | Connector polls MRI Evolution for WO status changes → feeds resolution data back to SENTINEL ML |
-| **Asset Sync** | Daily full sync + 4-hourly delta sync of MRI Evolution asset register into SENTINEL cache |
-
-## Module Structure
-
-```
-simbiot_concept/
-├── __init__.py                      # Package exports
-├── connectors/
-│   └── concept_connector.py         # Main ConceptConnector class
-├── models/
-│   ├── config.py                    # ConceptConfig (Pydantic)
-│   ├── anomaly.py                   # SentinelAnomaly input model
-│   └── work_order.py                # WorkOrder payload/response models
-├── services/
-│   └── auth.py                      # FSIAuthService (JWT management)
-└── utils/
-    ├── resilience.py                # RateLimiter, CircuitBreaker, Dedup
-    └── audit.py                     # Structured API audit logging
+┌──────────────────────────────────────────────────────────────┐
+│                        Frontend (React/Vite)                  │
+│                     Cockpit dashboards + settings             │
+└──────────────────────────┬───────────────────────────────────┘
+                           │ REST + SSE
+┌──────────────────────────▼───────────────────────────────────┐
+│                      Backend (FastAPI)                        │
+│                                                               │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐ │
+│  │  Agents  │  │ Services │  │ Adapters │  │  Scheduler   │ │
+│  │  (NLP,   │  │ (ML,     │  │ (BMS,    │  │  (APScheduler│ │
+│  │  Graph)  │  │  Health) │  │  IoT)    │  │   tasks)     │ │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘ │
+│                                                               │
+│  ┌────────────────────────────────────────────────────────┐  │
+│  │               Database Layer (Supabase)                 │  │
+│  │      PostgreSQL + Redis caching + real-time             │  │
+│  └────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
 
-```python
-from simbiot_concept import ConceptConnector, ConceptConfig, SentinelAnomaly
-from simbiot_concept.models.anomaly import AnomalySource
+```bash
+git clone git@github.com:Bederf/sentinel-ai.git
+cd sentinel-ai
 
-# 1. Configure
-config = ConceptConfig(
-    api_base_url="https://developer.fsiservices.com",
-    subscription_key="your-key",
-    api_username="sentinel_api",
-    api_password="your-password",
-    customer_site_code="YOUR_SITE",
-    segments=[...],
-    severity_mapping=SeverityMapping(...),
-    trade_mapping=TradeMapping(...),
-)
+cp .env.example .env
+# Edit .env with your Supabase credentials
 
-# 2. Initialise
-connector = ConceptConnector(config)
-await connector.initialise()
-
-# 3. Create work order from SENTINEL anomaly
-anomaly = SentinelAnomaly(
-    source=AnomalySource.BMS_ANOMALY,
-    segment_id="SEG--001",
-    asset_type="chiller",
-    severity_score=0.82,
-    summary="Chiller compressor discharge temp rising abnormally",
-    diagnostics="SENTINEL detected progressive increase in...",
-)
-
-result = await connector.create_work_order(anomaly)
-print(f"Work order created: {result.work_order_id}")
-
-# 4. Shutdown
-await connector.shutdown()
+./quickstart.sh
 ```
 
-## Prerequisites
+This starts the backend (FastAPI on `:9095`) and frontend (Vite on `:5173`).
 
-- **FSI API Access** enabled in MRI Evolution contract
-- **Subscription key** from FSI Developer Portal (developer.fsiservices.com)
-- **Dedicated API user** in MRI Evolution (e.g. `sentinel_api`)
-- **Segment IDs** for each facility/contract
-- **Priority and Trade IDs** from MRI Evolution administrator
-- Python 3.10+, `httpx`, `pydantic`
+## Project Structure
 
-## Key Design Decisions
+```
+├── backend/          # FastAPI application
+│   ├── app/
+│   │   ├── agents/       # NLP, recommendation, automation agents
+│   │   ├── api/          # REST endpoints + SSE real-time events
+│   │   ├── services/     # ML, health monitoring, integrations
+│   │   ├── adapters/     # BMS protocol adapters (BACnet, Modbus)
+│   │   └── database/     # Supabase client + repositories
+│   └── tests/
+├── frontend/         # React + Vite + TypeScript
+│   ├── src/
+│   │   ├── cockpit/     # Main dashboard views
+│   │   ├── settings/    # Configuration UI
+│   │   └── components/  # Shared UI components
+│   └── e2e/             # Playwright tests
+├── supabase/         # Database migrations + config
+├── docs/             # Architecture, API reference, operations
+├── infrastructure/   # Docker, monitoring, deployment configs
+└── .github/          # CI/CD workflows
+```
 
-1. **Complement, don't replace.** Work orders appear in FSI GO exactly as manually-created ones. Zero technician retraining.
-2. **Resilience first.** Rate limiter (200/min), circuit breaker (5-fail → local queue), exponential backoff, auto-retry.
-3. **Zero disk persistence for secrets.** JWT tokens live in memory only. Credentials from Vault or env vars.
-4. **Deduplication.** 30-minute cooldown per asset prevents alarm storms from flooding the helpdesk.
-5. **Feedback loop.** Status polling captures technician resolution notes → feeds SENTINEL ML for continuous improvement.
+## Running Tests
 
----
+```bash
+# Backend tests
+cd backend && python -m pytest
 
-*SIMBIOT: The integration layer that makes SENTINEL work with anything.*
+# Frontend tests
+cd frontend && npm test
+
+# End-to-end tests
+cd frontend && npx playwright test
+```
+
+## Deployment
+
+### Docker Compose (production)
+
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Services
+
+- `sentinel-backend.service` — systemd unit for the FastAPI backend
+- `sentinel-frontend.service` — systemd unit for the frontend (Nginx)
+
+## Environment
+
+See `.env.example` for all required configuration:
+
+| Variable | Description |
+|----------|-------------|
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_SERVICE_KEY` | Supabase service role key |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `REDIS_URL` | Redis connection string (caching) |
+
+## Key Features
+
+- **Predictive maintenance** — ML models trained on BMS telemetry detect anomalies before failure
+- **Automated diagnostics** — AI agents analyze faults and recommend actions
+- **Real-time monitoring** — SSE-powered live dashboard with 30s polling
+- **Multi-site** — Site-isolated data model supports any number of buildings
+- **Protocol agnostic** — SIMBIOT adapter layer works with BACnet, Modbus, Desigo, Niagara
+- **Human-in-loop** — All automated actions require operator approval
+
+## License
+
+Proprietary. All rights reserved.
