@@ -17,11 +17,13 @@ set -euo pipefail
 
 REPO_URL="git@github.com:Bederf/bms-intelligence.git"
 PUBLIC_REPO="git@github.com:Bederf/sentinel-ai.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TMP_DIR=$(mktemp -d)
 FILTER_FILE=$(mktemp)
+WORK_DIR=$(mktemp -d)
 
 # Cleanup on exit
-trap 'rm -rf "$TMP_DIR" "$FILTER_FILE"' EXIT
+trap 'rm -rf "$TMP_DIR" "$FILTER_FILE" "$WORK_DIR"' EXIT
 
 echo "==> Cloning working repo..."
 git clone --bare --no-local "$REPO_URL" "$TMP_DIR" 2>/dev/null || git clone --bare "$REPO_URL" "$TMP_DIR"
@@ -84,17 +86,30 @@ docs/improvement-loops/
 docs/DOCUMENTATION_RULES.md
 *.mp4
 *.wasm
-*.bak
 ENDSTRIP
 
 echo "==> Filtering history..."
 git -C "$TMP_DIR" filter-repo \
   --paths-from-file "$FILTER_FILE" \
+  --path-glob '*.bak' \
+  --path-glob 'supabase/migrations/*.md' \
+  --path-glob 'supabase/migrations/*.py' \
+  --path-glob 'supabase/migrations/.orphaned/**' \
   --invert-paths \
   --force
 
+echo "==> Preparing clean deployment tree..."
+git clone "$TMP_DIR" "$WORK_DIR"
+
+# Normalize migrations: remove junk, renumber by true authorship order.
+python3 "$SCRIPT_DIR/clean_migrations.py" "$WORK_DIR/supabase/migrations"
+
+echo "==> Committing cleaned migrations..."
+git -C "$WORK_DIR" add -A
+git -C "$WORK_DIR" commit -m "chore(deploy): clean and renumber migrations for sentinel-ai mirror" || true
+
 echo "==> Pushing to sentinel-ai..."
-git -C "$TMP_DIR" remote add public "$PUBLIC_REPO"
-git -C "$TMP_DIR" push public main --force
+git -C "$WORK_DIR" remote add public "$PUBLIC_REPO"
+git -C "$WORK_DIR" push public main --force
 
 echo "==> Done. sentinel-ai is synced."
