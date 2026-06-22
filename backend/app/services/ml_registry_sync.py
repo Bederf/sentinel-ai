@@ -17,7 +17,7 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 _REGISTRY_PATH = Path(__file__).parent.parent.parent / "ml" / "models" / "registry.json"
-_DATABASE_URL = os.getenv("DATABASE_URL")
+_DATABASE_URL = os.getenv("PGBOUNCER_URL") or os.getenv("DATABASE_URL")
 if not _DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
 

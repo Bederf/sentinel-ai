@@ -72,6 +72,26 @@ class DeskIngestionRequest(BaseModel):
     desks: list[DeskConfig] = Field(..., description="List of desk configurations")
 
 
+class AutoZonePlanRequest(BaseModel):
+    """Optional overrides for automatic zone planning."""
+
+    building_type: str | None = Field(None, description="Override building type")
+    total_desks: int | None = Field(None, ge=0, description="Override total desks/workpoints")
+    floors: list[str] | None = Field(None, description="Override floor labels")
+    sqm: int | None = Field(None, ge=0, description="Override gross floor area")
+
+
+class AutoZonePlanResponse(BaseModel):
+    """Generated draft zone/desk plan for operator review."""
+
+    site_id: str
+    building_type: str
+    strategy: str
+    zones: list[ZoneConfig]
+    desks: list[DeskConfig]
+    metadata: dict[str, Any]
+
+
 class IngestionResponse(BaseModel):
     """Response from ingestion operations."""
 
@@ -229,6 +249,37 @@ async def ingest_desks(
     except Exception as e:
         logger.error(f"Desk ingestion failed: {e}")
         raise HTTPException(status_code=500, detail=f"Ingestion failed: {e}")
+
+
+@router.post("/{site_id}/zone-ingestion/auto-plan", response_model=AutoZonePlanResponse)
+async def generate_auto_zone_plan(
+    site_id: str = Path(..., description="Building UUID or site code"),
+    request: AutoZonePlanRequest | None = None,
+    auth: AuthContext = Depends(require_site_access("site_id")),
+) -> AutoZonePlanResponse:
+    """Generate draft zones/desks from site type, floors, desks, and area.
+
+    The result is not persisted. The onboarding wizard applies it as a draft
+    so the operator can review and edit before ingestion.
+    """
+    service = ZoneIngestionService()
+    request = request or AutoZonePlanRequest()
+
+    try:
+        plan = service.generate_auto_plan(
+            site_id=site_id,
+            building_type=request.building_type,
+            total_desks=request.total_desks,
+            floors=request.floors,
+            sqm=request.sqm,
+        )
+        return AutoZonePlanResponse(**plan)
+    except ValueError as e:
+        logger.warning("Auto zone plan failed: %s", e)
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Auto zone plan failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Auto zone plan failed: {e}")
 
 
 @router.get(

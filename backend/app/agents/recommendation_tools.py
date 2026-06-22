@@ -118,7 +118,94 @@ async def check_equipment_health(equipment_code: str) -> dict[str, Any]:
     # Health simulation service removed — live telemetry drives health scoring
     # via the ML pipeline. Return default healthy until health score is
     # available from the ML service.
-    return {"health_score": 100, "is_healthy": True, "details": {}}
+    return {
+        "health_score": None,
+        "is_healthy": None,
+        "details": {},
+        "checked": False,
+        "source": "unavailable",
+    }
+
+
+def _values_match(current_value: Any, recommended_value: Any) -> bool:
+    """Compare current and recommended values with tolerance for numeric points."""
+    if current_value is None or recommended_value is None:
+        return False
+
+    try:
+        return abs(float(current_value) - float(recommended_value)) <= 0.1
+    except (TypeError, ValueError):
+        return str(current_value).strip().lower() == str(recommended_value).strip().lower()
+
+
+async def check_recommendation_action_still_needed(recommendation: dict[str, Any]) -> dict[str, Any]:
+    """Check whether an actionable point change still needs to be made.
+
+    If a recommendation has a concrete equipment/point/value target and the
+    device already reports that value, the change is no longer valid.
+    Read failures are non-blocking: the caller should keep processing the
+    recommendation rather than expiring it on missing telemetry.
+    """
+    action = recommendation.get("action") or {}
+    equipment_code = recommendation.get("target_equipment", "")
+    point_name = action.get("point") or action.get("point_name")
+    target_value = action.get("value")
+
+    if action.get("execution_blocked"):
+        blocker = action.get("blocker") or "execution_blocked"
+        return {
+            "is_needed": False,
+            "checked": True,
+            "reason": f"Recommendation execution blocked by {blocker}; recommendation no longer valid",
+        }
+
+    if not equipment_code or not point_name or target_value is None:
+        return {
+            "is_needed": True,
+            "checked": False,
+            "reason": "No concrete equipment/point/value target to validate",
+        }
+
+    try:
+        from app.services.device_abstraction import device_manager
+
+        device_value = await device_manager.read_device_value(equipment_code, point_name)
+        current_value = getattr(device_value, "value", device_value)
+    except Exception as e:
+        logger.debug(
+            "Could not read current value for recommendation %s on %s.%s: %s",
+            recommendation.get("id"),
+            equipment_code,
+            point_name,
+            e,
+        )
+        return {
+            "is_needed": True,
+            "checked": False,
+            "reason": f"Current value unavailable for {equipment_code}.{point_name}",
+        }
+
+    if _values_match(current_value, target_value):
+        return {
+            "is_needed": False,
+            "checked": True,
+            "reason": (
+                f"{equipment_code}.{point_name} already at recommended value "
+                f"{target_value}; recommendation no longer valid"
+            ),
+            "current_value": current_value,
+            "target_value": target_value,
+        }
+
+    return {
+        "is_needed": True,
+        "checked": True,
+        "reason": (
+            f"{equipment_code}.{point_name} current value {current_value} differs from recommended value {target_value}"
+        ),
+        "current_value": current_value,
+        "target_value": target_value,
+    }
 
 
 async def check_maintenance_calendar(equipment_code: str) -> dict[str, Any]:

@@ -347,20 +347,114 @@ class TestScheduleConflictPath:
     """Tests for schedule conflict handling."""
 
     @pytest.mark.asyncio
-    async def test_defers_on_conflict(self):
-        """Active WO on equipment → deferred."""
-        from langchain_core.messages import HumanMessage
-        from langgraph.checkpoint.memory import MemorySaver
-
-        from app.agents.recommendation_graph import build_recommendation_graph
+    async def test_expires_on_conflict(self):
+        """Active WO on equipment → expired because the recommendation is covered."""
+        from app.agents.recommendation_graph import defer_node
 
         rec = make_recommendation()
 
+        with patch(
+            "app.agents.recommendation_graph.update_recommendation_status",
+            new_callable=AsyncMock,
+            return_value=True,
+        ) as update_status:
+            result = await defer_node(
+                {
+                    "recommendation_id": rec["id"],
+                    "conflict_details": "Active maintenance on FCU-201",
+                }
+            )
+
+            assert "expired" in result["response"].lower()
+            update_status.assert_awaited_once_with(rec["id"], "expired")
+
+    @pytest.mark.asyncio
+    async def test_maintenance_rec_expires_when_equipment_health_recovers(self):
+        """Maintenance recommendations expire once the underlying equipment is healthy."""
+        from app.agents.recommendation_graph import mark_expired_node, validate_relevance_node
+
+        rec = make_recommendation()
+        rec["action_type"] = "maintenance"
+
         with (
             patch(
-                "app.agents.recommendation_graph.get_pending_recommendations",
+                "app.agents.recommendation_graph.check_recommendation_freshness",
+                return_value={"is_fresh": True, "reason": "fresh"},
+            ),
+            patch(
+                "app.agents.recommendation_graph.check_equipment_health",
                 new_callable=AsyncMock,
-                return_value=[rec],
+                return_value={"health_score": 91, "is_healthy": True, "details": {}, "checked": True},
+            ),
+            patch(
+                "app.agents.recommendation_graph.update_recommendation_status",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as update_status,
+        ):
+            relevance = await validate_relevance_node({"recommendation": rec})
+            result = await mark_expired_node(
+                {
+                    "recommendation_id": rec["id"],
+                    "relevance_reason": relevance["relevance_reason"],
+                }
+            )
+
+            assert "expired" in result["response"].lower()
+            assert "health recovered" in result["response"].lower()
+            update_status.assert_awaited_once_with(rec["id"], "expired")
+
+    @pytest.mark.asyncio
+    async def test_maintenance_rec_stays_active_when_health_unavailable(self):
+        """Maintenance recommendations do not expire on default unavailable health."""
+        from app.agents.recommendation_graph import validate_relevance_node
+
+        rec = make_recommendation()
+        rec["action_type"] = "maintenance"
+
+        with (
+            patch(
+                "app.agents.recommendation_graph.check_recommendation_freshness",
+                return_value={"is_fresh": True, "reason": "fresh"},
+            ),
+            patch(
+                "app.agents.recommendation_graph.check_equipment_health",
+                new_callable=AsyncMock,
+                return_value={
+                    "health_score": None,
+                    "is_healthy": None,
+                    "details": {},
+                    "checked": False,
+                    "source": "unavailable",
+                },
+            ),
+            patch(
+                "app.agents.recommendation_graph.check_recommendation_action_still_needed",
+                new_callable=AsyncMock,
+                return_value={
+                    "is_needed": True,
+                    "checked": False,
+                    "reason": "No concrete equipment/point/value target to validate",
+                },
+            ),
+        ):
+            relevance = await validate_relevance_node({"recommendation": rec})
+
+        assert relevance["is_relevant"] is True
+        assert relevance["relevance_reason"] == "Valid and fresh"
+
+    @pytest.mark.asyncio
+    async def test_setpoint_rec_expires_when_already_at_target_value(self):
+        """Setpoint recommendations expire when the current point already matches."""
+        from app.agents.recommendation_graph import mark_expired_node, validate_relevance_node
+
+        rec = make_recommendation()
+        rec["action"] = {"point": "zone_temp_setpoint", "value": 18.0}
+
+        with (
+            patch(
+                "app.agents.recommendation_graph.check_recommendation_freshness",
+                return_value={"is_fresh": True, "reason": "fresh"},
             ),
             patch(
                 "app.agents.recommendation_graph.check_equipment_health",
@@ -368,35 +462,78 @@ class TestScheduleConflictPath:
                 return_value={"health_score": 45, "is_healthy": False, "details": {}},
             ),
             patch(
-                "app.agents.recommendation_graph.check_maintenance_calendar",
+                "app.agents.recommendation_graph.check_recommendation_action_still_needed",
                 new_callable=AsyncMock,
                 return_value={
-                    "has_conflict": True,
-                    "work_orders": [{"id": "wo-1"}],
-                    "reason": "Active maintenance on FCU-201",
+                    "is_needed": False,
+                    "checked": True,
+                    "reason": "S002-FCU-201.zone_temp_setpoint already at recommended value 18.0; recommendation no longer valid",
                 },
             ),
             patch(
-                "app.agents.recommendation_tools.cross_reference_similar_faults",
+                "app.agents.recommendation_graph.update_recommendation_status",
                 new_callable=AsyncMock,
-                return_value=[],
-            ),
+                return_value=True,
+            ) as update_status,
         ):
-            graph = build_recommendation_graph()
-            compiled = graph.compile(checkpointer=MemorySaver())
-            config = {"configurable": {"thread_id": "test_conflict"}}
-
-            result = await compiled.ainvoke(
+            relevance = await validate_relevance_node({"recommendation": rec})
+            result = await mark_expired_node(
                 {
-                    "messages": [HumanMessage(content="process")],
-                    "site_id": "S002",
-                    "channel": "system",
-                    "trigger": "manual",
-                },
-                config=config,
+                    "recommendation_id": rec["id"],
+                    "relevance_reason": relevance["relevance_reason"],
+                }
             )
 
-            assert "deferred" in result["response"].lower() or "conflict" in result["response"].lower()
+            assert "expired" in result["response"].lower()
+            assert "already at recommended value" in result["response"].lower()
+            update_status.assert_awaited_once_with(rec["id"], "expired")
+
+    @pytest.mark.asyncio
+    async def test_execution_blocked_rec_expires(self):
+        """Recommendations blocked by unresolved BMS points expire before routing."""
+        from app.agents.recommendation_graph import mark_expired_node, validate_relevance_node
+
+        rec = make_recommendation()
+        rec["action"] = {
+            "point": None,
+            "value": 20.0,
+            "execution_blocked": True,
+            "blocker": "unresolved_bms_point",
+        }
+
+        with (
+            patch(
+                "app.agents.recommendation_graph.check_recommendation_freshness",
+                return_value={"is_fresh": True, "reason": "fresh"},
+            ),
+            patch(
+                "app.agents.recommendation_graph.check_equipment_health",
+                new_callable=AsyncMock,
+                return_value={
+                    "health_score": None,
+                    "is_healthy": None,
+                    "details": {},
+                    "checked": False,
+                    "source": "unavailable",
+                },
+            ),
+            patch(
+                "app.agents.recommendation_graph.update_recommendation_status",
+                new_callable=AsyncMock,
+                return_value=True,
+            ) as update_status,
+        ):
+            relevance = await validate_relevance_node({"recommendation": rec})
+            result = await mark_expired_node(
+                {
+                    "recommendation_id": rec["id"],
+                    "relevance_reason": relevance["relevance_reason"],
+                }
+            )
+
+            assert "expired" in result["response"].lower()
+            assert "unresolved_bms_point" in result["response"]
+            update_status.assert_awaited_once_with(rec["id"], "expired")
 
 
 # ===================================================================

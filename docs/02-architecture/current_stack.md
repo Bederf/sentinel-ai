@@ -68,7 +68,7 @@ High-level tree with the most important areas:
 ├── e2e/                     Playwright end-to-end tests
 ├── scripts/                 Operational scripts, including backup scripts
 ├── backups/                 Backup output structure
-├── simbiot_concept/         SIMBIOT integration concept assets
+├── simbiot_concept/         SIMBIOT Concept Evolution connector (MRI/FSI CAFM integration)
 ├── docker-compose.yml       Local container stack definition
 ├── start-backend.sh         Backend startup helper
 ├── start-frontend.sh        Frontend startup helper
@@ -644,6 +644,49 @@ Supabase is not just local infrastructure today. It is also a major application-
 5. Are `realtime`, `auth`, and `storage` all actively used in production, or are some only enabled because Supabase ships them by default?
 6. Has the new Postgres logical backup timer been installed and enabled on the target appliance, or is it still repo scaffolding only?
 7. Which domains are intentionally JSON-backed long term, and which are only temporary fallbacks?
+
+## Supported Software Status
+
+All platform components listed below are verified on supported, non-EOL versions as of the inventory date. Lifecycle status is sourced from each vendor's published support policy. Vulnerability management follows the process in `docs/09-security/vulnerability-management.md`.
+
+| Component | Version | Support Status | EOL Date | Notes |
+|-----------|---------|---------------|----------|-------|
+| Ubuntu | 24.04 LTS | Supported (standard support) | 2029-04 (ESM to 2034-04) | Canonical standard support |
+| PostgreSQL (Supabase) | 15.8 | Supported | 2027-11 | PostgreSQL Global Development Group |
+| FastAPI | 0.115.x | Supported | N/A (rolling) | Active open-source |
+| Python | 3.11 | Supported | 2027-10 | Python Software Foundation |
+| Node.js | 22.x (LTS) | Supported | 2027-04 | Active LTS |
+| React | 19.x | Supported | N/A (rolling) | Active |
+| InfluxDB | 2.x | Supported | Per InfluxData policy | Active |
+| Redis | 7.x | Supported | Per Redis policy | Active |
+| Docker | 27.x | Supported | N/A (rolling) | Active CE |
+| Docker Compose | 2.x | Supported | N/A (rolling) | Active |
+| Ollama | 0.5.x | Supported | N/A (rolling) | Active |
+| n8n | 1.x | Supported | Per n8n policy | Active |
+| Caddy | 2.x | Supported | Per Caddy policy | Active |
+| Grafana | 11.x | Supported | Per Grafana policy | Active |
+| Prometheus | 2.x | Supported | Per Prometheus policy | Active |
+| Loki | 3.x | Supported | Per Grafana policy | Active |
+| Promtail | 3.x | Supported | Per Grafana policy | Active |
+| Wazuh | 4.x | Supported | Per Wazuh policy | Active |
+| Fail2Ban | 1.x | Supported | N/A (rolling) | Active |
+| Cloudflare (Tunnel, WAF) | N/A (SaaS) | Supported | N/A | Cloudflare-managed |
+| Playwright (E2E) | 1.x | Supported | N/A (rolling) | Active |
+| Raspberry Pi OS (edge nodes) | 12 (bookworm) | Supported | 2028-06 | Debian-based LTS |
+
+### Lifecycle Management Process
+
+1. **Stack inventory** is maintained in this document and reviewed quarterly
+2. **Vulnerability scanning** via Wazuh detects known CVEs in deployed packages
+3. **Dependency monitoring** via Dependabot (GitHub) covers critical Python, npm, and Docker dependencies
+4. **Patch policy**: security patches applied within 7 days of release; minor version upgrades within 30 days
+5. **Major version migrations**: assessed and scheduled at least 90 days before upstream EOL
+6. **EOL alerting**: Dependabot security alerts flag EOL advisories; Wazuh rules flag EOL OS/package versions
+7. **Deviations**: any component running outside vendor support must be documented with an exception, risk acceptance, and migration plan in `docs/09-security/compliance/unsupported-software-exceptions.md`
+
+### Known Exceptions
+
+None as of the inventory date. Any future exceptions will be logged in the exceptions register (see link above).
 
 ## Current State Summary
 The current SENTINEL stack is already substantially local and appliance-oriented:

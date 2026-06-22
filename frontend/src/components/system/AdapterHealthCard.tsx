@@ -17,6 +17,7 @@ interface AdapterStatus {
   uptime_24h_percent: number | null;
   last_check: string | null;
   consecutive_failures: number;
+  error_message?: string | null;
 }
 
 interface AdapterHealthData {
@@ -204,21 +205,31 @@ export function AdapterHealthCard({ siteId = 'site-002' }: { siteId?: string }) 
             return (
               <div
                 key={adapter.name}
-                className="flex items-center justify-between p-2 rounded text-xs"
+                className="flex items-start justify-between gap-3 p-2 rounded text-xs"
                 style={{ background: 'var(--color-sentinel-bg-secondary)' }}
               >
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 items-start gap-2">
                   {getAdapterIcon(adapter.type, adapter.is_healthy)}
-                  <div>
-                    <span style={{ color: 'var(--color-sentinel-text-primary)' }}>
-                      {label}
-                    </span>
-                    <span
-                      className="ml-2"
-                      style={{ color: 'var(--color-sentinel-text-disabled)', fontSize: '10px' }}
-                    >
-                      {adapter.name}
-                    </span>
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <span style={{ color: 'var(--color-sentinel-text-primary)' }}>
+                        {label}
+                      </span>
+                      <span
+                        className="truncate"
+                        style={{ color: 'var(--color-sentinel-text-disabled)', fontSize: '10px' }}
+                      >
+                        {adapter.name}
+                      </span>
+                    </div>
+                    {!adapter.is_healthy && adapter.error_message && (
+                      <div
+                        className="mt-1 break-words"
+                        style={{ color: 'var(--color-sentinel-red)', fontSize: '10px', lineHeight: 1.35 }}
+                      >
+                        {adapter.error_message}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-3">

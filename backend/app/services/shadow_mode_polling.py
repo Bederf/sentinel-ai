@@ -112,6 +112,123 @@ def _parse_eq_code_parts(code: str) -> tuple[str, str]:
 
 logger = logging.getLogger("sentinel.shadow_mode")
 
+DALI_LIGHTING_READING_NAMES = {
+    "brightness",
+    "power_watts",
+    "energy_kwh",
+    "occupancy",
+    "on_off",
+    "lamp_status",
+    "control_gear_status",
+    "lux",
+}
+
+SYNTHETIC_ALARM_PATTERNS = [
+    "synthetic alarm",
+    "desigo feed validation",
+]
+
+
+def _is_synthetic_alarm(message_text: str) -> bool:
+    if not message_text:
+        return False
+    text_lower = message_text.lower()
+    return any(pattern in text_lower for pattern in SYNTHETIC_ALARM_PATTERNS)
+
+
+def _bridge_marks_synthetic_alarm(alarm: dict[str, Any]) -> bool | None:
+    for key in ("is_synthetic", "synthetic_alarm"):
+        value = alarm.get(key)
+        if isinstance(value, bool):
+            return value
+    return None
+
+
+def _normalize_bridge_equipment_status(status: str | None) -> str:
+    normalized = (status or "offline").lower()
+    if normalized in ("online", "normal", "ok", "running"):
+        return "normal"
+    if normalized in ("needs_attention", "warning", "degraded"):
+        return "needs_attention"
+    if normalized in ("offline", "maintenance", "critical", "unknown"):
+        return normalized
+    return "unknown"
+
+
+def _bridge_zone_alias(zone_id: str) -> str | None:
+    """Return bridge numeric alias for canonical zone IDs.
+
+    Supabase owns the canonical zone model. Some bridge telemetry still reports
+    simple numeric IDs like Zone-101 for Zone-L1-1; allow only aliases derived
+    from Supabase-owned zones.
+    """
+    match = re.match(r"^Zone-L(\d+)-(\d+)$", str(zone_id or "").strip(), re.IGNORECASE)
+    if not match:
+        return None
+    level = int(match.group(1))
+    zone_number = int(match.group(2))
+    if zone_number <= 0:
+        return None
+    return f"Zone-{level}{zone_number:02d}"
+
+
+def _bridge_zone_id_from_equipment_code(site_prefix: str, equipment_code: str) -> str | None:
+    """Return numeric bridge zone ID for zone-scoped terminal equipment."""
+    pattern = rf"^{re.escape(site_prefix)}-(FCU|VAV|DALI|LTG|LUM)-(\d{{3}})$"
+    match = re.match(pattern, str(equipment_code or "").strip().upper())
+    if not match:
+        return None
+    return f"Zone-{match.group(2)}"
+
+
+def _is_dali_lighting_mapping(mapping: dict[str, Any]) -> bool:
+    equipment_id = str(mapping.get("extracted_asset_id") or "")
+    parameter_name = str(mapping.get("parameter_name") or "").strip().lower()
+    return "-DALI-" in equipment_id and parameter_name in DALI_LIGHTING_READING_NAMES
+
+
+def _lighting_energy_payload_from_state(
+    *,
+    site_id: str,
+    equipment_id: str,
+    zone_id: str | None,
+    readings: dict[str, Any],
+    observed_at: datetime,
+) -> dict[str, Any] | None:
+    """Build a lighting_energy row from a DALI zone state.
+
+    DALI bridge telemetry is zone-level, not individual-luminaire telemetry, so
+    active_luminaires is left null unless the bridge later provides a real count.
+    """
+    if not zone_id or not str(zone_id).startswith("Zone-"):
+        return None
+
+    total_watts = _safe_float(readings.get("power_watts"))
+    avg_dim_level = _safe_float(readings.get("brightness"))
+    if total_watts is None and avg_dim_level is None:
+        return None
+
+    return {
+        "time": observed_at.isoformat(),
+        "controller_id": equipment_id,
+        "zone_id": zone_id,
+        "total_watts": total_watts,
+        "active_luminaires": None,
+        "avg_dim_level": avg_dim_level,
+        "site_id": site_id,
+    }
+
+
+def _safe_float(value: Any) -> float | None:
+    if value is None or value == "":
+        return None
+    try:
+        if isinstance(value, bool):
+            return 1.0 if value else 0.0
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
 
 class ShadowModePollingService:
     """Polls the site bridge and feeds live data to the ML pipeline."""
@@ -137,6 +254,9 @@ class ShadowModePollingService:
         self._zone_to_ahu: dict[str, str] = {}
         # Sensor codes for trends polling (built from catalog)
         self._trends_sensor_codes: list[str] = []
+        # Supabase is the source of truth for building zones. Bridge zone
+        # telemetry is accepted only when it maps to one of these IDs.
+        self._valid_bridge_zone_ids: set[str] = set()
         # Energy accumulation state (kWh, accumulated since last DB write)
         self._energy_accumulator: dict[str, float] = {
             "hvac_kwh": 0.0,
@@ -150,8 +270,9 @@ class ShadowModePollingService:
         from app.services.fcu_state_tracker import FCUStateTracker
         from app.services.fcu_state_tracker_backend import SupabaseBackend
 
-        # Build zone_type_resolver from Supabase zones table (static, cached)
+        # Build zone_type_resolver from Supabase inventory (static, cached)
         zone_type_map = self._build_zone_type_map()
+        self._valid_bridge_zone_ids = set(zone_type_map)
         self.fcu_state_tracker = FCUStateTracker(
             zone_type_resolver=lambda zid: zone_type_map.get(zid, ""),
             backend=SupabaseBackend(site_id=site_id),
@@ -161,6 +282,8 @@ class ShadowModePollingService:
         """Load zone_id → zone_type mapping from Supabase zones table.
 
         Zone types are static configuration — fetched once, cached for session.
+        Supabase is the source of truth; JSON files and bridge-provided zone
+        IDs must not create zones.
         """
         try:
             from app.config.settings import settings
@@ -174,8 +297,27 @@ class ShadowModePollingService:
             if not site_row.data:
                 return {}
             site_uuid = site_row.data[0]["id"]
-            rows = client.table("zones").select("zone_id, zone_type").eq("site_id", site_uuid).execute()
-            return {r["zone_id"]: r["zone_type"] for r in rows.data}
+            zone_type_map: dict[str, str] = {}
+
+            def add_zone(zone_id: str | None, zone_type: str = "open_office") -> None:
+                cleaned = str(zone_id or "").strip()
+                if not cleaned:
+                    return
+                zone_type_map.setdefault(cleaned, zone_type)
+                alias = _bridge_zone_alias(cleaned)
+                if alias:
+                    zone_type_map.setdefault(alias, zone_type)
+
+            zones_rows = client.table("zones").select("zone_id, zone_type").eq("site_id", site_uuid).execute()
+            for row in zones_rows.data or []:
+                add_zone(row.get("zone_id"), str(row.get("zone_type") or "open_office"))
+
+            hvac_rows = client.table("hvac_zones").select("zone_id").eq("site_id", site_uuid).execute()
+            for row in hvac_rows.data or []:
+                add_zone(row.get("zone_id"))
+
+            logger.info("[SHADOW] Loaded %d Supabase-authorized zone IDs for %s", len(zone_type_map), self.site_id)
+            return zone_type_map
         except Exception as exc:
             logger.warning(f"[SHADOW] Could not load zone types from Supabase: {exc}")
             return {}
@@ -183,11 +325,33 @@ class ShadowModePollingService:
     def _get_bridge_credentials(self) -> tuple[str, str]:
         """Return (base_url, api_token).
 
-        Uses per-instance overrides (injected by MultiSitePollingCoordinator from DB)
-        when present, otherwise falls back to settings env vars.
+        Uses per-instance overrides first, then the enabled per-site bridge
+        adapter config in Supabase, then legacy settings env vars.
         """
         if self._override_bridge_url and self._override_bridge_token:
             return self._override_bridge_url.rstrip("/"), self._override_bridge_token
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            result = (
+                client.table("site_adapter_config")
+                .select("connection_config")
+                .eq("site_id", self.site_id)
+                .eq("protocol", "bridge")
+                .eq("enabled", True)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                config = result.data[0].get("connection_config") or {}
+                base = config.get("base_url")
+                token = config.get("token")
+                if base and token:
+                    return str(base).rstrip("/"), str(token)
+        except Exception as exc:
+            logger.debug("[SHADOW] Site bridge config lookup failed for %s: %s", self.site_id, exc)
 
         from app.config.settings import settings
 
@@ -198,6 +362,96 @@ class ShadowModePollingService:
         if not token:
             raise RuntimeError("Bridge API token not configured — set SIMBIOT_API_KEY or BRIDGE_API_TOKEN")
         return base.rstrip("/"), token
+
+    def _equipment_zone_inventory_blocker(self, equipment_code: str) -> tuple[str, str] | None:
+        """Return (zone_id, reason) when bridge terminal equipment is outside Supabase inventory."""
+        zone_id = _bridge_zone_id_from_equipment_code(self._site_prefix, equipment_code)
+        if not zone_id:
+            return None
+        if zone_id in self._valid_bridge_zone_ids:
+            return None
+        return zone_id, "derived_zone_not_in_supabase_inventory"
+
+    def _equipment_code_allowed_by_supabase_zone_inventory(self, equipment_code: str) -> bool:
+        """Allow bridge terminal equipment only when its zone exists in Supabase."""
+        blocker = self._equipment_zone_inventory_blocker(equipment_code)
+        if not blocker:
+            return True
+        zone_id, _reason = blocker
+        logger.warning(
+            "[SHADOW] Ignoring bridge equipment %s for %s: derived zone %s is not in Supabase zone inventory",
+            equipment_code,
+            self.site_id,
+            zone_id,
+        )
+        return False
+
+    def _record_discovered_bridge_equipment(
+        self,
+        bridge_code: str,
+        canonical_code: str,
+        bridge_status_data: dict[str, Any] | None = None,
+        *,
+        reason: str = "new_bridge_equipment",
+        derived_zone_id: str | None = None,
+    ) -> None:
+        """Record bridge equipment that must be reviewed before onboarding.
+
+        Supabase remains the source of truth. This only creates or refreshes a
+        pending discovery row; it never creates zones or active equipment.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            eq_type, _ = self._parse_equipment_code(canonical_code)
+            payload = bridge_status_data or {}
+            now_iso = datetime.now(tz=UTC).isoformat()
+            existing = (
+                client.table("bridge_discovered_equipment")
+                .select("id, seen_count, status")
+                .eq("site_id", self.site_id)
+                .eq("canonical_code", canonical_code)
+                .limit(1)
+                .execute()
+            )
+            update_payload = {
+                "bridge_code": bridge_code,
+                "equipment_type": eq_type,
+                "derived_zone_id": derived_zone_id,
+                "reason": reason,
+                "payload": payload,
+                "last_seen_at": now_iso,
+                "updated_at": now_iso,
+            }
+            if existing.data:
+                row = existing.data[0]
+                update_payload["seen_count"] = int(row.get("seen_count") or 0) + 1
+                client.table("bridge_discovered_equipment").update(update_payload).eq("id", row["id"]).execute()
+                return
+
+            client.table("bridge_discovered_equipment").insert(
+                {
+                    "site_id": self.site_id,
+                    "bridge_code": bridge_code,
+                    "canonical_code": canonical_code,
+                    "equipment_type": eq_type,
+                    "derived_zone_id": derived_zone_id,
+                    "status": "pending",
+                    "reason": reason,
+                    "payload": payload,
+                    "first_seen_at": now_iso,
+                    "last_seen_at": now_iso,
+                    "seen_count": 1,
+                }
+            ).execute()
+        except Exception as exc:
+            logger.warning(
+                "[SHADOW] Failed to record discovered bridge equipment %s for %s: %s",
+                canonical_code,
+                self.site_id,
+                exc,
+            )
 
     async def _load_object_catalog(self, base: str, headers: dict[str, str]) -> None:
         """Load and cache the BACnet object catalog. Called once on first poll."""
@@ -253,9 +507,11 @@ class ShadowModePollingService:
                     # Collect setpoint object IDs for separate polling pass
                     setpoint_codes.add(obj_id.replace(".", "-"))
 
-            # Add explicit zone temp trends (pre-emptive, in case catalog lacks these)
-            for i in range(1, 21):
-                sensor_codes.add(f"Zone-{i:03d}-temp")
+            # Add explicit zone temp trends only for Supabase-authorized bridge
+            # zone IDs. Do not create synthetic Zone-001..020 assumptions.
+            for zone_id in sorted(self._valid_bridge_zone_ids):
+                if re.match(r"^Zone-\d{3}$", zone_id):
+                    sensor_codes.add(f"{zone_id}-temp")
 
             # Build floor→AHU map from AHU equipment IDs in catalog
             floor_to_ahu: dict[str, str] = {}
@@ -295,9 +551,22 @@ class ShadowModePollingService:
         prefix = f"{self._site_prefix}-"
         if c.startswith(prefix):
             c = c[len(prefix) :]
+        if self._site_prefix == "S002":
+            legacy_aliases = {
+                "AHU-001": "AHU-B01",
+                "AHU-002": "AHU-201",
+                "AHU-003": "AHU-R01",
+            }
+            if c in legacy_aliases:
+                return f"{prefix}{legacy_aliases[c]}"
         m = re.match(r"^(.+)-B1-", c)
         if m:
             return f"{prefix}{m.group(1)}-B01"
+        m = re.match(r"^(.+)-L(\d)-(\d+)$", c)
+        if m:
+            floor = int(m.group(2))
+            seq = int(m.group(3))
+            return f"{prefix}{m.group(1)}-{floor * 100 + seq:03d}"
         m = re.match(r"^(.+)-R-\d{3}$", c)
         if m:
             return f"{prefix}{m.group(1)}-R01"
@@ -398,6 +667,11 @@ class ShadowModePollingService:
 
             for z in zones:
                 zone_id: str = z.get("zone_id", "")
+                if zone_id not in self._valid_bridge_zone_ids:
+                    logger.warning(
+                        "[SHADOW] Ignoring bridge zone %s for %s: not in Supabase zone inventory", zone_id, self.site_id
+                    )
+                    continue
                 parts = zone_id.split("-")
                 zone_num = parts[1] if len(parts) == 2 else zone_id
                 equip_code = f"{self._site_prefix}-FCU-{zone_num}"
@@ -426,7 +700,7 @@ class ShadowModePollingService:
                     timestamp=now,
                 )
 
-            result["zones_polled"] = len(zones)
+            result["zones_polled"] = len(zone_states)
 
         except httpx.HTTPStatusError as e:
             logger.warning(f"[SHADOW] Zone poll HTTP {e.response.status_code}: {e.response.text[:200]}")
@@ -572,9 +846,9 @@ class ShadowModePollingService:
             else:
                 # Dict format (site-002 legacy): {"ahu1": {...aggregated readings...}}
                 ahu_map = {
-                    "ahu1": f"{self._site_prefix}-AHU-001",
-                    "ahu2": f"{self._site_prefix}-AHU-002",
-                    "ahu3": f"{self._site_prefix}-AHU-201",
+                    "ahu1": f"{self._site_prefix}-AHU-B01",
+                    "ahu2": f"{self._site_prefix}-AHU-201",
+                    "ahu3": f"{self._site_prefix}-AHU-R01",
                 }
                 for ahu_prefix, equip_code in ahu_map.items():
                     ahu_readings = {}
@@ -960,6 +1234,23 @@ class ShadowModePollingService:
             except Exception as e:
                 logger.warning(f"[SHADOW] Setpoint poll error: {e}")
 
+        # ── 5c. Poll verified SIMBIOT meter mappings ────────────────────────
+        # Meters are static assets, but their verified BACnet points still need
+        # to be sampled into equipment_sensor_readings for carbon/utility use.
+        simbiot_meter_states = await self._poll_verified_meter_mappings(base, headers)
+        result["simbiot_meter_points"] = sum(
+            len(state.get("sensor_readings", {})) for state in simbiot_meter_states.values()
+        )
+
+        # ── 5d. Poll mapped bridge object points ─────────────────────────────
+        # /points lists equipment online/offline state; mapped point IDs hold
+        # the actual telemetry for VAVs, pumps, cooling towers, and AHUs.
+        mapped_point_states = await self._poll_mapped_bridge_points(base, headers)
+        result["mapped_bridge_points"] = sum(
+            len(state.get("sensor_readings", {})) for state in mapped_point_states.values()
+        )
+        result["lighting_energy_rows"] = await self._write_lighting_energy_from_states(mapped_point_states)
+
         # ── 6. Sync equipment online/offline status from /points ─────────────
         points_result = await self._sync_equipment_status(base, headers)
         result["equipment_updated"] = points_result["updated"]
@@ -982,6 +1273,13 @@ class ShadowModePollingService:
             equipment_states[code] = state
         for code, state in points_result.get("meter_states", {}).items():
             equipment_states[code] = state
+        for code, state in mapped_point_states.items():
+            if code in equipment_states:
+                equipment_states[code].setdefault("sensor_readings", {}).update(state.get("sensor_readings", {}))
+                if not equipment_states[code].get("type") and state.get("type"):
+                    equipment_states[code]["type"] = state.get("type")
+            else:
+                equipment_states[code] = state
 
         # Normalize equipment codes: bridge codes like S002-CHILLER-B1-001
         # become S002-CHILLER-B01 so they match the DB equipment table codes.
@@ -990,8 +1288,34 @@ class ShadowModePollingService:
             db_code = self._normalize_to_db_code(code)
             if db_code != code:
                 logger.debug("[SHADOW] Normalized equipment code: %s → %s", code, db_code)
+            blocker = self._equipment_zone_inventory_blocker(db_code)
+            if blocker:
+                zone_id, reason = blocker
+                logger.warning(
+                    "[SHADOW] Ignoring bridge equipment %s for %s: derived zone %s is not in Supabase zone inventory",
+                    db_code,
+                    self.site_id,
+                    zone_id,
+                )
+                self._record_discovered_bridge_equipment(
+                    bridge_code=code,
+                    canonical_code=db_code,
+                    bridge_status_data=state,
+                    reason=reason,
+                    derived_zone_id=zone_id,
+                )
+                continue
             normalized[db_code] = state
         equipment_states = normalized
+
+        # SIMBIOT mappings are already canonical equipment IDs. Merge after raw
+        # bridge-code normalization so sub-meters like S002-MTR-B1-001 are not
+        # collapsed to the main basement meter.
+        for code, state in simbiot_meter_states.items():
+            if code in equipment_states:
+                equipment_states[code].setdefault("sensor_readings", {}).update(state.get("sensor_readings", {}))
+            else:
+                equipment_states[code] = state
 
         if not equipment_states:
             logger.warning(f"[SHADOW] Poll {self._poll_count}: no data — errors={errors}")
@@ -1029,6 +1353,293 @@ class ShadowModePollingService:
             f"errors={errors or 'none'}"
         )
         return result
+
+    async def _poll_verified_meter_mappings(self, base: str, headers: dict[str, str]) -> dict[str, dict[str, Any]]:
+        """Read verified SIMBIOT meter mappings from the bridge."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            site_resp = client.table("sites").select("id").eq("code", self.site_id).limit(1).execute()
+            if not site_resp.data:
+                return {}
+            site_uuid = site_resp.data[0]["id"]
+            mapping_resp = (
+                client.table("point_asset_mappings")
+                .select("bms_point_id, extracted_asset_id, parameter_name, parameter_type")
+                .eq("site_id", site_uuid)
+                .eq("is_verified", True)
+                .eq("mapping_source", "simbiot_manual")
+                .like("parameter_type", "meter:%")
+                .execute()
+            )
+            mappings = mapping_resp.data or []
+        except Exception as exc:
+            logger.debug("[SHADOW] SIMBIOT meter mapping load failed: %s", exc)
+            return {}
+
+        if not mappings:
+            return {}
+
+        async def fetch_mapping(mapping: dict[str, Any]) -> tuple[dict[str, Any], Any | None]:
+            point_id = mapping.get("bms_point_id")
+            if not point_id:
+                return mapping, None
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                try:
+                    resp = await client.get(f"{base}/api/sites/{self.site_id}/points/{point_id}", headers=headers)
+                    resp.raise_for_status()
+                    data = resp.json()
+                    if data.get("value") is not None:
+                        return mapping, data.get("value")
+                except Exception:
+                    pass
+
+                try:
+                    resp = await client.get(
+                        f"{base}/api/sites/{self.site_id}/trends/{point_id}",
+                        headers=headers,
+                        params={"limit": 1},
+                    )
+                    resp.raise_for_status()
+                    data = resp.json()
+                    samples = data.get("samples") or []
+                    if samples and samples[-1].get("value") is not None:
+                        return mapping, samples[-1].get("value")
+                except Exception:
+                    pass
+
+            return mapping, None
+
+        results = await asyncio.gather(*(fetch_mapping(mapping) for mapping in mappings), return_exceptions=True)
+        states: dict[str, dict[str, Any]] = {}
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+            mapping, value = result
+            if value is None:
+                continue
+            try:
+                numeric_value = float(value)
+            except (TypeError, ValueError):
+                continue
+
+            equipment_id = mapping.get("extracted_asset_id")
+            parameter_name = mapping.get("parameter_name")
+            if not equipment_id or not parameter_name:
+                continue
+            if equipment_id not in states:
+                states[equipment_id] = {"type": "meter", "sensor_readings": {}}
+            states[equipment_id]["sensor_readings"][parameter_name] = numeric_value
+
+        return states
+
+    async def _poll_mapped_bridge_points(self, base: str, headers: dict[str, str]) -> dict[str, dict[str, Any]]:
+        """Read mapped bridge object points into equipment sensor states."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            site_resp = client.table("sites").select("id").eq("code", self.site_id).limit(1).execute()
+            if not site_resp.data:
+                return {}
+            site_uuid = site_resp.data[0]["id"]
+            mapping_resp = (
+                client.table("point_asset_mappings")
+                .select("bms_point_id, extracted_asset_id, parameter_name, parameter_type")
+                .eq("site_id", site_uuid)
+                .in_("mapping_source", ["bridge_objects", "catalog_resolver"])
+                .execute()
+            )
+            mappings = mapping_resp.data or []
+        except Exception as exc:
+            logger.debug("[SHADOW] Bridge point mapping load failed: %s", exc)
+            return {}
+
+        hvac_tokens = ("-AHU-", "-CHILLER-", "-CT-", "-VAV-", "-PUMP-")
+        candidate_mappings = []
+        for mapping in mappings:
+            equipment_id = str(mapping.get("extracted_asset_id") or "")
+            point_id = str(mapping.get("bms_point_id") or "")
+            parameter_name = str(mapping.get("parameter_name") or "")
+            parameter_type = str(mapping.get("parameter_type") or "")
+            if not equipment_id or not point_id:
+                continue
+            if any(skip in point_id.lower() for skip in ("health_score", "updated_at")):
+                continue
+            if _is_dali_lighting_mapping(mapping):
+                candidate_mappings.append(mapping)
+                continue
+            if not any(token in equipment_id for token in hvac_tokens):
+                continue
+            if not (
+                parameter_name
+                or parameter_type.startswith(("sensor", "status", "cooling_tower"))
+                or any(
+                    token in point_id.upper() for token in ("ROOMTEMP", "DAMPER", "RUN_STATE", "FAN_SPEED", "FILTER_DP")
+                )
+            ):
+                continue
+            candidate_mappings.append(mapping)
+
+        if not candidate_mappings:
+            return {}
+
+        def reading_name_for(mapping: dict[str, Any]) -> str | None:
+            point_id = str(mapping.get("bms_point_id") or "")
+            parameter_name = str(mapping.get("parameter_name") or "").strip()
+            upper_point = point_id.upper()
+            if "ROOMTEMP" in upper_point:
+                return "room_temp"
+            if "DAMPER" in upper_point:
+                return "damper_position"
+            if "RUN_STATE" in upper_point or upper_point.endswith(".STATUS"):
+                return "equipment_online"
+            if "FAN_SPEED" in upper_point:
+                return "fan_speed"
+            if "FILTER_DP" in upper_point:
+                return "filter_dp"
+            if "SUPPLY_AIR_TEMP" in upper_point:
+                return "supply_air_temp"
+            if "RETURN_AIR_TEMP" in upper_point:
+                return "return_air_temp"
+
+            if _is_dali_lighting_mapping(mapping):
+                return parameter_name.lower()
+
+            if parameter_name and parameter_name not in {"unknown", "unknown_sensor"} and len(parameter_name) > 1:
+                aliases = {
+                    "room_temperature": "room_temp",
+                    "zone_temperature": "zone_temp",
+                    "fan_speed_hz": "fan_speed",
+                    "fan_current": "fan_speed",
+                    "outlet_water_temp_c": "outlet_water_temp",
+                    "temperature_setpoint": "setpoint_temp",
+                }
+                return aliases.get(parameter_name, parameter_name)
+
+            return None
+
+        semaphore = asyncio.Semaphore(12)
+
+        async def fetch_mapping(mapping: dict[str, Any]) -> tuple[dict[str, Any], Any | None]:
+            point_id = mapping.get("bms_point_id")
+            if not point_id:
+                return mapping, None
+            async with semaphore:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    try:
+                        resp = await client.get(f"{base}/api/sites/{self.site_id}/points/{point_id}", headers=headers)
+                        resp.raise_for_status()
+                        data = resp.json()
+                        value = data.get("value")
+                        if value is None:
+                            value = data.get("present_value")
+                        if value is not None:
+                            return mapping, value
+                    except Exception:
+                        pass
+
+                    try:
+                        resp = await client.get(
+                            f"{base}/api/sites/{self.site_id}/trends/{point_id}",
+                            headers=headers,
+                            params={"limit": 1},
+                        )
+                        resp.raise_for_status()
+                        data = resp.json()
+                        samples = data.get("samples") or []
+                        if samples and samples[-1].get("value") is not None:
+                            return mapping, samples[-1].get("value")
+                    except Exception:
+                        pass
+
+            return mapping, None
+
+        results = await asyncio.gather(
+            *(fetch_mapping(mapping) for mapping in candidate_mappings), return_exceptions=True
+        )
+        states: dict[str, dict[str, Any]] = {}
+        for result in results:
+            if isinstance(result, Exception):
+                continue
+            mapping, value = result
+            reading_name = reading_name_for(mapping)
+            equipment_id = mapping.get("extracted_asset_id")
+            if not equipment_id or not reading_name or value is None:
+                continue
+            try:
+                if isinstance(value, bool):
+                    numeric_value = 1.0 if value else 0.0
+                elif isinstance(value, str) and value.lower() in {"online", "normal", "ok", "running"}:
+                    numeric_value = 1.0
+                elif isinstance(value, str) and value.lower() in {"offline", "fault", "failed", "stopped"}:
+                    numeric_value = 0.0
+                else:
+                    numeric_value = float(value)
+            except (TypeError, ValueError):
+                continue
+
+            equipment_type, _ = self._parse_equipment_code(str(equipment_id))
+            state = states.setdefault(
+                str(equipment_id),
+                {"type": equipment_type.lower(), "sensor_readings": {}},
+            )
+            state["sensor_readings"][reading_name] = numeric_value
+
+        return states
+
+    async def _write_lighting_energy_from_states(self, states: dict[str, dict[str, Any]]) -> int:
+        """Persist current DALI zone telemetry into lighting_energy."""
+        dali_states = {
+            equipment_id: state
+            for equipment_id, state in states.items()
+            if "-DALI-" in equipment_id and state.get("sensor_readings")
+        }
+        if not dali_states:
+            return 0
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            site_resp = client.table("sites").select("id").eq("code", self.site_id).limit(1).execute()
+            if not site_resp.data:
+                return 0
+            site_uuid = site_resp.data[0]["id"]
+            equipment_resp = (
+                client.table("equipment")
+                .select("code,zone_key")
+                .eq("site_id", site_uuid)
+                .in_("code", list(dali_states))
+                .execute()
+            )
+            zone_by_equipment = {
+                str(row.get("code")): str(row.get("zone_key") or "")
+                for row in equipment_resp.data or []
+                if row.get("code")
+            }
+            observed_at = datetime.now(UTC)
+            rows = []
+            for equipment_id, state in dali_states.items():
+                payload = _lighting_energy_payload_from_state(
+                    site_id=self.site_id,
+                    equipment_id=equipment_id,
+                    zone_id=zone_by_equipment.get(equipment_id),
+                    readings=state.get("sensor_readings") or {},
+                    observed_at=observed_at,
+                )
+                if payload:
+                    rows.append(payload)
+
+            if not rows:
+                return 0
+            client.table("lighting_energy").insert(rows).execute()
+            logger.info("[SHADOW] Wrote %d DALI lighting_energy rows for %s", len(rows), self.site_id)
+            return len(rows)
+        except Exception as exc:
+            logger.warning("[SHADOW] Failed to write DALI lighting_energy rows for %s: %s", self.site_id, exc)
+            return 0
 
     @property
     def status(self) -> dict:
@@ -1095,8 +1706,20 @@ class ShadowModePollingService:
                 from app.services.sentinel_data_sync import get_sentinel_data_sync
 
                 sync = get_sentinel_data_sync(site_id=self.site_id)
+                synthetic_skipped = 0
                 for alarm in alarms:
+                    message = alarm.get("message_text") or alarm.get("active_text") or alarm.get("description", "")
+                    bridge_synthetic = _bridge_marks_synthetic_alarm(alarm)
+                    is_synthetic = bridge_synthetic if bridge_synthetic is not None else _is_synthetic_alarm(message)
+                    if is_synthetic:
+                        synthetic_skipped += 1
+                        continue
                     sync.ml_feeder.ingest_fault_event(alarm)
+                if synthetic_skipped:
+                    logger.warning(
+                        "[SHADOW] Skipped %d synthetic alarm(s) from ML fault feeder",
+                        synthetic_skipped,
+                    )
             except Exception as e:
                 logger.warning("[SHADOW] ML feeder alarm ingest failed: %s", e)
 
@@ -1149,9 +1772,6 @@ class ShadowModePollingService:
             logger.warning(f"[SHADOW] Could not resolve site UUID: {e}")
             return
 
-        # Build bridge site code (S002 format)
-        bridge_site_id = self.site_id.replace("site-", "S").upper()
-
         rows_to_insert = []
         for alarm in alarms:
             # Extract equipment code
@@ -1184,14 +1804,18 @@ class ShadowModePollingService:
             if not message:
                 message = alarm.get("message", "Fault detected")
 
+            bridge_synthetic = _bridge_marks_synthetic_alarm(alarm)
+            is_synthetic = bridge_synthetic if bridge_synthetic is not None else _is_synthetic_alarm(message)
+
             rows_to_insert.append(
                 {
-                    "site_id": bridge_site_id,
+                    "site_id": self.site_id,
                     "equipment_code": equip_code or "UNKNOWN",
                     "alarm_code": alarm_code,
                     "event_type": event_type,
                     "severity": alarm.get("severity") or alarm.get("priority", "warning"),
                     "message_text": message[:500],  # Truncate to avoid overflow
+                    "is_synthetic": is_synthetic,
                     "recorded_at": recorded_at,
                     "raw_payload": alarm,
                 }
@@ -1525,9 +2149,10 @@ class ShadowModePollingService:
     async def _sync_equipment_status(self, base: str, headers: dict[str, str]) -> dict[str, Any]:
         """Sync equipment online/offline status from bridge /points endpoint.
 
-        Updates the status field in Supabase equipment table for all equipment
-        that appears in the bridge /points response. Equipment not in the bridge
-        are marked offline. Equipment on the bridge but not in DB are auto-created.
+        Updates the status field in Supabase equipment table for all onboarded
+        equipment that appears in the bridge /points response. Equipment not in
+        the bridge is marked offline. Bridge equipment not in DB is recorded for
+        onboarding review; polling does not create active equipment.
 
         Returns:
             Dict with 'updated' count, 'missing_from_bridge' list, and 'created' count.
@@ -1545,7 +2170,9 @@ class ShadowModePollingService:
             # /points returns {"equipment": [{"code": {"status": "online", ...}}, ...]}
             # The response is a list containing one dict with ALL equipment codes as keys.
             equip_list = data.get("equipment", [])
-            if isinstance(equip_list, list) and len(equip_list) > 0:
+            if isinstance(equip_list, dict):
+                equip_status_map = equip_list
+            elif isinstance(equip_list, list) and len(equip_list) > 0:
                 equip_status_map = equip_list[0] if isinstance(equip_list[0], dict) else {}
             else:
                 equip_status_map = {}
@@ -1694,6 +2321,26 @@ class ShadowModePollingService:
 
             mapped_db_codes = set(bridge_to_db.values())
 
+            def _remap_point_states(states: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+                remapped: dict[str, dict[str, Any]] = {}
+                for bridge_code, state in states.items():
+                    db_code = bridge_to_db.get(bridge_code) or self._normalize_to_db_code(bridge_code)
+                    target = remapped.setdefault(
+                        db_code,
+                        {
+                            "type": state.get("type"),
+                            "sensor_readings": {},
+                        },
+                    )
+                    target.setdefault("sensor_readings", {}).update(state.get("sensor_readings", {}))
+                    if not target.get("type") and state.get("type"):
+                        target["type"] = state.get("type")
+                return remapped
+
+            result["vav_states"] = _remap_point_states(vav_states)
+            result["dali_states"] = _remap_point_states(dali_states)
+            result["meter_states"] = _remap_point_states(meter_states)
+
             # Equipment in DB but not on bridge → mark offline
             missing = db_full_set - mapped_db_codes - bridge_lum_codes
             result["missing_from_bridge"] = sorted(missing)
@@ -1709,9 +2356,7 @@ class ShadowModePollingService:
                     continue
 
                 bridge_status = bridge_status_data.get("status", "offline")
-                # Normalise: bridge returns "online"/"offline" or "normal"/etc.
-                # Map to DB status values — 'normal' for online, 'offline' for offline
-                db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
+                db_status = _normalize_bridge_equipment_status(bridge_status)
 
                 try:
                     eq_repo.update(db_code, {"status": db_status})
@@ -1727,15 +2372,15 @@ class ShadowModePollingService:
                 except Exception as e:
                     logger.warning(f"[SHADOW] Failed to mark {db_code} offline: {e}")
 
-            # Auto-create equipment that exists on bridge but not in DB
+            # Record bridge equipment that exists on the site but is not in
+            # Supabase inventory. Onboarding, not polling, is responsible for
+            # creating active equipment and zone links.
             bridge_all_codes = set(equip_status_map.keys())
             new_codes = bridge_all_codes - set(bridge_to_db.keys()) - bridge_lum_codes
             created = 0
             if new_codes:
                 for bcode in sorted(new_codes):
                     bridge_status_data = equip_status_map.get(bcode, {})
-                    bridge_status = bridge_status_data.get("status", "offline")
-                    db_status = "normal" if bridge_status in ("online", "normal", "ok") else bridge_status
                     # Skip luminaries
                     if "-LUM-" in bcode:
                         continue
@@ -1744,37 +2389,31 @@ class ShadowModePollingService:
                     bcode_norm = _normalise(bcode)
                     conv = _letter_zone_to_numeric(bcode_norm)
                     canonical_code = f"{self._site_prefix}-{conv}" if conv else bcode
+                    blocker = self._equipment_zone_inventory_blocker(canonical_code)
+                    derived_zone_id = (
+                        blocker[0]
+                        if blocker
+                        else _bridge_zone_id_from_equipment_code(
+                            self._site_prefix,
+                            canonical_code,
+                        )
+                    )
+                    reason = blocker[1] if blocker else "new_bridge_equipment"
                     # If canonical code already exists in DB, update it instead of creating duplicate
                     if canonical_code != bcode:
                         existing = eq_repo.get_by_id(canonical_code)
                         if existing:
+                            bridge_status = bridge_status_data.get("status", "offline")
+                            db_status = _normalize_bridge_equipment_status(bridge_status)
                             eq_repo.update(canonical_code, {"status": db_status})
-                            created += 1
                             continue
-                    eq_type, _ = self._parse_equipment_code(canonical_code)
-                    # Fallback: classify from BACnet object catalog metadata
-                    # when the code doesn't have a recognizable type segment
-                    if eq_type == "unknown":
-                        catalog_type = self._classify_from_catalog(canonical_code)
-                        if catalog_type != "unknown":
-                            eq_type = catalog_type
-                    # Normalize name using SENTINEL convention: S002-TYPE-LOC → "TYPE Floor Zone N"
-                    _, eq_loc = _parse_eq_code_parts(canonical_code)
-                    eq_name = _format_display_name(eq_type, eq_loc)
-                    try:
-                        eq_repo.create(
-                            {
-                                "code": canonical_code,
-                                "name": eq_name,
-                                "type": eq_type,
-                                "status": db_status,
-                                "site_id": site_uuid,
-                                "health_score": 100,
-                            }
-                        )
-                        created += 1
-                    except Exception as e:
-                        logger.warning(f"[SHADOW] Failed to create {canonical_code} (bridge {bcode}): {e}")
+                    self._record_discovered_bridge_equipment(
+                        bridge_code=bcode,
+                        canonical_code=canonical_code,
+                        bridge_status_data=bridge_status_data,
+                        reason=reason,
+                        derived_zone_id=derived_zone_id,
+                    )
 
                 if created > 0:
                     logger.info(f"[SHADOW] Auto-created {created} equipment from bridge")

@@ -252,6 +252,7 @@ class PointMappingService:
                     "confidence": p.confidence.value,
                     "object_type": p.object_type,
                     "instance": p.instance,
+                    "bacnet_device_id": p.bacnet_device_id,
                     "present_value": p.present_value,
                     "writable": p.writable,
                 }
@@ -341,6 +342,9 @@ class PointMappingService:
                 "default_value": p.get("present_value"),
             }
 
+        bacnet_device_ids = {p.get("bacnet_device_id") for p in mapping.points if p.get("bacnet_device_id") is not None}
+        bacnet_device_id = next(iter(bacnet_device_ids)) if len(bacnet_device_ids) == 1 else None
+
         # Map equipment type to device type
         device_type_map = {
             "chiller": "hvac",
@@ -391,6 +395,7 @@ class PointMappingService:
                 "discovery_confidence": mapping.confidence,
                 "auto_generated": True,
                 "created_at": mapping.created_at,
+                **({"bacnet_device_id": bacnet_device_id} if bacnet_device_id is not None else {}),
             },
         }
 

@@ -698,6 +698,57 @@ class TestWrite:
 
         assert success is False
 
+    @pytest.mark.asyncio
+    async def test_write_float32_roundtrip(self):
+        """Test float32 write then read back round-trip."""
+        register_map = {
+            "GEN-01": {
+                "temperature_setpoint": {
+                    "address": 40200,
+                    "type": "holding",
+                    "data_type": "float32",
+                    "scale": 1.0,
+                    "writable": True,
+                }
+            }
+        }
+
+        # Float 25.5 -> IEEE 754 = 0x41CC0000 -> registers [0x41CC, 0x0000] (big-endian)
+        read_responses = [
+            MagicMock(isError=lambda: False, registers=[0x41CC, 0x0000]),  # initial read (0)
+            MagicMock(isError=lambda: False, registers=[0x41CC, 0x0000]),  # read back after write (25.5)
+        ]
+        write_response = MagicMock(isError=lambda: False)
+        call_count = [0]
+
+        async def fake_read(*args, **kwargs):
+            resp = read_responses[call_count[0]]
+            call_count[0] += 1
+            return resp
+
+        mock_client = AsyncMock()
+        mock_client.connect = MagicMock(return_value=True)
+        mock_client.connected = True
+        mock_client.read_holding_registers = fake_read
+        mock_client.write_registers = AsyncMock(return_value=write_response)
+
+        adapter = ModbusBmsAdapter()
+        with patch(
+            "app.services.simbiot.modbus_bms_adapter.AsyncModbusTcpClient",
+            return_value=mock_client,
+        ):
+            await adapter.connect(_make_config(register_map=register_map))
+            success = await adapter.write_point(
+                BmsWriteRequest(device_id="GEN-01", point_id="temperature_setpoint", value=25.5)
+            )
+
+        assert success is True
+        # Verify write_registers was called (not write_register)
+        mock_client.write_registers.assert_called_once()
+        # Verify the registers written: [0x41CC, 0x0000] = 25.5 in float32
+        written_regs = mock_client.write_registers.call_args[1]["values"]
+        assert written_regs == [0x41CC, 0x0000]
+
 
 # -------------------------------------------------------------------------
 # Register map parsing tests

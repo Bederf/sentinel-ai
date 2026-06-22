@@ -2,9 +2,9 @@
 title: "SIMBIOT Concept Evolution Connector"
 type: "technical"
 status: "ready"
-version: "1.1.0"
+version: "1.2.0"
 created: "2026-02-04"
-updated: "2026-03-16"
+updated: "2026-06-19"
 author: "Sentinel Development Team"
 tags: [simbiot, concept, mri-evolution, fsi, cafm, work-orders, integration]
 related:

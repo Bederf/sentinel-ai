@@ -47,7 +47,7 @@ Across both patterns, the contract is the same:
 - Anthropic API key (or OpenAI key as fallback)
 - Supabase project (local or cloud)
 - SMTP credentials for email notifications
-- Telegram bot token (from @BotFather) — optional but recommended
+- Sentry bot tokens (manager, technician, staff) if Telegram bot access is enabled
 
 ---
 
@@ -266,17 +266,23 @@ If no BMS yet, use `DEMO_MODE=true` to explore with sample data.
 3. For each technician, enter:
    - Name, email, phone
    - Disciplines (HVAC, Electrical, Plumbing, etc.)
-   - Telegram ID (if using Sentry bot)
+   - Technician Telegram ID/channel binding if Sentry Tech bot notifications are enabled
 4. Technicians will automatically receive alerts matching their disciplines
 
-## Step 10: Configure Alert Routing (5 min)
+## Step 10: Sentry Staff Bot Onboarding (5 min)
+
+For site-002, do not manually collect Telegram IDs for every staff member. Import or sync the staff roster first, then send a registration link or QR code. The roster should include `staff_number`, `name`, `email`, `phone`, `desk`, `site_id`, and `active`. Staff open the Staff bot link, enter their staff number, confirm the last 4 digits of their phone number, and Sentry binds the channel ID to that staff identity.
+
+Current Telegram link: `https://t.me/sentinelstaffbot?start=staff`. WhatsApp or custom app channels should use the same staff-number verification pattern with their own channel binding. Keep first-contact registration disabled unless the roster/HR lookup is active.
+
+## Step 11: Configure Alert Routing (5 min)
 
 1. Go to **Settings** → **Alert Routing Rules**
 2. Default rules are pre-populated (critical → Telegram+WhatsApp, warning → Telegram)
 3. Adjust channels and escalation times as needed
 4. Test via **Notification Channels** → **Send Test** button
 
-## Step 11: RAG Knowledge Base (automatic)
+## Step 12: RAG Knowledge Base (automatic)
 
 RAG auto-loads on first startup if the vector store is empty:
 - Equipment fault codes and maintenance procedures (26 entries)

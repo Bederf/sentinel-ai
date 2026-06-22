@@ -43,6 +43,7 @@ from app.api import (
     event_bus_monitor,
     event_intelligence,
     fairlands_sla_dashboard,
+    google_webhook_endpoint,
     graph_webhook_endpoint,
     health_config,
     health_rating,
@@ -78,6 +79,7 @@ from app.api import (
     signal_replay,
     space,
     spare_parts,
+    staff_roster,
     stats,
     sustainability,
     telegram_webhook,
@@ -131,6 +133,7 @@ def register_operations_routers(app: FastAPI) -> None:
     app.include_router(sentry_webhooks.router, tags=["sentry"])
     app.include_router(whatsapp_webhooks.router, tags=["whatsapp"])
     app.include_router(telegram_webhook.router, tags=["telegram"])
+    app.include_router(google_webhook_endpoint.router, tags=["google_webhook"])
     app.include_router(graph_webhook_endpoint.router, tags=["graph_webhook"])
 
     # Module registry and configuration
@@ -213,6 +216,9 @@ def register_operations_routers(app: FastAPI) -> None:
 
     # Technician Registry (handoff blocker)
     app.include_router(technicians_api.router, tags=["technicians"])
+
+    # Staff roster for Sentry Staff bot self-registration
+    app.include_router(staff_roster.router, tags=["staff-roster"])
 
     # Manager Registry (Phase 193+)
     app.include_router(managers.router, tags=["managers"])

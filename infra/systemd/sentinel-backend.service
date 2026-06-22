@@ -17,7 +17,7 @@ Wants=network-online.target ollama.service
 Type=simple
 User=sentinel
 WorkingDirectory=/opt/sentinel/backend
-ExecStart=/opt/sentinel/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 9095 --workers 1
+ExecStart=/opt/sentinel/backend/venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 9095 --workers 2
 
 # Canonical edge configuration — all deployment-specific values
 # Source: /etc/sentinel/edge.conf (deployed from infra/edge.conf)

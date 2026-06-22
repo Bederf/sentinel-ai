@@ -40,6 +40,17 @@ NON_DEACTIVATABLE_MODULES = frozenset(
 )
 
 
+def _default_module_config(module_type: ModuleType, config: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Apply conservative defaults for safety-sensitive modules."""
+    merged = dict(config or {})
+    if module_type == ModuleType.FIRE:
+        merged.setdefault("auto_mode", False)
+        merged.setdefault("commissioned_cause_effect", False)
+        merged.setdefault("authority", "fire_panel_and_bms")
+        merged.setdefault("sentinel_role", "monitoring_only")
+    return merged
+
+
 class ModuleRegistryService:
     """
     Central service for managing bolt-on modules.
@@ -121,7 +132,7 @@ class ModuleRegistryService:
                         module_type=ModuleType(m["module_type"]),
                         status=ModuleStatus(m["status"]),
                         activated_at=m["activated_at"],
-                        config=m.get("config") or {},
+                        config=_default_module_config(ModuleType(m["module_type"]), m.get("config") or {}),
                         health_score=m.get("health_score", 100.0),
                         last_telemetry=m.get("last_telemetry"),
                         error_message=m.get("error_message"),
@@ -402,6 +413,7 @@ class ModuleRegistryService:
         if existing:
             existing.status = ModuleStatus.ACTIVE
             existing.licensed = True
+            existing.config = _default_module_config(module_type, existing.config)
             existing.error_message = None
             self._save_configs()
             return existing
@@ -413,7 +425,7 @@ class ModuleRegistryService:
             module_type=module_type,
             status=ModuleStatus.ACTIVE,
             activated_at=datetime.utcnow().isoformat(),
-            config=config or {},
+            config=_default_module_config(module_type, config),
             licensed=True,
         )
 

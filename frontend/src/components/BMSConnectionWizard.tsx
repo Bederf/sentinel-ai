@@ -9,6 +9,7 @@ import {
   Search,
   ClipboardCheck,
   ShieldCheck,
+  KeyRound,
   MapPin,
   HelpCircle,
   Locate,
@@ -22,7 +23,7 @@ import type {
   BACnetDevice,
   SimbiotCapabilitiesSummary,
 } from '@/lib/api';
-import { sitesApi } from '@/lib/api/sites';
+import { sitesApi, type OnboardingFactSource } from '@/lib/api/sites';
 import { siteGeocodeApi } from '@/lib/api/zone_ingestion';
 import { siteProfileApi } from '@/lib/api/sites';
 import { api, niagaraApi, resolveSimbiotProtocol, buildingConfigApi } from '@/lib/api';
@@ -78,16 +79,33 @@ interface WizardState {
   siteType: string;
   siteFloors: string;  // Comma-separated list
   siteSqm: number;
+  yearBuilt: number;
+  occupancyCapacity: number;
+  totalDesks: number;
+  parkingBays: number;
+  nmdLimitKva: number;
+  demandChargePerKva: number;
+  electricityProvider: string;
+  siteOperates24_7: boolean;
+  weekdayStart: string;
+  weekdayEnd: string;
+  saturdayActive: boolean;
+  sundayActive: boolean;
+  clinicalZonesPresent: boolean;
   primaryObjective: string;  // cost | comfort | compliance | balanced
   // Geocoded location
   latitude: number | null;
   longitude: number | null;
   orientation_degrees: number | null;
-  // Site contacts (Step 5)
+  // Site contacts (Step 6)
   facilityManager: string;
   contactEmail: string;
   contactPhone: string;
+  whatsappPhone: string;
   technicianEmails: string;
+  tenantName: string;
+  tenantAccessMode: string;
+  tenantAccessConfirmed: boolean;
   // BMS connection
   bmsVendor: BMSVendor;
   host: string;
@@ -110,6 +128,10 @@ interface WizardState {
   approveResult: { equipment_created: number } | null;
   capabilitySummary: SimbiotCapabilitiesSummary | null;
   capabilityError: string | null;
+  onboardingFactsLoading: boolean;
+  onboardingFactsMessage: string;
+  onboardingFactSources: Record<string, OnboardingFactSource>;
+  onboardingFactsMissing: string[];
   loading: boolean;
   error: string | null;
   // Equipment verification
@@ -119,8 +141,10 @@ interface WizardState {
   showZoneIngestionWizard: boolean;
 }
 
+type WizardFieldValue = string | number | boolean | null | Record<string, OnboardingFactSource> | string[];
+
 type WizardAction =
-  | { type: "SET_FIELD"; field: string; value: string | number | boolean | null }
+  | { type: "SET_FIELD"; field: string; value: WizardFieldValue }
   | { type: "SET_BACNET_DEVICES"; devices: BACnetDevice[]; selectedDeviceId: number | null }
   | { type: "SET_CONNECTION_STATUS"; status: ConnectionStatus; message?: string }
   | { type: "SET_STEP"; step: number }
@@ -218,7 +242,8 @@ function StepIndicator({ currentStep }: { currentStep: number }) {
     { num: 2, label: "Discover", icon: Search },
     { num: 3, label: "Review", icon: ClipboardCheck },
     { num: 4, label: "Approve", icon: ShieldCheck },
-    { num: 5, label: "Configure", icon: Settings },
+    { num: 5, label: "Access", icon: KeyRound },
+    { num: 6, label: "Configure", icon: Settings },
   ];
 
   return (
@@ -315,6 +340,75 @@ const labelStyle: React.CSSProperties = {
   color: "var(--color-sentinel-text-secondary)",
 };
 
+function siteDisplayCode(siteId: string): string {
+  const value = siteId.trim();
+  if (!value) return "S---";
+  const lower = value.toLowerCase();
+  if (lower.startsWith("site-") && lower.length >= 8) {
+    return `S${lower.slice(-3)}`.toUpperCase();
+  }
+  return value.toUpperCase();
+}
+
+const BUILDING_TYPE_MAP: Record<string, string> = {
+  office: "commercial_office",
+  retail: "retail",
+  hospital: "hospital",
+  private_hospital: "hospital",
+  industrial: "industrial",
+  warehouse: "industrial",
+  data_centre: "commercial_office",
+  mixed_use: "mixed_use",
+};
+
+function isHospitalType(siteType: string): boolean {
+  return ["hospital", "private_hospital"].includes(siteType);
+}
+
+function parseWizardNumber(value: string): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildOperatingHours(state: WizardState): Record<string, unknown> {
+  const timezone = "Africa/Johannesburg";
+  const enabledDays = state.siteOperates24_7
+    ? ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+    : ["monday", "tuesday", "wednesday", "thursday", "friday"];
+  const schedule = Object.fromEntries(
+    ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"].map((day) => {
+      const weekendEnabled = day === "saturday" ? state.saturdayActive : day === "sunday" ? state.sundayActive : true;
+      const enabled = state.siteOperates24_7 || (enabledDays.includes(day) && weekendEnabled);
+      return [
+        day,
+        {
+          enabled,
+          open: state.siteOperates24_7 ? "00:00" : state.weekdayStart,
+          close: state.siteOperates24_7 ? "23:59" : state.weekdayEnd,
+        },
+      ];
+    })
+  );
+
+  return {
+    timezone,
+    is_24_7: state.siteOperates24_7,
+    weekday_start: state.siteOperates24_7 ? "00:00" : state.weekdayStart,
+    weekday_end: state.siteOperates24_7 ? "23:59" : state.weekdayEnd,
+    saturday_active: state.siteOperates24_7 || state.saturdayActive,
+    sunday_active: state.siteOperates24_7 || state.sundayActive,
+    ...schedule,
+  };
+}
+
+function shouldPrefillString(current: string): boolean {
+  return current.trim().length === 0;
+}
+
+function shouldPrefillNumber(current: number): boolean {
+  return !Number.isFinite(current) || current <= 0;
+}
+
 // ============= Main Component =============
 
 export function BMSConnectionWizard({
@@ -332,6 +426,19 @@ export function BMSConnectionWizard({
     siteType: "office",
     siteFloors: "G, L1, L2",
     siteSqm: 5000,
+    yearBuilt: 0,
+    occupancyCapacity: 0,
+    totalDesks: 0,
+    parkingBays: 0,
+    nmdLimitKva: 0,
+    demandChargePerKva: 0,
+    electricityProvider: "",
+    siteOperates24_7: false,
+    weekdayStart: "08:00",
+    weekdayEnd: "18:00",
+    saturdayActive: false,
+    sundayActive: false,
+    clinicalZonesPresent: false,
     primaryObjective: "balanced",
     // BMS connection
     bmsVendor: "niagara",
@@ -340,11 +447,15 @@ export function BMSConnectionWizard({
     username: "",
     password: "",
     useHttps: false,
-    // Site contacts (Step 5)
+    // Site contacts (Step 6)
     facilityManager: "",
     contactEmail: "",
     contactPhone: "",
+    whatsappPhone: "",
     technicianEmails: "",
+    tenantName: "",
+    tenantAccessMode: "shadow_readonly",
+    tenantAccessConfirmed: false,
     siteId: initialSiteId || "",
     discoveredDevices: [],
     selectedDeviceId: null,
@@ -360,6 +471,10 @@ export function BMSConnectionWizard({
     approveResult: null,
     capabilitySummary: null,
     capabilityError: null,
+    onboardingFactsLoading: false,
+    onboardingFactsMessage: "",
+    onboardingFactSources: {},
+    onboardingFactsMissing: [],
     loading: false,
     error: null,
     showVerificationWizard: false,
@@ -390,6 +505,85 @@ export function BMSConnectionWizard({
     return devices.length === 1 ? devices[0].device_id : null;
   }, []);
 
+  const handleScrapeOnboardingFacts = useCallback(async () => {
+    dispatch({ type: "SET_FIELD", field: "onboardingFactsLoading", value: true });
+    dispatch({ type: "SET_FIELD", field: "onboardingFactsMessage", value: "" });
+    try {
+      const result = await sitesApi.scrapeOnboardingFacts({
+        site_name: state.siteName.trim(),
+        address: state.siteAddress.trim(),
+        building_type: state.siteType,
+      });
+      const values = result.values || {};
+
+      if (values.address && shouldPrefillString(state.siteAddress)) {
+        dispatch({ type: "SET_FIELD", field: "siteAddress", value: values.address });
+      }
+      if (typeof values.sqm === "number" && shouldPrefillNumber(state.siteSqm)) {
+        dispatch({ type: "SET_FIELD", field: "siteSqm", value: values.sqm });
+      }
+      if (typeof values.year_built === "number" && shouldPrefillNumber(state.yearBuilt)) {
+        dispatch({ type: "SET_FIELD", field: "yearBuilt", value: values.year_built });
+      }
+      if (typeof values.latitude === "number") {
+        dispatch({ type: "SET_FIELD", field: "latitude", value: values.latitude });
+      }
+      if (typeof values.longitude === "number") {
+        dispatch({ type: "SET_FIELD", field: "longitude", value: values.longitude });
+      }
+      if (values.contact_email && shouldPrefillString(state.contactEmail)) {
+        dispatch({ type: "SET_FIELD", field: "contactEmail", value: values.contact_email });
+      }
+      if (values.contact_phone && shouldPrefillString(state.contactPhone)) {
+        dispatch({ type: "SET_FIELD", field: "contactPhone", value: values.contact_phone });
+      }
+      if (values.whatsapp_phone && shouldPrefillString(state.whatsappPhone)) {
+        dispatch({ type: "SET_FIELD", field: "whatsappPhone", value: values.whatsapp_phone });
+      }
+      if (values.electricity_provider && shouldPrefillString(state.electricityProvider)) {
+        dispatch({ type: "SET_FIELD", field: "electricityProvider", value: values.electricity_provider });
+      }
+      if (typeof values.nmd_limit_kva === "number" && shouldPrefillNumber(state.nmdLimitKva)) {
+        dispatch({ type: "SET_FIELD", field: "nmdLimitKva", value: values.nmd_limit_kva });
+      }
+      if (typeof values.demand_charge_per_kva === "number" && shouldPrefillNumber(state.demandChargePerKva)) {
+        dispatch({ type: "SET_FIELD", field: "demandChargePerKva", value: values.demand_charge_per_kva });
+      }
+
+      dispatch({ type: "SET_FIELD", field: "onboardingFactSources", value: result.sources || {} });
+      dispatch({ type: "SET_FIELD", field: "onboardingFactsMissing", value: result.missing || [] });
+      const foundCount = Object.keys(result.sources || {}).length;
+      const missingCount = result.missing?.length ?? 0;
+      dispatch({
+        type: "SET_FIELD",
+        field: "onboardingFactsMessage",
+        value: result.scrape_available
+          ? `Prefilled ${foundCount} field${foundCount === 1 ? "" : "s"}. ${missingCount} still need manual confirmation.`
+          : `Geocode/manual mode: Firecrawl did not return public facts. ${missingCount} fields still need manual completion.`,
+      });
+    } catch (error) {
+      dispatch({
+        type: "SET_FIELD",
+        field: "onboardingFactsMessage",
+        value: error instanceof Error ? error.message : "Could not scrape onboarding facts",
+      });
+    } finally {
+      dispatch({ type: "SET_FIELD", field: "onboardingFactsLoading", value: false });
+    }
+  }, [
+    state.contactEmail,
+    state.contactPhone,
+    state.demandChargePerKva,
+    state.electricityProvider,
+    state.nmdLimitKva,
+    state.siteAddress,
+    state.siteName,
+    state.siteSqm,
+    state.siteType,
+    state.whatsappPhone,
+    state.yearBuilt,
+  ]);
+
   const ensureSiteCreated = useCallback(async (): Promise<string> => {
     const existingSiteId = state.siteId || siteIdRef.current;
     if (existingSiteId) {
@@ -401,6 +595,22 @@ export function BMSConnectionWizard({
       return createSitePromiseRef.current;
     }
 
+    const operatingHours = buildOperatingHours(state);
+    const profileBuildingType = BUILDING_TYPE_MAP[state.siteType] ?? state.siteType;
+    const features = {
+      hvac: true,
+      dali: false,
+      desk_diagnosis: state.totalDesks > 0,
+      load_shedding_optimization: true,
+    };
+    const optimizationSettings = {
+      mode: state.primaryObjective,
+      active_profile: state.primaryObjective,
+      sentinel_operating_mode:
+        state.primaryObjective === "cost" ? "cost_saving" : state.primaryObjective === "comfort" ? "comfort" : "balanced",
+      control_tier: "supervised",
+    };
+
     createSitePromiseRef.current = sitesApi.create({
       name: state.siteName.trim(),
       address: state.siteAddress,
@@ -411,31 +621,33 @@ export function BMSConnectionWizard({
         .map((floor) => floor.trim())
         .filter(Boolean),
       sqm: state.siteSqm,
+      year_built: state.yearBuilt || undefined,
+      latitude: state.latitude ?? undefined,
+      longitude: state.longitude ?? undefined,
+      contact_phone: state.contactPhone || undefined,
+      contact_email: state.contactEmail || undefined,
+      whatsapp_phone: state.whatsappPhone || undefined,
+      occupancy_capacity: state.occupancyCapacity || undefined,
+      total_desks: state.totalDesks || undefined,
+      parking_bays: state.parkingBays || undefined,
+      nmd_limit_kva: state.nmdLimitKva || undefined,
+      demand_charge_per_kva: state.demandChargePerKva || undefined,
+      electricity_provider: state.electricityProvider || undefined,
+      operating_hours: operatingHours,
+      optimization_settings: optimizationSettings,
+      features,
     }).then(async (siteResult) => {
       siteIdRef.current = siteResult.id;
       dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
-      // Phase 191: create building profile after site exists
-      // Building type mapping: wizard values → API values
-      const BUILDING_TYPE_MAP: Record<string, string> = {
-        office: "commercial_office",
-        retail: "retail",
-        hospital: "hospital",
-        private_hospital: "hospital",
-        industrial: "industrial",
-        warehouse: "industrial",
-        data_centre: "commercial_office",
-        mixed_use: "mixed_use",
-      };
       await siteProfileApi.create(siteResult.id, {
-        building_type: BUILDING_TYPE_MAP[state.siteType] ?? state.siteType,
+        building_type: profileBuildingType,
         primary_objective: state.primaryObjective,
-        operating_schedule: {
-          weekday_start: "08:00",
-          weekday_end: "18:00",
-          sunday_active: false,
-          timezone: "Africa/Johannesburg",
-          is_24_7: false,
-        },
+        operating_schedule: operatingHours,
+        tariff_structure: state.electricityProvider.toLowerCase().includes("eskom") ? "tou_megaflex" : "municipal",
+        clinical_zones_present: state.clinicalZonesPresent || isHospitalType(state.siteType),
+        regulatory_frameworks: isHospitalType(state.siteType)
+          ? ["SANS_10400", "LEGIONELLA_RISK_MANAGEMENT"]
+          : ["SANS_10400"],
       });
       return siteResult.id;
     }).finally(() => {
@@ -443,7 +655,7 @@ export function BMSConnectionWizard({
     });
 
     return createSitePromiseRef.current;
-  }, [state.siteAddress, state.siteFloors, state.siteId, state.siteName, state.siteRegion, state.siteSqm, state.siteType, state.primaryObjective]);
+  }, [state]);
 
   // ---------- Step 1: Test Connection ----------
   const handleTestConnection = useCallback(async () => {
@@ -733,7 +945,7 @@ export function BMSConnectionWizard({
         result: { equipment_created: res.equipment_created },
       });
 
-      // On success, advance to Step 5 (Configure) for new sites, or verification for BACnet
+      // On success, advance to tenant access setup for bridge sites, or verification for BACnet.
       if (res.success) {
         setTimeout(() => {
           if (isBridgeOrNiagara) {
@@ -755,7 +967,7 @@ export function BMSConnectionWizard({
   // ---------- Step navigation ----------
   const goNext = useCallback(async () => {
     const nextStep = state.step + 1;
-    if (nextStep > 5) {
+    if (nextStep > 6) {
       onComplete();
       return;
     }
@@ -787,6 +999,8 @@ export function BMSConnectionWizard({
       case 4:
         return state.approveStatus !== "idle";
       case 5:
+        return state.tenantAccessConfirmed;
+      case 6:
         return true;
       default:
         return false;
@@ -942,6 +1156,37 @@ export function BMSConnectionWizard({
             )}
           </div>
 
+          <div className="col-span-2">
+            <button
+              type="button"
+              onClick={handleScrapeOnboardingFacts}
+              disabled={state.onboardingFactsLoading || (!state.siteName.trim() && !state.siteAddress.trim())}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
+              style={{
+                background: "var(--color-sentinel-bg-primary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-primary)",
+              }}
+            >
+              {state.onboardingFactsLoading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Search className="w-4 h-4" />
+              )}
+              Prefill From Web
+            </button>
+            {state.onboardingFactsMessage && (
+              <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {state.onboardingFactsMessage}
+              </p>
+            )}
+            {state.onboardingFactsMissing.length > 0 && (
+              <p className="text-xs mt-1" style={{ color: "var(--color-sentinel-amber)" }}>
+                Manual: {state.onboardingFactsMissing.join(", ")}
+              </p>
+            )}
+          </div>
+
           {/* Region */}
           <div className="col-span-2 sm:col-span-1">
             <label className="block text-sm font-medium mb-1" style={labelStyle}>
@@ -972,13 +1217,17 @@ export function BMSConnectionWizard({
             </label>
             <select
               value={state.siteType}
-              onChange={(e) =>
+              onChange={(e) => {
+                const nextType = e.target.value;
+                const hospital = isHospitalType(nextType);
                 dispatch({
                   type: "SET_FIELD",
                   field: "siteType",
-                  value: e.target.value,
-                })
-              }
+                  value: nextType,
+                });
+                dispatch({ type: "SET_FIELD", field: "siteOperates24_7", value: hospital });
+                dispatch({ type: "SET_FIELD", field: "clinicalZonesPresent", value: hospital });
+              }}
               className="w-full rounded px-3 py-2 text-sm"
               style={inputStyle}
             >
@@ -1052,6 +1301,167 @@ export function BMSConnectionWizard({
               style={inputStyle}
             />
           </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Year Built
+            </label>
+            <input
+              type="number"
+              value={state.yearBuilt || ""}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "yearBuilt", value: parseWizardNumber(e.target.value) })}
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Occupancy Capacity
+            </label>
+            <input
+              type="number"
+              value={state.occupancyCapacity || ""}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "occupancyCapacity", value: parseWizardNumber(e.target.value) })}
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Desks / Workpoints
+            </label>
+            <input
+              type="number"
+              value={state.totalDesks || ""}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "totalDesks", value: parseWizardNumber(e.target.value) })}
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Parking Bays
+            </label>
+            <input
+              type="number"
+              value={state.parkingBays || ""}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "parkingBays", value: parseWizardNumber(e.target.value) })}
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Electricity Provider
+            </label>
+            <input
+              type="text"
+              value={state.electricityProvider}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "electricityProvider", value: e.target.value })}
+              placeholder="City Power, Eskom, eThekwini"
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              NMD Limit (kVA)
+            </label>
+            <input
+              type="number"
+              value={state.nmdLimitKva || ""}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "nmdLimitKva", value: parseWizardNumber(e.target.value) })}
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Demand Charge (per kVA)
+            </label>
+            <input
+              type="number"
+              value={state.demandChargePerKva || ""}
+              onChange={(e) => dispatch({ type: "SET_FIELD", field: "demandChargePerKva", value: parseWizardNumber(e.target.value) })}
+              className="w-full rounded px-3 py-2 text-sm"
+              style={inputStyle}
+            />
+          </div>
+
+          <div className="col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              <input
+                type="checkbox"
+                checked={state.siteOperates24_7}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "siteOperates24_7", value: e.target.checked })}
+              />
+              24/7 operation
+            </label>
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              <input
+                type="checkbox"
+                checked={state.saturdayActive}
+                disabled={state.siteOperates24_7}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "saturdayActive", value: e.target.checked })}
+              />
+              Saturday occupied
+            </label>
+            <label className="flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              <input
+                type="checkbox"
+                checked={state.sundayActive}
+                disabled={state.siteOperates24_7}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "sundayActive", value: e.target.checked })}
+              />
+              Sunday occupied
+            </label>
+          </div>
+
+          {!state.siteOperates24_7 && (
+            <>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                  Weekday Open
+                </label>
+                <input
+                  type="time"
+                  value={state.weekdayStart}
+                  onChange={(e) => dispatch({ type: "SET_FIELD", field: "weekdayStart", value: e.target.value })}
+                  className="w-full rounded px-3 py-2 text-sm"
+                  style={inputStyle}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                  Weekday Close
+                </label>
+                <input
+                  type="time"
+                  value={state.weekdayEnd}
+                  onChange={(e) => dispatch({ type: "SET_FIELD", field: "weekdayEnd", value: e.target.value })}
+                  className="w-full rounded px-3 py-2 text-sm"
+                  style={inputStyle}
+                />
+              </div>
+            </>
+          )}
+
+          {isHospitalType(state.siteType) && (
+            <label className="col-span-2 flex items-center gap-2 text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              <input
+                type="checkbox"
+                checked={state.clinicalZonesPresent}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "clinicalZonesPresent", value: e.target.checked })}
+              />
+              Clinical zones present
+            </label>
+          )}
         </div>
       </div>
 
@@ -1954,7 +2364,7 @@ export function BMSConnectionWizard({
           )}
           <button
             onClick={() => {
-              onComplete();
+              dispatch({ type: "SET_STEP", step: 5 });
             }}
             className="px-6 py-2 rounded text-sm font-medium mt-2"
             style={{
@@ -1962,7 +2372,7 @@ export function BMSConnectionWizard({
               color: "#fff",
             }}
           >
-            Done
+            Continue to Tenant Access
           </button>
         </div>
       ) : (
@@ -2173,8 +2583,161 @@ export function BMSConnectionWizard({
     </div>
   );
 
-  // ============= Step 5: Configure Site Settings =============
+  // ============= Step 5: Tenant Access =============
   const renderStep5 = () => {
+    const shortSiteCode = siteDisplayCode(state.siteId);
+    const schemaUrl = `https://bms.sentinel-ai.co.za/api/mcp/openai/openapi.json?site_id=${encodeURIComponent(shortSiteCode)}`;
+    const tenantName = state.tenantName.trim() || state.siteName.trim() || shortSiteCode;
+
+    return (
+      <div className="space-y-5">
+        <div>
+          <h3 className="text-lg font-semibold mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            Step 5: Tenant MCP Access
+          </h3>
+          <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+            Bind this site to a tenant-scoped GPT connector before client sharing.
+          </p>
+        </div>
+
+        <HelpSection title="Tenant Boundary" variant="warning">
+          New sites stay private to onboarding until a tenant key and scoped schema are created. This step records the intended boundary; final key creation remains an admin-controlled deployment action.
+        </HelpSection>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div
+            className="rounded-lg p-4 space-y-4"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" style={{ color: "var(--color-sentinel-blue)" }} />
+              <h4 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                Tenant Scope
+              </h4>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1" style={labelStyle}>
+                Tenant / Client Name
+              </label>
+              <input
+                type="text"
+                value={state.tenantName}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "tenantName", value: e.target.value })}
+                className="w-full rounded px-3 py-2 text-sm"
+                placeholder={state.siteName || "Client name"}
+                style={inputStyle}
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium mb-1" style={labelStyle}>
+                Initial Access Mode
+              </label>
+              <select
+                value={state.tenantAccessMode}
+                onChange={(e) => dispatch({ type: "SET_FIELD", field: "tenantAccessMode", value: e.target.value })}
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              >
+                <option value="shadow_readonly">Shadow read-only</option>
+                <option value="advisory_readonly">Advisory read-only</option>
+                <option value="disabled">Create later</option>
+              </select>
+            </div>
+
+            <div
+              className="rounded p-3 text-sm space-y-2"
+              style={{
+                background: "var(--color-sentinel-bg-primary)",
+                border: "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <div className="flex justify-between gap-3">
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Allowed site</span>
+                <span className="font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {shortSiteCode}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Tenant</span>
+                <span className="font-medium text-right" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                  {tenantName}
+                </span>
+              </div>
+              <div className="flex justify-between gap-3">
+                <span style={{ color: "var(--color-sentinel-text-secondary)" }}>Write tools</span>
+                <span className="font-medium" style={{ color: "var(--color-sentinel-amber)" }}>
+                  Disabled
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className="rounded-lg p-4 space-y-4"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+            }}
+          >
+            <h4 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+              Connector Package
+            </h4>
+            <div
+              className="rounded p-3 text-xs break-all"
+              style={{
+                background: "var(--color-sentinel-bg-primary)",
+                border: "1px solid var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-secondary)",
+              }}
+            >
+              {schemaUrl}
+            </div>
+            <div className="space-y-2 text-sm">
+              {[
+                `Schema exposes ${shortSiteCode} only`,
+                "Tenant key must be deployed separately",
+                "Search/fetch remain disabled for tenant-scoped connectors",
+                "Promotion from shadow requires manual approval",
+              ].map((item) => (
+                <div key={item} className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 shrink-0" style={{ color: "var(--color-sentinel-green)" }} />
+                  <span style={{ color: "var(--color-sentinel-text-primary)" }}>{item}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <label
+          className="flex items-start gap-3 rounded-lg p-4 cursor-pointer"
+          style={{
+            background: "var(--color-sentinel-green)11",
+            border: "1px solid var(--color-sentinel-green)44",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={state.tenantAccessConfirmed}
+            onChange={(e) =>
+              dispatch({ type: "SET_FIELD", field: "tenantAccessConfirmed", value: e.target.checked })
+            }
+            className="mt-1"
+          />
+          <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+            Tenant access boundary recorded for {tenantName}. Do not share this GPT until the scoped key is deployed.
+          </span>
+        </label>
+      </div>
+    );
+  };
+
+  // ============= Step 6: Configure Site Settings =============
+  const renderStep6 = () => {
     const handleSaveContacts = async () => {
       if (!state.siteId) return;
       dispatch({ type: "SET_LOADING", loading: true });
@@ -2184,6 +2747,7 @@ export function BMSConnectionWizard({
             facility_manager: state.facilityManager,
             email: state.contactEmail,
             emergency: state.contactPhone,
+            whatsapp: state.whatsappPhone,
           },
         });
       } catch (e) {
@@ -2197,7 +2761,7 @@ export function BMSConnectionWizard({
     <div className="space-y-5">
       <div>
         <h3 className="text-lg font-semibold mb-1" style={{ color: "var(--color-sentinel-text-primary)" }}>
-          Step 5: Configure Site Settings
+          Step 6: Configure Site Settings
         </h3>
         <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Your site is connected. Set up contacts and enable data flow, or skip to finish later.
@@ -2226,6 +2790,12 @@ export function BMSConnectionWizard({
               Emergency Phone
             </label>
             <input type="tel" value={state.contactPhone || ""} onChange={(e) => dispatch({ type: "SET_FIELD", field: "contactPhone", value: e.target.value })} className="w-full rounded px-3 py-2 text-sm" placeholder="+27 82 555 0101" style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+              WhatsApp
+            </label>
+            <input type="tel" value={state.whatsappPhone || ""} onChange={(e) => dispatch({ type: "SET_FIELD", field: "whatsappPhone", value: e.target.value })} className="w-full rounded px-3 py-2 text-sm" placeholder="+27 82 555 0101" style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }} />
           </div>
           <div>
             <label className="block text-xs font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
@@ -2300,7 +2870,7 @@ export function BMSConnectionWizard({
 
   // ============= Main Render =============
 
-  const stepRenderers = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5];
+  const stepRenderers = [renderStep1, renderStep2, renderStep3, renderStep4, renderStep5, renderStep6];
 
   // Extract equipment list for verification wizard
   const discoveredEquipment = state.mappings?.equipment.map((eq) => ({
@@ -2356,14 +2926,12 @@ export function BMSConnectionWizard({
                 siteId={state.siteId}
                 onComplete={() => {
                   dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
-                  // Mark zone configuration as complete and trigger parent callback
-                  onComplete?.();
+                  dispatch({ type: "SET_STEP", step: 5 });
                 }}
                 onSkip={() => {
                   // User chose to skip zone configuration for now
                   dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
-                  // Still trigger parent completion
-                  onComplete?.();
+                  dispatch({ type: "SET_STEP", step: 5 });
                 }}
                 onCancel={() => {
                   dispatch({ type: "SET_ZONE_INGESTION_WIZARD", show: false });
@@ -2401,7 +2969,7 @@ export function BMSConnectionWizard({
       </div>
 
       {/* Navigation */}
-      {state.step < 4 && (
+      {(state.step < 4 || state.step === 5) && (
         <div className="flex justify-between mt-6">
           <button
             onClick={state.step === 1 ? onClose : goBack}

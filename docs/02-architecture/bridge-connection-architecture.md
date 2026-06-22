@@ -48,8 +48,25 @@ wg show
 | GET | `/api/sites/{site_id}/telemetry` | Bearer token |
 | GET | `/api/sites/{site_id}/points` | Bearer token |
 | GET | `/api/sites/{site_id}/devices` | Bearer token |
+| GET | `/api/sites/{site_id}/objects` | Bearer token |
 | POST | `/api/telemetry/read` | Bearer token |
 | POST | `/api/telemetry/write` | Bearer token |
+
+## Point Discovery and Writeability
+
+For bridge-connected sites, the bridge object catalog is the source of truth for point existence and writeability.
+
+`GET /api/sites/{site_id}/objects` returns the BACnet/object catalog with fields such as:
+
+- `object_id` — exact bridge point ID, for example `S002-AHU-B1-001.DAMPER_POSITION`
+- `equipment_id` — raw site equipment ID from the bridge/site
+- `object_type` and `instance` — BACnet object metadata
+- `point_type` — semantic role when provided, for example `command` or `setpoint`
+- `writable` — whether the bridge reports that the point can be written
+
+Sentinel must preserve `writable=true` when importing bridge objects into `point_asset_mappings`. The bridge write endpoint also enforces its site-side writable-point allowlist, so the bridge must keep that guard synced to the same object catalog. When the bridge guard is synced, a known-equipment bridge object with `writable=true` is a verified writable mapping for Sentinel readiness and approval prechecks.
+
+Analog Value, Binary Value, and Multi-State Value points are not assumed writable from object type alone. They are candidates for control only when the bridge catalog marks the specific point as `writable=true`, and actual writes still require the bridge write guard to allow the exact `object_id`.
 
 ## Authentication: Per-Site Tokens
 
@@ -63,10 +80,9 @@ The bridge supports **global** and **per-site** tokens via environment variables
 The bridge validates site-specific endpoints against the per-site token.
 Global `BRIDGE_API_TOKEN` alone will **not** authenticate site-specific requests.
 
-### Current Tokens (site-002)
+### Current Tokens
 
-- Global: `GDGKc5HuaKDvm9CXb9nsOx50TvCrNqfazRgATrnlC2TKiK2cJHYWudISBnII_VYh`
-- Site-002: `ScUAjUet7i2vvcE0fuzn6dsF3C+YRMWbf8yMWwdoYbw=`
+Do not store literal bridge tokens in documentation. Check the configured secret stores directly when rotating or debugging credentials.
 
 ### Storage
 
@@ -111,10 +127,9 @@ systemctl restart wg-quick@wg0
 ### Bridge Offline
 ```bash
 curl http://10.99.0.1:8080/health    # Unauthenticated health check
-# From bridge VPS:
-systemctl status sentinel-bridge
-journalctl -u sentinel-bridge -f
 ```
+
+Operational access from the Sentinel host is through the WireGuard bridge API. Do not assume SSH access or host-level service control from Sentinel.
 
 ### Token Mismatch
 ```bash

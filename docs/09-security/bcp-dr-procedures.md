@@ -28,8 +28,8 @@ estimated_read_time: 10
 This document describes the business continuity planning (BCP) and disaster recovery (DR) procedures for the SENTINEL BMS Intelligence Platform. SENTINEL is a cloud-hosted building management system that provides predictive maintenance, conversational AI, and device control capabilities for facilities management.
 
 **Platform Architecture:**
-- **Hosting:** Contabo VPS with Docker Swarm orchestration
-- **Database:** Supabase (PostgreSQL) with JSON file fallback
+- **Hosting:** Contabo VPS with Docker/Supabase services
+- **Database:** Supabase/PostgreSQL primary on the Sentinel VPS with async WAL streaming to a remote PostgreSQL 17 hot standby
 - **Remote Access:** Cloudflare Tunnel (zero-trust networking)
 - **AI Services:** Claude API (primary) + Ollama (local fallback)
 - **Monitoring:** Loki/Grafana centralised logging, Wazuh SIEM
@@ -78,7 +78,7 @@ SENTINEL processes ranked by business criticality for recovery prioritisation.
 | Component | RTO | RPO | Backup Method | Recovery Method |
 |-----------|-----|-----|---------------|-----------------|
 | **Contabo VPS** | 4 hours | 24 hours | Daily VM snapshots | Snapshot restoration |
-| **Supabase (PostgreSQL)** | 2 hours | 1 hour | Continuous backup (PITR) | Point-in-time recovery |
+| **Supabase (PostgreSQL)** | 2 hours | Seconds-low minutes for healthy standby promotion; about 24h worst case if using logical dumps only | Async WAL standby, logical dumps, physical basebackup + WAL archive on remote VPS | Standby promotion, logical restore, or basebackup + WAL replay |
 | **Docker Services** | 30 minutes | 0 (stateless) | Container images | Service restart / redeploy |
 | **Cloudflare Tunnel** | 1 hour | N/A | Configuration backup | Tunnel reconfiguration |
 | **AI Services (Claude)** | Automatic | N/A | Circuit breaker | Ollama fallback |
@@ -103,13 +103,13 @@ Layer 1: Application Resilience
 
 Layer 2: Infrastructure Resilience
 ├── Contabo VM snapshots (daily, automated)
-├── Supabase continuous backup (PITR)
+├── Remote PostgreSQL hot standby with WAL streaming
 ├── Docker image registry (rebuild from images)
 ├── Cloudflare Tunnel (encrypted, auto-reconnect)
 └── SSH fallback (direct access if tunnel down)
 
 Layer 3: Data Resilience
-├── Supabase PITR (1-hour RPO)
+├── Remote basebackup + WAL replay path for PITR-style recovery
 ├── JSON file fallback (part of VM snapshot)
 ├── InfluxDB data (Docker volume, snapshotted)
 ├── Audit logs (JSON + structured logging to Loki)
@@ -144,7 +144,8 @@ When external dependencies fail, SENTINEL degrades gracefully rather than going 
 | Backup | Frequency | Retention | Location | Verification |
 |--------|-----------|-----------|----------|-------------|
 | VM snapshot | Daily | 7 days | Contabo infrastructure | Monthly restore test |
-| Supabase backup | Continuous (PITR) | 7 days (Pro) | Supabase infrastructure | Monthly data check |
+| PostgreSQL logical dumps | Daily + weekly | Last 30 dump-sets | Remote standby VPS | Restore test required |
+| PostgreSQL basebackup + WAL archive | Weekly basebackup + continuous WAL | Last 3 basebackups plus WAL pruned to oldest retained basebackup | Remote standby VPS | Restore test required |
 | JSON data files | With VM snapshot | 7 days | Contabo infrastructure | Part of VM verify |
 | Docker images | On build | Latest + previous | Container registry | Build pipeline |
 | Audit logs | Real-time (Loki) | 30 days (Loki) | Grafana Loki storage | Dashboard query test |

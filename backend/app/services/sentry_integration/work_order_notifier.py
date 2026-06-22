@@ -67,7 +67,7 @@ class WorkOrderNotifier:
                 )
             )
             field = "id" if is_uuid else "code"
-            resp = sb.table("equipment").select("id,code,name,type").eq(field, equipment_id).execute()
+            resp = sb.table("equipment").select("id,code,type").eq(field, equipment_id).execute()
             if resp.data:
                 return resp.data[0]
         except Exception:
@@ -164,6 +164,41 @@ class WorkOrderNotifier:
             logger.warning(f"Could not load checklist for {equipment_type}: {e}")
             return ""
 
+    @staticmethod
+    def _get_telegram_checklist_summary(equipment_type: str, max_items: int = 6) -> str:
+        """Return a compact technician checklist for Telegram assignment messages."""
+        if not equipment_type or equipment_type == "n/a":
+            return ""
+        try:
+            from app.services.checklist_service import get_checklist_service
+
+            svc = get_checklist_service()
+            template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
+            if not template:
+                return ""
+
+            lines = []
+            for item in template.get("checklist_items", [])[:max_items]:
+                question = item.get("question") or item.get("description") or ""
+                if not question:
+                    continue
+                options = item.get("options", [])
+                if options:
+                    option_text = " / ".join(str(o.get("label") or "").strip() for o in options if o.get("label"))
+                    suffix = f" ({option_text})" if option_text else ""
+                elif item.get("item_type") == "measurement":
+                    unit = item.get("unit", "")
+                    tmin = item.get("tolerance_min")
+                    tmax = item.get("tolerance_max")
+                    suffix = f" ({tmin}-{tmax} {unit})" if tmin is not None else ""
+                else:
+                    suffix = ""
+                lines.append(f"- {question}{suffix}")
+            return "\n".join(lines)
+        except Exception as e:
+            logger.warning(f"Could not load Telegram checklist for {equipment_type}: {e}")
+            return ""
+
     async def _load_work_order_context(self, work_order_id: str) -> dict[str, Any]:
         """Load work order context from repository using ID or code."""
         if not work_order_id:
@@ -185,7 +220,12 @@ class WorkOrderNotifier:
 
     def _build_email_subject(self, work_order_data: dict[str, Any], work_order: dict[str, Any]) -> str:
         """Build a descriptive subject line with WO reference and priority."""
-        equipment_name = work_order_data.get("equipment_name") or work_order.get("title") or "Equipment"
+        equipment_name = (
+            work_order_data.get("equipment_code")
+            or work_order_data.get("equipment_name")
+            or work_order.get("equipment_code")
+            or "Equipment"
+        )
         criticality = str(work_order_data.get("criticality") or work_order.get("priority") or "MEDIUM").upper()
         wo_ref = (
             work_order.get("code")
@@ -231,8 +271,8 @@ class WorkOrderNotifier:
             or work_order_data.get("work_order_id")
             or "N/A"
         )
-        equipment_name = work_order_data.get("equipment_name") or equipment_obj.get("name") or "Unknown Equipment"
         equipment_code = equipment_obj.get("code") or work_order_data.get("equipment_code") or "N/A"
+        equipment_name = equipment_code
         equipment_type = (equipment_obj.get("type") or work_order_data.get("equipment_type") or "N/A").upper()
         site_name = site_obj.get("name") or work_order_data.get("site_name") or "N/A"
         site_code = site_obj.get("code") or work_order_data.get("site_code") or "N/A"
@@ -382,8 +422,8 @@ class WorkOrderNotifier:
             or work_order_data.get("work_order_id")
             or "N/A"
         )
-        equipment_name = work_order_data.get("equipment_name") or equipment_obj.get("name") or "Unknown Equipment"
         equipment_code = equipment_obj.get("code") or work_order_data.get("equipment_code") or "N/A"
+        equipment_name = equipment_code
         equipment_type = (equipment_obj.get("type") or work_order_data.get("equipment_type") or "N/A").upper()
         site_name = site_obj.get("name") or work_order_data.get("site_name") or "N/A"
         site_code = site_obj.get("code") or work_order_data.get("site_code") or "N/A"
@@ -874,6 +914,15 @@ class WorkOrderNotifier:
             if problem:
                 lines.append("")
                 lines.append(problem)
+            checklist_summary = self._get_telegram_checklist_summary(
+                (work_order_data.get("equipment_type") or "").lower()
+            )
+            if checklist_summary:
+                lines.append("")
+                lines.append("Report back on:")
+                lines.append(checklist_summary)
+                lines.append("")
+                lines.append("Closeout will ask these one by one: ok / warning / critical.")
             msg = "\n".join(lines)
 
             code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
@@ -1928,7 +1977,16 @@ async def handle_telegram_recommendation_approval(telegram_user_id: str, message
             )
             if result.get("success"):
                 return f"Recommendation {rec_id[:8]} executed successfully."
-            return f"Could not execute {rec_id[:8]}: {result.get('error_message') or 'unknown error'}"
+            logger.warning(
+                "Telegram recommendation approval failed: rec_id=%s user_id=%s error=%s",
+                rec_id,
+                telegram_user_id,
+                result.get("error_message"),
+            )
+            return (
+                "Approval could not be completed. "
+                "The recommendation was not applied. Please try again in a moment or contact support."
+            )
 
         result = await reject_recommendation(
             recommendation_id=rec_id,
@@ -1937,7 +1995,13 @@ async def handle_telegram_recommendation_approval(telegram_user_id: str, message
         )
         if result.get("success"):
             return f"Recommendation {rec_id[:8]} rejected: {reason}"
-        return f"Could not reject {rec_id[:8]}: {result.get('error_message') or 'unknown error'}"
+        logger.warning(
+            "Telegram recommendation rejection failed: rec_id=%s user_id=%s error=%s",
+            rec_id,
+            telegram_user_id,
+            result.get("error_message"),
+        )
+        return "Rejection could not be completed. Please try again in a moment or contact support."
 
     except ImportError:
         logger.debug("LangGraph not available for Telegram recommendation approvals")

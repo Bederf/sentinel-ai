@@ -22,7 +22,8 @@ Usage:
 
 import json
 import logging
-from datetime import datetime
+import re
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -45,6 +46,50 @@ try:
     BASE_URL = settings.sentinel_public_url or settings.backend_url or "http://localhost:9095"
 except Exception:
     BASE_URL = "http://localhost:9095"
+
+
+# Health scoring applies to maintainable/runtime assets, not static endpoints,
+# virtual zones, luminaires, meters, or one-off telemetry sensors.
+HEALTH_SCORED_EQUIPMENT_TYPES = {
+    "ahu",
+    "bess",
+    "chiller",
+    "cooling_tower",
+    "ct",
+    "fcu",
+    "generator",
+    "inverter",
+    "pump",
+    "ups",
+    "vav",
+}
+STATIC_ALERT_PREFIXES = (
+    "sensor.",
+    "zone.",
+)
+
+
+def _canonical_s002_equipment_code(code: str | None) -> str | None:
+    """Normalize known S002 bridge aliases to canonical equipment codes."""
+    if not code:
+        return code
+    match = re.match(r"^(S002-[A-Z]+)-B1-\d+$", code)
+    if match:
+        return f"{match.group(1)}-B01"
+    match = re.match(r"^(S002-[A-Z]+)-R-\d+$", code)
+    if match:
+        return f"{match.group(1)}-R01"
+    match = re.match(r"^(S002-[A-Z]+)-L(\d)-(\d+)$", code)
+    if match:
+        floor = int(match.group(2))
+        seq = int(match.group(3))
+        return f"{match.group(1)}-{floor * 100 + seq:03d}"
+    aliases = {
+        "S002-AHU-001": "S002-AHU-B01",
+        "S002-AHU-002": "S002-AHU-201",
+        "S002-AHU-003": "S002-AHU-R01",
+    }
+    return aliases.get(code, code)
 
 
 def _load_json(filepath: Path) -> Any:
@@ -233,8 +278,10 @@ def _build_equipment_document(equipment: dict, source: str = "supabase") -> dict
     """Build searchable document for equipment."""
     equip_id = equipment.get("code") or equipment.get("id", "unknown")
     site_name = ""
+    site_id = equipment.get("site_id")
     if equipment.get("sites"):
         site_name = equipment["sites"].get("name", "")
+        site_id = equipment["sites"].get("code") or site_id
 
     text_parts = [
         f"Equipment: {equipment.get('name', equip_id)}",
@@ -276,6 +323,7 @@ def _build_equipment_document(equipment: dict, source: str = "supabase") -> dict
             "model": equipment.get("model"),
             "health_score": equipment.get("health_score"),
             "status": equipment.get("status"),
+            "site_id": site_id,
             "source": source,
         },
     }
@@ -286,11 +334,13 @@ def _build_alert_document(alert: dict, source: str = "supabase") -> dict[str, An
     alert_id = alert.get("id", "unknown")
     equipment_name = ""
     site_name = ""
+    site_id = alert.get("site_id")
 
     if alert.get("equipment"):
         equipment_name = alert["equipment"].get("name", "")
     if alert.get("sites"):
         site_name = alert["sites"].get("name", "")
+        site_id = alert["sites"].get("code") or site_id
 
     text_parts = [
         f"Alert: {alert.get('title', 'Unknown Alert')}",
@@ -321,6 +371,7 @@ def _build_alert_document(alert: dict, source: str = "supabase") -> dict[str, An
             "severity": alert.get("severity"),
             "status": alert.get("status"),
             "type": alert.get("type"),
+            "site_id": site_id,
             "source": source,
         },
     }
@@ -332,12 +383,14 @@ def _build_prediction_document(prediction: dict, source: str = "supabase") -> di
     equipment_name = ""
     equipment_type = ""
     site_name = ""
+    site_id = prediction.get("site_id")
 
     if prediction.get("equipment"):
         equipment_name = prediction["equipment"].get("name", "")
         equipment_type = prediction["equipment"].get("type", "")
     if prediction.get("sites"):
         site_name = prediction["sites"].get("name", "")
+        site_id = prediction["sites"].get("code") or site_id
 
     text_parts = [
         f"Prediction: {prediction.get('prediction_type', 'Unknown')}",
@@ -391,6 +444,7 @@ def _build_prediction_document(prediction: dict, source: str = "supabase") -> di
             "severity": prediction.get("severity"),
             "urgency": prediction.get("urgency"),
             "status": prediction.get("status"),
+            "site_id": site_id,
             "source": source,
         },
     }
@@ -401,11 +455,13 @@ def _build_work_order_document(wo: dict, source: str = "supabase") -> dict[str, 
     wo_id = wo.get("code") or wo.get("id", "unknown")
     equipment_name = ""
     site_name = ""
+    site_id = wo.get("site_id")
 
     if wo.get("equipment"):
         equipment_name = wo["equipment"].get("name", "")
     if wo.get("sites"):
         site_name = wo["sites"].get("name", "")
+        site_id = wo["sites"].get("code") or site_id
 
     text_parts = [
         f"Work Order: {wo.get('title', 'Unknown')}",
@@ -440,6 +496,7 @@ def _build_work_order_document(wo: dict, source: str = "supabase") -> dict[str, 
             "work_order_id": str(wo_id),
             "priority": wo.get("priority"),
             "status": wo.get("status"),
+            "site_id": site_id,
             "source": source,
         },
     }
@@ -478,6 +535,7 @@ def _build_tech_document(doc: dict, source: str = "supabase") -> dict[str, Any]:
             "document_type": doc.get("document_type"),
             "equipment_type": doc.get("equipment_type"),
             "manufacturer": doc.get("manufacturer"),
+            "scope": "global",
             "source": source,
         },
     }
@@ -692,8 +750,35 @@ class OpenAIConnectorMCPServer:
                 },
             },
             {
+                "name": "get_hvac_runtime_status",
+                "description": (
+                    "Check whether HVAC appears to be running from latest telemetry. "
+                    "Uses measured readings such as staging_state, compressor current, fan speed, and HVAC kW; "
+                    "reports explicitly when run/stop state is inferred or unavailable."
+                ),
+                "inputSchema": {
+                    "type": "object",
+                    "properties": {
+                        "site_id": {
+                            "type": "string",
+                            "description": "Site identifier (e.g., S002)",
+                            "enum": ["S002"],
+                        },
+                        "equipment_id": {
+                            "type": "string",
+                            "description": "Optional HVAC equipment code to inspect (e.g., S002-CHILLER-B01)",
+                        },
+                    },
+                    "required": ["site_id"],
+                },
+            },
+            {
                 "name": "get_recommendations",
-                "description": "Get top active recommendations for a site with action, priority, and projected savings.",
+                "description": (
+                    "Get technical maintenance/optimization recommendations for a site. "
+                    "Use only when the user asks for recommendations, maintenance actions, or technical follow-up; "
+                    "do not use this as a CEO site-status headline."
+                ),
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -1116,9 +1201,9 @@ class OpenAIConnectorMCPServer:
         if not site_id:
             return ""
         # Already in correct format
-        if site_id.lower() in ("site-002"):
+        if site_id.lower().startswith("site-"):
             return site_id.lower()
-        if site_id.upper() in ("S002"):
+        if len(site_id.upper()) == 4 and site_id.upper().startswith("S") and site_id[1:].isdigit():
             return f"site-{site_id[-3:].lower()}"
         # Try to resolve UUID to code
         try:
@@ -1167,52 +1252,86 @@ class OpenAIConnectorMCPServer:
             site_result = client.table("sites").select("name, code, region, type").eq("code", site_code).execute()
             site_data = site_result.data[0] if site_result.data else {}
 
-            # Get critical alerts count (alerts uses site UUID)
+            # Get active high/critical alerts (alerts uses site UUID). These can contain
+            # repeated poll-cycle rows for the same fault, so expose both raw rows and
+            # deduplicated alert groups.
             alerts_result = (
                 client.table("alerts")
-                .select("id, severity, status")
+                .select("id, equipment_id, severity, status, message, created_at")
                 .eq("site_id", site_uuid)
                 .eq("status", "active")
                 .in_("severity", ["high", "critical"])
                 .execute()
             )
-            critical_alerts = len(alerts_result.data) if alerts_result.data else 0
-
-            # Get recent recommendations count (recommendations uses site-002 format)
-            recs_result = (
-                client.table("recommendations")
-                .select("id, status, risk_level")
-                .eq("site_id", site_code)
-                .eq("shadow_mode", False)
-                .order("timestamp", desc=True)
-                .limit(100)
-                .execute()
+            alert_rows = alerts_result.data or []
+            critical_alert_rows = len(alert_rows)
+            alert_groups_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+            static_alert_groups_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
+            for alert in alert_rows:
+                message = str(alert.get("message") or "").strip()
+                key = (
+                    str(alert.get("equipment_id") or "site"),
+                    str(alert.get("severity") or "unknown"),
+                    message,
+                )
+                is_static_alert = any(message.lower().startswith(prefix) for prefix in STATIC_ALERT_PREFIXES)
+                target_groups = static_alert_groups_by_key if is_static_alert else alert_groups_by_key
+                group = target_groups.setdefault(
+                    key,
+                    {
+                        "equipment_id": alert.get("equipment_id"),
+                        "severity": alert.get("severity"),
+                        "message": message,
+                        "occurrences": 0,
+                        "latest_seen_at": alert.get("created_at"),
+                        "excluded_reason": "health_scoring_exempt_static_endpoint" if is_static_alert else None,
+                    },
+                )
+                group["occurrences"] += 1
+                created_at = alert.get("created_at")
+                if created_at and (not group.get("latest_seen_at") or created_at > group["latest_seen_at"]):
+                    group["latest_seen_at"] = created_at
+            critical_alert_groups = sorted(
+                alert_groups_by_key.values(),
+                key=lambda group: (group.get("latest_seen_at") or "", group.get("occurrences") or 0),
+                reverse=True,
             )
-            recent_recs = len(recs_result.data) if recs_result.data else 0
+            critical_alerts = len(critical_alert_groups)
+            static_alert_groups_excluded = sorted(
+                static_alert_groups_by_key.values(),
+                key=lambda group: (group.get("latest_seen_at") or "", group.get("occurrences") or 0),
+                reverse=True,
+            )
 
             # Get equipment at risk (equipment uses site UUID)
             equip_result = (
                 client.table("equipment")
-                .select("id, code, name, health_score, status, health_confidence, health_trend")
+                .select("id, code, name, type, health_score, status, health_confidence, health_trend")
                 .eq("site_id", site_uuid)
                 .in_("status", ["warning", "critical", "fault"])
                 .order("health_score", desc=False)
-                .limit(10)
+                .limit(100)
                 .execute()
             )
             equipment_at_risk = []
             if equip_result.data:
                 for eq in equip_result.data:
+                    equipment_type = str(eq.get("type") or "").lower()
+                    if equipment_type not in HEALTH_SCORED_EQUIPMENT_TYPES or eq.get("health_score") is None:
+                        continue
                     equipment_at_risk.append(
                         {
-                            "id": eq.get("code") or eq.get("id"),
-                            "name": eq.get("name"),
+                            "equipment_id": eq.get("code") or eq.get("id"),
+                            "display_label": eq.get("code") or eq.get("id"),
+                            "type": eq.get("type"),
                             "risk_level": "high" if eq.get("status") == "critical" else "medium",
                             "health_score": eq.get("health_score"),
                             "health_confidence": eq.get("health_confidence", "unknown"),
                             "health_trend": eq.get("health_trend", "unknown"),
                         }
                     )
+                    if len(equipment_at_risk) >= 10:
+                        break
 
             # Determine overall status
             overall_status = "green"
@@ -1220,6 +1339,36 @@ class OpenAIConnectorMCPServer:
                 overall_status = "red"
             elif len(equipment_at_risk) > 3:
                 overall_status = "amber"
+
+            top_status_drivers = [
+                {
+                    "equipment_id": group.get("equipment_id"),
+                    "alert": group.get("message"),
+                    "severity": group.get("severity"),
+                    "occurrences": group.get("occurrences"),
+                    "latest_seen_at": group.get("latest_seen_at"),
+                }
+                for group in critical_alert_groups[:5]
+            ]
+            if critical_alerts > 0:
+                status_reason = (
+                    f"Red because {critical_alerts} active high/critical alert groups are still open "
+                    f"after deduplicating {critical_alert_rows} raw alert rows."
+                )
+                status_interpretation = (
+                    "This is an active-alert status, not a statement that the whole HVAC plant is stopped. "
+                    "This senior-manager MCP does not expose point-level runtime telemetry."
+                )
+            elif len(equipment_at_risk) > 3:
+                status_reason = (
+                    f"Amber because {len(equipment_at_risk)} health-scored equipment assets are flagged at risk."
+                )
+                status_interpretation = "No active high/critical alert groups are currently driving a red site state."
+            else:
+                status_reason = (
+                    "Green because there are no active high/critical alert groups and limited equipment risk."
+                )
+                status_interpretation = "No material building-status driver is currently active."
 
             # Get ML training status from sites.ml_hours_ingested
             ml_status = "unknown"
@@ -1240,14 +1389,320 @@ class OpenAIConnectorMCPServer:
             return {
                 "site_name": site_data.get("name", site_id),
                 "overall_status": overall_status,
+                "building_status": overall_status,
+                "status_reason": status_reason,
+                "status_interpretation": status_interpretation,
+                "status_drivers": top_status_drivers,
+                "executive_summary": (
+                    f"{site_data.get('name', site_id)} is {overall_status.upper()}. {status_reason} "
+                    f"{status_interpretation}"
+                ),
                 "critical_alerts": critical_alerts,
-                "recent_recommendations": recent_recs,
+                "critical_alert_groups": critical_alert_groups[:10],
+                "critical_alert_raw_rows": critical_alert_rows,
+                "critical_alert_count_basis": "deduplicated_active_high_or_critical_alert_groups_excluding_static_endpoints",
+                "health_scoring_exempt_alert_groups_excluded": len(static_alert_groups_excluded),
+                "health_scoring_exempt_alert_group_examples": static_alert_groups_excluded[:5],
+                "maintenance_recommendations_visibility": (
+                    "Hidden from CEO site status. Use get_recommendations only when the user asks for maintenance "
+                    "recommendations or technical follow-up actions."
+                ),
                 "ml_training_status": ml_status,
                 "equipment_at_risk": equipment_at_risk,
-                "summary": f"{site_data.get('name', site_id)}: {critical_alerts} critical alerts, {len(equipment_at_risk)} equipment at risk",
+                "presentation_guidance": {
+                    "audience": "senior_manager",
+                    "answer_order": (
+                        "Start with building_status and status_reason. Then list only the top status_drivers. "
+                        "Do not lead with ML status, raw row counts, or maintenance recommendations."
+                    ),
+                    "equipment_reference": "Use equipment_id/code as the primary label. Do not lead with friendly equipment names.",
+                    "recommendations": "Do not mention maintenance recommendation backlog in site status unless asked.",
+                    "raw_rows": "Do not show critical_alert_raw_rows unless the user asks for diagnostics or data quality detail.",
+                    "telemetry": "Do not expose point-level runtime telemetry through this senior-manager MCP.",
+                },
+                "summary": (f"{site_data.get('name', site_id)} is {overall_status.upper()}: {status_reason}"),
             }
         except Exception as e:
             logger.error(f"get_site_status failed: {e}")
+            return {"error": str(e)}
+
+    async def get_hvac_runtime_status(self, site_id: str, equipment_id: str | None = None) -> dict[str, Any]:
+        """Return measured/inferred HVAC runtime status from latest telemetry."""
+        client = _get_supabase_client()
+        if not client:
+            return {"error": "Supabase not available"}
+
+        site_code = self._get_site_code(site_id)
+        site_uuid = self._get_site_uuid(site_id)
+        if not site_code or not site_uuid:
+            return {"error": "Invalid site_id"}
+
+        hvac_types = ["ahu", "chiller", "cooling_tower", "ct", "vav", "fcu", "pump"]
+        try:
+            equipment_query = (
+                client.table("equipment").select("code,name,type,status,health_score").eq("site_id", site_uuid)
+            )
+            if equipment_id:
+                equipment_query = equipment_query.eq("code", equipment_id)
+            equipment_rows = equipment_query.execute().data or []
+            hvac_equipment = [
+                row
+                for row in equipment_rows
+                if any(token in str(row.get("type") or "").lower() for token in hvac_types)
+                or any(
+                    token.upper() in str(row.get("code") or "").upper()
+                    for token in ["-AHU-", "-CHILLER-", "-CT-", "-VAV-", "-FCU-", "-PUMP-"]
+                )
+            ]
+            canonical_equipment: dict[str, dict[str, Any]] = {}
+            for row in hvac_equipment:
+                raw_code = row.get("code")
+                canonical_code = _canonical_s002_equipment_code(raw_code)
+                if not canonical_code:
+                    continue
+                normalized_row = {**row, "code": canonical_code}
+                existing = canonical_equipment.get(canonical_code)
+                if not existing or raw_code == canonical_code:
+                    canonical_equipment[canonical_code] = normalized_row
+            hvac_equipment = list(canonical_equipment.values())
+
+            equipment_codes = [row.get("code") for row in hvac_equipment if row.get("code")]
+            if not equipment_codes:
+                return {
+                    "site_id": site_code,
+                    "overall": "unknown",
+                    "confidence": "none",
+                    "note": "No HVAC equipment found for the requested scope",
+                    "equipment": [],
+                }
+
+            runtime_sensor_types = [
+                "staging_state",
+                "run_state",
+                "fan_speed_pct",
+                "fan_speed",
+                "compressor_current_1",
+                "compressor_current_2",
+            ]
+            operational_sensor_types = [
+                *runtime_sensor_types,
+                "filter_dp",
+                "room_temp",
+                "room_temperature",
+                "zone_temp",
+                "co2_ppm",
+                "chw_supply_temp",
+                "chw_return_temp",
+                "supply_air_temp",
+                "return_air_temp",
+                "damper_position",
+                "setpoint_temp",
+                "outlet_water_temp",
+                "equipment_online",
+                "cond_supply_temp",
+                "cond_return_temp",
+                "condenser_flow",
+                "hvac_kw",
+                "autoencoder_anomaly_score",
+                "anomaly_score",
+            ]
+            runtime_fresh_after = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
+            readings_resp = (
+                client.table("equipment_sensor_readings")
+                .select("equipment_id,sensor_type,value,unit,recorded_at,quality_flag")
+                .eq("site_id", site_code)
+                .in_("equipment_id", [*equipment_codes, f"{site_code.upper()}-CHILLER-AGG"])
+                .in_("sensor_type", operational_sensor_types)
+                .gte("recorded_at", runtime_fresh_after)
+                .order("recorded_at", desc=True)
+                .limit(5000)
+                .execute()
+            )
+            latest_by_equipment: dict[str, dict[str, dict[str, Any]]] = {}
+            for reading in readings_resp.data or []:
+                eq_code = reading.get("equipment_id")
+                point = reading.get("sensor_type")
+                if not eq_code or not point:
+                    continue
+                latest_by_equipment.setdefault(eq_code, {}).setdefault(point, reading)
+
+            def _value(points: dict[str, dict[str, Any]], *names: str) -> float | None:
+                for name in names:
+                    if name in points and points[name].get("value") is not None:
+                        try:
+                            return float(points[name]["value"])
+                        except (TypeError, ValueError):
+                            return None
+                return None
+
+            details = []
+            running_count = 0
+            stopped_count = 0
+            unknown_count = 0
+            runtime_telemetry_unavailable_count = 0
+            runtime_telemetry_unavailable_examples = []
+            live_telemetry_no_runtime_count = 0
+            no_live_telemetry_count = 0
+            telemetry_by_type: dict[str, dict[str, Any]] = {}
+            latest_timestamp = None
+
+            for equipment in hvac_equipment:
+                code = equipment.get("code")
+                equipment_type = str(equipment.get("type") or "").lower()
+                points = latest_by_equipment.get(code, {})
+                staging = _value(points, "staging_state", "run_state")
+                fan_speed = _value(points, "fan_speed_pct", "fan_speed")
+                compressor_1 = _value(points, "compressor_current_1")
+                compressor_2 = _value(points, "compressor_current_2")
+                filter_dp = _value(points, "filter_dp")
+                fresh_sensor_types = sorted(points.keys())
+
+                evidence = {}
+                state = "unknown"
+                confidence = "none"
+                telemetry_status = "no_live_telemetry"
+                if staging is not None:
+                    evidence["staging_state"] = staging
+                    state = "running" if staging > 0 else "stopped"
+                    confidence = "measured"
+                    telemetry_status = "runtime_observed"
+                elif fan_speed is not None:
+                    evidence["fan_speed_pct"] = fan_speed
+                    state = "running" if fan_speed > 5 else "stopped"
+                    confidence = "inferred"
+                    telemetry_status = "runtime_observed"
+                elif compressor_1 is not None or compressor_2 is not None:
+                    total_current = (compressor_1 or 0) + (compressor_2 or 0)
+                    evidence["compressor_current_total_a"] = round(total_current, 2)
+                    state = "running" if total_current > 5 else "stopped"
+                    confidence = "inferred"
+                    telemetry_status = "runtime_observed"
+                elif equipment_type == "ahu" and filter_dp is not None:
+                    evidence["filter_dp"] = filter_dp
+                    state = "running" if filter_dp > 10 else "stopped"
+                    confidence = "inferred_from_operational_telemetry"
+                    telemetry_status = "runtime_inferred_from_operational_telemetry"
+                else:
+                    state = "not_reported"
+                    confidence = "live_telemetry_no_runtime" if points else "no_live_telemetry"
+                    telemetry_status = "live_telemetry_no_runtime" if points else "no_live_telemetry"
+
+                timestamps = [p.get("recorded_at") for p in points.values() if p.get("recorded_at")]
+                if timestamps:
+                    equipment_latest = max(timestamps)
+                    latest_timestamp = max(latest_timestamp or equipment_latest, equipment_latest)
+                else:
+                    equipment_latest = None
+
+                if state == "running":
+                    running_count += 1
+                elif state == "stopped":
+                    stopped_count += 1
+                elif state == "unknown":
+                    unknown_count += 1
+                else:
+                    runtime_telemetry_unavailable_count += 1
+                    if points:
+                        live_telemetry_no_runtime_count += 1
+                    else:
+                        no_live_telemetry_count += 1
+                    if len(runtime_telemetry_unavailable_examples) < 10:
+                        runtime_telemetry_unavailable_examples.append(
+                            {
+                                "equipment_id": code,
+                                "display_label": code,
+                                "type": equipment.get("type"),
+                                "telemetry_status": telemetry_status,
+                                "fresh_sensor_types": fresh_sensor_types,
+                            }
+                        )
+                type_summary = telemetry_by_type.setdefault(
+                    equipment_type or "unknown",
+                    {
+                        "equipment_count": 0,
+                        "runtime_observed_or_inferred": 0,
+                        "live_telemetry_no_runtime": 0,
+                        "no_live_telemetry": 0,
+                    },
+                )
+                type_summary["equipment_count"] += 1
+                if telemetry_status in {"runtime_observed", "runtime_inferred_from_operational_telemetry"}:
+                    type_summary["runtime_observed_or_inferred"] += 1
+                elif telemetry_status == "live_telemetry_no_runtime":
+                    type_summary["live_telemetry_no_runtime"] += 1
+                else:
+                    type_summary["no_live_telemetry"] += 1
+
+                details.append(
+                    {
+                        "equipment_id": code,
+                        "display_label": code,
+                        "type": equipment.get("type"),
+                        "runtime_state": state,
+                        "confidence": confidence,
+                        "telemetry_status": telemetry_status,
+                        "fresh_sensor_types": fresh_sensor_types,
+                        "evidence": evidence,
+                        "latest_telemetry_at": equipment_latest,
+                        "equipment_health_status": equipment.get("status"),
+                        "health_score": equipment.get("health_score"),
+                    }
+                )
+
+            aggregate_points = latest_by_equipment.get(f"{site_code.upper()}-CHILLER-AGG", {})
+            hvac_kw = _value(aggregate_points, "hvac_kw")
+            aggregate = {}
+            if hvac_kw is not None:
+                aggregate["hvac_kw"] = hvac_kw
+                if hvac_kw > 1 and running_count == 0:
+                    running_count += 1
+
+            if running_count > 0:
+                overall = "running"
+                confidence = "measured_or_inferred"
+            elif stopped_count > 0 and unknown_count == 0:
+                overall = "stopped"
+                confidence = "measured_or_inferred"
+            elif runtime_telemetry_unavailable_count and not unknown_count:
+                overall = "not_reported"
+                confidence = "runtime_telemetry_unavailable"
+            else:
+                overall = "unknown"
+                confidence = "insufficient_runtime_points"
+
+            return {
+                "site_id": site_code,
+                "overall": overall,
+                "confidence": confidence,
+                "running_equipment_count": running_count,
+                "stopped_equipment_count": stopped_count,
+                "unknown_equipment_count": unknown_count,
+                "runtime_telemetry_unavailable_count": runtime_telemetry_unavailable_count,
+                "live_telemetry_no_runtime_count": live_telemetry_no_runtime_count,
+                "no_live_telemetry_count": no_live_telemetry_count,
+                "runtime_telemetry_unavailable_examples": runtime_telemetry_unavailable_examples,
+                "telemetry_by_type": telemetry_by_type,
+                "latest_telemetry_at": latest_timestamp,
+                "aggregate_evidence": aggregate,
+                "presentation_guidance": {
+                    "equipment_reference": "Use equipment_id/code as the primary label. Do not lead with friendly equipment names.",
+                    "runtime_caveat": "Only call equipment running/stopped when runtime_state is running or stopped; not_reported means no runtime point.",
+                },
+                "equipment": [
+                    item
+                    for item in details
+                    if item.get("runtime_state") in {"running", "stopped", "unknown"}
+                    or item.get("telemetry_status") == "live_telemetry_no_runtime"
+                ][:25],
+                "note": (
+                    "Run/stop is measured when explicit run/staging state exists; otherwise inferred from fan speed, "
+                    "compressor current, or defensible operational telemetry such as AHU filter differential pressure. "
+                    "Equipment with fresh comfort/condition telemetry but no run-state point is reported as "
+                    "live_telemetry_no_runtime, not as unknown or failed."
+                ),
+            }
+        except Exception as e:
+            logger.error(f"get_hvac_runtime_status failed: {e}")
             return {"error": str(e)}
 
     async def get_recommendations(self, site_id: str, limit: int = 5, status: str = "pending") -> dict[str, Any]:
@@ -1324,7 +1779,8 @@ class OpenAIConnectorMCPServer:
                     recommendations.append(
                         {
                             "id": rec.get("id"),
-                            "equipment": equipment,
+                            "equipment_id": equipment,
+                            "display_label": equipment,
                             "action_type": rec.get("action_type", "unknown"),
                             "status": rec.get("status"),
                             "priority": priority,
@@ -2237,10 +2693,13 @@ class OpenAIConnectorMCPServer:
 
         try:
             site_code = self._get_site_code(site_id)
+            site_uuid = self._get_site_uuid(site_id)
+            if not site_code or not site_uuid:
+                return {"error": "Invalid site_id"}
             query = (
                 client.table("work_orders")
                 .select("id, code, title, priority, status, assigned_to, equipment_id, created_at")
-                .eq("site_id", site_code)
+                .eq("site_id", site_uuid)
             )
 
             if status != "all":
@@ -2263,7 +2722,7 @@ class OpenAIConnectorMCPServer:
                 )
 
             return {
-                "site_id": site_id,
+                "site_id": site_code,
                 "count": len(work_orders),
                 "work_orders": work_orders,
             }
@@ -2343,6 +2802,11 @@ class OpenAIConnectorMCPServer:
             return await self.fetch(kwargs.get("id", ""))
         elif tool_name == "get_site_status":
             return await self.get_site_status(kwargs.get("site_id", ""))
+        elif tool_name == "get_hvac_runtime_status":
+            return await self.get_hvac_runtime_status(
+                kwargs.get("site_id", ""),
+                kwargs.get("equipment_id"),
+            )
         elif tool_name == "get_recommendations":
             return await self.get_recommendations(
                 kwargs.get("site_id", ""),

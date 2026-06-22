@@ -671,6 +671,399 @@
           "decimals": 2
         }
       }
+    },
+    {
+      "id": 30,
+      "title": "Verified Rec kWh Impact",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_recommendation_actual_saving_kwh) or vector(0)",
+          "legendFormat": "Verified Rec kWh Impact"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "decimals": 3,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 0
+              },
+              {
+                "color": "#10b981",
+                "value": 0.001
+              }
+            ]
+          },
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.12)"
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "description": "Measured recommendation kWh impact from actual before/after telemetry. Negative means the approved action used more energy."
+    },
+    {
+      "id": 31,
+      "title": "Verified Rec R Impact",
+      "type": "stat",
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_recommendation_actual_saving_zar) or vector(0)",
+          "legendFormat": "Verified Rec R Impact"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyZAR",
+          "decimals": 2,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "#ef4444",
+                "value": null
+              },
+              {
+                "color": "#f59e0b",
+                "value": 0
+              },
+              {
+                "color": "#10b981",
+                "value": 0.001
+              }
+            ]
+          },
+          "sparkline": {
+            "displayMode": "area",
+            "lineColor": "#10b981",
+            "fillColor": "rgba(16, 185, 129, 0.12)"
+          }
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "description": "Measured recommendation Rand impact, calculated from actual kWh delta and tariff rate."
+    },
+    {
+      "id": 32,
+      "title": "Verified Recommendation Energy Outcome",
+      "type": "timeseries",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 20
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(sentinel_recommendation_baseline_energy_kwh) or vector(0)",
+          "legendFormat": "Before kWh"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(sentinel_recommendation_actual_energy_kwh) or vector(0)",
+          "legendFormat": "After kWh"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(sentinel_recommendation_actual_saving_kwh) or vector(0)",
+          "legendFormat": "kWh delta"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "kwatth",
+          "decimals": 3,
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 18,
+            "gradientMode": "none"
+          },
+          "thresholds": {
+            "mode": "absolute"
+          }
+        }
+      },
+      "description": "Feedback-loop measurement for executed recommendations: baseline kWh before implementation, actual kWh after implementation, and calculated delta."
+    },
+    {
+      "id": 33,
+      "title": "Equipment Baseline Coverage",
+      "type": "stat",
+      "description": "Percent of equipment with an active onboarding/shadow baseline record in equipment_baselines.",
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "expr": "sentinel_equipment_baseline_coverage_percent or vector(0)",
+          "legendFormat": "Baseline coverage",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 34,
+      "title": "Equipment Health by Phase",
+      "type": "bargauge",
+      "description": "Average equipment health score observed in each onboarding/control phase.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 6,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "expr": "sentinel_equipment_phase_health_score_avg or vector(0)",
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 35,
+      "title": "Equipment Health Delta from Shadow",
+      "type": "timeseries",
+      "description": "Average equipment health score delta from shadow/shadow_live baseline. Missing/zero indicates no shadow health baseline is available.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 14,
+        "y": 36
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "PBFA97CFB590B2093"
+      },
+      "targets": [
+        {
+          "expr": "sentinel_equipment_phase_health_delta_from_shadow or vector(0)",
+          "legendFormat": "{{phase}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 80
+              },
+              {
+                "color": "red",
+                "value": 95
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "orientation": "auto",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      }
     }
   ],
   "refresh": "30s",

@@ -259,9 +259,12 @@ async def startup_event():
 
         site_devices = []
         if not testing_mode:
-            # Load all equipment from building directories (including monitoring-only)
-            site_devices = await load_equipment_from_buildings()
-            print(f"[DEVICES] Loaded {len(site_devices)} building equipment")
+            # Supabase is the source of truth. Local equipment files only enrich
+            # matching Supabase equipment with protocol point metadata.
+            from app.services.ai_optimizer import load_device_manager_devices_from_supabase
+
+            site_devices = await load_device_manager_devices_from_supabase()
+            print(f"[DEVICES] Loaded {len(site_devices)} Supabase-backed protocol devices")
         else:
             print("[DEVICES] TESTING mode: skipping building equipment load")
             # Keep startup fast by limiting reference devices

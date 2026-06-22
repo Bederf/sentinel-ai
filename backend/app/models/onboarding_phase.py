@@ -150,7 +150,7 @@ def normalise_stage(raw: str) -> str:
 
 
 def validate_transition(current_stage: str, requested_stage: str) -> tuple[bool, str | None]:
-    """Validate that a requested transition is at most one step forward.
+    """Validate that promotion is at most one step forward; demotion is allowed.
 
     Returns (is_valid, error_message).
     """
@@ -167,10 +167,7 @@ def validate_transition(current_stage: str, requested_stage: str) -> tuple[bool,
             f"Must transition through '{VALID_STAGES[current_idx + 1]}' first."
         )
     if requested_idx < current_idx:
-        return False, (
-            f"Backward transitions are not permitted. "
-            f"Current stage is '{current_stage}'; cannot move to '{requested_stage}'."
-        )
+        return True, None
     return True, None
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 
 from app.services.simbiot.bms_adapter import (
@@ -18,6 +19,8 @@ from app.services.simbiot.connection_policy import (
     is_point_allowed_for_site,
     is_runtime_processing_enabled,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class PolicyEnforcedBmsAdapter(BmsAdapter):
@@ -99,9 +102,16 @@ class PolicyEnforcedBmsAdapter(BmsAdapter):
 
     async def read_points(self, device_id: str, point_ids: Sequence[str]) -> list[BmsPointValue]:
         self._ensure_runtime_enabled()
-        allowed_point_ids = [
-            point_id for point_id in point_ids if self._point_allowed(device_id=device_id, point_id=point_id)
-        ]
+        allowed_point_ids = []
+        for point_id in point_ids:
+            if self._point_allowed(device_id=device_id, point_id=point_id):
+                allowed_point_ids.append(point_id)
+            else:
+                logger.warning(
+                    "Point %s:%s blocked by module policy, dropped from bulk read",
+                    device_id,
+                    point_id,
+                )
         if not allowed_point_ids:
             return []
         return await self._inner.read_points(device_id, allowed_point_ids)

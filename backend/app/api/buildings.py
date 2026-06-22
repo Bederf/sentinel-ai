@@ -19,7 +19,7 @@ import logging
 import re
 import shutil
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -336,6 +336,22 @@ class BuildingCreate(BaseModel):
     region: str | None = ""
     type: str | None = "regional_office"
     sqm: int | None = 0
+    year_built: int | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    whatsapp_phone: str | None = None
+    occupancy_capacity: int | None = None
+    total_desks: int | None = None
+    parking_bays: int | None = None
+    nmd_limit_kva: float | None = None
+    demand_charge_per_kva: float | None = None
+    electricity_provider: str | None = None
+    equipment_count: int | None = None
+    operating_hours: dict[str, Any] | None = None
+    optimization_settings: dict[str, Any] | None = None
+    building_geometry: dict[str, Any] | None = None
     timezone: str = "Africa/Johannesburg"
     floors: list[str] = []
     features: dict = {}
@@ -361,9 +377,19 @@ class BuildingConfigUpdate(BaseModel):
     building_type: str | None = None  # commercial_office, retail, industrial, mixed_use
     floors: list[str] | None = None
     sqm: int | None = None
+    year_built: int | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     occupancy_capacity: int | None = None
     total_desks: int | None = None
     parking_bays: int | None = None
+    nmd_limit_kva: float | None = None
+    demand_charge_per_kva: float | None = None
+    electricity_provider: str | None = None
+    equipment_count: int | None = None
+    operating_hours: dict[str, Any] | None = None
+    optimization_settings: dict[str, Any] | None = None
+    building_geometry: dict[str, Any] | None = None
     optimization_profile: str | None = None  # cost_saving, comfort, balanced
     sentinel_operating_mode: Literal["comfort", "cost_saving", "asset_preservation"] | None = None
     control_tier: str | None = None  # human_in_loop, supervised, automatic
@@ -650,6 +676,17 @@ async def update_building_config(
     if config.floors is not None:
         changes["floor_labels"] = {"old": current.get("floor_labels"), "new": config.floors}
         updates["floor_labels"] = config.floors
+        changes["floors"] = {"old": current.get("floors"), "new": len(config.floors)}
+        updates["floors"] = len(config.floors)
+    if config.year_built is not None:
+        changes["year_built"] = {"old": current.get("year_built"), "new": config.year_built}
+        updates["year_built"] = config.year_built
+    if config.latitude is not None:
+        changes["latitude"] = {"old": current.get("latitude"), "new": config.latitude}
+        updates["latitude"] = config.latitude
+    if config.longitude is not None:
+        changes["longitude"] = {"old": current.get("longitude"), "new": config.longitude}
+        updates["longitude"] = config.longitude
     if config.occupancy_capacity is not None:
         changes["occupancy_capacity"] = {"old": current.get("occupancy_capacity"), "new": config.occupancy_capacity}
         updates["occupancy_capacity"] = config.occupancy_capacity
@@ -659,39 +696,56 @@ async def update_building_config(
     if config.parking_bays is not None:
         changes["parking_bays"] = {"old": current.get("parking_bays"), "new": config.parking_bays}
         updates["parking_bays"] = config.parking_bays
+    if config.nmd_limit_kva is not None:
+        changes["nmd_limit_kva"] = {"old": current.get("nmd_limit_kva"), "new": config.nmd_limit_kva}
+        updates["nmd_limit_kva"] = config.nmd_limit_kva
+    if config.demand_charge_per_kva is not None:
+        changes["demand_charge_per_kva"] = {
+            "old": current.get("demand_charge_per_kva"),
+            "new": config.demand_charge_per_kva,
+        }
+        updates["demand_charge_per_kva"] = config.demand_charge_per_kva
+    if config.electricity_provider is not None:
+        changes["electricity_provider"] = {
+            "old": current.get("electricity_provider"),
+            "new": config.electricity_provider,
+        }
+        updates["electricity_provider"] = config.electricity_provider
+    if config.equipment_count is not None:
+        changes["equipment_count"] = {"old": current.get("equipment_count"), "new": config.equipment_count}
+        updates["equipment_count"] = config.equipment_count
     if config.features is not None:
         changes["features"] = {"old": current.get("features"), "new": config.features}
         updates["features"] = config.features
-    # contacts: facility_manager -> metadata.contacts, email -> contact_email, emergency -> contact_phone
+    if config.operating_hours is not None:
+        changes["operating_hours"] = {"old": current.get("operating_hours"), "new": config.operating_hours}
+        updates["operating_hours"] = config.operating_hours
+    if config.optimization_settings is not None:
+        changes["optimization_settings"] = {
+            "old": current.get("optimization_settings"),
+            "new": config.optimization_settings,
+        }
+        updates["optimization_settings"] = config.optimization_settings
+    if config.building_geometry is not None:
+        changes["building_geometry"] = {"old": current.get("building_geometry"), "new": config.building_geometry}
+        updates["building_geometry"] = config.building_geometry
+    # contacts: email -> contact_email, emergency -> contact_phone, whatsapp -> whatsapp_phone
     if config.contacts is not None:
-        fm = config.contacts.get("facility_manager")
         email = config.contacts.get("email")
         emergency = config.contacts.get("emergency")
+        whatsapp = config.contacts.get("whatsapp")
         if email is not None:
             updates["contact_email"] = email
             changes["contact_email"] = {"old": current.get("contact_email"), "new": email}
         if emergency is not None:
             updates["contact_phone"] = emergency
             changes["contact_phone"] = {"old": current.get("contact_phone"), "new": emergency}
-        # Store facility_manager as JSON in metadata
-        contacts_meta = {}
-        if fm is not None:
-            contacts_meta["facility_manager"] = fm
-        if contacts_meta:
-            existing_meta = current.get("metadata") or {}
-            if isinstance(existing_meta, str):
-                import json as _json
-
-                try:
-                    existing_meta = _json.loads(existing_meta)
-                except Exception:
-                    existing_meta = {}
-            existing_meta["contacts"] = contacts_meta
-            updates["metadata"] = existing_meta
-            changes["metadata.contacts"] = {"old": None, "new": contacts_meta}
+        if whatsapp is not None:
+            updates["whatsapp_phone"] = whatsapp
+            changes["whatsapp_phone"] = {"old": current.get("whatsapp_phone"), "new": whatsapp}
 
     # Optimization settings stored in optimization_settings JSONB
-    current_opt = current.get("optimization_settings") or {}
+    current_opt = updates.get("optimization_settings") or current.get("optimization_settings") or {}
     new_opt = dict(current_opt)
     if config.optimization_profile is not None:
         changes["optimization.active_profile"] = {
@@ -715,7 +769,7 @@ async def update_building_config(
         return {"status": "no_changes", "site_id": site_code}
 
     try:
-        client.table("buildings").update(updates).eq("code", site_code).execute()
+        client.table("sites").update(updates).eq("code", site_code).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to update building config: {e}") from e
 
@@ -775,14 +829,31 @@ async def create_building(building: BuildingCreate) -> dict:
         "sqm": building.sqm or 0,
         "timezone": building.timezone,
         "floors": building.floors,
+        "year_built": building.year_built,
+        "latitude": building.latitude,
+        "longitude": building.longitude,
+        "operating_hours": building.operating_hours,
+        "building_geometry": building.building_geometry,
         "features": building.features
         or {
             "hvac": True,
             "dali": False,
             "desk_diagnosis": True,
         },
+        "contacts": {
+            "email": building.contact_email or "",
+            "emergency": building.contact_phone or "",
+            "whatsapp": building.whatsapp_phone or "",
+        },
         "metadata": {
             "created_at": "auto",
+            "occupancy_capacity": building.occupancy_capacity,
+            "total_desks": building.total_desks,
+            "parking_bays": building.parking_bays,
+            "nmd_limit_kva": building.nmd_limit_kva,
+            "demand_charge_per_kva": building.demand_charge_per_kva,
+            "electricity_provider": building.electricity_provider,
+            "equipment_count": building.equipment_count,
         },
     }
 
@@ -815,23 +886,46 @@ async def create_building(building: BuildingCreate) -> dict:
 
         client = get_supabase_client()
         site_uuid = str(uuid.uuid5(uuid.NAMESPACE_DNS, f"site-{site_id}"))
-        client.table("sites").upsert(
-            {
-                "id": site_uuid,
-                "code": site_id,
-                "name": building.name,
-                "address": building.address or "",
-                "region": building.region or "",
-                # Map wizard types to Supabase check constraint values
-                "type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(
-                    building.type or "", building.type or "regional_office"
-                ),
-                "sqm": building.sqm or 0,
-                "optimization_enabled": False,
-                "onboarding_phase": "commissioning",
+        site_record: dict[str, Any] = {
+            "id": site_uuid,
+            "code": site_id,
+            "name": building.name,
+            "display_name": building.display_name or building.name,
+            "address": building.address or "",
+            "region": building.region or "",
+            # Map wizard types to Supabase check constraint values
+            "type": {"private_hospital": "hospital", "regional_office": "regional_office"}.get(
+                building.type or "", building.type or "regional_office"
+            ),
+            "sqm": building.sqm or 0,
+            "floors": len(building.floors) if building.floors else 1,
+            "floor_labels": building.floors or ["G"],
+            "year_built": building.year_built,
+            "latitude": building.latitude,
+            "longitude": building.longitude,
+            "contact_phone": building.contact_phone,
+            "contact_email": building.contact_email,
+            "whatsapp_phone": building.whatsapp_phone,
+            "occupancy_capacity": building.occupancy_capacity,
+            "total_desks": building.total_desks,
+            "parking_bays": building.parking_bays,
+            "nmd_limit_kva": building.nmd_limit_kva,
+            "demand_charge_per_kva": building.demand_charge_per_kva,
+            "electricity_provider": building.electricity_provider,
+            "equipment_count": building.equipment_count or 0,
+            "features": building.features
+            or {
+                "hvac": True,
+                "dali": False,
+                "desk_diagnosis": True,
             },
-            on_conflict="code",
-        ).execute()
+            "operating_hours": building.operating_hours,
+            "optimization_settings": building.optimization_settings,
+            "building_geometry": building.building_geometry,
+            "optimization_enabled": False,
+            "onboarding_phase": "commissioning",
+        }
+        client.table("sites").upsert(site_record, on_conflict="code").execute()
     except Exception as e:
         logger.warning(f"Failed to create Supabase record for {site_id}: {e}")
 
@@ -1480,12 +1574,14 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
             # Phase 226 — passive devices get no health score
             from app.config.health_config import get_scoreability
 
-            if not get_scoreability(eq_type).get("scoreable", False):
+            is_scoreable = get_scoreability(eq_type).get("scoreable", False)
+            if not is_scoreable:
                 health = None
+                status = "normal"
 
             # Override status if equipment has active alerts
             eq_uuid = eq.get("id")
-            if eq_uuid and eq_uuid in alert_severity_map:
+            if is_scoreable and eq_uuid and eq_uuid in alert_severity_map:
                 alert_sev = alert_severity_map[eq_uuid]
                 if alert_sev == "critical" and status != "critical":
                     status = "critical"
@@ -1497,7 +1593,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
 
             # Derive status from health score to align with SafetySummary thresholds
             # (sites_aggregation.py: <57 = alarm, 57-80 = warning, >=80 = safe)
-            if status == "normal" and isinstance(health, (int, float)):
+            if is_scoreable and status == "normal" and isinstance(health, (int, float)):
                 if health < 57:
                     status = "critical"
                 elif health < 80:
@@ -1658,6 +1754,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
             "offline": ("critical", 20),
             "warning": ("warning", 60),
             "maintenance": ("warning", 50),
+            "needs_attention": ("warning", 75),
         }
         return status_map.get(status.lower() if status else "unknown", ("unknown", 50))
 

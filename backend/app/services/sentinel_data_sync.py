@@ -406,17 +406,46 @@ class SentinelDataSync:
         # Get equipment metadata from DB for health calculations and trend tracking
         equipment_codes = list(equipment_states.keys())
         equipment_meta = {}
+
+        def _derive_age_years(equipment: dict[str, Any]) -> float | None:
+            source_date = equipment.get("install_date") or equipment.get("commissioning_date")
+            if not source_date:
+                return None
+            try:
+                if isinstance(source_date, date):
+                    installed_on = source_date
+                else:
+                    installed_on = datetime.fromisoformat(str(source_date)).date()
+                return round((date.today() - installed_on).days / 365.25, 2)
+            except Exception:
+                return None
+
+        def _derive_runtime_hours(equipment: dict[str, Any]) -> float | None:
+            operating_data = equipment.get("operating_data")
+            if not isinstance(operating_data, dict):
+                return None
+            value = operating_data.get("runtime_hours")
+            if isinstance(value, dict):
+                value = value.get("value")
+            try:
+                return float(value) if value is not None else None
+            except (TypeError, ValueError):
+                return None
+
         try:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
             resp = (
                 client.table("equipment")
-                .select("id, code, type, age_years, runtime_hours, operating_data, health_score, updated_at")
+                .select("id, code, type, install_date, commissioning_date, operating_data, health_score, updated_at")
                 .in_("code", equipment_codes)
                 .execute()
             )
             if resp.data:
+                for eq in resp.data:
+                    eq["age_years"] = _derive_age_years(eq)
+                    eq["runtime_hours"] = _derive_runtime_hours(eq)
                 equipment_meta = {eq["code"]: eq for eq in resp.data}
         except Exception as e:
             logger.warning(f"Could not fetch equipment metadata: {e}")
@@ -798,6 +827,10 @@ class SentinelDataSync:
             "occupancy": "%",
             "power_kw": "kW",
             "energy_kwh": "kWh",
+            "energy_import_kwh": "kWh",
+            "energy_export_kwh": "kWh",
+            "thermal_energy_kwh": "kWh",
+            "total_consumption_m3": "m3",
             "illuminance": "lux",
             "soc_pct": "%",
             "voltage": "V",

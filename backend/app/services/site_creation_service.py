@@ -73,6 +73,21 @@ class SiteCreationService:
         building_type: str,
         location: str,
         gross_floor_area: float | None = None,
+        year_built: int | None = None,
+        latitude: float | None = None,
+        longitude: float | None = None,
+        contact_phone: str | None = None,
+        contact_email: str | None = None,
+        whatsapp_phone: str | None = None,
+        occupancy_capacity: int | None = None,
+        total_desks: int | None = None,
+        parking_bays: int | None = None,
+        nmd_limit_kva: float | None = None,
+        demand_charge_per_kva: float | None = None,
+        electricity_provider: str | None = None,
+        operating_hours: dict[str, Any] | None = None,
+        optimization_settings: dict[str, Any] | None = None,
+        building_geometry: dict[str, Any] | None = None,
         site_code: str | None = None,
         enabled: bool = True,
         onboarding_phase: str = "shadow_live",
@@ -110,7 +125,25 @@ class SiteCreationService:
                     "onboarding_phase": onboarding_phase,
                 }
                 if gross_floor_area is not None:
-                    payload["gross_floor_area"] = gross_floor_area
+                    payload["sqm"] = gross_floor_area
+                optional_fields = {
+                    "year_built": year_built,
+                    "latitude": latitude,
+                    "longitude": longitude,
+                    "contact_phone": contact_phone,
+                    "contact_email": contact_email,
+                    "whatsapp_phone": whatsapp_phone,
+                    "occupancy_capacity": occupancy_capacity,
+                    "total_desks": total_desks,
+                    "parking_bays": parking_bays,
+                    "nmd_limit_kva": nmd_limit_kva,
+                    "demand_charge_per_kva": demand_charge_per_kva,
+                    "electricity_provider": electricity_provider,
+                    "operating_hours": operating_hours,
+                    "optimization_settings": optimization_settings,
+                    "building_geometry": building_geometry,
+                }
+                payload.update({key: value for key, value in optional_fields.items() if value is not None})
 
                 result = self.supabase.table("sites").insert(payload).execute()
 

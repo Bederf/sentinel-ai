@@ -166,7 +166,7 @@ def test_acknowledge_transitions_status_and_logs_audit():
     assert audit.issue_id == issue.id
 
 
-def test_create_work_order_rejected_when_issue_new():
+def test_create_work_order_accepts_new_issue():
     issue = _seed_issue(_make_issue())
     request = CockpitActionRequest(
         action="create_work_order",
@@ -177,9 +177,9 @@ def test_create_work_order_rejected_when_issue_new():
     )
     result, status_after, message = cockpit_api._apply_action(issue, request)
 
-    assert result == "rejected"
-    assert status_after == "new"
-    assert "triaged or in_progress" in message
+    assert result == "accepted"
+    assert status_after == "in_progress"
+    assert message == "Work order created"
 
 
 def test_assign_requires_assignee_or_team():
@@ -198,20 +198,11 @@ def test_assign_requires_assignee_or_team():
 
 def test_available_actions_reflect_issue_state():
     issue = _seed_issue(_make_issue())
-    request = CockpitActionRequest(
-        action="assign",
-        actor_id="operator-1",
-        actor_label="Operator 1",
-        assign_team="operations",
-        evidence_refs=[],
-    )
-    result, status_after, _ = cockpit_api._apply_action(issue, request)
 
-    assert result == "accepted"
-    assert status_after == "triaged"
     next_actions = cockpit_api._available_actions(issue.status)
     assert "create_work_order" in next_actions
-    assert "assign" in next_actions
+    assert "acknowledge" in next_actions
+    assert "assign" not in next_actions
 
 
 @pytest.mark.asyncio
@@ -404,6 +395,67 @@ async def test_api_action_acknowledge(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_api_action_rebuilds_issue_cache_on_miss(monkeypatch):
+    """POST /cockpit/issues/.../action rebuilds issue cache before returning 404."""
+    from httpx import ASGITransport, AsyncClient
+
+    from app.api import cockpit as c
+    from app.main import app as fastapi_app
+
+    issue = _make_issue()
+    now = datetime.now(UTC)
+    statuses = [
+        CockpitSourceStatus(
+            source="bms",
+            label="BMS",
+            state="healthy",
+            badge_tone="normal",
+            last_updated_at=now,
+            freshness_seconds=30,
+            stale_after_seconds=90,
+            degraded_after_seconds=45,
+            degraded_confidence=False,
+            message="Telemetry current",
+        )
+    ]
+
+    async def _mock_phase(site_id: str) -> str:
+        return "supervised"
+
+    async def _mock_control(site_id: str) -> bool:
+        return True
+
+    monkeypatch.setattr(c, "_fetch_site_phase", _mock_phase)
+    monkeypatch.setattr(c, "_fetch_control_enabled", _mock_control)
+    monkeypatch.setattr(
+        c.cockpit_issue_service,
+        "aggregate",
+        lambda site_id, **kwargs: ([issue], [], statuses, [], issue.id),
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=fastapi_app),
+        base_url="http://test",
+    ) as client:
+        resp = await client.post(
+            f"/api/cockpit/issues/S002/{issue.id}/action",
+            json={
+                "action": "acknowledge",
+                "actor_id": "op-1",
+                "actor_label": "Operator 1",
+                "evidence_refs": [],
+            },
+            headers=_make_jwt_headers(),
+        )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["result"] == "accepted"
+    assert data["status_after"] == "triaged"
+    assert c._ISSUE_STORE["S002"][0].id == issue.id
+
+
+@pytest.mark.asyncio
 async def test_api_action_blocked_in_advisory(monkeypatch):
     """Advisory posture blocks create_work_order (403)."""
     from httpx import ASGITransport, AsyncClient
@@ -443,8 +495,8 @@ async def test_api_action_blocked_in_advisory(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_api_action_blocked_when_control_disabled(monkeypatch):
-    """control_enabled=False blocks create_work_order even in supervised phase (403)."""
+async def test_api_action_create_work_order_allowed_when_control_disabled(monkeypatch):
+    """control_enabled=False still allows maintenance work-order creation."""
     from httpx import ASGITransport, AsyncClient
 
     from app.api import cockpit as c
@@ -462,6 +514,17 @@ async def test_api_action_blocked_when_control_disabled(monkeypatch):
     monkeypatch.setattr(c, "_fetch_site_phase", _mock_phase)
     monkeypatch.setattr(c, "_fetch_control_enabled", _mock_control)
 
+    async def _mock_create_work_order(site_id, issue, request):
+        return {
+            "success": True,
+            "action": "work_order_created",
+            "issue_id": issue.id,
+            "work_order": {"id": "wo-001", "code": "WO-2026-0001"},
+            "equipment_code": "S002-CHILLER-B1-001",
+        }
+
+    monkeypatch.setattr(c, "_create_work_order_for_issue", _mock_create_work_order)
+
     async with AsyncClient(
         transport=ASGITransport(app=fastapi_app),
         base_url="http://test",
@@ -478,8 +541,11 @@ async def test_api_action_blocked_when_control_disabled(monkeypatch):
             headers=_make_jwt_headers(),
         )
 
-    assert resp.status_code == 403
-    assert "Control not enabled" in resp.json()["detail"]
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["result"] == "accepted"
+    assert data["status_after"] == "in_progress"
+    assert data["work_order"]["code"] == "WO-2026-0001"
 
 
 @pytest.mark.asyncio

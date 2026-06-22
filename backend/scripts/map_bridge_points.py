@@ -54,24 +54,35 @@ print(f"Fetched {len(objects)} objects from bridge catalog ({url})")
 
 mappings = []
 for obj in objects:
+    equipment_id = (obj.get("equipment_id") or "").strip()
     eq_type = obj.get("equipment_type") or "unknown"
-    pt_type = obj.get("point_type") or "sensor"
-    match_conf = "exact" if eq_type != "unknown" else "fuzzy"
+    bridge_writable = obj.get("writable") is True
+    pt_type = (obj.get("point_type") or "").strip()
+    if not pt_type and bridge_writable:
+        pt_type = "writable"
+    if not pt_type:
+        pt_type = "sensor"
+    object_type = (obj.get("object_type") or "").strip()
+    instance = obj.get("instance")
+    unit = obj.get("unit")
+    parameter_type = pt_type
+    if object_type and instance is not None:
+        parameter_type = f"{parameter_type}:{object_type},{instance}"
+    if unit:
+        parameter_type = f"{parameter_type}:{unit}"
+    match_conf = "exact" if equipment_id else "fuzzy"
     mappings.append(
         {
             "site_id": site_uuid,
             "bms_point_id": obj.get("object_id", ""),
-            "extracted_asset_id": obj.get("equipment_id", ""),
+            "extracted_asset_id": equipment_id,
             "parameter_name": obj.get("object_name", ""),
-            "parameter_type": pt_type,
+            "parameter_type": parameter_type,
             "match_confidence": match_conf,
-            "is_verified": match_conf == "exact",
+            "is_verified": match_conf == "exact" and bridge_writable,
             "mapping_source": "catalog_resolver",
         }
     )
-
-existing = sb.table("point_asset_mappings").delete().eq("site_id", site_uuid).execute()
-print(f"Deleted {len(existing.data or [])} existing mappings")
 
 batch_size = 500
 for i in range(0, len(mappings), batch_size):

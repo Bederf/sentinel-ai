@@ -678,6 +678,7 @@ class PointDiscoveryService:
                         {
                             "name": str(name) if name else f"{point.object_type}_{point.instance}",
                             "description": str(description) if description else "",
+                            "bacnet_device_id": device_id,
                             "object_type": point.object_type,
                             "instance": point.instance,
                             "units": str(units) if units else "",
@@ -698,6 +699,7 @@ class PointDiscoveryService:
                         {
                             "name": f"{point.object_type}_{point.instance}",
                             "description": "",
+                            "bacnet_device_id": device_id,
                             "object_type": point.object_type,
                             "instance": point.instance,
                             "units": "",

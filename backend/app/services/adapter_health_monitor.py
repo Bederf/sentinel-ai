@@ -245,13 +245,13 @@ class AdapterHealthMonitor:
         """Check a DeviceAdapter via its get_status() method."""
         start = time.perf_counter()
         try:
-            # NiagaraBACnetAdapter returns DeviceStatus enum; BacnetBmsAdapter returns BmsConnectionStatus
+            # BACnet device adapters return DeviceStatus enum; SIMBIOT adapters return BmsConnectionStatus.
             status = await asyncio.wait_for(adapter.get_status(), timeout=5.0)
             latency_ms = (time.perf_counter() - start) * 1000
 
             # Normalize different adapter return types
             is_healthy = self._extract_healthy(status)
-            error_message = self._extract_message(status)
+            error_message = self._extract_message(status) or getattr(adapter, "_last_status_message", None)
             consecutive = await self._count_consecutive_failures(site_id, adapter_name)
 
             return AdapterHealthRecord(
@@ -315,6 +315,7 @@ class AdapterHealthMonitor:
                     "consecutive_failures": record.consecutive_failures,
                     "uptime_1h_percent": uptime_1h,
                     "uptime_24h_percent": uptime_24h,
+                    "error_message": record.error_message,
                     "updated_at": now.isoformat(),
                 },
                 on_conflict="site_id,adapter_name",
@@ -859,10 +860,10 @@ class AdapterHealthMonitor:
         name_lower = adapter_name.lower()
         if "shadow" in name_lower or "bridge" in name_lower:
             return "shadow_bridge"
-        if "niagara" in name_lower:
-            return "niagara"
         if "bacnet" in name_lower:
             return "bacnet"
+        if "niagara" in name_lower:
+            return "niagara"
         if "obix" in name_lower:
             return "obix"
         if "dali" in name_lower or "lighting" in name_lower:
@@ -872,10 +873,10 @@ class AdapterHealthMonitor:
         # Infer from class name
         if adapter is not None:
             class_name = adapter.__class__.__name__.lower()
-            if "niagara" in class_name:
-                return "niagara"
             if "bacnet" in class_name:
                 return "bacnet"
+            if "niagara" in class_name:
+                return "niagara"
             if "obix" in class_name:
                 return "obix"
             if "dali" in class_name or "lighting" in class_name:

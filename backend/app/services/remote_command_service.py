@@ -594,8 +594,15 @@ class RemoteCommandService:
         """
         overrides = list(self._active_overrides.values())
         if site_id:
-            supabase_site = normalize_site_id(site_id, to_supabase=True).upper()
-            overrides = [o for o in overrides if o["device_id"].startswith(supabase_site) or site_id in o["device_id"]]
+            canonical_site_id = normalize_site_id(site_id, to_supabase=True)
+            equipment_prefix = (
+                f"S{canonical_site_id.split('-', 1)[1]}" if canonical_site_id.startswith("site-") else canonical_site_id
+            )
+            overrides = [
+                o
+                for o in overrides
+                if o["device_id"].startswith(equipment_prefix) or canonical_site_id in o["device_id"]
+            ]
         return overrides
 
     # ------------------------------------------------------------------ #

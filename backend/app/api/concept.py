@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import date
-from typing import Annotated, Literal
+from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field, model_validator
@@ -113,27 +113,18 @@ class ConceptDocumentUploadMetadata(BaseModel):
     site_id: str = Field(..., description="SENTINEL site_id e.g. site-002")
 
     # F2 — Discipline
-    discipline: DISCIPLINE_VALUES = Field(
-        ..., description="Technical discipline — F2 controlled dropdown"
-    )
+    discipline: DISCIPLINE_VALUES = Field(..., description="Technical discipline — F2 controlled dropdown")
 
     # F3 — Document Type
-    document_type: DOCUMENT_TYPE_VALUES = Field(
-        ..., description="Document classification — F3 controlled dropdown"
-    )
+    document_type: DOCUMENT_TYPE_VALUES = Field(..., description="Document classification — F3 controlled dropdown")
 
     # F4 — Frequency
-    frequency: FREQUENCY_VALUES = Field(
-        ..., description="Inspection / service frequency — F4 controlled dropdown"
-    )
+    frequency: FREQUENCY_VALUES = Field(..., description="Inspection / service frequency — F4 controlled dropdown")
 
     # F5 — Document Creation Date (actual activity date, NOT upload timestamp)
     document_creation_date: date = Field(
         ...,
-        description=(
-            "Date the activity occurred — F5. "
-            "This is the retention clock start. Must not default to today."
-        ),
+        description=("Date the activity occurred — F5. This is the retention clock start. Must not default to today."),
     )
 
     # F6 — Trigger Type + Trigger Date (Vital records only)
@@ -163,6 +154,7 @@ class ConceptDocumentUploadMetadata(BaseModel):
 # ---------------------------------------------------------------------------
 # Dropdown fields endpoint — chat UI fetches this to build the form
 # ---------------------------------------------------------------------------
+
 
 @router.get("/documents/fields")
 async def get_document_upload_fields():
@@ -246,6 +238,7 @@ async def get_document_upload_fields():
 # ---------------------------------------------------------------------------
 # Document upload — F1-F8 enforced
 # ---------------------------------------------------------------------------
+
 
 @router.post("/documents/upload")
 async def upload_concept_document(
@@ -338,6 +331,7 @@ def _calculate_retention(discipline: str, document_type: str, frequency: str) ->
 # ---------------------------------------------------------------------------
 # Existing endpoints — unchanged
 # ---------------------------------------------------------------------------
+
 
 @router.get("/health")
 async def get_integration_health():

@@ -1,0 +1,10 @@
+# Gitleaks configuration for SENTINEL BMS
+
+[allowlist]
+  description = "SENTINEL-specific false positive allowlist"
+  paths = [
+    '''backend/\.env''',
+    '''\.pre-dedup\.bak$''',
+    '''(node_modules|venv|\.venv)/''',
+    '''tests?/fixtures/''',
+  ]

@@ -13,6 +13,7 @@ SENTINEL BMS Intelligence operations runbooks, procedures, and references.
 | `logging-observability.md` | Logging and observability setup |
 | `ml-model-health.md` | ML model health monitoring and recovery |
 | `monitoring-stack.md` | Monitoring stack (Grafana/Prometheus/Loki) |
+| `disaster-recovery.md` | Database failover, backup restore, and WAL replica recovery |
 | `sprint0-hardware-test-protocol.md` | Hardware test protocol for Sprint 0 |
 | `supabase-performance-runbook.md` | Supabase performance tuning |
 | `alert-escalation-sop.md` | Alert escalation procedures and on-call rotation |

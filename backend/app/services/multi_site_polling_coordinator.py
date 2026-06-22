@@ -104,6 +104,8 @@ class MultiSitePollingCoordinator:
             from app.services.shadow_mode_polling import get_shadow_mode_polling_service
 
             svc = get_shadow_mode_polling_service()
+            svc._override_bridge_url = connection_config.get("base_url")
+            svc._override_bridge_token = connection_config.get("token")
             if svc not in self._services.values():
                 self._services[site_id] = svc
                 logger.info("[COORDINATOR] Using singleton polling service for %s", site_id)

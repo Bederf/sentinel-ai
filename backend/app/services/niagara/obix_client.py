@@ -242,6 +242,102 @@ class OBIXClient:
 
         return self._parse_point_response(response.content, point_path)
 
+    def write_point(self, point_path: str, value: Any, verify: bool = False) -> bool:
+        """
+        Write a single point value via oBIX.
+
+        Args:
+            point_path: Path to the point (e.g., "config/points/setpoint1")
+            value: Value to write (int, float, bool, or str)
+            verify: If True, read back the point after writing and compare.
+                    Returns False if the read-back value doesn't match.
+                    This catches silent no-ops where Niagara accepts the PUT
+                    (HTTP 200) but the write doesn't take effect (e.g.
+                    higher-priority override in the priority array, manual
+                    override state, or point not actually writable).
+
+        Returns:
+            True if write successful (and verified if verify=True).
+            False if verify=True and read-back doesn't match.
+
+        Raises:
+            OBIXPointNotFoundError: If point does not exist.
+            OBIXConnectionError: If write fails.
+        """
+        obix_path = f"/obix/config/{point_path}"
+
+        # First, read the point to get its type and href
+        current = self.read_point(point_path)
+        point_type = current.get("type", "real")
+        href = current.get("href", obix_path)
+
+        # Build oBIX XML for the write
+        xml_body = self._build_write_xml(point_type, value)
+
+        # PUT to the point's href with the new value
+        response = self._request("PUT", href, data=xml_body, headers={"Content-Type": "application/xml"})
+
+        if response.status_code == 404:
+            raise OBIXPointNotFoundError(f"Point not found for write: {point_path}")
+
+        if response.status_code not in (200, 204):
+            raise OBIXConnectionError(f"Write failed with status {response.status_code}: {response.text[:200]}")
+
+        if not verify:
+            return True
+
+        # Read back and verify
+        readback = self.read_point(point_path)
+        readback_value = readback.get("value")
+
+        if not self._values_match(value, readback_value, point_type):
+            logger.warning(
+                "oBIX write verification failed for %s: wrote %s, read back %s "
+                "(possible priority-array override or manual-override no-op)",
+                point_path,
+                value,
+                readback_value,
+            )
+            return False
+
+        return True
+
+    def _values_match(self, written: Any, readback: Any, obix_type: str) -> bool:
+        """Check if written and read-back values match within tolerance."""
+        if readback is None:
+            return False
+
+        if obix_type in ("real",):
+            try:
+                return abs(float(readback) - float(written)) < 0.01
+            except (ValueError, TypeError):
+                return False
+        elif obix_type == "int":
+            try:
+                return int(readback) == int(written)
+            except (ValueError, TypeError):
+                return False
+        elif obix_type == "bool":
+            return bool(readback) == bool(written)
+        else:
+            return str(readback) == str(written)
+
+    def _build_write_xml(self, obix_type: str, value: Any) -> str:
+        """Build oBIX XML element for writing a value."""
+        if obix_type == "real":
+            return f'<real val="{float(value)}"/>'
+        elif obix_type == "int":
+            return f'<int val="{int(value)}"/>'
+        elif obix_type == "bool":
+            return f'<bool val="{str(value).lower()}"/>'
+        elif obix_type == "str":
+            # Escape XML special characters
+            escaped = str(value).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+            return f'<str val="{escaped}"/>'
+        else:
+            # Default to real for unknown types
+            return f'<real val="{float(value)}"/>'
+
     def read_history(
         self,
         history_path: str,

@@ -10,6 +10,7 @@ Main entry: ``replay_case("fairlands")``
 
 import json
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -247,7 +248,7 @@ async def _run_correlation(signal_ids: list[str]) -> dict:
     if not signal_ids:
         return summary
 
-    db_url = settings.supabase_db_url
+    db_url = os.getenv("PGBOUNCER_URL") or settings.database_url
     if not db_url:
         summary["errors"].append("No Supabase DB URL configured — skipping correlation")
         return summary

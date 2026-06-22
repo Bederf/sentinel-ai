@@ -7,6 +7,7 @@ so discovery, reads, and writes flow through one building-level boundary.
 from __future__ import annotations
 
 import asyncio
+import logging
 from typing import Any
 
 from app.services.niagara.obix_client import (
@@ -15,6 +16,8 @@ from app.services.niagara.obix_client import (
     OBIXParseError,
     OBIXPointNotFoundError,
 )
+
+logger = logging.getLogger(__name__)
 from app.services.simbiot.bms_adapter import (
     BmsAdapter,
     BmsAdapterCapabilities,
@@ -73,7 +76,7 @@ class ObixBmsAdapter(BmsAdapter):
             supports_device_discovery=False,  # oBIX has no device discovery
             supports_point_discovery=True,
             supports_reads=True,
-            supports_writes=False,
+            supports_writes=True,
             supports_subscriptions=False,
             supports_history=True,
         )
@@ -202,6 +205,8 @@ class ObixBmsAdapter(BmsAdapter):
         unit = result.get("type", "")  # OBIXClient uses "type" for the value type, unit comes from attrs
 
         is_numeric = raw_value is not None and isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
+        normalized_value = raw_value
+        si_unit = unit
         if is_numeric and unit:
             # Try to get unit from the point metadata if available
             normalized_value, si_unit = _normalize_unit(float(raw_value), unit)
@@ -234,11 +239,11 @@ class ObixBmsAdapter(BmsAdapter):
             raw_value = result.get("value")
             unit = result.get("type", "")
 
-            normalized_value = raw_value
-            si_unit = unit
             is_numeric = (
                 raw_value is not None and isinstance(raw_value, (int, float)) and not isinstance(raw_value, bool)
             )
+            normalized_value = raw_value
+            si_unit = unit
             if is_numeric and unit:
                 normalized_value, si_unit = _normalize_unit(float(raw_value), unit)
 
@@ -257,9 +262,28 @@ class ObixBmsAdapter(BmsAdapter):
         self._ensure_connected()
         assert self._obix_client is not None
 
-        # OBIXClient doesn't have a direct write method
-        # This would require extension of the client
-        raise NotImplementedError(f"{self.adapter_id} write_point requires client extension")
+        try:
+            # Run sync write_point in thread pool to avoid blocking event loop
+            # verify=True reads back the point after writing to catch silent
+            # no-ops (Niagara priority-array override, manual-override state)
+            result = await asyncio.to_thread(self._obix_client.write_point, request.point_id, request.value, True)
+            if result:
+                logger.info(f"oBIX write verified: {request.device_id}:{request.point_id} = {request.value}")
+            else:
+                logger.warning(
+                    f"oBIX write verification failed: {request.device_id}:{request.point_id} "
+                    f"(wrote {request.value}, read-back mismatch — possible priority-array override)"
+                )
+            return result
+        except OBIXPointNotFoundError:
+            logger.error(f"oBIX write failed: point not found {request.point_id}")
+            return False
+        except OBIXConnectionError as e:
+            logger.error(f"oBIX write connection error for {request.point_id}: {e}")
+            return False
+        except Exception as e:
+            logger.error(f"oBIX write failed for {request.point_id}: {e}")
+            return False
 
     def _ensure_connected(self) -> None:
         if not self._connected or not self._obix_client:

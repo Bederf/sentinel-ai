@@ -736,7 +736,7 @@ class LightingService:
         Used for real-time dashboard vs simulation data.
 
         Args:
-            site_id: Site identifier (e.g., 'S002')
+            site_id: Canonical site identifier (e.g., 'site-002')
 
         Returns:
             dict with keys: summary, zones, energy_stats, last_updated

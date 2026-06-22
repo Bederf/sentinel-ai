@@ -4,7 +4,7 @@ type: "architecture"
 status: "approved"
 version: "1.0.0"
 created: "2026-03-01"
-updated: "2026-03-01"
+updated: "2026-06-21"
 author: "Sentinel Development Team"
 tags: ["site-resolver", "multi-site", "building-resolution", "phase-143"]
 domain: "general"
@@ -33,6 +33,21 @@ hardcoded string `"site-002"` as a default site ID. This created three problems:
   services assumed `site-002` existed.
 
 ## Architecture
+
+### Canonical site identifier
+
+The canonical `site_id` format is `site-###`, for example `site-002` and
+`site-005`.
+
+Equipment codes may still use the physical/building prefix, for example
+`S002-AHU-B01` or `S005-AHU-301`, but that prefix is not a database `site_id`.
+Application code, API parameters, recommendation rows, telemetry rows, reflex
+findings, module configs, and dashboard filters should store and query `site_id`
+as `site-###` only.
+
+Legacy `S###` values are accepted only as input aliases at system edges where a
+human or equipment code may provide that form. They must be normalized to
+`site-###` before persistence or internal queries.
 
 ### Site resolver module
 

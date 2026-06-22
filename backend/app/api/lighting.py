@@ -483,7 +483,7 @@ async def get_live_lighting_data(
     Shows live building occupancy and lighting system status, NOT simulation data.
 
     Args:
-        site_id: Site identifier (e.g., 'S002' or 'site-002')
+        site_id: Canonical site identifier (e.g., 'site-002')
 
     Returns:
         Real-time DALI system metrics including:

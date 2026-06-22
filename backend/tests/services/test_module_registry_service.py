@@ -50,6 +50,18 @@ def test_activate_control_addon(monkeypatch):
     assert result.module_type == ModuleType.HVAC_CONTROL
 
 
+def test_fire_module_defaults_to_monitoring_only(monkeypatch):
+    """New Fire module activations must not enable cause/effect control by default."""
+    service = _new_registry_service(monkeypatch)
+
+    result = service.activate_module("site-test", "Test Site", ModuleType.FIRE)
+
+    assert result.config["auto_mode"] is False
+    assert result.config["commissioned_cause_effect"] is False
+    assert result.config["authority"] == "fire_panel_and_bms"
+    assert result.config["sentinel_role"] == "monitoring_only"
+
+
 def test_deactivate_base_module_blocked(monkeypatch):
     """Base-pack modules cannot be deactivated."""
     service = _new_registry_service(monkeypatch)

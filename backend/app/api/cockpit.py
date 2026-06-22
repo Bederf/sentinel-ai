@@ -14,6 +14,7 @@ POST /api/cockpit/issues/{site_id}/{issue_id}/action
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import uuid
 from datetime import UTC, datetime
@@ -181,9 +182,9 @@ def _available_actions(status: IssueStatus, posture: str = "supervised") -> list
         # Read-only: only acknowledge allowed for new issues
         return ["acknowledge"] if status == "new" else []
     if status == "new":
-        return ["acknowledge", "assign"]
+        return ["acknowledge", "create_work_order"]
     if status == "triaged":
-        return ["assign", "create_work_order", "escalate"]
+        return ["create_work_order", "escalate"]
     if status == "in_progress":
         return ["create_work_order", "escalate"]
     return []
@@ -214,8 +215,8 @@ def _apply_action(
         return "accepted", issue.status, "Issue assigned"
 
     if action == "create_work_order":
-        if issue.status not in ("triaged", "in_progress"):
-            return "rejected", issue.status, "create_work_order requires triaged or in_progress status"
+        if issue.status not in ("new", "triaged", "in_progress"):
+            return "rejected", issue.status, "create_work_order requires new, triaged or in_progress status"
         issue.status = "in_progress"
         return "accepted", issue.status, "Work order created"
 
@@ -234,6 +235,7 @@ def _record_audit(
     message: str | None = None,
     *,
     site_id: str | None = None,
+    work_order_id: str | None = None,
 ) -> CockpitActionAudit:
     """Record an action audit entry and persist to _AUDIT_LOG_STORE."""
     outcome_map: dict[str, AuditOutcome] = {
@@ -256,11 +258,179 @@ def _record_audit(
         status_after=status_after,
         notes=message or request.notes,
         evidence_refs=request.evidence_refs,
+        work_order_id=work_order_id,
     )
 
     resolved_site = site_id or _ISSUE_SITE_LOOKUP.get(issue.id, "unknown")
     _AUDIT_LOG_STORE.setdefault(resolved_site, []).append(audit)
     return audit
+
+
+def _recommendation_id_from_issue(issue: CockpitIssue) -> str | None:
+    """Find a recommendation id carried by an AI cockpit issue."""
+    if issue.source == "ai" and issue.source_record_id:
+        return issue.source_record_id
+    for ref in issue.evidence_refs:
+        if ref.kind == "recommendation" and ref.id:
+            return ref.id
+    return None
+
+
+def _equipment_code_from_issue(issue: CockpitIssue) -> str | None:
+    """Best-effort equipment code extraction from issue location/group metadata."""
+    for candidate in [*issue.member_equipment_ids, *issue.location.asset_ids]:
+        if candidate and not candidate.startswith("zone:"):
+            return candidate
+    return None
+
+
+async def _create_work_order_for_issue(
+    site_id: str,
+    issue: CockpitIssue,
+    request: CockpitActionRequest,
+) -> dict[str, Any]:
+    """
+    Create a Supabase work order using the same AI recommendation path as Telegram
+    when a recommendation id is available, otherwise follow the same assignment and
+    technician-notification pattern with cockpit issue context.
+    """
+    recommendation_id = _recommendation_id_from_issue(issue)
+    if recommendation_id:
+        from app.services.notification_service import notification_service
+
+        result = await notification_service.handle_work_order_request(
+            f"wo:rec_id:{recommendation_id}",
+            requested_by_telegram_id=request.actor_id or "cockpit_operator",
+        )
+        if result.get("success") or result.get("error") != "recommendation_not_found":
+            return result
+        logger.warning(
+            "Cockpit recommendation %s not found; falling back to issue-based work-order creation",
+            recommendation_id,
+        )
+        recommendation_id = None
+
+    from app.database.repositories.technician_repository import TechnicianRepository
+    from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+    if not module_registry.is_module_active(site_id, ModuleType.MAINTENANCE):
+        return {
+            "success": False,
+            "error": "maintenance_module_inactive",
+            "issue_id": issue.id,
+            "site_id": site_id,
+        }
+
+    work_order_repo = get_work_order_repository()
+    equipment_code = _equipment_code_from_issue(issue)
+
+    if equipment_code:
+        open_wos = await work_order_repo.get_open_work_orders_for_equipment(equipment_code)
+        if open_wos:
+            return {
+                "success": True,
+                "action": "open_work_order_exists",
+                "issue_id": issue.id,
+                "recommendation_id": recommendation_id,
+                "work_order": open_wos[0],
+                "equipment_code": equipment_code,
+            }
+
+    tech_telegram_id = None
+    tech_email = None
+    tech_name = None
+    assigned_to = None
+    assigned_team = None
+    if equipment_code:
+        try:
+            technician = await TechnicianRepository().get_technician_for_equipment_code(equipment_code)
+            if technician:
+                tech_name = technician.get("name", "Unassigned")
+                tech_telegram_id = technician.get("telegram_id") or technician.get("telegram_chat_id")
+                tech_email = technician.get("email")
+                assigned_to = tech_name
+                assigned_team = technician.get("specialty")
+        except Exception as tech_err:
+            logger.warning("Cockpit WO technician lookup failed for %s: %s", equipment_code, tech_err)
+
+    priority_map = {"critical": "urgent", "high": "high", "medium": "medium", "low": "low"}
+    priority = priority_map.get(issue.severity, "medium")
+    affected_assets = issue.member_equipment_ids or issue.location.asset_ids
+    description = (
+        f"Created from SENTINEL cockpit issue {issue.id}.\n\n"
+        f"Site: {site_id}\n"
+        f"Equipment: {equipment_code or 'Unknown'}\n"
+        f"Severity: {issue.severity}\n"
+        f"Subsystem: {issue.subsystem or 'general'}\n"
+        f"Floor: {issue.location.floor_id or 'Unknown'}\n"
+        f"Affected assets: {', '.join(affected_assets) if affected_assets else 'Unknown'}\n\n"
+        f"Summary:\n{issue.summary}\n\n"
+        f"Impact:\n{issue.impact_summary or 'Not specified'}\n\n"
+        f"Cause hypothesis:\n{issue.cause_hypothesis or 'Not specified'}\n\n"
+        f"Recommended action:\n{issue.recommended_action or request.work_order_title or issue.title}"
+    )
+
+    resolved_site_id = site_id
+    if not equipment_code:
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            site_row = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if site_row.data:
+                resolved_site_id = site_row.data[0]["id"]
+        except Exception as site_err:
+            logger.warning("Cockpit WO site lookup failed for %s: %s", site_id, site_err)
+
+    created_wo = await work_order_repo.create_work_order(
+        {
+            "title": request.work_order_title or f"SENTINEL Cockpit Action: {issue.title}",
+            "description": description,
+            "priority": priority,
+            "status": "scheduled",
+            "equipment_code": equipment_code,
+            "site_id": resolved_site_id,
+            "created_by": f"cockpit:{request.actor_id or 'operator'}",
+            "milestone_status": "assigned",
+            "estimated_duration_hours": 1,
+            "assigned_to": assigned_to,
+            "assigned_team": assigned_team,
+            "recommendation_id": recommendation_id,
+        }
+    )
+
+    if not created_wo:
+        return {"success": False, "error": "work_order_create_failed", "issue_id": issue.id}
+
+    wo_code = created_wo.get("code")
+    if wo_code:
+        notifier = WorkOrderNotifier()
+        notify_data = {
+            "work_order_id": created_wo.get("id"),
+            "code": wo_code,
+            "site_id": site_id,
+            "equipment_code": equipment_code,
+            "equipment_name": equipment_code or issue.title,
+            "criticality": priority.upper(),
+            "service_type": "callout",
+            "technician_id": tech_telegram_id,
+            "technician_name": tech_name or "Pending",
+            "description": description,
+            "problem_description": description,
+            "technician_email": tech_email,
+            "create_service_record": False,
+        }
+        asyncio.create_task(notifier.notify_technician(notify_data))
+
+    return {
+        "success": True,
+        "action": "work_order_created",
+        "issue_id": issue.id,
+        "recommendation_id": recommendation_id,
+        "work_order": created_wo,
+        "equipment_code": equipment_code,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +524,13 @@ async def cockpit_issue_action(
     posture = posture_map.get(phase, "advisory")
 
     issues = _ISSUE_STORE.get(site_id, [])
+    if not any(i.id == issue_id for i in issues):
+        # The action endpoint is stateful because issue status mutations are
+        # cached in-process. Rebuild the cache from live issue fusion when the
+        # process restarted or an operator acts before the poll endpoint warms it.
+        await _build_cockpit_payload(site_id)
+        issues = _ISSUE_STORE.get(site_id, [])
+
     issue = next((i for i in issues if i.id == issue_id), None)
     if not issue:
         raise HTTPException(status_code=404, detail=f"Issue {issue_id} not found")
@@ -365,17 +542,56 @@ async def cockpit_issue_action(
             detail=f"Action '{request.action}' not available in advisory posture",
         )
 
-    # Control-enabled gate: create_work_order and escalate require control_enabled
+    # Control-enabled gate: only escalation requires control-enabled posture.
+    # Creating a maintenance work order follows the Telegram AI recommendation
+    # work-order path and does not perform live equipment control.
     control_enabled = await _fetch_control_enabled(site_id)
-    if not control_enabled and request.action in ("create_work_order", "escalate"):
+    if not control_enabled and request.action in ("escalate",):
         raise HTTPException(
             status_code=403,
             detail=f"Control not enabled for site {site_id}. Enable via site settings.",
         )
 
     status_before = issue.status
+    work_order_result: dict[str, Any] | None = None
+    work_order_id: str | None = None
+    if request.action == "create_work_order":
+        work_order_result = await _create_work_order_for_issue(site_id, issue, request)
+        if not work_order_result.get("success"):
+            audit = _record_audit(
+                issue,
+                request,
+                "failed",
+                status_before,
+                issue.status,
+                str(work_order_result.get("error") or "work_order_create_failed"),
+                site_id=site_id,
+            )
+            return {
+                "result": "failed",
+                "status_before": status_before,
+                "status_after": issue.status,
+                "message": work_order_result.get("error") or "Work order creation failed",
+                "audit_id": audit.id,
+                "available_actions": _available_actions(issue.status, posture),
+                "work_order": None,
+            }
+        work_order = work_order_result.get("work_order") or {}
+        work_order_id = work_order.get("id") or work_order.get("code")
+
     result, status_after, message = _apply_action(issue, request)
-    audit = _record_audit(issue, request, result, status_before, status_after, message, site_id=site_id)
+    if work_order_result and work_order_result.get("action") == "open_work_order_exists":
+        message = "Open work order already exists"
+    audit = _record_audit(
+        issue,
+        request,
+        result,
+        status_before,
+        status_after,
+        message,
+        site_id=site_id,
+        work_order_id=work_order_id,
+    )
 
     return {
         "result": result,
@@ -384,6 +600,8 @@ async def cockpit_issue_action(
         "message": message,
         "audit_id": audit.id,
         "available_actions": _available_actions(status_after, posture),
+        "work_order": work_order_result.get("work_order") if work_order_result else None,
+        "work_order_action": work_order_result.get("action") if work_order_result else None,
     }
 
 
@@ -409,11 +627,15 @@ async def approve_cockpit_decision(site_id: str) -> dict[str, Any]:
 
     recommendation = await _fetch_active_recommendation(site_id)
     if not recommendation:
-        logger.warning("Cockpit approve rejected: no pending recommendation for %s", site_id)
-        raise HTTPException(
-            status_code=404,
-            detail="No pending recommendation found for this site.",
-        )
+        logger.info("Cockpit approve no-op: no pending recommendation for %s", site_id)
+        return {
+            "accepted": False,
+            "site_id": site_id,
+            "accepted_at": accepted_at,
+            "recommendation_id": None,
+            "execution_status": "no_pending_recommendation",
+            "correlation_id": "",
+        }
 
     rec_id = recommendation.get("id", "")
     if not rec_id:

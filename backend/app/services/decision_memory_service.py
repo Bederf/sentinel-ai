@@ -56,6 +56,8 @@ class DecisionMemoryService:
         self._patterns: list[DecisionPattern] = []
         self._loaded = False
         self._client = None
+        self._site_uuid_cache: dict[str, str | None] = {}
+        self._equipment_uuid_cache: dict[str, str | None] = {}
         # Allow explicit path overrides for testing isolation
         self._data_dir_override = data_dir
         self._records_file_override = records_file
@@ -450,7 +452,13 @@ class DecisionMemoryService:
         try:
             if self._db_enabled and self.client:
                 response = self.client.table("decision_records").select("*").order("created_at").execute()
-                return [DecisionRecord.from_dict(d) for d in (response.data or [])]
+                records = []
+                for row in response.data or []:
+                    if row.get("decision_id") or (
+                        isinstance(row.get("decision_data"), dict) and row["decision_data"].get("record_id")
+                    ):
+                        records.append(self._record_from_db_row(row))
+                return records
             if records_file.exists():
                 with open(records_file) as f:
                     data = json.load(f)
@@ -464,7 +472,7 @@ class DecisionMemoryService:
         try:
             if self._db_enabled and self.client:
                 response = self.client.table("decision_patterns").select("*").order("created_at").execute()
-                return [DecisionPattern.from_dict(d) for d in (response.data or [])]
+                return [self._pattern_from_db_row(d) for d in (response.data or [])]
             if patterns_file.exists():
                 with open(patterns_file) as f:
                     data = json.load(f)
@@ -476,9 +484,8 @@ class DecisionMemoryService:
     def _save_records(self) -> None:
         try:
             if self._db_enabled and self.client:
-                payload = [r.to_dict() for r in self._records]
-                if payload:
-                    self.client.table("decision_records").upsert(payload, on_conflict="record_id").execute()
+                for record in self._records:
+                    self._save_record_db(record)
                 return
             self._data_dir.mkdir(parents=True, exist_ok=True)
             with open(self._records_file, "w") as f:
@@ -489,15 +496,145 @@ class DecisionMemoryService:
     def _save_patterns(self) -> None:
         try:
             if self._db_enabled and self.client:
-                payload = [p.to_dict() for p in self._patterns]
-                if payload:
-                    self.client.table("decision_patterns").upsert(payload, on_conflict="pattern_id").execute()
+                for pattern in self._patterns:
+                    self._save_pattern_db(pattern)
                 return
             self._data_dir.mkdir(parents=True, exist_ok=True)
             with open(self._patterns_file, "w") as f:
                 json.dump([p.to_dict() for p in self._patterns], f, indent=2)
         except Exception as e:
             logger.error("Failed to save decision patterns: %s", e)
+
+    def _record_from_db_row(self, row: dict[str, Any]) -> DecisionRecord:
+        data = row.get("decision_data") or {}
+        if not isinstance(data, dict):
+            data = {}
+        data.setdefault("record_id", row.get("decision_id"))
+        data.setdefault("outcome", row.get("outcome") or "pending")
+        data.setdefault("diagnosis", row.get("reasoning") or "")
+        data.setdefault("diagnosis_confidence", row.get("confidence") or 0.0)
+        data.setdefault("created_at", row.get("created_at"))
+        data.setdefault("updated_at", row.get("updated_at"))
+        return DecisionRecord.from_dict(data)
+
+    def _pattern_from_db_row(self, row: dict[str, Any]) -> DecisionPattern:
+        trigger = row.get("trigger_conditions") or {}
+        actions = row.get("recommended_actions") or {}
+        if not isinstance(trigger, dict):
+            trigger = {}
+        if not isinstance(actions, dict):
+            actions = {}
+        return DecisionPattern.from_dict(
+            {
+                "pattern_id": row.get("pattern_name"),
+                "event_type": trigger.get("event_type") or row.get("pattern_type") or "",
+                "equipment_type": trigger.get("equipment_type") or "",
+                "likely_diagnosis": trigger.get("diagnosis") or "",
+                "recommended_action": actions.get("action_type") or "",
+                "action_details": actions.get("action_details") or {},
+                "success_rate": row.get("success_rate") or 0.0,
+                "total_occurrences": row.get("usage_count") or 0,
+                "created_at": row.get("created_at"),
+                "updated_at": row.get("updated_at"),
+            }
+        )
+
+    def _save_record_db(self, record: DecisionRecord) -> None:
+        if not record.record_id:
+            return
+        payload = self._record_to_db_row(record)
+        existing = (
+            self.client.table("decision_records").select("id").eq("decision_id", record.record_id).limit(1).execute()
+        )
+        if existing.data:
+            self.client.table("decision_records").update(payload).eq("id", existing.data[0]["id"]).execute()
+        else:
+            self.client.table("decision_records").insert(payload).execute()
+
+    def _save_pattern_db(self, pattern: DecisionPattern) -> None:
+        payload = self._pattern_to_db_row(pattern)
+        existing = (
+            self.client.table("decision_patterns")
+            .select("id")
+            .eq("pattern_name", pattern.pattern_id)
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            self.client.table("decision_patterns").update(payload).eq("id", existing.data[0]["id"]).execute()
+        else:
+            self.client.table("decision_patterns").insert(payload).execute()
+
+    def _record_to_db_row(self, record: DecisionRecord) -> dict[str, Any]:
+        data = record.to_dict()
+        return {
+            "decision_id": record.record_id,
+            "site_id": self._resolve_site_uuid(record.site_id),
+            "equipment_id": self._resolve_equipment_uuid(record.equipment_id),
+            "decision_type": record.event_type or record.action_type or "recommendation_outcome",
+            "decision_data": data,
+            "reasoning": record.diagnosis or record.outcome_details or "",
+            "outcome": record.outcome.value,
+            "confidence": record.diagnosis_confidence,
+            "created_at": data.get("created_at"),
+            "updated_at": data.get("updated_at"),
+        }
+
+    def _pattern_to_db_row(self, pattern: DecisionPattern) -> dict[str, Any]:
+        site_id = pattern.applicable_sites[0] if pattern.applicable_sites else ""
+        return {
+            "pattern_name": pattern.pattern_id,
+            "site_id": self._resolve_site_uuid(site_id),
+            "pattern_type": pattern.event_type or "decision_memory",
+            "trigger_conditions": {
+                "event_type": pattern.event_type,
+                "equipment_type": pattern.equipment_type,
+                "diagnosis": pattern.likely_diagnosis,
+                "seasonal_pattern": pattern.seasonal_pattern,
+            },
+            "recommended_actions": {
+                "action_type": pattern.recommended_action,
+                "action_details": pattern.action_details,
+                "avg_resolution_time_minutes": pattern.avg_resolution_time_minutes,
+                "resolved_count": pattern.resolved_count,
+            },
+            "success_rate": pattern.success_rate,
+            "usage_count": pattern.total_occurrences,
+            "created_at": pattern.created_at.isoformat()
+            if isinstance(pattern.created_at, datetime)
+            else pattern.created_at,
+            "updated_at": pattern.updated_at.isoformat()
+            if isinstance(pattern.updated_at, datetime)
+            else pattern.updated_at,
+        }
+
+    def _resolve_site_uuid(self, site_id: str | None) -> str | None:
+        if not site_id:
+            return None
+        if site_id in self._site_uuid_cache:
+            return self._site_uuid_cache[site_id]
+        try:
+            resp = self.client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            value = resp.data[0]["id"] if resp.data else None
+        except Exception as e:
+            logger.debug("Failed to resolve site UUID for %s: %s", site_id, e)
+            value = None
+        self._site_uuid_cache[site_id] = value
+        return value
+
+    def _resolve_equipment_uuid(self, equipment_id: str | None) -> str | None:
+        if not equipment_id:
+            return None
+        if equipment_id in self._equipment_uuid_cache:
+            return self._equipment_uuid_cache[equipment_id]
+        try:
+            resp = self.client.table("equipment").select("id").eq("code", equipment_id).limit(1).execute()
+            value = resp.data[0]["id"] if resp.data else None
+        except Exception as e:
+            logger.debug("Failed to resolve equipment UUID for %s: %s", equipment_id, e)
+            value = None
+        self._equipment_uuid_cache[equipment_id] = value
+        return value
 
 
 # -----------------------------------------------------------------

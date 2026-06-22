@@ -23,6 +23,19 @@ class SiteThresholdsUpdate(BaseModel):
     site_id: str | None = None
 
 
+class ProposalPromoteRequest(BaseModel):
+    """Promote a pending threshold proposal to active."""
+
+    proposal_id: int
+
+
+class RollbackRequest(BaseModel):
+    """Rollback to a prior change_log entry's threshold values."""
+
+    log_id: int
+    site_id: str
+
+
 class HealthThresholdsUpdate(BaseModel):
     """Health threshold update model (legacy compat)."""
 
@@ -88,21 +101,110 @@ async def update_site_thresholds(
     request: Request,
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, Any]:
-    """Update unified health + risk thresholds. Requires ADMIN (level 4)."""
+    """Update unified health + risk thresholds. Requires ADMIN (level 4).
+
+    Routes through tuner_promote_thresholds (atomic: change_log + upsert).
+    """
     from app.database.repositories.site_threshold_repository import SiteThresholdRepository
 
     site_key = thresholds.site_id or "__global__"
     repo = SiteThresholdRepository()
-    result = repo.upsert(site_key, thresholds.health, thresholds.risk)
+    result = repo.upsert(site_key, thresholds.health, thresholds.risk, approved_by=auth.user_id)
 
     from app.services.health_threshold_service import get_health_threshold_service
 
     get_health_threshold_service().clear_cache(site_key)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-    audit_config_change("site-thresholds.update", user=auth.user_id, source_ip=source_ip, site_id=site_key)
+    audit_config_change("site-thresholds.update", user=auth.user_id, source_ip=source_ip)
 
     return result
+
+
+@router.post("/settings/site-thresholds/promote")
+async def promote_threshold_proposal(
+    body: ProposalPromoteRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> dict[str, Any]:
+    """Promote a pending threshold proposal to active. Requires ADMIN (level 4).
+
+    Atomic: writes change_log → upserts site_thresholds → marks proposal approved.
+    """
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
+
+    repo = SiteThresholdRepository()
+    try:
+        result = repo.promote_proposal(body.proposal_id, approved_by=auth.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    get_health_threshold_service().clear_cache(result["site_id"])
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change(
+        "site-thresholds.promote",
+        user=auth.user_id,
+        source_ip=source_ip,
+    )
+
+    return result
+
+
+@router.post("/settings/site-thresholds/rollback")
+async def rollback_thresholds(
+    body: RollbackRequest,
+    request: Request,
+    auth: AuthContext = Depends(require_role(4)),
+) -> dict[str, Any]:
+    """Restore threshold values from a prior change_log entry. Requires ADMIN (level 4).
+
+    Restores the values that the target log entry established (its new_* values,
+    i.e. what was live after that promotion). A new change_log entry is written
+    with triggered_by='rollback'. Uses the same atomic promote function as normal
+    promotion — one code path, one transaction.
+
+    To undo change N, rollback to entry N-1 (which holds the values that were
+    active before change N).
+    """
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
+
+    repo = SiteThresholdRepository()
+    try:
+        result = repo.rollback_to_log_entry(body.log_id, body.site_id, approved_by=auth.user_id)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    from app.services.health_threshold_service import get_health_threshold_service
+
+    get_health_threshold_service().clear_cache(result["site_id"])
+
+    source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
+    audit_config_change(
+        "site-thresholds.rollback",
+        user=auth.user_id,
+        source_ip=source_ip,
+    )
+
+    return result
+
+
+@router.get("/settings/site-thresholds/change-log")
+async def get_threshold_change_log(
+    site_id: str | None = None,
+    limit: int = 20,
+    auth: AuthContext = Depends(require_role(1)),
+) -> list[dict[str, Any]]:
+    """Get threshold change history. Any authenticated user (level 1+).
+
+    Returns change_log entries newest-first, optionally filtered by site.
+    """
+    from app.database.repositories.site_threshold_repository import SiteThresholdRepository
+
+    repo = SiteThresholdRepository()
+    return repo.get_change_log(site_id=site_id, limit=limit)
 
 
 # ── Legacy health/risk threshold endpoints (compat adapters) ─────────
@@ -199,7 +301,7 @@ async def update_health_thresholds_legacy(
     get_health_threshold_service().clear_cache(site_key)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-    audit_config_change("site-thresholds.health.update", user=auth.user_id, source_ip=source_ip, site_id=site_key)
+    audit_config_change("site-thresholds.health.update", user=auth.user_id, source_ip=source_ip)
 
     return result["health"]
 

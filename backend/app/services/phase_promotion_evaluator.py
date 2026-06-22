@@ -64,6 +64,11 @@ class PhasePromotionEvaluator:
             "gates": [
                 "ml_hours_ingested >= 500",
                 "recommendations_acknowledged >= 3",
+                "control_modules_active_for_controllable_equipment",
+                "write_capable_adapter_configured",
+                "bridge_write_endpoint_available",
+                "verified_writable_control_points >= 10",
+                "controllable_equipment_control_coverage >= 0.75",
                 "no_safety_violations_30d",
             ],
         },
@@ -75,6 +80,7 @@ class PhasePromotionEvaluator:
                 "false_positive_rate <= 0.10",
                 "recommendations_approved >= 30",
                 "no_safety_violations_7d",
+                "write_capable_adapter_enabled",
                 "human_approved_autonomous",
             ],
         },
@@ -123,14 +129,7 @@ class PhasePromotionEvaluator:
         return results
 
     async def evaluate_site(self, site_id: str, current_phase: str) -> PromotionResult:
-        """Check all gates and auto-promote via the PATCH /api/sites/{site_id}/phase endpoint.
-
-        All phases auto-promote via the API (not direct DB writes) so that audit
-        logs record changed_by="phase_promotion_evaluator" instead of "system".
-        """
-        import json
-
-        import httpx
+        """Check all gates and surface readiness for manual operator promotion."""
 
         gates_config = self.PROMOTION_GATES.get(current_phase)
         if not gates_config:
@@ -144,39 +143,15 @@ class PhasePromotionEvaluator:
 
         if all_passed:
             target = gates_config["target"]
-            await self._ensure_config()
-            reason_payload = json.dumps(
-                {
-                    "trigger": "auto_promotion",
-                    "from_phase": current_phase,
-                    "gate_results": [g.to_dict() for g in gate_results],
-                }
+            await self._set_ready_flag(site_id, current_phase, target, gate_results)
+            return PromotionResult(
+                eligible=True,
+                promoted=False,
+                from_phase=current_phase,
+                to_phase=target,
+                reason="ready_for_manual_promotion",
+                gates=gate_results,
             )
-            try:
-                async with httpx.AsyncClient() as client:
-                    resp = await client.patch(
-                        f"{self._backend_url}/api/sites/{site_id}/phase",
-                        json={
-                            "phase": target,
-                            "changed_by": "phase_promotion_evaluator",
-                            "reason": reason_payload,
-                        },
-                        headers={"X-Internal-Service": self._internal_key or ""},
-                        timeout=30,
-                    )
-                    resp.raise_for_status()
-                logger.info("Auto-promoted %s: %s → %s (all gates passed)", site_id, current_phase, target)
-                await self._notify_promoted(site_id, current_phase, target, gate_results)
-                return PromotionResult(
-                    eligible=True,
-                    promoted=True,
-                    from_phase=current_phase,
-                    to_phase=target,
-                    gates=gate_results,
-                )
-            except Exception as e:
-                logger.error("Auto-promotion API call failed for %s: %s", site_id, e)
-                return PromotionResult(eligible=True, promoted=False, reason=str(e), gates=gate_results)
 
         return PromotionResult(eligible=False, gates=gate_results)
 
@@ -195,6 +170,24 @@ class PhasePromotionEvaluator:
         from app.config.settings import settings
         from supabase import create_client
 
+        met_at = datetime.now(tz=UTC).isoformat()
+        readiness = {
+            "event": "phase_promotion_readiness",
+            "ready": True,
+            "from_phase": from_phase,
+            "to_phase": to_phase,
+            "met_at": met_at,
+            "gate_results": [g.to_dict() for g in gate_results],
+            "current_progress": {
+                g.gate: {
+                    "met": g.passed,
+                    "value": g.value,
+                    "threshold": g.threshold,
+                }
+                for g in gate_results
+            },
+        }
+
         logger.info(
             "Phase readiness set: %s %s → %s (%d/%d gates passed)",
             site_id,
@@ -205,24 +198,66 @@ class PhasePromotionEvaluator:
         )
 
         client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+        previous_ready = False
+        try:
+            existing = client.table("sites").select("phase_promotion_readiness").eq("code", site_id).limit(1).execute()
+            if existing.data:
+                previous = existing.data[0].get("phase_promotion_readiness") or {}
+                previous_ready = (
+                    bool(previous.get("ready"))
+                    and previous.get("from_phase") == from_phase
+                    and previous.get("to_phase") == to_phase
+                )
+        except Exception as e:
+            logger.debug("Could not read previous phase readiness for %s: %s", site_id, e)
+
         client.table("sites").update(
             {
                 "phase_promotion_ready": True,
-                "phase_promotion_ready_since": datetime.now(tz=UTC).isoformat(),
+                "phase_promotion_ready_since": met_at,
                 "phase_promotion_target": to_phase,
+                "phase_promotion_readiness": readiness,
             }
         ).eq("code", site_id).execute()
 
+        if not previous_ready:
+            await self._log_readiness_flip(client, site_id, from_phase, to_phase, readiness)
+
         await self._notify_ready(site_id, from_phase, to_phase, gate_results)
 
-    async def _notify_promoted(
+    async def _log_readiness_flip(
+        self,
+        client,
+        site_id: str,
+        from_phase: str,
+        to_phase: str,
+        readiness: dict,
+    ) -> None:
+        """Record a readiness event distinct from a phase transition."""
+        try:
+            client.table("phase_promotion_readiness_log").insert(
+                {
+                    "site_id": site_id,
+                    "from_phase": from_phase,
+                    "to_phase": to_phase,
+                    "met": True,
+                    "met_at": readiness["met_at"],
+                    "current_progress": readiness["current_progress"],
+                    "gate_results": readiness["gate_results"],
+                    "recorded_by": "phase_promotion_evaluator",
+                }
+            ).execute()
+        except Exception as e:
+            logger.warning("Failed to write phase readiness audit log for %s: %s", site_id, e)
+
+    async def _notify_ready(
         self,
         site_id: str,
         from_phase: str,
         to_phase: str,
         gate_results: list[GateResult],
     ) -> None:
-        """Send Telegram alert that a site was auto-promoted."""
+        """Send Telegram alert that a site is ready for manual promotion."""
         ml_hours = 0.0
         for g in gate_results:
             if g.gate.startswith("ml_hours_ingested") and isinstance(g.value, (int, float)):
@@ -233,20 +268,21 @@ class PhasePromotionEvaluator:
             from app.models.notification import AlertLevel
             from app.services.notification_service import notification_service
 
-            title = f"SENTINEL Phase Promotion — {site_id.upper()}"
+            title = f"SENTINEL Phase Readiness — {site_id.upper()}"
             body = (
-                f"Auto-promoted: {from_phase} → {to_phase}\n"
+                f"Ready for operator review: {from_phase} → {to_phase}\n"
                 f"All Trust Ladder gates passed.\n"
-                f"ML hours ingested: {ml_hours:.0f}h"
+                f"ML hours ingested: {ml_hours:.0f}h\n"
+                f"No phase change was applied automatically."
             )
             await notification_service.send_alert_direct(
                 title=title,
                 body=body,
                 alert_level=AlertLevel.INFO,
             )
-            logger.info("Promotion notification sent for %s", site_id)
+            logger.info("Phase readiness notification sent for %s", site_id)
         except Exception as e:
-            logger.warning("Promotion notification failed for %s: %s", site_id, e)
+            logger.warning("Phase readiness notification failed for %s: %s", site_id, e)
 
     async def _evaluate_gates(
         self,
@@ -371,6 +407,7 @@ class PhasePromotionEvaluator:
                         client.table("equipment_fault_events")
                         .select("id", count="exact")
                         .eq("site_id", site_id)
+                        .eq("is_synthetic", False)
                         .execute()
                     )
                     fault_count += (
@@ -449,6 +486,151 @@ class PhasePromotionEvaluator:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
                 return GateResult(gate=gate, passed=False, value=str(e))
 
+        # ── write_capable_adapter_enabled ──────────────────────────────
+        if gate == "write_capable_adapter_enabled":
+            try:
+                rows = (
+                    client.table("site_adapter_config")
+                    .select("protocol,connection_config")
+                    .eq("site_id", site_id)
+                    .eq("enabled", True)
+                    .execute()
+                )
+                write_ready = False
+                protocols: list[str] = []
+                for row in rows.data or []:
+                    protocol = str(row.get("protocol") or "").strip().lower()
+                    config = row.get("connection_config") or {}
+                    protocols.append(protocol)
+                    if protocol in {"bacnet", "knx", "modbus", "obix"} or (
+                        protocol == "bridge"
+                        and config.get("supports_writes") is True
+                        and config.get("write_enabled") is True
+                    ):
+                        write_ready = True
+                return GateResult(gate=gate, passed=write_ready, value=",".join(protocols) or None)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e))
+
+        # ── write_capable_adapter_configured ───────────────────────────
+        # Advisory mode keeps bridge writes disabled, but promotion to
+        # supervised still requires proof that a write-capable transport is
+        # configured and ready to be enabled at promotion time.
+        if gate == "write_capable_adapter_configured":
+            try:
+                rows = (
+                    client.table("site_adapter_config")
+                    .select("protocol,connection_config")
+                    .eq("site_id", site_id)
+                    .eq("enabled", True)
+                    .execute()
+                )
+                configured = False
+                protocols: list[str] = []
+                for row in rows.data or []:
+                    protocol = str(row.get("protocol") or "").strip().lower()
+                    config = row.get("connection_config") or {}
+                    protocols.append(protocol)
+                    if protocol in {"bacnet", "knx", "modbus", "obix"} or (
+                        protocol == "bridge" and config.get("supports_writes") is True
+                    ):
+                        configured = True
+                return GateResult(gate=gate, passed=configured, value=",".join(protocols) or None)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e))
+
+        # ── control_modules_active_for_controllable_equipment ─────────
+        # Advisory is where the site proves it is ready for supervised
+        # control. If controllable equipment exists, the matching control
+        # add-on must already be licensed/active before promotion.
+        if gate == "control_modules_active_for_controllable_equipment":
+            if not site_uuid:
+                return GateResult(gate=gate, passed=False, value=None)
+            try:
+                equipment_rows = client.table("equipment").select("type").eq("site_id", site_uuid).execute()
+                equipment_types = {
+                    str(row.get("type") or "").strip().lower() for row in (equipment_rows.data or []) if row.get("type")
+                }
+                required_modules: set[str] = set()
+                if equipment_types & {"ahu", "fcu", "vav", "chiller", "cooling_tower", "pump"}:
+                    required_modules.add("hvac_control")
+                if equipment_types & {"meter", "power_meter", "bess", "generator", "ups", "inverter"}:
+                    required_modules.add("energy_control")
+                if equipment_types & {"lighting", "dali", "luminaire"}:
+                    required_modules.add("lighting_control")
+                if equipment_types & {"solar", "pv", "inverter"}:
+                    required_modules.add("solar_control")
+                if not required_modules:
+                    return GateResult(gate=gate, passed=True, value="none_required")
+
+                module_rows = (
+                    client.table("site_modules")
+                    .select("module_type,status,licensed")
+                    .eq("site_id", site_id)
+                    .in_("module_type", sorted(required_modules))
+                    .execute()
+                )
+                active_modules = {
+                    str(row.get("module_type") or "")
+                    for row in (module_rows.data or [])
+                    if row.get("status") == "active" and row.get("licensed") is True
+                }
+                missing = sorted(required_modules - active_modules)
+                return GateResult(
+                    gate=gate,
+                    passed=not missing,
+                    value="ok" if not missing else ",".join(missing),
+                )
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e))
+
+        # ── bridge_write_endpoint_available ───────────────────────────
+        # In advisory, bridge writes remain disabled locally. This gate only
+        # verifies that the upstream bridge exposes the supervised write API
+        # that will be enabled when the site is promoted.
+        if gate == "bridge_write_endpoint_available":
+            import httpx
+
+            try:
+                rows = (
+                    client.table("site_adapter_config")
+                    .select("protocol,connection_config")
+                    .eq("site_id", site_id)
+                    .eq("enabled", True)
+                    .execute()
+                )
+                checked: list[str] = []
+                for row in rows.data or []:
+                    protocol = str(row.get("protocol") or "").strip().lower()
+                    config = row.get("connection_config") or {}
+                    if protocol in {"bacnet", "knx", "modbus", "obix"}:
+                        return GateResult(gate=gate, passed=True, value=protocol)
+                    if protocol != "bridge" or config.get("supports_writes") is not True:
+                        continue
+                    base_url = str(config.get("base_url") or "").rstrip("/")
+                    if not base_url:
+                        continue
+                    checked.append("bridge")
+                    token = str(config.get("token") or "")
+                    headers = {"Authorization": f"Bearer {token}"} if token else {}
+                    resp = httpx.options(
+                        f"{base_url}/api/sites/{site_id}/write",
+                        headers=headers,
+                        timeout=10,
+                    )
+                    allow = resp.headers.get("allow", "")
+                    if resp.status_code in (200, 204) or "POST" in allow.upper():
+                        return GateResult(gate=gate, passed=True, value="bridge")
+                    if resp.status_code == 405 and "GET" in allow.upper() and "POST" not in allow.upper():
+                        return GateResult(gate=gate, passed=False, value="bridge_write_endpoint_get_only")
+                return GateResult(gate=gate, passed=False, value=",".join(checked) or None)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e))
+
         # ── recommendations_generated >= X (all-time count) ──────────
         if gate.startswith("recommendations_generated >="):
             threshold = int(gate.split(">=")[1].strip())
@@ -460,6 +642,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .eq("source", "ai_optimizer")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
@@ -479,6 +662,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .neq("status", "pending")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
@@ -515,6 +699,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .eq("acknowledgement_type", "accepted")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 rows_dismissed = (
@@ -522,6 +707,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .eq("acknowledgement_type", "dismissed")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 accepted_c = rows_accepted.count if hasattr(rows_accepted, "count") else len(rows_accepted.data or [])
@@ -555,6 +741,101 @@ class PhasePromotionEvaluator:
                 if "does not exist" in str(e):
                     return GateResult(gate=gate, passed=True, value=0)
                 return GateResult(gate=gate, passed=False, value=str(e))
+
+        # ── verified_writable_control_points >= X ──────────────────────
+        if gate.startswith("verified_writable_control_points >="):
+            threshold = int(gate.split(">=")[1].strip())
+            if not site_uuid:
+                return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
+            try:
+                rows = (
+                    client.table("point_asset_mappings")
+                    .select("id", count="exact")
+                    .eq("site_id", site_uuid)
+                    .eq("is_verified", True)
+                    .or_(
+                        "parameter_type.ilike.command:%,"
+                        "parameter_type.ilike.setpoint:%,"
+                        "parameter_type.ilike.writable:%,"
+                        "parameter_type.eq.command,"
+                        "parameter_type.eq.setpoint,"
+                        "parameter_type.eq.writable,"
+                        "parameter_type.ilike.%analogOutput%,"
+                        "parameter_type.ilike.%binaryOutput%,"
+                        "parameter_type.ilike.%multiStateOutput%"
+                    )
+                    .execute()
+                )
+                count = rows.count if hasattr(rows, "count") else len(rows.data or [])
+                return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
+
+        # ── controllable_equipment_control_coverage >= X ───────────────
+        if gate.startswith("controllable_equipment_control_coverage >="):
+            threshold = float(gate.split(">=")[1].strip())
+            if not site_uuid:
+                return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
+            controllable_types = [
+                "ahu",
+                "fcu",
+                "vav",
+                "chiller",
+                "cooling_tower",
+                "pump",
+                "bess",
+                "generator",
+                "inverter",
+            ]
+            try:
+                equipment_rows = (
+                    client.table("equipment")
+                    .select("code,type")
+                    .eq("site_id", site_uuid)
+                    .in_("type", controllable_types)
+                    .execute()
+                )
+                controllable_codes = {
+                    str(row.get("code") or "").strip() for row in (equipment_rows.data or []) if row.get("code")
+                }
+                if not controllable_codes:
+                    return GateResult(gate=gate, passed=False, value=0.0, threshold=threshold)
+
+                mapping_rows = (
+                    client.table("point_asset_mappings")
+                    .select("extracted_asset_id")
+                    .eq("site_id", site_uuid)
+                    .eq("is_verified", True)
+                    .or_(
+                        "parameter_type.ilike.command:%,"
+                        "parameter_type.ilike.setpoint:%,"
+                        "parameter_type.ilike.writable:%,"
+                        "parameter_type.eq.command,"
+                        "parameter_type.eq.setpoint,"
+                        "parameter_type.eq.writable,"
+                        "parameter_type.ilike.%analogOutput%,"
+                        "parameter_type.ilike.%binaryOutput%,"
+                        "parameter_type.ilike.%multiStateOutput%"
+                    )
+                    .execute()
+                )
+                equipment_with_control = {
+                    str(row.get("extracted_asset_id") or "").strip()
+                    for row in (mapping_rows.data or [])
+                    if row.get("extracted_asset_id")
+                }
+                covered = len(controllable_codes & equipment_with_control)
+                coverage = covered / max(len(controllable_codes), 1)
+                return GateResult(
+                    gate=gate,
+                    passed=coverage >= threshold,
+                    value=round(coverage, 3),
+                    threshold=threshold,
+                )
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
 
         # ── bridge_connected_uptime_pct >= X ─────────────────────────
         if gate.startswith("bridge_connected_uptime_pct >="):
@@ -625,6 +906,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .eq("status", "approved")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
@@ -686,6 +968,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .neq("status", "pending")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 approved = (
@@ -693,6 +976,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .eq("status", "approved")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 total_c = total.count if hasattr(total, "count") else len(total.data or [])
@@ -719,6 +1003,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .eq("status", "rejected")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 non_pending = (
@@ -726,6 +1011,7 @@ class PhasePromotionEvaluator:
                     .select("id", count="exact")
                     .eq("site_id", site_id)
                     .neq("status", "pending")
+                    .eq("shadow_mode", False)
                     .execute()
                 )
                 rejected_c = rejected.count if hasattr(rejected, "count") else len(rejected.data or [])

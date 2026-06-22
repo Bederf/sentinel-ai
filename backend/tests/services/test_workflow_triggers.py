@@ -31,6 +31,13 @@ class TestWorkflowTriggerEngine:
         """Create a fresh trigger engine for each test."""
         return WorkflowTriggerEngine()
 
+    class _FakeWorkOrderRepo:
+        async def create_work_order(self, payload):
+            return {"id": "wo-pending-001", "code": "WO-PENDING-001", **payload}
+
+        async def get_open_work_orders_for_equipment(self, equipment_code):
+            return []
+
     # ========================================================================
     # Trigger 1: ML Anomaly Tests
     # ========================================================================
@@ -160,8 +167,8 @@ class TestWorkflowTriggerEngine:
     # ========================================================================
 
     @pytest.mark.asyncio
-    async def test_critical_deficiency_creates_work_order(self, trigger_engine):
-        """Test that critical deficiency creates work order."""
+    async def test_critical_deficiency_requires_manual_work_order(self, trigger_engine):
+        """Test that critical deficiency requires manual work-order creation."""
         deficiency = InspectionDeficiency(
             id="def-001",
             inspection_id="insp-001",
@@ -179,13 +186,13 @@ class TestWorkflowTriggerEngine:
 
         assert result.success is True
         assert result.trigger_type == TriggerType.CRITICAL_DEFICIENCY
-        assert result.action_taken == "created_work_order"
-        assert "work_order_id" in result.details
-        assert "baseline_task_id" in result.details
+        assert result.action_taken == "manual_work_order_required"
+        assert result.details["deficiency_id"] == "def-001"
+        assert result.details["recommended_action"] == "Replace bearings"
 
     @pytest.mark.asyncio
-    async def test_safety_deficiency_creates_work_order(self, trigger_engine):
-        """Test that safety deficiency creates work order."""
+    async def test_safety_deficiency_requires_manual_work_order(self, trigger_engine):
+        """Test that safety deficiency requires manual work-order creation."""
         deficiency = InspectionDeficiency(
             id="def-002",
             inspection_id="insp-001",
@@ -199,7 +206,28 @@ class TestWorkflowTriggerEngine:
         result = await trigger_engine.on_critical_deficiency(deficiency)
 
         assert result.success is True
-        assert result.action_taken == "created_work_order"
+        assert result.action_taken == "manual_work_order_required"
+
+    @pytest.mark.asyncio
+    async def test_supervised_critical_deficiency_creates_pending_approval_work_order(self, trigger_engine):
+        """Test supervised mode creates a draft WO that still requires approval."""
+        trigger_engine._work_order_repo = self._FakeWorkOrderRepo()
+        deficiency = InspectionDeficiency(
+            id="def-004",
+            inspection_id="insp-001",
+            equipment_id="pump-001",
+            severity="safety",
+            deficiency_title="Leak detected near electrical",
+            deficiency_description="Water leak near control panel",
+            recommended_action="Isolate and repair after approval",
+        )
+
+        result = await trigger_engine.on_critical_deficiency(deficiency, site_phase="supervised")
+
+        assert result.success is True
+        assert result.action_taken == "created_pending_approval_work_order"
+        assert result.details["work_order_code"] == "WO-PENDING-001"
+        assert result.details["site_phase"] == "supervised"
 
     @pytest.mark.asyncio
     async def test_minor_deficiency_skipped(self, trigger_engine):
@@ -399,7 +427,7 @@ class TestTriggerChain:
         )
         result2 = await engine.on_critical_deficiency(deficiency)
         assert result2.success is True
-        work_order_id = result2.details["work_order_id"]
+        work_order_id = result2.details.get("work_order_id", "manual-wo-001")
 
         # Step 3: Repair completed
         result3 = await engine.on_repair_completed(

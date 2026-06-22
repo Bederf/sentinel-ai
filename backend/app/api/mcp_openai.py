@@ -44,6 +44,201 @@ CORS_HEADERS = {
     "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, Cache-Control",
 }
 
+_SITE_ID_CODE_CACHE: dict[str, str] = {}
+
+TENANT_SCOPED_DEFAULT_TOOLS = {
+    "search",
+    "fetch",
+    "ping",
+    "get_site_status",
+    "get_recommendations",
+    "get_roi_summary",
+    "get_curtailable_load",
+    "get_odse_export",
+    "search_knowledge",
+    "get_knowledge_detail",
+    "get_work_orders",
+}
+
+
+def _normalize_site_code(site_id: str | None) -> str:
+    """Normalize S005/site-005/UUID-ish site input to the canonical site-### code."""
+    if not site_id:
+        return ""
+    value = str(site_id).strip()
+    if not value:
+        return ""
+    lower = value.lower()
+    if lower.startswith("site-"):
+        return lower
+    upper = value.upper()
+    if len(upper) == 4 and upper.startswith("S") and upper[1:].isdigit():
+        return f"site-{upper[1:]}"
+    if len(value) == 36 and value.count("-") == 4:
+        cached = _SITE_ID_CODE_CACHE.get(value)
+        if cached:
+            return cached
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            result = sb.table("sites").select("code").eq("id", value).limit(1).execute()
+            if result.data:
+                code = str(result.data[0].get("code") or value).lower()
+                _SITE_ID_CODE_CACHE[value] = code
+                return code
+        except Exception as exc:
+            logger.warning("Could not resolve site UUID for MCP tenant filter: %s", exc)
+    return lower
+
+
+def _display_site_code(site_id: str) -> str:
+    """Return the short S### form used by GPT Action schemas."""
+    site_code = _normalize_site_code(site_id)
+    if site_code.startswith("site-") and len(site_code) == 8:
+        return f"S{site_code[-3:]}"
+    return site_id
+
+
+def _load_tenant_key_config() -> dict[str, dict[str, Any]]:
+    """Parse MCP_TENANT_API_KEYS into token -> tenant context config."""
+    from app.config.settings import settings
+
+    raw = getattr(settings, "mcp_tenant_api_keys", "") or ""
+    if not raw.strip():
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        logger.error("Invalid MCP_TENANT_API_KEYS JSON; ignoring tenant-scoped keys")
+        return {}
+    if not isinstance(parsed, dict):
+        logger.error("MCP_TENANT_API_KEYS must be a JSON object; ignoring tenant-scoped keys")
+        return {}
+    return {str(token): cfg for token, cfg in parsed.items() if isinstance(cfg, dict)}
+
+
+def _auth_context_for_token(token: str) -> dict[str, Any] | None:
+    """Return tenant auth context for a bearer token, preserving legacy S002 behavior."""
+    from app.config.settings import settings
+
+    legacy_key = getattr(settings, "mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
+    if legacy_key and hmac.compare_digest(token.encode(), legacy_key.encode()):
+        return {
+            "tenant_id": "legacy-s002",
+            "allowed_sites": ["site-002"],
+            "allowed_tools": set(TENANT_SCOPED_DEFAULT_TOOLS),
+            "legacy": True,
+        }
+
+    for configured_token, cfg in _load_tenant_key_config().items():
+        if not hmac.compare_digest(token.encode(), configured_token.encode()):
+            continue
+        allowed_sites = [_normalize_site_code(site) for site in cfg.get("allowed_sites", []) if site]
+        tools = cfg.get("tools")
+        allowed_tools = set(tools) if isinstance(tools, list) and tools else set(TENANT_SCOPED_DEFAULT_TOOLS)
+        return {
+            "tenant_id": str(cfg.get("tenant_id") or "tenant"),
+            "allowed_sites": allowed_sites,
+            "allowed_tools": allowed_tools,
+            "legacy": False,
+        }
+    return None
+
+
+def _is_authorized_for_tool(auth_ctx: dict[str, Any], tool_name: str, request_data: dict | None) -> tuple[bool, str]:
+    """Enforce tenant tool and site scope before dispatching to MCP tool handlers."""
+    allowed_tools = auth_ctx.get("allowed_tools")
+    if allowed_tools is not None and tool_name not in allowed_tools:
+        return False, f"Tool '{tool_name}' is not enabled for this tenant"
+
+    allowed_sites = set(auth_ctx.get("allowed_sites") or [])
+    if not allowed_sites:
+        return True, ""
+
+    request_data = request_data or {}
+    requested_site = request_data.get("site_id")
+    if requested_site:
+        site_code = _normalize_site_code(str(requested_site))
+        if site_code not in allowed_sites:
+            return False, f"Tenant is not authorized for site_id '{requested_site}'"
+
+    return True, ""
+
+
+def _doc_is_allowed_for_tenant(auth_ctx: dict[str, Any] | None, doc: dict[str, Any] | None) -> bool:
+    """Allow global technical docs, but scope Supabase operational records by site."""
+    if not auth_ctx:
+        return True
+    allowed_sites = {_normalize_site_code(site) for site in (auth_ctx.get("allowed_sites") or []) if site}
+    if not allowed_sites:
+        return True
+    if not doc:
+        return False
+
+    if doc.get("doc_type") == "technical_document" or doc.get("metadata", {}).get("scope") == "global":
+        return True
+
+    source = doc.get("metadata", {}).get("source")
+    site_id = doc.get("metadata", {}).get("site_id")
+    if source == "supabase" and not site_id:
+        return False
+    if site_id:
+        return _normalize_site_code(str(site_id)) in allowed_sites
+    return True
+
+
+def _filter_result_for_tenant(
+    auth_ctx: dict[str, Any] | None,
+    tool_name: str,
+    result: dict[str, Any],
+    server: Any,
+) -> dict[str, Any]:
+    """Filter search/fetch document results without hiding global docs."""
+    if not auth_ctx or tool_name not in {"search", "fetch"}:
+        return result
+
+    server._ensure_index()
+    doc_index = getattr(server, "_document_index", {}) or {}
+
+    if tool_name == "search":
+        filtered_results = []
+        for item in result.get("results", []):
+            doc = doc_index.get(item.get("id"))
+            if _doc_is_allowed_for_tenant(auth_ctx, doc):
+                filtered_results.append(item)
+        return {**result, "results": filtered_results}
+
+    doc = doc_index.get(result.get("id"))
+    if _doc_is_allowed_for_tenant(auth_ctx, doc):
+        return result
+    return {
+        "id": result.get("id", ""),
+        "title": "Document Not Found",
+        "text": "No document found with that ID for this tenant.",
+        "url": "",
+        "metadata": {"error": "not_found"},
+    }
+
+
+def _tools_for_schema(tools: list[dict[str, Any]], site_id: str | None = None) -> list[dict[str, Any]]:
+    """Build OpenAPI tool definitions for a site-scoped GPT schema."""
+    if not site_id:
+        return tools
+
+    display_site = _display_site_code(site_id)
+    filtered = []
+    for tool in tools:
+        if tool.get("name") not in TENANT_SCOPED_DEFAULT_TOOLS:
+            continue
+        cloned = json.loads(json.dumps(tool))
+        properties = cloned.get("inputSchema", {}).get("properties", {})
+        if "site_id" in properties:
+            properties["site_id"]["enum"] = [display_site]
+            properties["site_id"]["description"] = f"Site identifier for this tenant ({display_site})"
+        filtered.append(cloned)
+    return filtered
+
 
 def as_single_text_content(payload: dict[str, Any]) -> dict[str, Any]:
     """
@@ -88,13 +283,19 @@ class MCPStreamableHTTPHandler:
             "capabilities": {"tools": {}},
         }
 
-    async def handle_tools_list(self) -> dict:
+    async def handle_tools_list(self, auth_ctx: dict[str, Any] | None = None) -> dict:
         """List available tools."""
         tools = self.server.list_tools()
+        if auth_ctx:
+            allowed_tools = auth_ctx.get("allowed_tools") or TENANT_SCOPED_DEFAULT_TOOLS
+            tools = [tool for tool in tools if tool.get("name") in allowed_tools]
+            allowed_sites = auth_ctx.get("allowed_sites") or []
+            if allowed_sites:
+                tools = _tools_for_schema(tools, allowed_sites[0])
         logger.debug(f"MCP tools/list: returning {len(tools)} tools")
         return {"tools": tools}
 
-    async def handle_tools_call(self, params: dict) -> dict:
+    async def handle_tools_call(self, params: dict, auth_ctx: dict[str, Any] | None = None) -> dict:
         """
         Execute tool call with OpenAI connector response format.
 
@@ -106,7 +307,12 @@ class MCPStreamableHTTPHandler:
         logger.info(f"MCP tools/call: {tool_name}({json.dumps(arguments)[:100]})")
 
         try:
+            if auth_ctx:
+                allowed, reason = _is_authorized_for_tool(auth_ctx, tool_name, arguments)
+                if not allowed:
+                    raise ValueError(reason)
             result = await self.server.call_tool(tool_name, **arguments)
+            result = _filter_result_for_tenant(auth_ctx, tool_name, result, self.server)
             return as_single_text_content(result)
 
         except ValueError as e:
@@ -117,7 +323,7 @@ class MCPStreamableHTTPHandler:
             logger.error(f"MCP internal error: {e}", exc_info=True)
             return as_single_text_error(f"Internal error: {e!s}")
 
-    async def handle_request(self, request_body: dict) -> dict:
+    async def handle_request(self, request_body: dict, auth_ctx: dict[str, Any] | None = None) -> dict:
         """
         Handle incoming JSON-RPC request.
 
@@ -139,10 +345,10 @@ class MCPStreamableHTTPHandler:
                 return {"jsonrpc": "2.0", "id": request_id, "result": {}}
 
             elif method == "tools/list":
-                result = await self.handle_tools_list()
+                result = await self.handle_tools_list(auth_ctx)
 
             elif method == "tools/call":
-                result = await self.handle_tools_call(params)
+                result = await self.handle_tools_call(params, auth_ctx)
 
             elif method == "ping":
                 result = {}
@@ -217,7 +423,9 @@ async def mcp_streamable_http_endpoint(
     from app.config.settings import settings
 
     expected_key = getattr(settings, "mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
-    if not expected_key:
+    tenant_keys = _load_tenant_key_config()
+    auth_ctx: dict[str, Any] | None = None
+    if not expected_key and not tenant_keys:
         logger.error("MCP API key not configured — endpoint is open (auth disabled)")
     elif not authorization:
         logger.warning("MCP request missing Authorization header")
@@ -243,7 +451,8 @@ async def mcp_streamable_http_endpoint(
                 },
                 headers=CORS_HEADERS,
             )
-        if not hmac.compare_digest(token.encode(), expected_key.encode()):
+        auth_ctx = _auth_context_for_token(token)
+        if auth_ctx is None:
             logger.warning(f"MCP request with invalid API key: {token[:8]}...")
             return JSONResponse(
                 status_code=401,
@@ -266,7 +475,7 @@ async def mcp_streamable_http_endpoint(
         )
 
     handler = get_mcp_handler()
-    response = await handler.handle_request(body)
+    response = await handler.handle_request(body, auth_ctx)
 
     return JSONResponse(content=response, headers=CORS_HEADERS)
 
@@ -362,7 +571,7 @@ async def openai_connector_stats():
 @router.post("/refresh", include_in_schema=False)
 async def openai_connector_refresh(authorization: str | None = Header(default=None, alias="Authorization")):
     """Force refresh the document index. Requires Bearer auth."""
-    ok, err = _require_bearer_auth(authorization)
+    ok, err, _auth_ctx = _require_bearer_auth(authorization)
     if not ok:
         return err
     server = get_openai_connector_server()
@@ -472,7 +681,7 @@ async def mcp_discovery_options():
 
 
 @wellknown_router.get("/.well-known/openapi.json")
-async def well_known_openapi():
+async def well_known_openapi(site_id: str | None = None):
     """
     OpenAPI 3.1 schema for ChatGPT Actions discovery.
 
@@ -480,7 +689,7 @@ async def well_known_openapi():
     Always stays in sync with actual tool availability — never hardcoded.
     """
     server = get_openai_connector_server()
-    tool_schemas = server.list_tools()
+    tool_schemas = _tools_for_schema(server.list_tools(), site_id)
 
     paths: dict[str, Any] = {}
     for tool in tool_schemas:
@@ -560,7 +769,7 @@ async def well_known_openapi_options():
 
 
 @router.get("/openapi.json", include_in_schema=True)
-async def openapi_json():
+async def openapi_json(site_id: str | None = None):
     """
     OpenAPI 3.1 schema for GPT Actions integration.
 
@@ -574,7 +783,7 @@ async def openapi_json():
     from app.mcp.openai_connector_server import get_openai_connector_server
 
     server = get_openai_connector_server()
-    tools = server.list_tools()
+    tools = _tools_for_schema(server.list_tools(), site_id)
 
     paths: dict[str, Any] = {}
 
@@ -587,11 +796,12 @@ async def openapi_json():
         properties = input_schema.get("properties", {})
         required = input_schema.get("required", [])
 
-        schema_body = {"type": "object"}
-        if properties:
-            schema_body["properties"] = {
-                k: {**v, "description": v.get("description", "")} for k, v in properties.items()
-            }
+        schema_body = {
+            "type": "object",
+            "properties": {k: {**v, "description": v.get("description", "")} for k, v in properties.items()},
+        }
+        if not properties:
+            schema_body["properties"] = {}
         if required:
             schema_body["required"] = required
 
@@ -637,7 +847,11 @@ async def openapi_json():
                 "version": "1.0.0",
                 "description": (
                     "SENTINEL Building Management Intelligence Platform — "
-                    "live operational data for Sandton City Office Tower (site-002)."
+                    + (
+                        f"tenant-scoped operational data for {_normalize_site_code(site_id)}."
+                        if site_id
+                        else "live operational data for Sandton City Office Tower (site-002)."
+                    )
                 ),
             },
             "servers": [{"url": "https://bms.sentinel-ai.co.za/api/mcp/openai"}],
@@ -660,44 +874,67 @@ async def openapi_json():
 # =============================================================================
 
 
-def _require_bearer_auth(authorization: str | None) -> tuple[bool, JSONResponse | None]:
-    """Check Bearer auth. Returns (ok, error_response). If ok=True, caller proceeds."""
+def _require_bearer_auth(authorization: str | None) -> tuple[bool, JSONResponse | None, dict[str, Any] | None]:
+    """Check Bearer auth. Returns (ok, error_response, auth_context)."""
     from app.config.settings import settings
 
     expected_key = getattr(settings, "mcp_api_key", None) or getattr(settings, "MCP_API_KEY", None)
-    if not expected_key:
+    tenant_keys = _load_tenant_key_config()
+    if not expected_key and not tenant_keys:
         logger.error("MCP API key not configured — auth disabled")
-        return True, None  # Allow when key not configured
+        return True, None, None  # Allow when key not configured
     if not authorization:
-        return False, JSONResponse(
-            status_code=401,
-            content={"error": "Missing Authorization: Bearer header"},
-            headers=CORS_HEADERS,
+        return (
+            False,
+            JSONResponse(
+                status_code=401,
+                content={"error": "Missing Authorization: Bearer header"},
+                headers=CORS_HEADERS,
+            ),
+            None,
         )
     scheme, _, token = authorization.partition(" ")
     if scheme.lower() != "bearer" or not token:
-        return False, JSONResponse(
-            status_code=401,
-            content={"error": "Authorization must be: Bearer <api-key>"},
-            headers=CORS_HEADERS,
+        return (
+            False,
+            JSONResponse(
+                status_code=401,
+                content={"error": "Authorization must be: Bearer <api-key>"},
+                headers=CORS_HEADERS,
+            ),
+            None,
         )
-    if not hmac.compare_digest(token.encode(), expected_key.encode()):
-        return False, JSONResponse(
-            status_code=401,
-            content={"error": "Invalid API key"},
-            headers=CORS_HEADERS,
+    auth_ctx = _auth_context_for_token(token)
+    if auth_ctx is None:
+        return (
+            False,
+            JSONResponse(
+                status_code=401,
+                content={"error": "Invalid API key"},
+                headers=CORS_HEADERS,
+            ),
+            None,
         )
-    return True, None
+    return True, None, auth_ctx
 
 
 async def _tool_endpoint(tool_name: str, request_data: dict | None, authorization: str | None = None) -> JSONResponse:
     """Generic handler for all OpenAPI tool endpoints. Requires Bearer auth."""
-    ok, err = _require_bearer_auth(authorization)
+    ok, err, auth_ctx = _require_bearer_auth(authorization)
     if not ok:
         return err
+    if auth_ctx:
+        allowed, reason = _is_authorized_for_tool(auth_ctx, tool_name, request_data)
+        if not allowed:
+            return JSONResponse(
+                status_code=403,
+                content={"content": [{"type": "text", "text": json.dumps({"error": reason})}], "isError": True},
+                headers=CORS_HEADERS,
+            )
     server = get_openai_connector_server()
     try:
         result = await server.call_tool(tool_name, **(request_data or {}))
+        result = _filter_result_for_tenant(auth_ctx, tool_name, result, server)
         return JSONResponse(content={"content": [{"type": "text", "text": json.dumps(result)}]}, headers=CORS_HEADERS)
     except Exception as e:
         logger.error(f"[{tool_name}] tool call failed: {e}")
@@ -741,6 +978,14 @@ async def tool_get_site_status(
 ):
     body = await request.json()
     return await _tool_endpoint("get_site_status", body, authorization)
+
+
+@router.post("/get_hvac_runtime_status", include_in_schema=False)
+async def tool_get_hvac_runtime_status(
+    request: Request, authorization: str | None = Header(default=None, alias="Authorization")
+):
+    body = await request.json()
+    return await _tool_endpoint("get_hvac_runtime_status", body, authorization)
 
 
 @router.post("/get_recommendations", include_in_schema=False)

@@ -25,6 +25,7 @@ from app.database.repositories.audit_repository import AuditRepository
 from app.services.cov_monitor_service import get_cov_monitor_service
 from app.services.device_abstraction import device_manager
 from app.services.sentinel_write_whitelist import get_sentinel_write_whitelist
+from app.services.simbiot.bms_adapter import BmsConnectionConfig, BmsWriteRequest
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,7 @@ async def execute_command(
     previous_value: Any = None
     whitelist_passed = False
     whitelist_reason = ""
+    execution_metadata: dict[str, Any] = {"write_path": "device_manager"}
 
     # --- Wave 2: Determine BACnet priority ---
     write_priority = bacnet_priority
@@ -167,29 +169,62 @@ async def execute_command(
         previous_value = None
 
     try:
-        # Step 1: Write to device (with BACnet priority)
-        try:
-            write_ok = await device_manager.write_device_value(
-                device_id=equipment_id,
-                point_name=control_point,
-                value=target_value,
+        # Step 1: Write to device. Bridge-configured sites must use the site
+        # adapter first; otherwise a local/sim device manager can report success
+        # without the command ever reaching the site bridge.
+        if _site_should_use_adapter_write(site_id):
+            fallback = await _execute_site_adapter_write(
+                site_id=site_id,
+                equipment_id=equipment_id,
+                control_point=control_point,
+                target_value=target_value,
                 priority=write_priority,
+                source=source,
+                correlation_id=correlation_id,
             )
-            success = bool(write_ok)
+            success = bool(fallback.get("success"))
+            previous_value = fallback.get("previous_value", previous_value)
+            actual_value = fallback.get("actual_value")
+            verified = bool(fallback.get("verified", False))
+            error = None if success else fallback.get("error")
+            execution_metadata.update(
+                {
+                    "write_path": "site_adapter",
+                    "adapter_id": fallback.get("adapter_id"),
+                    "bridge_point_id": fallback.get("bridge_point_id"),
+                    "bridge_write_response": fallback.get("write_response"),
+                }
+            )
             if not success:
-                error = f"Device write returned False for {equipment_id}.{control_point}"
-        except Exception as exc:
-            success = False
-            error = f"Device write exception: {exc}"
-            logger.error(
-                "execute_command write failed: equipment=%s point=%s error=%s",
-                equipment_id,
-                control_point,
-                exc,
-            )
+                logger.error(
+                    "execute_command site adapter write failed: equipment=%s point=%s error=%s",
+                    equipment_id,
+                    control_point,
+                    error,
+                )
+        else:
+            try:
+                write_ok = await device_manager.write_device_value(
+                    device_id=equipment_id,
+                    point_name=control_point,
+                    value=target_value,
+                    priority=write_priority,
+                )
+                success = bool(write_ok)
+                if not success:
+                    error = f"Device write returned False for {equipment_id}.{control_point}"
+            except Exception as exc:
+                success = False
+                error = f"Device write exception: {exc}"
+                logger.error(
+                    "execute_command device_manager write failed: equipment=%s point=%s error=%s",
+                    equipment_id,
+                    control_point,
+                    exc,
+                )
 
         # Step 2: Verify (always attempt, even on write failure, to capture actual state)
-        if success:
+        if success and execution_metadata.get("write_path") != "site_adapter":
             try:
                 cov_monitor = get_cov_monitor_service()
                 cov_result = await cov_monitor.verify_write(
@@ -235,6 +270,7 @@ async def execute_command(
             previous_value=previous_value,
             bacnet_priority=write_priority,
             whitelist_version=wl_result.whitelist_version,
+            execution_metadata=execution_metadata,
         )
 
     return {
@@ -248,7 +284,147 @@ async def execute_command(
         "whitelist_passed": whitelist_passed,
         "whitelist_reason": whitelist_reason,
         "bacnet_priority": write_priority,
+        **execution_metadata,
     }
+
+
+def _site_should_use_adapter_write(site_id: str) -> bool:
+    """Return True when the site has an enabled write-capable bridge adapter."""
+    if not site_id:
+        return False
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        result = (
+            get_supabase_client()
+            .table("site_adapter_config")
+            .select("protocol,enabled,connection_config")
+            .eq("site_id", site_id)
+            .eq("enabled", True)
+            .execute()
+        )
+        for row in result.data or []:
+            protocol = str(row.get("protocol") or "").strip().lower()
+            config = row.get("connection_config") or {}
+            if protocol == "bridge" and config.get("supports_writes") is True and config.get("write_enabled") is True:
+                return True
+    except Exception as exc:
+        logger.debug("Could not determine adapter write preference for %s: %s", site_id, exc)
+    return False
+
+
+async def _execute_site_adapter_write(
+    *,
+    site_id: str,
+    equipment_id: str,
+    control_point: str,
+    target_value: Any,
+    priority: int,
+    source: str,
+    correlation_id: str,
+) -> dict[str, Any]:
+    """Fallback write path for SIMBIOT site adapters such as the HTTP bridge."""
+    if not site_id:
+        return {"success": False, "error": "No site_id provided for site adapter write"}
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+        from app.services.site_adapter_manager import SiteAdapterManager
+
+        sb = get_supabase_client()
+        site_row = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+        if not site_row.data:
+            return {"success": False, "error": f"Site {site_id} not found"}
+        site_uuid = site_row.data[0]["id"]
+
+        mapping_row = (
+            sb.table("point_asset_mappings")
+            .select("bms_point_id,parameter_name,parameter_type,is_verified")
+            .eq("site_id", site_uuid)
+            .eq("extracted_asset_id", equipment_id)
+            .eq("is_verified", True)
+            .execute()
+        )
+        bridge_point_id = None
+        requested = str(control_point or "").strip().lower()
+        for mapping in mapping_row.data or []:
+            parameter_name = str(mapping.get("parameter_name") or "").strip().lower()
+            bms_point_id = str(mapping.get("bms_point_id") or "").strip()
+            suffix = bms_point_id.rsplit(".", 1)[-1].lower() if "." in bms_point_id else bms_point_id.lower()
+            parameter_type = str(mapping.get("parameter_type") or "").lower()
+            is_writable = (
+                parameter_type in {"command", "setpoint", "writable"}
+                or parameter_type.startswith(("command:", "setpoint:", "writable:"))
+                or "analogoutput" in parameter_type
+                or "binaryoutput" in parameter_type
+                or "multistateoutput" in parameter_type
+            )
+            if is_writable and requested in {parameter_name, suffix}:
+                bridge_point_id = bms_point_id
+                break
+        if not bridge_point_id:
+            return {"success": False, "error": f"No verified writable bridge point for {equipment_id}.{control_point}"}
+
+        adapters = SiteAdapterManager(sb).get_adapters_for_site(site_id)
+        writable_adapters = [adapter for adapter in adapters if adapter.capabilities.supports_writes]
+        if not writable_adapters:
+            return {"success": False, "error": f"No write-capable adapter enabled for {site_id}"}
+
+        adapter = writable_adapters[0]
+        connection_status = await adapter.connect(BmsConnectionConfig(site_id=site_id, source_type=adapter.adapter_id))
+        if not connection_status.connected:
+            return {
+                "success": False,
+                "adapter_id": adapter.adapter_id,
+                "bridge_point_id": bridge_point_id,
+                "error": f"Bridge adapter connection failed: {connection_status.message or connection_status.status}",
+            }
+
+        previous_value = None
+        try:
+            current = await adapter.read_point(equipment_id, bridge_point_id)
+            previous_value = current.value
+        except Exception as exc:
+            logger.debug("Could not pre-read via site adapter %s.%s: %s", equipment_id, bridge_point_id, exc)
+
+        success = await adapter.write_point(
+            BmsWriteRequest(
+                device_id=equipment_id,
+                point_id=bridge_point_id,
+                value=target_value,
+                priority=priority,
+                user=source,
+                metadata={"correlation_id": correlation_id, "sentinel_point": control_point},
+            )
+        )
+        write_response = getattr(adapter, "last_write_response", None)
+        actual_value = None
+        verified = False
+        if success:
+            try:
+                current = await adapter.read_point(equipment_id, bridge_point_id)
+                actual_value = current.value
+                if isinstance(target_value, (int, float)) and isinstance(actual_value, (int, float)):
+                    tolerance = abs(float(target_value) * 0.05) if float(target_value) != 0 else 0.5
+                    verified = abs(float(actual_value) - float(target_value)) <= tolerance
+                else:
+                    verified = actual_value == target_value
+            except Exception as exc:
+                logger.warning("Could not verify bridge write %s.%s: %s", equipment_id, bridge_point_id, exc)
+
+        return {
+            "success": bool(success),
+            "adapter_id": adapter.adapter_id,
+            "bridge_point_id": bridge_point_id,
+            "write_response": write_response,
+            "previous_value": previous_value,
+            "actual_value": actual_value,
+            "verified": verified,
+            "error": None if success else f"Bridge adapter write returned False for {bridge_point_id}",
+        }
+    except Exception as exc:
+        logger.error("Site adapter write failed for %s.%s: %s", equipment_id, control_point, exc)
+        return {"success": False, "error": str(exc)}
 
 
 def _audit_execution(
@@ -267,6 +443,7 @@ def _audit_execution(
     previous_value: Any = None,
     bacnet_priority: int = 8,
     whitelist_version: str = "",
+    execution_metadata: dict[str, Any] | None = None,
 ) -> None:
     """Write a device-control audit record synchronously.
 
@@ -277,8 +454,23 @@ def _audit_execution(
     try:
         audit_repo = AuditRepository()
         result_status = "SUCCESS" if success else "FAILED"
+        device_uuid = None
+        try:
+            from uuid import UUID
+
+            UUID(str(equipment_id))
+            device_uuid = str(equipment_id)
+        except ValueError:
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                row = get_supabase_client().table("equipment").select("id").eq("code", equipment_id).limit(1).execute()
+                if row.data:
+                    device_uuid = row.data[0].get("id")
+            except Exception as lookup_exc:
+                logger.debug("Could not resolve equipment UUID for audit %s: %s", equipment_id, lookup_exc)
         audit_repo.log_device_control(
-            device_id=equipment_id,
+            device_id=device_uuid,
             point_name=control_point,
             old_value=previous_value,
             new_value=target_value,
@@ -290,12 +482,14 @@ def _audit_execution(
                 "action_type": "execution",
                 "source": source,
                 "site_id": site_id,
+                "equipment_code": equipment_id,
                 "decision_id": decision_id,
                 "actual_value": actual_value,
                 "verified": verified,
                 "timestamp": datetime.utcnow().isoformat(),
                 "bacnet_priority": bacnet_priority,
                 "whitelist_version": whitelist_version,
+                **(execution_metadata or {}),
             },
         )
     except Exception as exc:

@@ -4,6 +4,7 @@ Provides unified system health monitoring and SIMBIOT-powered diagnostics.
 """
 
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -96,7 +97,280 @@ class DiagnosticsRequest(BaseModel):
     site_code: str | None = None
 
 
+class DiscoveredEquipmentRow(BaseModel):
+    id: str
+    site_id: str
+    bridge_code: str
+    canonical_code: str
+    equipment_type: str | None = None
+    derived_zone_id: str | None = None
+    status: str
+    reason: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    first_seen_at: str | None = None
+    last_seen_at: str | None = None
+    seen_count: int = 0
+    zone_onboardable: bool = True
+    zone_message: str | None = None
+
+
+class DiscoveredEquipmentResponse(BaseModel):
+    site_id: str
+    pending_count: int
+    items: list[DiscoveredEquipmentRow]
+
+
+class OnboardDiscoveredEquipmentRequest(BaseModel):
+    equipment_name: str | None = None
+    equipment_type: str | None = None
+    zone_id: str | None = None
+
+
+class DiscoveredEquipmentActionResponse(BaseModel):
+    success: bool
+    message: str
+    equipment_code: str | None = None
+
+
 # ==================== Endpoints ====================
+
+
+def _get_supabase_client():
+    from app.database.supabase_client import get_supabase_client
+
+    return get_supabase_client()
+
+
+def _get_site_uuid(site_id: str) -> str:
+    client = _get_supabase_client()
+    response = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+    if not response.data:
+        raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+    return response.data[0]["id"]
+
+
+def _bridge_zone_alias(zone_id: str) -> str | None:
+    import re
+
+    match = re.match(r"^Zone-L(\d+)-(\d+)$", str(zone_id or "").strip(), re.IGNORECASE)
+    if not match:
+        return None
+    return f"Zone-{int(match.group(1))}{int(match.group(2)):02d}"
+
+
+def _zone_inventory(site_uuid: str) -> dict[str, str]:
+    """Return acceptable zone IDs and bridge aliases mapped to canonical zone IDs."""
+    client = _get_supabase_client()
+    inventory: dict[str, str] = {}
+
+    zones = client.table("zones").select("zone_id").eq("site_id", site_uuid).execute()
+    for row in zones.data or []:
+        zone_id = str(row.get("zone_id") or "").strip()
+        if not zone_id:
+            continue
+        inventory[zone_id] = zone_id
+        alias = _bridge_zone_alias(zone_id)
+        if alias:
+            inventory[alias] = zone_id
+
+    hvac = client.table("hvac_zones").select("zone_id").eq("site_id", site_uuid).execute()
+    for row in hvac.data or []:
+        zone_id = str(row.get("zone_id") or "").strip()
+        if not zone_id:
+            continue
+        inventory.setdefault(zone_id, zone_id)
+        alias = _bridge_zone_alias(zone_id)
+        if alias:
+            inventory.setdefault(alias, zone_id)
+
+    return inventory
+
+
+def _row_with_zone_status(row: dict[str, Any], inventory: dict[str, str]) -> DiscoveredEquipmentRow:
+    derived_zone_id = row.get("derived_zone_id")
+    zone_onboardable = True
+    zone_message = None
+    if derived_zone_id and derived_zone_id not in inventory:
+        zone_onboardable = False
+        zone_message = f"{derived_zone_id} is not in the site zone inventory. Create/confirm the zone during site onboarding first."
+
+    return DiscoveredEquipmentRow(
+        id=str(row.get("id")),
+        site_id=row.get("site_id"),
+        bridge_code=row.get("bridge_code"),
+        canonical_code=row.get("canonical_code"),
+        equipment_type=row.get("equipment_type"),
+        derived_zone_id=derived_zone_id,
+        status=row.get("status"),
+        reason=row.get("reason"),
+        payload=row.get("payload") or {},
+        first_seen_at=row.get("first_seen_at"),
+        last_seen_at=row.get("last_seen_at"),
+        seen_count=row.get("seen_count") or 0,
+        zone_onboardable=zone_onboardable,
+        zone_message=zone_message,
+    )
+
+
+@router.get("/sites/{site_id}/discovered-equipment", response_model=DiscoveredEquipmentResponse)
+async def get_discovered_equipment(site_id: str, limit: int = Query(50, ge=1, le=200)):
+    """List bridge-discovered equipment waiting for onboarding review."""
+    client = _get_supabase_client()
+    site_uuid = _get_site_uuid(site_id)
+    inventory = _zone_inventory(site_uuid)
+    response = (
+        client.table("bridge_discovered_equipment")
+        .select("*")
+        .eq("site_id", site_id)
+        .eq("status", "pending")
+        .order("last_seen_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    items = [_row_with_zone_status(row, inventory) for row in response.data or []]
+    return DiscoveredEquipmentResponse(site_id=site_id, pending_count=len(items), items=items)
+
+
+@router.post(
+    "/sites/{site_id}/discovered-equipment/{discovery_id}/dismiss",
+    response_model=DiscoveredEquipmentActionResponse,
+)
+async def dismiss_discovered_equipment(site_id: str, discovery_id: str):
+    """Dismiss a discovered bridge item without creating active equipment."""
+    client = _get_supabase_client()
+    now_iso = datetime.now(tz=UTC).isoformat()
+    response = (
+        client.table("bridge_discovered_equipment")
+        .update(
+            {
+                "status": "dismissed",
+                "dismissed_at": now_iso,
+                "dismissed_by": "system_health",
+                "updated_at": now_iso,
+            }
+        )
+        .eq("site_id", site_id)
+        .eq("id", discovery_id)
+        .execute()
+    )
+    if not response.data:
+        raise HTTPException(status_code=404, detail="Discovered equipment item not found")
+    row = response.data[0]
+    return DiscoveredEquipmentActionResponse(
+        success=True,
+        message="Discovered equipment dismissed.",
+        equipment_code=row.get("canonical_code"),
+    )
+
+
+@router.post(
+    "/sites/{site_id}/discovered-equipment/{discovery_id}/onboard",
+    response_model=DiscoveredEquipmentActionResponse,
+)
+async def onboard_discovered_equipment(site_id: str, discovery_id: str, body: OnboardDiscoveredEquipmentRequest):
+    """Create active equipment from a reviewed bridge discovery item.
+
+    Terminal equipment may only be onboarded into an existing Supabase zone.
+    This endpoint never creates zones.
+    """
+    client = _get_supabase_client()
+    site_uuid = _get_site_uuid(site_id)
+    discovery_response = (
+        client.table("bridge_discovered_equipment")
+        .select("*")
+        .eq("site_id", site_id)
+        .eq("id", discovery_id)
+        .limit(1)
+        .execute()
+    )
+    if not discovery_response.data:
+        raise HTTPException(status_code=404, detail="Discovered equipment item not found")
+
+    row = discovery_response.data[0]
+    canonical_code = row.get("canonical_code")
+    if not canonical_code:
+        raise HTTPException(status_code=422, detail="Discovered equipment has no canonical equipment code")
+
+    existing = client.table("equipment").select("id, code").eq("code", canonical_code).limit(1).execute()
+    now_iso = datetime.now(tz=UTC).isoformat()
+    if existing.data:
+        client.table("bridge_discovered_equipment").update(
+            {
+                "status": "onboarded",
+                "onboarded_at": now_iso,
+                "onboarded_by": "system_health",
+                "updated_at": now_iso,
+            }
+        ).eq("id", discovery_id).execute()
+        return DiscoveredEquipmentActionResponse(
+            success=True,
+            message="Equipment already exists and discovery was marked onboarded.",
+            equipment_code=canonical_code,
+        )
+
+    inventory = _zone_inventory(site_uuid)
+    requested_zone = body.zone_id or row.get("derived_zone_id")
+    zone_key = None
+    if requested_zone:
+        zone_key = inventory.get(requested_zone)
+        if not zone_key:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"{requested_zone} is not in the Supabase zone inventory. "
+                    "Zones must be created during site onboarding before equipment can be onboarded."
+                ),
+            )
+
+    from app.services.shadow_mode_polling import (
+        _format_display_name,
+        _normalize_bridge_equipment_status,
+        _parse_eq_code_parts,
+    )
+
+    equipment_type = (body.equipment_type or row.get("equipment_type") or "unknown").lower()
+    _parsed_type, location_code = _parse_eq_code_parts(canonical_code)
+    equipment_name = body.equipment_name or _format_display_name(equipment_type, location_code)
+    bridge_status = (row.get("payload") or {}).get("status", "offline")
+    equipment_status = _normalize_bridge_equipment_status(bridge_status)
+
+    equipment_payload = {
+        "code": canonical_code,
+        "name": equipment_name,
+        "type": equipment_type,
+        "status": equipment_status,
+        "site_id": site_uuid,
+        "health_score": 100,
+        "operating_data": {
+            "onboarding": {
+                "source": "bridge_discovery",
+                "bridge_code": row.get("bridge_code"),
+                "discovery_id": row.get("id"),
+                "onboarded_at": now_iso,
+            }
+        },
+    }
+    if zone_key:
+        equipment_payload["zone_key"] = zone_key
+
+    created = client.table("equipment").insert(equipment_payload).execute()
+    if not created.data:
+        raise HTTPException(status_code=500, detail="Equipment could not be created")
+
+    client.table("bridge_discovered_equipment").update(
+        {
+            "status": "onboarded",
+            "onboarded_at": now_iso,
+            "onboarded_by": "system_health",
+            "updated_at": now_iso,
+        }
+    ).eq("id", discovery_id).execute()
+
+    return DiscoveredEquipmentActionResponse(
+        success=True,
+        message="Equipment onboarded into the active site inventory.",
+        equipment_code=canonical_code,
+    )
 
 
 @router.get("/health", response_model=SystemHealthSnapshot)
@@ -402,9 +676,9 @@ async def get_monitoring_snapshot(site_id: str | None = Query(None)):
 async def get_adapter_health(site_id: str):
     """Current adapter health + uptime stats per site.
 
-    Returns health state for only the adapters configured in site_adapter_config.
-    Prevents showing DOWN status for phantom adapters (BACnetAdapter, DALIAdapter,
-    etc.) that don't run on this stack — only Shadow Bridge runs.
+    Returns current health state for adapters that have emitted health records.
+    This includes the site bridge plus device-level protocol adapters, so
+    point-mapping failures are visible without manual SQL.
     """
     from datetime import UTC
 
@@ -429,15 +703,7 @@ async def get_adapter_health(site_id: str):
             "status": "no_adapter_config",
         }
 
-    configured_names = [r["protocol"] for r in config_result.data]
-
-    current = (
-        supabase.table("adapter_health_current")
-        .select("*")
-        .eq("site_id", site_id)
-        .in_("adapter_name", configured_names)
-        .execute()
-    )
+    current = supabase.table("adapter_health_current").select("*").eq("site_id", site_id).execute()
 
     return {
         "site_id": site_id,
@@ -461,6 +727,7 @@ def _format_adapter_rows(rows: list[dict]) -> list[dict]:
             "uptime_24h_percent": row.get("uptime_24h_percent"),
             "last_check": row["last_check"],
             "consecutive_failures": row.get("consecutive_failures", 0),
+            "error_message": row.get("error_message"),
         }
         for row in rows
     ]
@@ -590,6 +857,67 @@ async def get_backup_status():
     from app.services.backup_service import backup_service
 
     return backup_service.get_status()
+
+
+@router.get("/dr-status")
+async def get_dr_status():
+    """Get read-only disaster recovery readiness: RPO, RTO, restore evidence, and gaps."""
+    from app.services.backup_service import backup_service
+
+    return backup_service.get_dr_status()
+
+
+@router.get("/phase-readiness")
+async def get_phase_readiness(site_id: str | None = Query(None)):
+    """Read-only Trust Ladder readiness for each site's next promotion phase."""
+    from app.database.supabase_client import get_supabase_client
+    from app.models.onboarding_phase import normalise_stage
+    from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
+
+    supabase = get_supabase_client()
+    query = supabase.table("sites").select("code,name,onboarding_phase").order("code")
+    if site_id:
+        query = query.eq("code", site_id)
+    rows = query.execute()
+
+    evaluator = get_phase_promotion_evaluator()
+    sites = []
+    for row in rows.data or []:
+        code = row.get("code")
+        phase = normalise_stage(row.get("onboarding_phase") or "commissioning")
+        config = evaluator.PROMOTION_GATES.get(phase)
+        if not code or not config:
+            sites.append(
+                {
+                    "site_id": code,
+                    "site_name": row.get("name") or code,
+                    "current_phase": phase,
+                    "target_phase": None,
+                    "eligible": False,
+                    "gates_passed": 0,
+                    "gates_total": 0,
+                    "gates": [],
+                    "reason": f"no_next_phase_from_{phase}",
+                }
+            )
+            continue
+
+        gates = await evaluator._evaluate_gates(code, config["gates"])
+        gates_payload = [gate.to_dict() for gate in gates]
+        sites.append(
+            {
+                "site_id": code,
+                "site_name": row.get("name") or code,
+                "current_phase": phase,
+                "target_phase": config["target"],
+                "eligible": all(gate.passed for gate in gates),
+                "gates_passed": sum(1 for gate in gates if gate.passed),
+                "gates_total": len(gates),
+                "gates": gates_payload,
+            }
+        )
+
+    return {"sites": sites}
 
 
 @router.post("/backup/trigger")

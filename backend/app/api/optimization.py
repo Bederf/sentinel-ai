@@ -1,6 +1,7 @@
 """Optimization API endpoints for HVAC load shedding and AI optimization."""
 
 import calendar
+import html
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -27,6 +28,13 @@ from app.models.recommendation import Recommendation, RecommendationStatus
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.approval_service import get_approval_service
 from app.services.audit_logger import AuditLogger
+from app.services.coordinated_optimization_planner import (
+    LEGACY_JACE_BACNET_BLOCKER,
+    READ_ONLY_BLOCKER,
+    SIMBIOT_WRITE_MAPPING_BLOCKER,
+    PlannerContext,
+    build_coordinated_bundles,
+)
 from app.services.decision_event_logger import emit_decision_event
 from app.services.device_abstraction import device_manager
 from app.services.eskomsepush_service import eskomsepush_service
@@ -79,6 +87,31 @@ class SiteScheduleResponse(BaseModel):
     source: str = "eskomsepush"
 
 
+class PackageCoordinatedBundleRequest(BaseModel):
+    """Request to package a reviewed coordinated bundle as a pending draft recommendation."""
+
+    site_id: str
+    bundle_id: str | None = None
+    bundle: dict[str, Any] | None = None
+    note: str | None = None
+
+
+class CoordinatedDraftDecisionRequest(BaseModel):
+    """Request to approve or reject a coordinated optimization draft."""
+
+    site_id: str
+    recommendation_id: str
+    reason: str | None = None
+
+
+class CoordinatedDraftExecuteRequest(BaseModel):
+    """Request to execute an approved coordinated optimization draft."""
+
+    site_id: str
+    recommendation_id: str
+    reason: str | None = None
+
+
 def get_site_name(site_id: str) -> str:
     """Get site name from site ID."""
     site_names = {
@@ -87,6 +120,31 @@ def get_site_name(site_id: str) -> str:
         "site-004": "Tygervalley",
     }
     return site_names.get(site_id, f"Site {site_id}")
+
+
+def _site_display_name(site_id: str, stored_name: str | None = None) -> str:
+    canonical = get_site_name(site_id)
+    if not canonical.startswith("Site "):
+        return canonical
+    return stored_name or canonical
+
+
+def _resolve_site_phase(site_id: str, fallback: str = "commissioning") -> str:
+    """Resolve canonical onboarding phase from Supabase, falling back to loaded site data."""
+    from app.models.onboarding_phase import normalise_stage
+
+    phase = fallback or "commissioning"
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+        if row.data:
+            phase = row.data[0].get("onboarding_phase") or phase
+    except Exception as exc:
+        logger.debug("Could not resolve onboarding phase for %s from Supabase: %s", site_id, exc)
+
+    return normalise_stage(phase)
 
 
 @router.get("/optimization/scenarios")
@@ -343,6 +401,1142 @@ async def get_optimization_status(
         raise
     except Exception as e:
         logger.error(f"Error getting optimization status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/optimization/coordinated-bundles")
+async def get_coordinated_optimization_bundles(
+    site_id: str = Query(..., description="Site code, e.g. site-002"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> dict[str, Any]:
+    """Return read-only coordinated optimization bundles for operator review."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+        site_rows = (
+            supabase.table("sites").select("id,code,name,onboarding_phase").eq("code", site_id).limit(1).execute()
+        )
+        if not site_rows.data and site_id.upper() == "S002":
+            site_rows = (
+                supabase.table("sites")
+                .select("id,code,name,onboarding_phase")
+                .eq("code", "site-002")
+                .limit(1)
+                .execute()
+            )
+        if not site_rows.data:
+            raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
+
+        site = site_rows.data[0]
+        site_uuid = site["id"]
+        site_code = site.get("code") or site_id
+        site_phase = site.get("onboarding_phase") or "advisory"
+
+        equipment_result = (
+            supabase.table("equipment")
+            .select("id,code,type,status,zone_key,location,health_score")
+            .eq("site_id", site_uuid)
+            .execute()
+        )
+        equipment_rows = equipment_result.data or []
+        equipment_code_by_id = {
+            row.get("id"): row.get("code") for row in equipment_rows if row.get("id") and row.get("code")
+        }
+
+        recommendation_site_ids = sorted({site_uuid, site_code, site_id, site_id.upper()})
+        recommendations_result = (
+            supabase.table("recommendations")
+            .select("id,site_id,target_equipment,action,status,confidence_score,metadata,timestamp")
+            .in_("site_id", recommendation_site_ids)
+            .order("timestamp", desc=True)
+            .limit(100)
+            .execute()
+        )
+
+        active_work_order_statuses = ["open", "scheduled", "assigned", "in_progress", "pending", "draft"]
+        work_orders_result = (
+            supabase.table("work_orders")
+            .select("id,code,status,equipment_id,milestone_status")
+            .eq("site_id", site_uuid)
+            .in_("status", active_work_order_statuses)
+            .limit(100)
+            .execute()
+        )
+        work_orders = []
+        for work_order in work_orders_result.data or []:
+            enriched = dict(work_order)
+            enriched["equipment_code"] = equipment_code_by_id.get(work_order.get("equipment_id"))
+            work_orders.append(enriched)
+
+        context = PlannerContext(
+            site_id=site_code,
+            site_phase=site_phase,
+            simbiot_write_mapping_verified=False,
+            insurance_confirmed=False,
+        )
+        bundles = build_coordinated_bundles(
+            context=context,
+            equipment=equipment_rows,
+            recommendations=recommendations_result.data or [],
+            work_orders=work_orders,
+            fault_signals=[],
+        )
+
+        return {
+            "site_id": site_code,
+            "site_name": site.get("name"),
+            "site_phase": site_phase,
+            "read_only": True,
+            "persisted": False,
+            "work_orders_created": False,
+            "source_counts": {
+                "equipment": len(equipment_rows),
+                "recommendations": len(recommendations_result.data or []),
+                "active_or_pending_work_orders": len(work_orders),
+                "fault_signals": 0,
+            },
+            "bundle_count": len(bundles),
+            "bundles": bundles,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error building coordinated optimization bundles for {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+def _bundle_payload(bundle: dict[str, Any]) -> dict[str, Any]:
+    metadata = bundle.get("metadata") if isinstance(bundle.get("metadata"), dict) else {}
+    payload = metadata.get("coordination_bundle") if isinstance(metadata.get("coordination_bundle"), dict) else {}
+    return payload
+
+
+def _normalize_coordinated_blocker(value: Any) -> Any:
+    if value == LEGACY_JACE_BACNET_BLOCKER:
+        return SIMBIOT_WRITE_MAPPING_BLOCKER
+    return value
+
+
+def _without_read_only_blocker(values: list[Any] | None) -> list[Any]:
+    return [_normalize_coordinated_blocker(value) for value in (values or []) if value != READ_ONLY_BLOCKER]
+
+
+def _is_controllable_child_action(action: dict[str, Any]) -> bool:
+    if str(action.get("action_type") or "").lower() == "operator_review":
+        return False
+    control_point_ref = action.get("control_point_ref") if isinstance(action.get("control_point_ref"), dict) else {}
+    point_name = control_point_ref.get("point_name") or action.get("point")
+    return bool(point_name and action.get("recommended_value") is not None)
+
+
+def _transition_bundle_to_supervised_draft(
+    bundle: dict[str, Any],
+    *,
+    requested_by: str,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Convert read-only planner output into a persisted parent draft payload."""
+
+    draft = dict(bundle)
+    payload = dict(_bundle_payload(bundle))
+    real_blockers = _without_read_only_blocker(payload.get("blocked_reasons"))
+
+    child_actions = []
+    for action in payload.get("recommended_actions") or []:
+        child_action = dict(action)
+        child_blockers = _without_read_only_blocker(child_action.get("blocked_reasons"))
+        child_action["blocked_reasons"] = child_blockers
+        child_action["approval_status"] = "blocked" if child_blockers else "pending"
+        child_actions.append(child_action)
+
+    constraints = _without_read_only_blocker(payload.get("constraints_checked"))
+    constraints = [constraint for constraint in constraints if constraint != "read_only"]
+    if "supervised_draft_packaging" not in constraints:
+        constraints.append("supervised_draft_packaging")
+
+    payload.update(
+        {
+            "recommended_actions": child_actions,
+            "constraints_checked": constraints,
+            "blocked_reasons": real_blockers,
+            "approval_mode": "supervised_pending_approval",
+            "execution_eligibility": "pending_approval",
+            "packaged_at": datetime.utcnow().isoformat(),
+            "packaged_by": requested_by,
+        }
+    )
+
+    metadata = dict(draft.get("metadata") or {})
+    metadata.update(
+        {
+            "lifecycle": "draft_pending_approval",
+            "coordination_bundle": payload,
+            "packaging_transition": "read_only_bundle_to_supervised_draft",
+            "packaging_note": note,
+        }
+    )
+
+    draft.update(
+        {
+            "id": str(uuid4()),
+            "timestamp": datetime.utcnow().isoformat(),
+            "action_type": "coordinated_optimization",
+            "risk_level": "medium",
+            "status": RecommendationStatus.PENDING.value,
+            "requires_approval": True,
+            "approval_status": "pending",
+            "action": {
+                "execution_blocked": True,
+                "blocker": "pending_human_approval",
+                "blockers": ["pending_human_approval", *real_blockers],
+                "bundle_id": payload.get("bundle_id"),
+            },
+            "profile": "coordinated_optimization",
+            "multi_objective_score": 0.0,
+            "shadow_mode": False,
+            "source": "coordinated_optimization_planner",
+            "source_type": "rule_based",
+            "metadata": metadata,
+        }
+    )
+    return draft
+
+
+def _find_bundle_by_id(bundles: list[dict[str, Any]], bundle_id: str) -> dict[str, Any] | None:
+    for bundle in bundles:
+        if _bundle_payload(bundle).get("bundle_id") == bundle_id:
+            return bundle
+    return None
+
+
+def _requested_bundle_id(body: PackageCoordinatedBundleRequest) -> str:
+    if body.bundle_id:
+        return body.bundle_id
+    if body.bundle:
+        return str(_bundle_payload(body.bundle).get("bundle_id") or "")
+    return ""
+
+
+def _validate_coordinated_packaging_allowed(bundle: dict[str, Any], site_phase: str) -> None:
+    if site_phase not in {"supervised", "automatic"}:
+        raise HTTPException(status_code=409, detail=f"Site phase '{site_phase}' cannot package coordinated drafts")
+
+    payload = _bundle_payload(bundle)
+    blockers = _without_read_only_blocker(payload.get("blocked_reasons"))
+    if any(str(blocker).startswith("active_or_pending_work_order:") for blocker in blockers):
+        raise HTTPException(status_code=409, detail="Affected equipment has active or pending work orders")
+
+    controllable_actions = [
+        action for action in payload.get("recommended_actions") or [] if _is_controllable_child_action(action)
+    ]
+    if not controllable_actions:
+        return
+
+    if SIMBIOT_WRITE_MAPPING_BLOCKER in blockers:
+        raise HTTPException(
+            status_code=409,
+            detail="Verified SIMBIOT/BMS write mapping is missing for controllable actions",
+        )
+    if "insurance_not_confirmed" in blockers:
+        raise HTTPException(status_code=409, detail="Insurance confirmation is missing for controllable actions")
+
+
+def _validate_coordinated_draft_record(record: dict[str, Any], site_id: str) -> None:
+    if record.get("site_id") not in {site_id, site_id.upper()}:
+        raise HTTPException(status_code=404, detail="Coordinated optimization draft not found for site")
+    if record.get("action_type") != "coordinated_optimization":
+        raise HTTPException(status_code=400, detail="Recommendation is not a coordinated optimization draft")
+    if (record.get("metadata") or {}).get("lifecycle") != "draft_pending_approval":
+        raise HTTPException(status_code=400, detail="Recommendation is not in coordinated draft lifecycle")
+    if record.get("status") != RecommendationStatus.PENDING.value:
+        raise HTTPException(status_code=409, detail=f"Coordinated draft is {record.get('status')}, not pending")
+    if record.get("approval_status") not in (None, "pending"):
+        raise HTTPException(status_code=409, detail=f"Coordinated draft approval is {record.get('approval_status')}")
+
+
+def _validate_coordinated_execution_record(record: dict[str, Any], site_id: str) -> None:
+    if record.get("site_id") not in {site_id, site_id.upper()}:
+        raise HTTPException(status_code=404, detail="Coordinated optimization draft not found for site")
+    if record.get("action_type") != "coordinated_optimization":
+        raise HTTPException(status_code=400, detail="Recommendation is not a coordinated optimization draft")
+    if (record.get("metadata") or {}).get("lifecycle") != "approved_pending_execution":
+        raise HTTPException(status_code=400, detail="Recommendation is not approved for coordinated execution")
+    if record.get("status") != RecommendationStatus.APPROVED.value:
+        raise HTTPException(status_code=409, detail=f"Coordinated draft is {record.get('status')}, not approved")
+    if record.get("approval_status") != "approved":
+        raise HTTPException(status_code=409, detail=f"Coordinated draft approval is {record.get('approval_status')}")
+
+
+def _validate_coordinated_retire_record(record: dict[str, Any], site_id: str) -> None:
+    _validate_coordinated_execution_record(record, site_id)
+    execution_status = (record.get("execution_result") or {}).get("status")
+    device_writes = (record.get("execution_result") or {}).get("device_writes")
+    if execution_status != "blocked_preflight" or device_writes not in (0, "0", None):
+        raise HTTPException(
+            status_code=409,
+            detail="Only approved coordinated recommendations blocked before device writes can be retired",
+        )
+
+
+def _is_active_coordinated_bundle_record(record: dict[str, Any], bundle_id: str) -> bool:
+    metadata = record.get("metadata") or {}
+    existing_bundle = metadata.get("coordination_bundle") or {}
+    if existing_bundle.get("bundle_id") != bundle_id:
+        return False
+
+    if record.get("status") not in {RecommendationStatus.PENDING.value, RecommendationStatus.APPROVED.value}:
+        return False
+
+    lifecycle = metadata.get("lifecycle")
+    if lifecycle in {"draft_pending_approval", "approved_pending_execution"}:
+        return True
+
+    return False
+
+
+def _coordinated_draft_retire_update(
+    record: dict[str, Any],
+    *,
+    user_id: str,
+    reason: str | None,
+) -> dict[str, Any]:
+    retired_at = datetime.utcnow().isoformat()
+    metadata = dict(record.get("metadata") or {})
+    bundle = dict(metadata.get("coordination_bundle") or {})
+    audit = list(metadata.get("approval_audit") or [])
+    audit.append(
+        {
+            "decision": "superseded",
+            "user_id": user_id,
+            "reason": reason,
+            "timestamp": retired_at,
+            "path": "coordinated_optimization_retire",
+        }
+    )
+
+    bundle["approval_status"] = "superseded"
+    bundle["superseded_by"] = user_id
+    bundle["superseded_at"] = retired_at
+    if reason:
+        bundle["superseded_reason"] = reason
+
+    metadata.update(
+        {
+            "lifecycle": "superseded",
+            "coordination_bundle": bundle,
+            "approval_audit": audit,
+        }
+    )
+
+    action = dict(record.get("action") or {})
+    action["execution_blocked"] = True
+    action["blocker"] = "superseded"
+    blockers = list(action.get("blockers") or [])
+    if "superseded" not in blockers:
+        blockers.append("superseded")
+    action["blockers"] = blockers
+
+    return {
+        "status": RecommendationStatus.EXPIRED.value,
+        "approval_status": "superseded",
+        "rejection_reason": reason or "Superseded by coordinated recommendation retire action",
+        "approved_by": user_id,
+        "action": action,
+        "metadata": metadata,
+        "execution_result": {
+            "status": "superseded",
+            "executed": False,
+            "device_writes": 0,
+            "reason": reason or "Superseded before coordinated execution",
+        },
+    }
+
+
+def _coordinated_bundle_from_record(record: dict[str, Any]) -> dict[str, Any]:
+    return (record.get("metadata") or {}).get("coordination_bundle") or {}
+
+
+def _coordinated_controllable_actions(bundle: dict[str, Any]) -> list[dict[str, Any]]:
+    return [action for action in bundle.get("recommended_actions") or [] if _is_controllable_child_action(action)]
+
+
+def _coordinated_action_device_id(action: dict[str, Any]) -> Any:
+    control_point_ref = action.get("control_point_ref") if isinstance(action.get("control_point_ref"), dict) else {}
+    return (
+        control_point_ref.get("device_id")
+        or control_point_ref.get("adapter_device_id")
+        or action.get("device_id")
+        or action.get("bms_device_id")
+        or action.get("jace_device_id")
+        or action.get("bacnet_device_id")
+    )
+
+
+def _coordinated_execution_blockers(
+    *,
+    record: dict[str, Any],
+    live_bundle: dict[str, Any] | None,
+    site_phase: str,
+) -> list[str]:
+    stored_bundle = _coordinated_bundle_from_record(record)
+    blockers = set(_without_read_only_blocker(stored_bundle.get("blocked_reasons")))
+
+    if site_phase not in {"supervised", "automatic"}:
+        blockers.add(f"site_phase_{site_phase}_not_supervised")
+
+    if not live_bundle:
+        blockers.add("bundle_no_longer_available")
+        return sorted(blockers)
+
+    live_payload = _bundle_payload(live_bundle)
+    blockers.update(_without_read_only_blocker(live_payload.get("blocked_reasons")))
+    for action in live_payload.get("recommended_actions") or []:
+        blockers.update(_without_read_only_blocker(action.get("blocked_reasons")))
+
+    if not _coordinated_controllable_actions(stored_bundle):
+        blockers.add("no_controllable_child_actions")
+
+    return sorted(blockers)
+
+
+def _coordinated_execution_blocked_result(
+    *,
+    record: dict[str, Any],
+    blockers: list[str],
+    user_id: str,
+    reason: str | None,
+) -> dict[str, Any]:
+    attempted_at = datetime.utcnow().isoformat()
+    return {
+        "execution_result": {
+            "status": "blocked_preflight",
+            "executed": False,
+            "device_writes": 0,
+            "blockers": blockers,
+            "attempted_by": user_id,
+            "attempted_at": attempted_at,
+            "reason": reason,
+        },
+        "metadata": {
+            **(record.get("metadata") or {}),
+            "last_execution_attempt": {
+                "status": "blocked_preflight",
+                "blockers": blockers,
+                "attempted_by": user_id,
+                "attempted_at": attempted_at,
+                "reason": reason,
+            },
+        },
+    }
+
+
+async def _execute_coordinated_child_actions(
+    *,
+    bundle: dict[str, Any],
+    user_id: str,
+    recommendation_id: str,
+) -> dict[str, Any]:
+    results = []
+    device_writes = 0
+    all_success = True
+
+    for action in _coordinated_controllable_actions(bundle):
+        control_point_ref = action.get("control_point_ref") if isinstance(action.get("control_point_ref"), dict) else {}
+        device_id = _coordinated_action_device_id(action)
+        point_name = control_point_ref.get("point_name") or action.get("point")
+        value = action.get("recommended_value")
+
+        if not device_id or not point_name or value is None:
+            all_success = False
+            results.append(
+                {
+                    "action_id": action.get("action_id"),
+                    "equipment_code": action.get("equipment_code"),
+                    "success": False,
+                    "error": "Missing device_id, point, or recommended_value",
+                }
+            )
+            continue
+
+        try:
+            success = await device_manager.write_device_value(
+                device_id=str(device_id),
+                point_name=str(point_name),
+                value=value,
+                user=user_id,
+            )
+            if success:
+                device_writes += 1
+            else:
+                all_success = False
+            results.append(
+                {
+                    "action_id": action.get("action_id"),
+                    "device_id": device_id,
+                    "point_name": point_name,
+                    "value": value,
+                    "success": bool(success),
+                }
+            )
+        except Exception as exc:
+            all_success = False
+            results.append(
+                {
+                    "action_id": action.get("action_id"),
+                    "device_id": device_id,
+                    "point_name": point_name,
+                    "value": value,
+                    "success": False,
+                    "error": str(exc),
+                }
+            )
+
+    return {
+        "status": "executed" if all_success and device_writes > 0 else "failed",
+        "executed": all_success and device_writes > 0,
+        "device_writes": device_writes,
+        "recommendation_id": recommendation_id,
+        "child_results": results,
+    }
+
+
+def _coordinated_draft_decision_update(
+    record: dict[str, Any],
+    *,
+    decision: str,
+    user_id: str,
+    reason: str | None,
+) -> dict[str, Any]:
+    if decision not in {"approved", "rejected"}:
+        raise ValueError(f"Unsupported coordinated draft decision: {decision}")
+
+    decided_at = datetime.utcnow().isoformat()
+    metadata = dict(record.get("metadata") or {})
+    bundle = dict(metadata.get("coordination_bundle") or {})
+    audit = list(metadata.get("approval_audit") or [])
+    audit.append(
+        {
+            "decision": decision,
+            "user_id": user_id,
+            "reason": reason,
+            "timestamp": decided_at,
+            "path": "coordinated_optimization_parent_bundle",
+        }
+    )
+
+    bundle["approval_status"] = decision
+    bundle["approved_by" if decision == "approved" else "rejected_by"] = user_id
+    bundle["approved_at" if decision == "approved" else "rejected_at"] = decided_at
+    if reason:
+        bundle["approval_reason" if decision == "approved" else "rejection_reason"] = reason
+
+    metadata.update(
+        {
+            "lifecycle": "approved_pending_execution" if decision == "approved" else "rejected",
+            "coordination_bundle": bundle,
+            "approval_audit": audit,
+        }
+    )
+
+    action = dict(record.get("action") or {})
+    action["execution_blocked"] = True
+    if decision == "approved":
+        action["blocker"] = "coordinated_execution_not_implemented"
+        blockers = list(action.get("blockers") or [])
+        if "coordinated_execution_not_implemented" not in blockers:
+            blockers.append("coordinated_execution_not_implemented")
+        action["blockers"] = blockers
+        return {
+            "status": RecommendationStatus.APPROVED.value,
+            "approval_status": "approved",
+            "approved_by": user_id,
+            "approved_at": decided_at,
+            "approval_reason": reason,
+            "action": action,
+            "metadata": metadata,
+            "execution_result": {
+                "status": "approved_pending_coordinated_execution",
+                "executed": False,
+                "device_writes": 0,
+                "reason": "Parent bundle approved; coordinated execution remains separately gated.",
+            },
+        }
+
+    action["blocker"] = "rejected"
+    return {
+        "status": RecommendationStatus.REJECTED.value,
+        "approval_status": "rejected",
+        "rejection_reason": reason or "Rejected by operator",
+        "approved_by": user_id,
+        "action": action,
+        "metadata": metadata,
+        "execution_result": {
+            "status": "rejected",
+            "executed": False,
+            "device_writes": 0,
+        },
+    }
+
+
+def _humanize_coordinated_value(value: Any) -> str:
+    text = str(value or "").replace("_", " ").replace("-", " ").strip()
+    return " ".join(text.split())
+
+
+def _coordinated_sentence_fragment(value: Any) -> str:
+    text = _humanize_coordinated_value(value)
+    return text[:1].lower() + text[1:] if text else text
+
+
+def _format_coordinated_system_label(bundle: dict[str, Any], record: dict[str, Any]) -> str:
+    objective = str(bundle.get("objective") or record.get("reason") or "Review coordinated optimization")
+    zones = bundle.get("zones") or []
+    zone = str(zones[0]) if zones else ""
+
+    if objective.startswith("coordinate_zone_") and objective.endswith("_terminal_response"):
+        return f"Terminal response coordination - {zone or _humanize_coordinated_value(objective)}"
+    if objective.startswith("stabilize_plant_group_"):
+        group = objective.removeprefix("stabilize_plant_group_")
+        return f"Plant group stabilization - {_humanize_coordinated_value(group).title()}"
+
+    return _humanize_coordinated_value(objective)
+
+
+def _format_coordinated_expected_benefit(benefit: dict[str, Any]) -> str:
+    parts = []
+    for key, value in benefit.items():
+        if value is None:
+            continue
+        parts.append(f"{_humanize_coordinated_value(key).capitalize()}: {_humanize_coordinated_value(value)}")
+    return "; ".join(parts)
+
+
+def _format_coordinated_action_line(action: dict[str, Any], index: int) -> str:
+    affected_equipment = action.get("affected_equipment") if isinstance(action.get("affected_equipment"), list) else []
+    equipment = (
+        ", ".join(str(item) for item in affected_equipment[:5])
+        or action.get("equipment_code")
+        or action.get("target_equipment")
+        or "affected equipment"
+    )
+    point = action.get("point")
+    value = action.get("recommended_value")
+    recommended_adjustment = action.get("recommended_adjustment")
+    reason = action.get("reason") or "Coordinate equipment response before any control change."
+
+    if point and value is not None:
+        return (
+            f"{index}. Adjust {html.escape(str(equipment))} "
+            f"{html.escape(_humanize_coordinated_value(point))} to {html.escape(str(value))} "
+            f"because {html.escape(_coordinated_sentence_fragment(reason))}."
+        )
+
+    if recommended_adjustment:
+        return (
+            f"{index}. {html.escape(_humanize_coordinated_value(recommended_adjustment))} "
+            f"involving {html.escape(str(equipment))} because {html.escape(_coordinated_sentence_fragment(reason))}."
+        )
+
+    return (
+        f"{index}. Review and coordinate {html.escape(str(equipment))} with the affected plant group "
+        f"because {html.escape(_coordinated_sentence_fragment(reason))}."
+    )
+
+
+def _format_coordinated_draft_telegram_message(record: dict[str, Any]) -> str:
+    metadata = record.get("metadata") or {}
+    bundle = metadata.get("coordination_bundle") or {}
+    affected = bundle.get("affected_equipment") or []
+    blockers = _without_read_only_blocker(bundle.get("blocked_reasons"))
+    benefit = bundle.get("expected_benefit") or record.get("expected_impact") or {}
+    confidence = bundle.get("confidence") or {}
+    actions = bundle.get("recommended_actions") or []
+    site_id = str(record.get("site_id") or bundle.get("site_id") or "unknown")
+    site_name = _site_display_name(site_id, str(metadata.get("site_name") or bundle.get("site_name") or ""))
+    objective = _format_coordinated_system_label(bundle, record)
+    benefit_text = _format_coordinated_expected_benefit(benefit) if isinstance(benefit, dict) else str(benefit)
+
+    affected_text = ", ".join(str(item) for item in affected[:5]) or record.get("target_equipment") or "Unknown"
+    if len(affected) > 5:
+        affected_text += f", +{len(affected) - 5} more"
+
+    lines = [
+        "<b>SENTINEL AI Recommendation</b>",
+        "",
+        f"<b>Site:</b> {html.escape(site_name)}",
+        f"<b>System:</b> {html.escape(objective)}",
+        f"<b>Affected:</b> {html.escape(affected_text)}",
+    ]
+    if actions:
+        lines.extend(["", "<b>Recommended action:</b>"])
+        lines.extend(_format_coordinated_action_line(action, idx) for idx, action in enumerate(actions[:5], start=1))
+    else:
+        lines.extend(
+            [
+                "",
+                "<b>Recommended action:</b>",
+                f"1. Review and coordinate {html.escape(affected_text)} because {html.escape(objective)}.",
+            ]
+        )
+    if benefit_text:
+        lines.append(f"<b>Expected benefit:</b> {html.escape(benefit_text)}")
+    if confidence:
+        lines.append(f"<b>Confidence:</b> {html.escape(str(confidence.get('score', 'medium')))}")
+    if blockers:
+        lines.append(f"<b>Cannot execute yet:</b> {html.escape(', '.join(str(item) for item in blockers[:5]))}")
+    lines.extend(
+        [
+            "",
+            "In supervised mode, Approve will apply the change only if SIMBIOT mapping, insurance, safety, and work-order checks pass.",
+        ]
+    )
+    return "\n".join(lines)
+
+
+async def _notify_coordinated_draft_packaged(record: dict[str, Any]) -> None:
+    from app.config.settings import settings
+    from app.services.telegram_message_sender import InlineButton, InlineKeyboard, TelegramMessageSender
+
+    bot_token = getattr(settings, "sentry_manager_bot_token", None) or getattr(settings, "telegram_bot_token", None)
+    chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
+    if not bot_token or not chat_id:
+        logger.debug("[COORD-OPT] Telegram notification skipped; bot token or chat id missing")
+        return
+
+    rec_id = str(record.get("id") or "")
+    if not rec_id:
+        logger.warning("[COORD-OPT] Telegram notification skipped; draft recommendation id missing")
+        return
+
+    keyboard = InlineKeyboard(
+        rows=[
+            [
+                InlineButton(label="Approve", callback_data=f"coord:approve:{rec_id}"),
+                InlineButton(label="Reject", callback_data=f"coord:reject:{rec_id}"),
+            ]
+        ]
+    )
+    sender = TelegramMessageSender(bot_token)
+    await sender.send_text(
+        str(chat_id),
+        _format_coordinated_draft_telegram_message(record),
+        keyboard=keyboard,
+        parse_mode="HTML",
+    )
+
+
+def _load_coordinated_bundle_inputs(site_id: str) -> dict[str, Any]:
+    from app.database.supabase_client import get_supabase_client
+
+    supabase = get_supabase_client()
+    site_rows = supabase.table("sites").select("id,code,name,onboarding_phase").eq("code", site_id).limit(1).execute()
+    if not site_rows.data and site_id.upper() == "S002":
+        site_rows = (
+            supabase.table("sites").select("id,code,name,onboarding_phase").eq("code", "site-002").limit(1).execute()
+        )
+    if not site_rows.data:
+        raise HTTPException(status_code=404, detail=f"Site not found: {site_id}")
+
+    site = site_rows.data[0]
+    site_uuid = site["id"]
+    site_code = site.get("code") or site_id
+    site_phase = site.get("onboarding_phase") or "advisory"
+
+    equipment_result = (
+        supabase.table("equipment")
+        .select("id,code,type,status,zone_key,location,health_score")
+        .eq("site_id", site_uuid)
+        .execute()
+    )
+    equipment_rows = equipment_result.data or []
+    equipment_code_by_id = {
+        row.get("id"): row.get("code") for row in equipment_rows if row.get("id") and row.get("code")
+    }
+
+    recommendation_site_ids = sorted({site_uuid, site_code, site_id, site_id.upper()})
+    recommendations_result = (
+        supabase.table("recommendations")
+        .select("id,site_id,target_equipment,action,status,confidence_score,metadata,timestamp")
+        .in_("site_id", recommendation_site_ids)
+        .order("timestamp", desc=True)
+        .limit(100)
+        .execute()
+    )
+
+    active_work_order_statuses = ["open", "scheduled", "assigned", "in_progress", "pending", "draft"]
+    work_orders_result = (
+        supabase.table("work_orders")
+        .select("id,code,status,equipment_id,milestone_status")
+        .eq("site_id", site_uuid)
+        .in_("status", active_work_order_statuses)
+        .limit(100)
+        .execute()
+    )
+    work_orders = []
+    for work_order in work_orders_result.data or []:
+        enriched = dict(work_order)
+        enriched["equipment_code"] = equipment_code_by_id.get(work_order.get("equipment_id"))
+        work_orders.append(enriched)
+
+    context = PlannerContext(
+        site_id=site_code,
+        site_phase=site_phase,
+        simbiot_write_mapping_verified=False,
+        insurance_confirmed=False,
+    )
+    bundles = build_coordinated_bundles(
+        context=context,
+        equipment=equipment_rows,
+        recommendations=recommendations_result.data or [],
+        work_orders=work_orders,
+        fault_signals=[],
+    )
+    return {
+        "site": site,
+        "site_code": site_code,
+        "site_phase": site_phase,
+        "bundles": bundles,
+    }
+
+
+@router.post("/optimization/coordinated-bundles/package")
+async def package_coordinated_optimization_bundle(
+    body: PackageCoordinatedBundleRequest = Body(...),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+) -> dict[str, Any]:
+    """Persist a reviewed coordinated bundle as one pending parent draft recommendation."""
+    try:
+        bundle_id = _requested_bundle_id(body)
+        if not bundle_id:
+            raise HTTPException(
+                status_code=422, detail="bundle_id or bundle.metadata.coordination_bundle.bundle_id is required"
+            )
+
+        from app.database.supabase_client import get_supabase_client
+
+        inputs = _load_coordinated_bundle_inputs(body.site_id)
+        bundle = _find_bundle_by_id(inputs["bundles"], bundle_id)
+        if not bundle:
+            raise HTTPException(status_code=404, detail=f"Coordinated bundle not found: {bundle_id}")
+
+        _validate_coordinated_packaging_allowed(bundle, inputs["site_phase"])
+
+        user_id = getattr(auth, "user_id", None) or "operator"
+        draft = _transition_bundle_to_supervised_draft(bundle, requested_by=user_id, note=body.note)
+        site_name = inputs["site"].get("name")
+        if site_name:
+            draft["metadata"]["site_name"] = site_name
+            draft["metadata"]["coordination_bundle"]["site_name"] = site_name
+        supabase = get_supabase_client()
+        existing_result = (
+            supabase.table("recommendations")
+            .select("id,status,approval_status,metadata")
+            .eq("site_id", inputs["site_code"])
+            .eq("action_type", "coordinated_optimization")
+            .limit(100)
+            .execute()
+        )
+        for existing in existing_result.data or []:
+            if _is_active_coordinated_bundle_record(existing, bundle_id):
+                message = "Active coordinated optimization bundle already exists"
+                if existing.get("status") == RecommendationStatus.PENDING.value:
+                    message = "Pending coordinated optimization draft already exists"
+                return {
+                    "success": True,
+                    "created": False,
+                    "site_id": inputs["site_code"],
+                    "bundle_id": bundle_id,
+                    "recommendation_id": existing.get("id"),
+                    "status": existing.get("status"),
+                    "approval_status": existing.get("approval_status"),
+                    "requires_approval": True,
+                    "execution_blocked": True,
+                    "work_orders_created": False,
+                    "message": message,
+                }
+
+        created_result = supabase.table("recommendations").insert(draft).execute()
+        if not created_result.data:
+            raise HTTPException(status_code=500, detail="Failed to create coordinated optimization draft")
+        created = created_result.data[0]
+        try:
+            await _notify_coordinated_draft_packaged(created)
+        except Exception as notify_error:
+            logger.warning("[COORD-OPT] Telegram notification failed for %s: %s", created.get("id"), notify_error)
+
+        return {
+            "success": True,
+            "created": True,
+            "site_id": inputs["site_code"],
+            "bundle_id": bundle_id,
+            "recommendation_id": created.get("id"),
+            "status": created.get("status"),
+            "approval_status": created.get("approval_status"),
+            "requires_approval": created.get("requires_approval"),
+            "execution_blocked": bool((created.get("action") or {}).get("execution_blocked")),
+            "work_orders_created": False,
+            "metadata": created.get("metadata"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error packaging coordinated optimization bundle for %s: %s", body.site_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/optimization/coordinated-drafts")
+async def list_coordinated_optimization_drafts(
+    site_id: str = Query(..., description="Site code, e.g. site-002"),
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> dict[str, Any]:
+    """List pending coordinated optimization draft bundles without relying on ai_optimization filters."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+        site_rows = supabase.table("sites").select("id,code").eq("code", site_id).limit(1).execute()
+        site_ids = {site_id, site_id.upper()}
+        if site_rows.data:
+            site_ids.add(site_rows.data[0].get("id"))
+            site_ids.add(site_rows.data[0].get("code"))
+
+        result = (
+            supabase.table("recommendations")
+            .select("*")
+            .in_("site_id", sorted(site_ids))
+            .eq("action_type", "coordinated_optimization")
+            .eq("status", RecommendationStatus.PENDING.value)
+            .order("timestamp", desc=True)
+            .limit(100)
+            .execute()
+        )
+        drafts = [
+            row
+            for row in (result.data or [])
+            if (row.get("metadata") or {}).get("lifecycle") == "draft_pending_approval"
+        ]
+        return {"site_id": site_id, "count": len(drafts), "drafts": drafts}
+    except Exception as e:
+        logger.error("Error listing coordinated optimization drafts for %s: %s", site_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/coordinated-drafts/approve")
+async def approve_coordinated_optimization_draft(
+    body: CoordinatedDraftDecisionRequest = Body(...),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+) -> dict[str, Any]:
+    """Approve a parent coordinated draft without executing setpoints."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+        result = supabase.table("recommendations").select("*").eq("id", body.recommendation_id).limit(1).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Coordinated optimization draft not found")
+
+        record = result.data[0]
+        _validate_coordinated_draft_record(record, body.site_id)
+        user_id = getattr(auth, "user_id", None) or "operator"
+        updates = _coordinated_draft_decision_update(
+            record,
+            decision="approved",
+            user_id=user_id,
+            reason=body.reason,
+        )
+
+        update_result = supabase.table("recommendations").update(updates).eq("id", body.recommendation_id).execute()
+        if not update_result.data:
+            raise HTTPException(status_code=500, detail="Failed to approve coordinated optimization draft")
+        updated = update_result.data[0]
+        return {
+            "success": True,
+            "recommendation_id": body.recommendation_id,
+            "status": updated.get("status"),
+            "approval_status": updated.get("approval_status"),
+            "execution_blocked": bool((updated.get("action") or {}).get("execution_blocked")),
+            "device_writes": 0,
+            "execution_result": updated.get("execution_result"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error approving coordinated optimization draft %s: %s", body.recommendation_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/coordinated-drafts/reject")
+async def reject_coordinated_optimization_draft(
+    body: CoordinatedDraftDecisionRequest = Body(...),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+) -> dict[str, Any]:
+    """Reject a parent coordinated draft without executing setpoints."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+        result = supabase.table("recommendations").select("*").eq("id", body.recommendation_id).limit(1).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Coordinated optimization draft not found")
+
+        record = result.data[0]
+        _validate_coordinated_draft_record(record, body.site_id)
+        user_id = getattr(auth, "user_id", None) or "operator"
+        updates = _coordinated_draft_decision_update(
+            record,
+            decision="rejected",
+            user_id=user_id,
+            reason=body.reason,
+        )
+
+        update_result = supabase.table("recommendations").update(updates).eq("id", body.recommendation_id).execute()
+        if not update_result.data:
+            raise HTTPException(status_code=500, detail="Failed to reject coordinated optimization draft")
+        updated = update_result.data[0]
+        return {
+            "success": True,
+            "recommendation_id": body.recommendation_id,
+            "status": updated.get("status"),
+            "approval_status": updated.get("approval_status"),
+            "execution_blocked": bool((updated.get("action") or {}).get("execution_blocked")),
+            "device_writes": 0,
+            "execution_result": updated.get("execution_result"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error rejecting coordinated optimization draft %s: %s", body.recommendation_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/coordinated-drafts/retire")
+async def retire_coordinated_optimization_draft(
+    body: CoordinatedDraftDecisionRequest = Body(...),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+) -> dict[str, Any]:
+    """Supersede an approved coordinated draft that is blocked before device writes."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+        result = supabase.table("recommendations").select("*").eq("id", body.recommendation_id).limit(1).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Coordinated optimization draft not found")
+
+        record = result.data[0]
+        _validate_coordinated_retire_record(record, body.site_id)
+        user_id = getattr(auth, "user_id", None) or "operator"
+        updates = _coordinated_draft_retire_update(
+            record,
+            user_id=user_id,
+            reason=body.reason,
+        )
+
+        update_result = supabase.table("recommendations").update(updates).eq("id", body.recommendation_id).execute()
+        if not update_result.data:
+            raise HTTPException(status_code=500, detail="Failed to retire coordinated optimization draft")
+        updated = update_result.data[0]
+        return {
+            "success": True,
+            "recommendation_id": body.recommendation_id,
+            "status": updated.get("status"),
+            "approval_status": updated.get("approval_status"),
+            "lifecycle": (updated.get("metadata") or {}).get("lifecycle"),
+            "execution_blocked": bool((updated.get("action") or {}).get("execution_blocked")),
+            "device_writes": (updated.get("execution_result") or {}).get("device_writes", 0),
+            "execution_result": updated.get("execution_result"),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error retiring coordinated optimization draft %s: %s", body.recommendation_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/optimization/coordinated-drafts/execute")
+async def execute_coordinated_optimization_draft(
+    body: CoordinatedDraftExecuteRequest = Body(...),
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+) -> dict[str, Any]:
+    """Execute an approved coordinated parent draft after live preflight checks."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        supabase = get_supabase_client()
+        result = supabase.table("recommendations").select("*").eq("id", body.recommendation_id).limit(1).execute()
+        if not result.data:
+            raise HTTPException(status_code=404, detail="Coordinated optimization draft not found")
+
+        record = result.data[0]
+        _validate_coordinated_execution_record(record, body.site_id)
+
+        inputs = _load_coordinated_bundle_inputs(body.site_id)
+        bundle = _coordinated_bundle_from_record(record)
+        bundle_id = bundle.get("bundle_id")
+        live_bundle = _find_bundle_by_id(inputs["bundles"], bundle_id) if bundle_id else None
+        user_id = getattr(auth, "user_id", None) or "operator"
+
+        blockers = _coordinated_execution_blockers(
+            record=record,
+            live_bundle=live_bundle,
+            site_phase=inputs["site_phase"],
+        )
+        if blockers:
+            updates = _coordinated_execution_blocked_result(
+                record=record,
+                blockers=blockers,
+                user_id=user_id,
+                reason=body.reason,
+            )
+            update_result = supabase.table("recommendations").update(updates).eq("id", body.recommendation_id).execute()
+            updated = update_result.data[0] if update_result.data else {**record, **updates}
+            execution_result = updated.get("execution_result") or updates["execution_result"]
+            return {
+                "success": False,
+                "recommendation_id": body.recommendation_id,
+                "status": updated.get("status"),
+                "approval_status": updated.get("approval_status"),
+                "execution_blocked": True,
+                "device_writes": 0,
+                "execution_result": execution_result,
+            }
+
+        execution_result = await _execute_coordinated_child_actions(
+            bundle=bundle,
+            user_id=user_id,
+            recommendation_id=body.recommendation_id,
+        )
+        executed = bool(execution_result.get("executed"))
+        executed_at = datetime.utcnow().isoformat()
+        updates = {
+            "status": RecommendationStatus.EXECUTED.value if executed else RecommendationStatus.FAILED.value,
+            "executed_at": executed_at if executed else None,
+            "execution_result": execution_result,
+            "metadata": {
+                **(record.get("metadata") or {}),
+                "lifecycle": "executed" if executed else "execution_failed",
+                "executed_by": user_id if executed else None,
+                "executed_at": executed_at if executed else None,
+            },
+        }
+        update_result = supabase.table("recommendations").update(updates).eq("id", body.recommendation_id).execute()
+        if not update_result.data:
+            raise HTTPException(status_code=500, detail="Failed to update coordinated execution result")
+        updated = update_result.data[0]
+        return {
+            "success": executed,
+            "recommendation_id": body.recommendation_id,
+            "status": updated.get("status"),
+            "approval_status": updated.get("approval_status"),
+            "execution_blocked": not executed,
+            "device_writes": execution_result.get("device_writes", 0),
+            "execution_result": execution_result,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error executing coordinated optimization draft %s: %s", body.recommendation_id, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -604,6 +1798,8 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
             site_settings = site.get("optimization_settings") or {}
             site_mode = site_settings.get("mode", "supervised")
             site_phase = site.get("onboarding_phase") or "shadow"
+        site_phase = _resolve_site_phase(request.site_id, site_phase)
+        is_shadow_phase = site_phase == "shadow_live"
         controls_module_active = _controls_module_active(request.site_id)
 
         # --- Tier Routing (Phase 82-02) ---
@@ -667,7 +1863,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
             _correlation_id = rec_item.get("correlation_id") or str(uuid4())
             _rec_obj = Recommendation(
                 site_id=request.site_id,
-                source="optimization_api",
+                source="ai_optimizer",
                 status=RecommendationStatus.PENDING,
                 target_equipment=rec_item.get("equipment_code", rec_item.get("equipment", "")),
                 action={
@@ -679,6 +1875,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
                 confidence=str(confidence) if not isinstance(confidence, str) else confidence,
                 profile=recommendation.profile or "",
                 correlation_id=_correlation_id,
+                shadow_mode=is_shadow_phase,
             )
             try:
                 # Supersede stale pending recs for same equipment+point before inserting

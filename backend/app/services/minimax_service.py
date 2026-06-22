@@ -1,4 +1,4 @@
-"""Minimax cloud LLM service (Anthropic-compatible chat completions)."""
+"""Minimax cloud LLM service (OpenAI-compatible chat completions)."""
 
 import logging
 import re
@@ -63,7 +63,7 @@ def _strip_thinking_tags(text: str) -> str:
 
 
 class MinimaxService:
-    """Service for interacting with Minimax chat completion API (Anthropic-compatible)."""
+    """Service for interacting with the MiniMax OpenAI-compatible chat API."""
 
     def __init__(self):
         self._api_key = settings.minimax_api_key
@@ -101,6 +101,7 @@ class MinimaxService:
         system_prompt: str | None = None,
         model_override: str | None = None,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Open the Minimax streaming connection eagerly, validate the HTTP status
@@ -114,19 +115,17 @@ class MinimaxService:
             raise ValueError("MINIMAX_API_KEY not configured.")
 
         system = system_prompt or MINIMAX_SYSTEM_PROMPT
-        anthropic_messages = [{"role": "system", "content": system}]
-        anthropic_messages.extend(messages)
+        chat_messages = [{"role": "system", "content": system}, *messages]
 
         model = model_override or self._model
-        url = f"{self._base_url}/messages"
+        url = f"{self._base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
         }
         payload = {
             "model": model,
-            "messages": anthropic_messages,
+            "messages": chat_messages,
             "max_tokens": 1536,
             "stream": True,
         }
@@ -169,30 +168,25 @@ class MinimaxService:
         import json
 
         try:
-            # Parse Anthropic SSE event stream
-            # Events: message_start, ping, content_block_start,
-            #         content_block_delta, content_block_stop, message_delta, message_stop
-            # Each event is "event: <type>\ndata: <json>\n"
-            event_type = None
+            # Parse OpenAI-compatible SSE event stream.
             async for line in response.aiter_lines():
-                if line.startswith("event: "):
-                    event_type = line[7:].strip()
-                elif line.startswith("data: ") and event_type:
-                    data_str = line[6:].strip()
-                    if not data_str:
-                        continue
-                    try:
-                        data = json.loads(data_str)
-                    except Exception:
-                        continue
-                    # Only yield text_delta content — skip thinking blocks
-                    if event_type == "content_block_delta":
-                        delta = data.get("delta", {})
-                        if delta.get("type") == "text_delta":
-                            text = delta.get("text", "")
-                            if text:
-                                yield text
-                    elif event_type == "message_stop":
+                if not line.startswith("data: "):
+                    continue
+                data_str = line[6:].strip()
+                if not data_str:
+                    continue
+                if data_str == "[DONE]":
+                    break
+                try:
+                    data = json.loads(data_str)
+                except Exception:
+                    continue
+                for choice in data.get("choices", []):
+                    delta = choice.get("delta", {})
+                    text = delta.get("content") or delta.get("reasoning_content") or ""
+                    if text:
+                        yield _strip_thinking_tags(str(text))
+                    if choice.get("finish_reason"):
                         break
         except httpx.HTTPStatusError as e:
             logger.error("Minimax HTTP error: %s", e)
@@ -210,25 +204,24 @@ class MinimaxService:
         system_prompt: str | None = None,
         model_override: str | None = None,
         source: str = "chat",
+        site_id: str | None = None,
     ) -> str:
         """Return a complete (non-streaming) completion from Minimax."""
         if not self._api_key:
             raise ValueError("MINIMAX_API_KEY not configured.")
 
         system = system_prompt or MINIMAX_SYSTEM_PROMPT
-        anthropic_messages = [{"role": "system", "content": system}]
-        anthropic_messages.extend(messages)
+        chat_messages = [{"role": "system", "content": system}, *messages]
 
         model = model_override or self._model
-        url = f"{self._base_url}/messages"
+        url = f"{self._base_url}/chat/completions"
         headers = {
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
-            "anthropic-version": "2023-06-01",
         }
         payload = {
             "model": model,
-            "messages": anthropic_messages,
+            "messages": chat_messages,
             "max_tokens": 1536,
             "stream": False,
         }
@@ -252,28 +245,22 @@ class MinimaxService:
                 usage_tracker.record(
                     provider="minimax",
                     model=model,
-                    input_tokens=u.get("input_tokens", 0),
-                    output_tokens=u.get("output_tokens", 0),
+                    input_tokens=u.get("prompt_tokens", u.get("input_tokens", 0)),
+                    output_tokens=u.get("completion_tokens", u.get("output_tokens", 0)),
                     source=source,
                     feature="intent_classifier",
+                    site_id=site_id or "unknown",
                 )
             except Exception:
                 pass
 
-            content = body.get("content", [])
-            if not content:
+            choices = body.get("choices", [])
+            if not choices:
                 return ""
 
-            # Extract text from content blocks, skipping thinking blocks
-            result_parts = []
-            for block in content:
-                if isinstance(block, dict):
-                    if block.get("type") == "text":
-                        result_parts.append(str(block.get("text", "")))
-                    # Skip thinking blocks
-                elif isinstance(block, str):
-                    result_parts.append(block)
-            return "".join(result_parts)
+            message = choices[0].get("message", {})
+            content = message.get("content") or message.get("reasoning_content") or ""
+            return _strip_thinking_tags(str(content))
 
 
 minimax_service = MinimaxService()

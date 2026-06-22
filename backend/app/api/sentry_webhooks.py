@@ -14,12 +14,15 @@ Manager control additions:
 """
 
 import base64
+import hashlib
 import hmac
+import html
 import logging
 import os
-from datetime import UTC, datetime
+import re
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Header, HTTPException, Query, Request, status
@@ -71,6 +74,25 @@ def _derive_equipment_code_from_desk(desk_id: str, site_code: str = "site-002") 
     zone_code = f"{floor_digit}{zone_number:02d}"
     site_prefix = site_code.replace("-", "").upper()
     return f"{site_prefix}-FCU-{zone_code}"
+
+
+def _normalise_dedupe_text(value: str | None) -> str:
+    """Normalise user supplied text for short-window duplicate detection."""
+    return " ".join((value or "").strip().lower().split())
+
+
+def _call_log_dedupe_key(req: "CallLogRequest") -> str:
+    """Stable key for the same reporter/location/issue within a short time window."""
+    parts = [
+        req.reporter_telegram_id or req.reported_by,
+        req.site_id,
+        req.desk_id or req.location_text,
+        req.category,
+        req.sub_category,
+        _normalise_dedupe_text(req.original_message or req.description),
+    ]
+    material = "|".join(_normalise_dedupe_text(part) for part in parts)
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
 async def _transcribe_voice_note(voice_file_id: str) -> str | None:
@@ -192,8 +214,8 @@ def _require_sentry_secret_or_key(
         raise HTTPException(status_code=503, detail="Sentry integration misconfigured")
 
     if settings.is_live_mode:
-        secret_ok = secret and hmac.compare_digest(secret, configured_secret)
-        key_ok = api_key and hmac.compare_digest(api_key, configured_key)
+        secret_ok = bool(secret and configured_secret and hmac.compare_digest(secret, configured_secret))
+        key_ok = bool(api_key and configured_key and hmac.compare_digest(api_key, configured_key))
         if not secret_ok and not key_ok:
             raise HTTPException(status_code=403, detail="Unauthorized")
         return
@@ -206,6 +228,939 @@ def _require_sentry_secret_or_key(
     if api_key and configured_key and hmac.compare_digest(api_key, configured_key):
         return
     raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+def _extract_supervised_approval_rec_id(text: str | None) -> str | None:
+    """Extract supervised recommendation approval IDs from callback data or forwarded text."""
+    raw = (text or "").strip()
+    if not raw:
+        return None
+    exact_prefix = "approve:rec_id:"
+    if raw.startswith(exact_prefix):
+        return raw.split(":", 2)[-1].strip()
+    match = re.search(
+        r"\bapprove\b[\s:]+rec_id[\s:]+([0-9a-fA-F-]{32,36})\b",
+        raw,
+        flags=re.IGNORECASE,
+    )
+    if match:
+        return match.group(1)
+    return None
+
+
+def _status_value(status: Any) -> str:
+    return str(getattr(status, "value", status) or "").strip().lower()
+
+
+def _format_telegram_time(value: Any) -> str:
+    if not value:
+        return "recorded earlier"
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            return str(value)
+    return parsed.strftime("%Y-%m-%d %H:%M UTC")
+
+
+def _closed_recommendation_approval_message(rec: Any) -> tuple[str, bool]:
+    status_value = _status_value(getattr(rec, "status", ""))
+    equipment = getattr(rec, "target_equipment", None) or "Equipment"
+    action = getattr(rec, "action", None) or {}
+    point = action.get("point") if isinstance(action, dict) else None
+    value = action.get("value") if isinstance(action, dict) else None
+    action_line = _approval_action_label(point, value) if point and value is not None else "Control action"
+
+    if status_value in {"executed", "auto_executed"}:
+        applied_at = getattr(rec, "executed_at", None) or getattr(rec, "approved_at", None)
+        outcome_validated = getattr(rec, "outcome_validated", None)
+        verification = (
+            "Outcome verification is complete." if outcome_validated is True else "Outcome verification is pending."
+        )
+        return (
+            f"✅ <b>Already actioned — {html.escape(str(equipment))}</b>\n"
+            f"<b>Action:</b> {html.escape(action_line)}\n"
+            f"<b>Applied:</b> {html.escape(_format_telegram_time(applied_at))}\n"
+            f"{verification}\n"
+            "No additional control action was applied.",
+            True,
+        )
+
+    if status_value == "approved":
+        return (
+            f"✅ <b>Already approved — {html.escape(str(equipment))}</b>\n"
+            f"<b>Action:</b> {html.escape(action_line)}\n"
+            "The approval was already recorded. No duplicate control action was applied.",
+            True,
+        )
+
+    if status_value == "expired":
+        return (
+            "Approval could not be completed.\n"
+            "This recommendation was replaced by a newer recommendation before approval. "
+            "No control action was applied from this button. Please use the latest SENTINEL recommendation.",
+            False,
+        )
+
+    if status_value == "rejected":
+        return (
+            "Approval could not be completed.\n"
+            "This recommendation was already rejected. No control action was applied.",
+            False,
+        )
+
+    if status_value == "failed":
+        return (
+            "Approval could not be completed.\n"
+            "This recommendation previously failed during execution. No duplicate control action was applied. "
+            "Please log an issue for support if the action is still required.",
+            False,
+        )
+
+    return (
+        "Approval could not be completed.\n"
+        "This recommendation is no longer pending. No control action was applied. "
+        "Please use the latest SENTINEL recommendation.",
+        False,
+    )
+
+
+async def _handle_supervised_recommendation_approval(
+    *,
+    chat_id: str,
+    user_id: str,
+    rec_uuid: str,
+    sender: Any,
+) -> dict[str, Any]:
+    from app.database.repositories.recommendation_repository import RecommendationRepository
+    from app.models.recommendation import RecommendationStatus
+    from app.services.approval_service import get_approval_service
+    from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
+    async def _safe_send(
+        *,
+        text: str,
+        keyboard: InlineKeyboard | None = None,
+        parse_mode: str | None = None,
+    ) -> None:
+        if not sender:
+            logger.warning("Telegram approval response not sent: no sender configured")
+            return
+        try:
+            await sender.send_text(chat_id=chat_id, text=text, keyboard=keyboard, parse_mode=parse_mode)
+        except Exception as exc:
+            logger.warning("Telegram approval response send failed: %s", exc)
+
+    repo = RecommendationRepository()
+    rec = await repo.get_by_id(rec_uuid)
+    if not rec:
+        await _safe_send(
+            text=(
+                "Approval could not be completed.\n"
+                "The recommendation is no longer available. No control action was applied."
+            ),
+        )
+        return {"success": True, "intent": "approve_recommendation", "confirmed": False}
+
+    if rec.status != RecommendationStatus.PENDING:
+        message, confirmed = _closed_recommendation_approval_message(rec)
+        await _safe_send(text=message, parse_mode="HTML")
+        return {
+            "success": True,
+            "intent": "approve_recommendation",
+            "confirmed": confirmed,
+            "recommendation_id": rec_uuid,
+            "status": _status_value(rec.status),
+        }
+
+    action = rec.action or {}
+    if action.get("execution_blocked") or not action.get("point") or action.get("value") is None:
+        keyboard = InlineKeyboard(
+            rows=[
+                [InlineButton("Create work order", f"wo:rec_id:{rec_uuid}")],
+                [InlineButton("Log issue", f"devissue:approval:{rec_uuid}")],
+            ]
+        )
+        await _safe_send(
+            text=(
+                "Approval could not be completed.\n"
+                "This recommendation requires manual BMS action. No control action was applied from Telegram."
+            ),
+            keyboard=keyboard,
+        )
+        return {
+            "success": True,
+            "intent": "approve_recommendation",
+            "confirmed": False,
+            "recommendation_id": rec_uuid,
+            "status": "manual_action_required",
+        }
+
+    try:
+        if not _recommendation_has_verified_write_path(
+            None,
+            site_id=rec.site_id,
+            equipment_id=rec.target_equipment,
+            point_name=action.get("point"),
+        ):
+            logger.warning(
+                "Telegram approval blocked because target write path is not verified: rec_id=%s site=%s equipment=%s point=%s",
+                rec_uuid,
+                rec.site_id,
+                rec.target_equipment,
+                action.get("point"),
+            )
+            keyboard = InlineKeyboard(
+                rows=[
+                    [InlineButton("Create work order", f"wo:rec_id:{rec_uuid}")],
+                    [InlineButton("Log issue", f"devissue:approval:{rec_uuid}")],
+                ]
+            )
+            await _safe_send(
+                text=_approval_failed_message(
+                    rec.target_equipment or "Equipment", "no verified writable control point"
+                ),
+                keyboard=keyboard,
+                parse_mode="HTML",
+            )
+            return {
+                "success": True,
+                "intent": "approve_recommendation",
+                "confirmed": False,
+                "recommendation_id": rec_uuid,
+                "status": "target_write_path_not_verified",
+            }
+    except Exception as readiness_err:
+        logger.warning(
+            "Telegram approval target write-path check failed closed: rec_id=%s site=%s error=%s",
+            rec_uuid,
+            rec.site_id,
+            readiness_err,
+        )
+        keyboard = InlineKeyboard(
+            rows=[
+                [InlineButton("Create work order", f"wo:rec_id:{rec_uuid}")],
+                [InlineButton("Log issue", f"devissue:approval:{rec_uuid}")],
+            ]
+        )
+        await _safe_send(
+            text=(
+                "Approval could not be completed.\n"
+                "The target control path could not be verified. No control action was applied from Telegram."
+            ),
+            keyboard=keyboard,
+        )
+        return {
+            "success": True,
+            "intent": "approve_recommendation",
+            "confirmed": False,
+            "recommendation_id": rec_uuid,
+            "status": "target_write_path_check_failed",
+        }
+
+    approval_svc = get_approval_service()
+    try:
+        result = await approval_svc.execute_approval(
+            recommendation_id=rec_uuid,
+            approved_by=f"telegram:{user_id}",
+            approval_notes="Approved via SENTRY Telegram supervised action notification",
+        )
+    except Exception as exc:
+        logger.exception(
+            "Telegram supervised recommendation approval crashed: rec_id=%s user_id=%s",
+            rec_uuid,
+            user_id,
+        )
+        keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{rec_uuid}")]])
+        await _safe_send(
+            text=_approval_failed_message(rec.target_equipment or "Equipment"),
+            keyboard=keyboard,
+            parse_mode="HTML",
+        )
+        return {
+            "success": True,
+            "intent": "approve_recommendation",
+            "confirmed": False,
+            "recommendation_id": rec_uuid,
+            "status": "error",
+            "error": type(exc).__name__,
+        }
+
+    equip = rec.target_equipment or "Equipment"
+    action = rec.action or {}
+    point = action.get("point") or "point"
+    value = action.get("value")
+    if result.success:
+        effect_text = _approval_effect_text(point)
+        text = (
+            f"✅ <b>Approved — {html.escape(str(equip))}</b>\n"
+            f"<b>Action:</b> {html.escape(_approval_action_label(point, value))}\n"
+            + (f"<b>Expected effect:</b> {html.escape(effect_text)}\n" if effect_text else "")
+            + "Adjustment submitted via supervised control.\n"
+            + "Outcome will be verified in ~30 minutes."
+        )
+        keyboard = None
+    else:
+        logger.warning(
+            "Telegram supervised recommendation approval failed: rec_id=%s user_id=%s status=%s error=%s",
+            rec_uuid,
+            user_id,
+            result.status,
+            result.error_message,
+        )
+        text = _approval_failed_message(equip, result.error_message)
+        if _is_control_path_not_ready_error(result.error_message):
+            keyboard = InlineKeyboard(
+                rows=[
+                    [InlineButton("Create work order", f"wo:rec_id:{rec_uuid}")],
+                    [InlineButton("Log issue", f"devissue:approval:{rec_uuid}")],
+                ]
+            )
+        else:
+            keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{rec_uuid}")]])
+    await _safe_send(text=text, keyboard=keyboard, parse_mode="HTML")
+    return {
+        "success": True,
+        "intent": "approve_recommendation",
+        "confirmed": result.success,
+        "recommendation_id": rec_uuid,
+        "status": result.status,
+    }
+
+
+async def _handle_supervised_package_approval(
+    *,
+    chat_id: str,
+    user_id: str,
+    site_id: str,
+    sender: Any,
+) -> dict[str, Any]:
+    from app.database.supabase_client import get_supabase_client
+    from app.services.approval_service import get_approval_service
+    from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
+    client = get_supabase_client()
+    rows = (
+        client.table("recommendations")
+        .select("id,site_id,target_equipment,action,status,timestamp")
+        .eq("site_id", site_id)
+        .eq("status", "pending")
+        .order("timestamp", desc=True)
+        .limit(8)
+        .execute()
+    )
+    latest_ts = None
+    for row in rows.data or []:
+        row_ts = row.get("timestamp")
+        if row_ts:
+            try:
+                parsed = datetime.fromisoformat(str(row_ts).replace("Z", "+00:00"))
+                latest_ts = parsed if latest_ts is None or parsed > latest_ts else latest_ts
+            except ValueError:
+                continue
+    candidates: list[dict[str, Any]] = []
+    recent_since = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+    for row in rows.data or []:
+        if latest_ts is not None and row.get("timestamp"):
+            try:
+                row_ts = datetime.fromisoformat(str(row["timestamp"]).replace("Z", "+00:00"))
+                if latest_ts - row_ts > timedelta(minutes=10):
+                    continue
+            except ValueError:
+                pass
+        action = row.get("action") or {}
+        if not isinstance(action, dict):
+            continue
+        if action.get("execution_blocked") or not action.get("point") or action.get("value") is None:
+            continue
+        executed_match = (
+            client.table("recommendations")
+            .select("id,action")
+            .eq("site_id", site_id)
+            .eq("target_equipment", row.get("target_equipment"))
+            .eq("status", "executed")
+            .gte("timestamp", recent_since)
+            .limit(20)
+            .execute()
+        )
+        already_executed = False
+        for executed_row in executed_match.data or []:
+            executed_action = executed_row.get("action") or {}
+            if (
+                isinstance(executed_action, dict)
+                and executed_action.get("point") == action.get("point")
+                and str(executed_action.get("value")) == str(action.get("value"))
+            ):
+                already_executed = True
+                break
+        if already_executed:
+            continue
+        if not _recommendation_has_verified_write_path(
+            None,
+            site_id=site_id,
+            equipment_id=row.get("target_equipment"),
+            point_name=action.get("point"),
+        ):
+            continue
+        candidates.append(row)
+
+    if not candidates:
+        await sender.send_text(
+            chat_id=chat_id,
+            text="Approval could not be completed.\nNo current executable supervised actions were ready for this site.",
+        )
+        return {"success": True, "intent": "approve_package", "confirmed": False, "site_id": site_id}
+
+    approval_svc = get_approval_service()
+    executed: list[str] = []
+    failed: list[str] = []
+    for row in candidates[:5]:
+        rec_id = str(row.get("id"))
+        action = row.get("action") or {}
+        label = f"{row.get('target_equipment')}.{action.get('point')}"
+        try:
+            result = await approval_svc.execute_approval(
+                recommendation_id=rec_id,
+                approved_by=f"telegram:{user_id}",
+                approval_notes="Approved via SENTRY Telegram supervised package approval",
+            )
+            if result.success:
+                executed.append(label)
+            else:
+                failed.append(label)
+        except Exception:
+            logger.exception("Package approval failed for recommendation %s", rec_id)
+            failed.append(label)
+
+    text = (
+        "✅ <b>Supervised package approved</b>\n"
+        f"<b>Actions submitted:</b> {len(executed)}\n"
+        "Expected effect: apply the coordinated sequence and verify building response on the next telemetry cycle."
+    )
+    if executed:
+        text += "\n\nApplied:\n" + "\n".join(f"• {html.escape(item)}" for item in executed)
+    if failed:
+        text += "\n\nNot applied:\n" + "\n".join(f"• {html.escape(item)}" for item in failed)
+        keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{site_id}")]])
+    else:
+        keyboard = None
+    await sender.send_text(chat_id=chat_id, text=text, keyboard=keyboard, parse_mode="HTML")
+    return {
+        "success": True,
+        "intent": "approve_package",
+        "confirmed": bool(executed) and not failed,
+        "site_id": site_id,
+        "executed": len(executed),
+        "failed": len(failed),
+    }
+
+
+def _approval_failed_message(equipment: str, error_message: str | None = None) -> str:
+    if _is_control_path_not_ready_error(error_message):
+        return (
+            "❌ <b>Approval could not be completed</b>\n"
+            f"<b>Recommendation:</b> {html.escape(str(equipment or 'Equipment'))}\n"
+            "This equipment is not ready for supervised control yet. "
+            "No control action was applied. Create a work order for manual BMS action or log an issue for support."
+        )
+    return (
+        "❌ <b>Approval could not be completed</b>\n"
+        f"<b>Recommendation:</b> {html.escape(str(equipment or 'Equipment'))}\n"
+        "The recommendation was not applied. Please try again in a moment or log an issue for support."
+    )
+
+
+def _parameter_type_is_writable(parameter_type: str | None) -> bool:
+    text = (parameter_type or "").lower()
+    if text in {"command", "setpoint", "writable"}:
+        return True
+    if text.startswith(("command:", "setpoint:", "writable:")):
+        return True
+    return any(token in text for token in ("analogoutput", "binaryoutput", "multistateoutput"))
+
+
+def _approval_action_label(point: str | None, value: Any) -> str:
+    point_key = str(point or "").strip().lower()
+    labels = {
+        "damper_position": "Open economiser damper",
+        "sat_setpoint": "Set supply-air temperature setpoint",
+        "chilled_water_setpoint": "Set chilled-water setpoint",
+        "fan_speed": "Set fan speed",
+        "setpoint": "Set temperature setpoint",
+        "on_off": "Set on/off command",
+    }
+    label = labels.get(point_key, f"Set {str(point or 'control point').replace('_', ' ')}")
+    return f"{label} to {value}"
+
+
+def _approval_effect_text(point: str | None) -> str | None:
+    point_key = str(point or "").strip().lower()
+    if point_key == "damper_position":
+        return "This brings in more cool outside air so the AHU can cool the building with less chiller load."
+    if point_key == "sat_setpoint":
+        return "This adjusts supply-air temperature so zones stay comfortable without unnecessary overcooling."
+    if point_key == "chilled_water_setpoint":
+        return "This makes chilled water warmer so the chiller compressor works less while cooling remains available."
+    if point_key == "fan_speed":
+        return "This changes airflow and fan energy; zone temperatures will be monitored for comfort drift."
+    if point_key in {"setpoint", "temperature_setpoint", "zone_setpoint"}:
+        return "This changes the zone target temperature and should reduce heating or cooling demand if comfort remains stable."
+    return None
+
+
+def _recommendation_has_verified_write_path(
+    client: Any | None,
+    *,
+    site_id: str,
+    equipment_id: str | None,
+    point_name: str | None,
+) -> bool:
+    equipment_code = _clean_equipment_code(equipment_id)
+    requested_point = str(point_name or "").strip().lower()
+    if not equipment_code or not requested_point:
+        return False
+
+    if client is None:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+
+    config_rows = (
+        client.table("site_adapter_config")
+        .select("protocol,connection_config")
+        .eq("site_id", site_id)
+        .eq("enabled", True)
+        .execute()
+    )
+    has_write_adapter = False
+    for row in config_rows.data or []:
+        protocol = str(row.get("protocol") or "").strip().lower()
+        config = row.get("connection_config") or {}
+        if protocol in {"bacnet", "knx", "modbus", "obix"}:
+            has_write_adapter = True
+            break
+        if protocol == "bridge" and config.get("supports_writes") is True and config.get("write_enabled") is True:
+            has_write_adapter = True
+            break
+    if not has_write_adapter:
+        return False
+
+    site_row = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+    if not site_row.data:
+        return False
+
+    mapping_rows = (
+        client.table("point_asset_mappings")
+        .select("bms_point_id,parameter_name,parameter_type")
+        .eq("site_id", site_row.data[0]["id"])
+        .eq("extracted_asset_id", equipment_code)
+        .eq("is_verified", True)
+        .execute()
+    )
+    for mapping in mapping_rows.data or []:
+        if not _parameter_type_is_writable(mapping.get("parameter_type")):
+            continue
+        parameter_name = str(mapping.get("parameter_name") or "").strip().lower()
+        bms_point_id = str(mapping.get("bms_point_id") or "").strip().lower()
+        suffix = bms_point_id.rsplit(".", 1)[-1] if "." in bms_point_id else bms_point_id
+        if requested_point in {parameter_name, suffix}:
+            return True
+    return False
+
+
+def _clean_equipment_code(value: str | None) -> str:
+    return str(value or "").strip().strip("*`").upper()
+
+
+def _is_control_path_not_ready_error(error_message: str | None) -> bool:
+    error_text = (error_message or "").lower()
+    return (
+        "no adapter registered" in error_text
+        or "not found or not connected" in error_text
+        or "no adapter for equipment" in error_text
+        or "writable whitelist" in error_text
+        or "not in the writable whitelist" in error_text
+        or "bridge adapter write returned false" in error_text
+        or "403 forbidden" in error_text
+    )
+
+
+def _developer_issue_recipient() -> str:
+    for env_name in (
+        "SENTRY_DEVELOPER_EMAIL",
+        "SENTINEL_DEVELOPER_EMAIL",
+        "DEVELOPER_ALERT_EMAIL",
+        "SUPPORT_EMAIL",
+    ):
+        value = (os.getenv(env_name, "") or "").strip()
+        if value:
+            return value
+    return "support@sentinel-ai.co.za"
+
+
+def _closeout_status_keyboard() -> Any:
+    from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
+    return InlineKeyboard(
+        rows=[
+            [
+                InlineButton("OK", "closeout:item:ok"),
+                InlineButton("Warning", "closeout:item:warning"),
+                InlineButton("Critical", "closeout:item:critical"),
+            ]
+        ]
+    )
+
+
+def _closeout_notes_keyboard() -> Any:
+    from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
+    return InlineKeyboard(rows=[[InlineButton("Skip notes/photos", "closeout:notes:skip")]])
+
+
+def _closeout_item_id(item: dict[str, Any], index: int) -> str:
+    return str(item.get("item_id") or item.get("id") or item.get("key") or f"item_{index + 1}")
+
+
+def _closeout_item_question(item: dict[str, Any]) -> str:
+    return str(item.get("question") or item.get("description") or item.get("label") or "Checklist item")
+
+
+async def _find_active_closeout_session(telegram_user_id: str) -> dict[str, Any] | None:
+    from app.database.supabase_client import get_supabase_client
+
+    sb = get_supabase_client()
+    result = (
+        sb.table("sentry_inspection_sessions")
+        .select("*")
+        .eq("telegram_user_id", str(telegram_user_id))
+        .in_("status", ["in_progress", "awaiting_notes"])
+        .order("updated_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return result.data[0] if result.data else None
+
+
+async def _update_closeout_session(session_id: str, updates: dict[str, Any]) -> None:
+    from app.database.supabase_client import get_supabase_client
+
+    sb = get_supabase_client()
+    payload = {**updates, "updated_at": datetime.now(UTC).isoformat()}
+    sb.table("sentry_inspection_sessions").update(payload).eq("id", session_id).execute()
+
+
+async def _send_closeout_item_prompt(chat_id: str, session: dict[str, Any], sender: Any) -> None:
+    items = session.get("checklist_items") or []
+    index = int(session.get("current_index") or 0)
+    if index >= len(items):
+        await sender.send_text(
+            chat_id=chat_id,
+            text="All checklist items recorded. Any final notes or photos to add?",
+            keyboard=_closeout_notes_keyboard(),
+            parse_mode="HTML",
+        )
+        return
+
+    item = items[index]
+    total = len(items)
+    question = _closeout_item_question(item)
+    text = f"Item {index + 1}/{total}: {html.escape(question)}"
+    await sender.send_text(chat_id=chat_id, text=text, keyboard=_closeout_status_keyboard(), parse_mode="HTML")
+
+
+def _build_closeout_summary(
+    session: dict[str, Any],
+    *,
+    final_notes: str = "",
+    photo_refs: list[str] | None = None,
+) -> tuple[list[Any], str, str, str]:
+    items = session.get("checklist_items") or []
+    responses = session.get("responses") or {}
+    result_items: list[SentryInspectionItem] = []
+    warnings: list[str] = []
+    criticals: list[str] = []
+    skipped: list[str] = []
+
+    for index, item in enumerate(items):
+        item_id = _closeout_item_id(item, index)
+        question = _closeout_item_question(item)
+        response = responses.get(item_id) or {}
+        status_value = str(response.get("status") or "").lower()
+        answer = str(response.get("answer") or status_value or "").strip()
+        if status_value not in {"ok", "warning", "critical"}:
+            status_value = "skipped"
+            answer = "NOT INSPECTED [SKIPPED]"
+            skipped.append(question)
+        elif status_value == "warning":
+            warnings.append(question)
+        elif status_value == "critical":
+            criticals.append(question)
+        result_items.append(
+            SentryInspectionItem(
+                item_id=item_id,
+                question=question,
+                answer=answer,
+                status=status_value,
+            )
+        )
+
+    if criticals:
+        outcome = "escalate"
+        diagnosis = "Critical findings recorded: " + "; ".join(criticals)
+        recommendations = (
+            "Escalate for follow-up work and verify the affected equipment before returning it to normal service."
+        )
+    elif warnings:
+        outcome = "parts_needed"
+        diagnosis = "Warning findings recorded: " + "; ".join(warnings)
+        recommendations = "Schedule follow-up maintenance for the warning items and monitor equipment operation."
+    else:
+        outcome = "fixed"
+        diagnosis = "All inspected checklist items passed. No abnormal findings were recorded."
+        recommendations = "No follow-up required from this closeout."
+
+    if skipped:
+        diagnosis += "\nSkipped/not inspected: " + "; ".join(skipped)
+    if final_notes:
+        diagnosis += f"\nTechnician notes: {final_notes}"
+    if photo_refs:
+        diagnosis += "\nPhoto/document references: " + ", ".join(photo_refs)
+
+    return result_items, diagnosis, recommendations, outcome
+
+
+async def _finalize_closeout_session(
+    *,
+    chat_id: str,
+    telegram_user_id: str,
+    sender: Any,
+    final_notes: str = "",
+    photo_refs: list[str] | None = None,
+) -> dict[str, Any]:
+    session = await _find_active_closeout_session(telegram_user_id)
+    if not session:
+        await sender.send_text(chat_id=chat_id, text="No active closeout session found.")
+        return {"success": True, "intent": "closeout", "confirmed": False}
+
+    items, diagnosis, recommendations, outcome = _build_closeout_summary(
+        session,
+        final_notes=final_notes,
+        photo_refs=photo_refs,
+    )
+    equipment_code = session.get("equipment_code") or ""
+    wo_code = session.get("wo_code") or ""
+
+    tech = None
+    try:
+        from app.database.repositories.technician_repository import get_technician_repository
+
+        tech = await get_technician_repository().get_technician_by_telegram_id(str(telegram_user_id))
+    except Exception:
+        logger.warning("Could not resolve technician for closeout finalisation: %s", telegram_user_id)
+    technician_name = (tech or {}).get("name") or str(telegram_user_id)
+
+    try:
+        await sentry_submit_inspection_result(
+            SentryInspectionResultRequest(
+                equipment_code=equipment_code,
+                work_order_code=wo_code,
+                technician_name=technician_name,
+                telegram_user_id=str(telegram_user_id),
+                items=items,
+                ai_diagnosis=diagnosis,
+                recommendations=recommendations,
+            ),
+            x_sentry_secret=get_sentry_webhook_secret(),
+        )
+        await advance_wo_milestone(
+            WoMilestoneRequest(
+                wo_code=wo_code,
+                milestone="resolved",
+                notes=diagnosis,
+                outcome=outcome,
+                operator_password="",
+            ),
+            x_sentry_secret=get_sentry_webhook_secret(),
+        )
+        await _update_closeout_session(str(session["id"]), {"status": "completed", "current_index": len(items)})
+    except Exception:
+        logger.exception("Closeout finalisation failed for %s", wo_code)
+        await sender.send_text(
+            chat_id=chat_id,
+            text="I couldn't complete the closeout sync right now. Please try again in a moment.",
+        )
+        return {"success": True, "intent": "closeout", "confirmed": False}
+
+    await sender.send_text(
+        chat_id=chat_id,
+        text=f"Closeout completed for {html.escape(wo_code)}. Results saved and the work order was updated.",
+        parse_mode="HTML",
+    )
+    return {"success": True, "intent": "closeout", "confirmed": True, "wo_code": wo_code}
+
+
+async def _handle_closeout_callback(
+    *,
+    chat_id: str,
+    telegram_user_id: str,
+    callback_data: str,
+    sender: Any,
+) -> dict[str, Any]:
+    parts = callback_data.split(":")
+    if len(parts) < 3:
+        await sender.send_text(chat_id=chat_id, text="Closeout action was not recognised.")
+        return {"success": True, "intent": "closeout", "confirmed": False}
+
+    action = parts[1]
+    value = parts[2]
+
+    if action == "notes" and value == "skip":
+        return await _finalize_closeout_session(
+            chat_id=chat_id,
+            telegram_user_id=telegram_user_id,
+            sender=sender,
+        )
+
+    if action != "item" or value not in {"ok", "warning", "critical"}:
+        await sender.send_text(chat_id=chat_id, text="Closeout action was not recognised.")
+        return {"success": True, "intent": "closeout", "confirmed": False}
+
+    session = await _find_active_closeout_session(telegram_user_id)
+    if not session:
+        await sender.send_text(chat_id=chat_id, text="No active closeout session found.")
+        return {"success": True, "intent": "closeout", "confirmed": False}
+    if session.get("status") != "in_progress":
+        await sender.send_text(
+            chat_id=chat_id,
+            text="All checklist items are recorded. Add final notes/photos, or tap Skip notes/photos.",
+            keyboard=_closeout_notes_keyboard(),
+        )
+        return {"success": True, "intent": "closeout", "confirmed": False}
+
+    items = session.get("checklist_items") or []
+    index = int(session.get("current_index") or 0)
+    if index >= len(items):
+        await _update_closeout_session(str(session["id"]), {"status": "awaiting_notes"})
+        await sender.send_text(
+            chat_id=chat_id,
+            text="All checklist items recorded. Any final notes or photos to add?",
+            keyboard=_closeout_notes_keyboard(),
+            parse_mode="HTML",
+        )
+        return {"success": True, "intent": "closeout", "confirmed": True}
+
+    item = items[index]
+    item_id = _closeout_item_id(item, index)
+    responses = session.get("responses") or {}
+    responses[item_id] = {
+        "answer": value,
+        "status": value,
+        "source": "telegram_inline_button",
+        "recorded_at": datetime.now(UTC).isoformat(),
+    }
+    next_index = index + 1
+    updates: dict[str, Any] = {"responses": responses, "current_index": next_index}
+    if next_index >= len(items):
+        updates["status"] = "awaiting_notes"
+    await _update_closeout_session(str(session["id"]), updates)
+
+    updated_session = {**session, **updates}
+    if next_index >= len(items):
+        await sender.send_text(
+            chat_id=chat_id,
+            text="All checklist items recorded. Any final notes or photos to add?",
+            keyboard=_closeout_notes_keyboard(),
+            parse_mode="HTML",
+        )
+    else:
+        await _send_closeout_item_prompt(chat_id, updated_session, sender)
+    return {"success": True, "intent": "closeout", "confirmed": True, "status": value}
+
+
+async def _handle_telegram_developer_issue(
+    *,
+    chat_id: str,
+    user_id: str,
+    rec_uuid: str,
+    sender: Any,
+) -> dict[str, Any]:
+    from app.database.repositories.recommendation_repository import RecommendationRepository
+    from app.services.email_reply_service import get_email_reply_service
+
+    repo = RecommendationRepository()
+    rec = None
+    try:
+        rec = await repo.get_by_id(rec_uuid)
+    except Exception:
+        logger.exception("Could not load recommendation while logging Telegram approval issue: %s", rec_uuid)
+
+    recipient = _developer_issue_recipient()
+    subject = f"[SENTINEL] Telegram approval issue {rec_uuid[:8]}"
+    now = datetime.now(UTC).isoformat()
+    equipment = getattr(rec, "target_equipment", None) or "unknown"
+    site_id = getattr(rec, "site_id", None) or "unknown"
+    action = getattr(rec, "action", None) or {}
+    status_value = getattr(rec, "status", None) or "unknown"
+    body_plain = (
+        "A Telegram manager logged an approval issue.\n\n"
+        f"Time: {now}\n"
+        f"Recommendation ID: {rec_uuid}\n"
+        f"Recommendation status: {status_value}\n"
+        f"Site: {site_id}\n"
+        f"Equipment: {equipment}\n"
+        f"Action: {action}\n"
+        f"Telegram chat ID: {chat_id}\n"
+        f"Telegram user ID: {user_id}\n\n"
+        "No control action was confirmed to the user."
+    )
+
+    email_sent = False
+    try:
+        email_service = get_email_reply_service()
+        if email_service.is_configured():
+            result = await email_service.send_reply(
+                to_email=recipient,
+                to_name="Sentinel Support",
+                subject=subject,
+                body_plain=body_plain,
+                body_html=None,
+            )
+            email_sent = result.sent
+            if not result.sent:
+                logger.warning("Telegram approval issue email was not sent: %s", result.error)
+        else:
+            logger.warning(
+                "Telegram approval issue logged but email service is not configured: rec_id=%s recipient=%s",
+                rec_uuid,
+                recipient,
+            )
+    except Exception:
+        logger.exception("Failed to email Telegram approval issue: rec_id=%s recipient=%s", rec_uuid, recipient)
+
+    logger.error(
+        "Telegram approval issue logged: rec_id=%s user_id=%s chat_id=%s site_id=%s equipment=%s email_sent=%s",
+        rec_uuid,
+        user_id,
+        chat_id,
+        site_id,
+        equipment,
+        email_sent,
+    )
+
+    if email_sent:
+        text = "Issue logged. Support has been notified. No control action was applied."
+    else:
+        text = "Issue logged for support review. No control action was applied."
+    await sender.send_text(chat_id=chat_id, text=text, parse_mode="HTML")
+    return {
+        "success": True,
+        "intent": "log_developer_issue",
+        "recommendation_id": rec_uuid,
+        "email_sent": email_sent,
+    }
 
 
 def _require_operator_password(
@@ -532,8 +1487,7 @@ async def reset_equipment_fault(
                 "blocked": False,
                 "reason": "Fault reset executed successfully",
                 "equipment_code": equipment_code,
-                "equipment_name": reset_data.get("equipment_name")
-                or (equipment_info or {}).get("name", equipment_code),
+                "equipment_name": equipment_code,
                 "previous_health": previous_health,
                 "new_health": new_health or 85,
                 "predictions_resolved": reset_data.get("predictions_resolved", 0),
@@ -698,6 +1652,62 @@ async def get_ocr_correction_status(service_record_id: str):
     return {"status": "unknown", "message": "No active OCR session"}
 
 
+def _is_technician_open_work_order(wo: dict[str, Any]) -> bool:
+    """Technician-facing WO state is binary: open or closed."""
+    status_value = str(wo.get("status") or "").strip().lower()
+    milestone = str(wo.get("milestone_status") or "").strip().lower()
+    if status_value in {"closed", "completed", "complete", "cancelled", "canceled"}:
+        return False
+    if milestone in {"resolved", "verified", "closed", "completed"}:
+        return False
+    if wo.get("closed_at") or wo.get("completed_at"):
+        return False
+    return True
+
+
+def _classify_sentry_work_order(wo: dict[str, Any], equipment_code: str | None = None) -> dict[str, str]:
+    """Return stable Sentry type/tier labels for bot detail and closeout routing."""
+    created_by = str(wo.get("created_by") or "").lower()
+    title = str(wo.get("title") or "").lower()
+    description = str(wo.get("description") or "").lower()
+    category = str(wo.get("category") or "").lower()
+    service_type = str(wo.get("service_type") or "").lower()
+    action_point = str(wo.get("action_point") or "").strip()
+
+    if action_point:
+        return {"work_order_type": "Advisory", "closeout_tier": "advisory"}
+
+    is_staff = "sentry:call_log:" in created_by or service_type == "callout"
+    comfort_terms = ("comfort", "too hot", "too cold", "aircon", "air con", "temperature", "hvac")
+    is_comfort = category in {"hvac", "air conditioning", "comfort"} or any(
+        term in title or term in description for term in comfort_terms
+    )
+    if is_staff and is_comfort:
+        return {"work_order_type": "Staff comfort complaint", "closeout_tier": "comfort"}
+
+    if is_staff:
+        return {"work_order_type": "Staff reported issue", "closeout_tier": "general"}
+
+    if equipment_code:
+        return {"work_order_type": "Equipment fault", "closeout_tier": "equipment"}
+
+    return {"work_order_type": "General task", "closeout_tier": "general"}
+
+
+def _normalise_work_order_row(wo: dict[str, Any], equipment: dict[str, Any] | None = None) -> dict[str, Any]:
+    equipment = equipment or {}
+    equipment_code = equipment.get("code")
+    labels = _classify_sentry_work_order(wo, equipment_code)
+    return {
+        **wo,
+        "equipment_code": equipment_code,
+        "equipment_name": equipment_code,
+        "equipment_type": equipment.get("type"),
+        "technician_status": "open" if _is_technician_open_work_order(wo) else "closed",
+        **labels,
+    }
+
+
 @router.get("/work-order/pending")
 async def get_pending_work_orders(
     request: Request,
@@ -752,6 +1762,56 @@ async def get_pending_work_orders(
     except Exception as e:
         logger.error(f"Error fetching pending work orders: {e}")
         return {"pending_count": 0, "work_orders": [], "error": str(e)}
+
+
+@router.get("/work-order/open")
+async def get_open_work_orders_for_technician(
+    x_sentry_secret: str | None = Header(None),
+    telegram_id: str | None = Query(None, description="Technician Telegram ID"),
+    limit: int = Query(25, ge=1, le=100),
+):
+    """Return technician-visible open work orders.
+
+    Unlike /work-order/pending, this is not notification polling. It is the
+    Tech bot queue: open means actionable by the technician; closed/resolved
+    work orders are excluded.
+    """
+    _require_sentry_secret(x_sentry_secret, endpoint_name="work_order_open")
+
+    try:
+        from app.database.repositories.work_order_repository import WorkOrderRepository
+        from app.database.supabase_client import get_supabase_client
+
+        wo_repo = WorkOrderRepository()
+        query = (
+            wo_repo.client.table("work_orders")
+            .select(wo_repo._DETAIL_COLUMNS)
+            .order("created_at", desc=True)
+            .limit(limit)
+        )
+        if telegram_id:
+            try:
+                query = query.eq("notified_technician_telegram_id", int(telegram_id))
+            except ValueError:
+                query = query.eq("notified_technician_telegram_id", telegram_id)
+        result = query.execute()
+        rows = [wo for wo in (result.data or []) if _is_technician_open_work_order(wo)]
+
+        equipment_ids = [wo.get("equipment_id") for wo in rows if wo.get("equipment_id")]
+        equipment_map: dict[str, dict[str, Any]] = {}
+        if equipment_ids:
+            sb = get_supabase_client()
+            eq_result = (
+                sb.table("equipment").select("id, code, name, type").in_("id", list(set(equipment_ids))).execute()
+            )
+            equipment_map = {row["id"]: row for row in (eq_result.data or [])}
+
+        formatted = [_normalise_work_order_row(wo, equipment_map.get(wo.get("equipment_id"))) for wo in rows]
+        return {"open_count": len(formatted), "work_orders": formatted}
+
+    except Exception as e:
+        logger.error(f"Error fetching open work orders: {e}")
+        return {"open_count": 0, "work_orders": [], "error": str(e)}
 
 
 @router.get("/freshness/breaches")
@@ -1378,7 +2438,7 @@ async def sentry_create_work_order(
                 "site_id": "",
                 "zone_id": "",
                 "equipment_code": req.equipment_code,
-                "equipment_name": created.get("equipment_name", req.title),
+                "equipment_name": req.equipment_code,
                 "service_type": "callout",
                 "criticality": req.priority.upper(),
                 "problem_description": req.description,
@@ -1399,7 +2459,7 @@ async def sentry_create_work_order(
             "code": created.get("code"),
             "id": created.get("id"),
             "equipment_code": req.equipment_code,
-            "equipment_name": created.get("equipment_name", req.title),
+            "equipment_name": req.equipment_code,
             "assigned_to": wo_data.get("assigned_to"),
             "technician_email": tech.get("email") if tech else None,
             "technician_telegram_id": tech.get("telegram_id") if tech else None,
@@ -1494,6 +2554,8 @@ async def sentry_call_log(
 
         # Build who-provenance string
         who = f"sentry:call_log:{req.reporter_telegram_id or req.reported_by or 'unknown'}"
+        dedupe_key = _call_log_dedupe_key(req)
+        tech = None
 
         # Build location string for WO
         if req.desk_id:
@@ -1503,9 +2565,45 @@ async def sentry_call_log(
         else:
             location = "Location not specified"
 
+        # Idempotency guard: staff bot conversations can occasionally repeat the
+        # final confirmation/tool call. Reuse the recent WO instead of creating
+        # and notifying a duplicate for the same reporter/location/issue.
+        try:
+            cutoff = (datetime.now(UTC) - timedelta(minutes=15)).isoformat()
+            existing_result = (
+                wo_repo.client.table("work_orders")
+                .select("id, code, title, assigned_to, created_at, notes, status")
+                .eq("created_by", who)
+                .neq("status", "cancelled")
+                .gte("created_at", cutoff)
+                .execute()
+            )
+            for existing in existing_result.data or []:
+                note_text = existing.get("notes") or ""
+                if f"call_log_dedupe_key={dedupe_key}" in note_text:
+                    logger.info(
+                        "Duplicate call-log suppressed: reporter=%s existing_wo=%s",
+                        req.reporter_telegram_id or req.reported_by,
+                        existing.get("code"),
+                    )
+                    return {
+                        "success": True,
+                        "duplicate_suppressed": True,
+                        "work_order_code": existing.get("code"),
+                        "work_order_id": existing.get("id"),
+                        "category": req.category,
+                        "priority": req.priority,
+                        "location": location,
+                        "assigned_to": existing.get("assigned_to") or "maintenance team",
+                        "technician_telegram_id": tech.get("telegram_id", "") if tech else "",
+                        "technician_notified": False,
+                        "location_memory_saved": False,
+                    }
+        except Exception as e:
+            logger.warning("Call-log dedupe lookup failed; continuing with create: %s", e)
+
         # Resolve site code to UUID
         resolved_site_uuid = None
-        tech = None
         try:
             from app.database.supabase_client import get_supabase_client
 
@@ -1572,7 +2670,7 @@ async def sentry_call_log(
             "created_by": who,
             "service_type": "callout",
             "category": req.category,
-            "notes": req.original_message,
+            "notes": f"{req.original_message}\ncall_log_dedupe_key={dedupe_key}",
         }
 
         if resolved_site_uuid:
@@ -1604,7 +2702,7 @@ async def sentry_call_log(
             "code": wo_code,
             "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
             "equipment_id": req.site_id,
-            "equipment_name": req.title,
+            "equipment_name": req.site_id,
             "site_id": req.site_id,
             "zone_id": req.zone_id or "",
             "desk_id": req.desk_id or "",
@@ -1788,6 +2886,8 @@ class WoStatusResponse(BaseModel):
     found: bool
     code: str = ""
     status: str = ""
+    display_status: str = ""
+    staff_summary: str = ""
     priority: str = ""
     category: str = ""
     title: str = ""
@@ -1797,6 +2897,20 @@ class WoStatusResponse(BaseModel):
     created_at: str = ""
     updated_at: str = ""
     completed_at: str = ""
+    resolved_at: str = ""
+    closed_at: str = ""
+
+
+def _staff_work_order_status(wo: dict[str, Any]) -> tuple[str, str]:
+    """Return staff-safe status and summary."""
+    status_value = str(wo.get("status") or "").strip().lower()
+    milestone = str(wo.get("milestone_status") or "").strip().lower()
+
+    if wo.get("closed_at") or wo.get("completed_at") or status_value in {"closed", "completed", "complete"}:
+        return "Closed", "This work order has been formally closed."
+    if milestone in {"resolved", "verified"} or wo.get("resolved_at"):
+        return "Resolved", "The technician has resolved the issue. Manager closure is still pending."
+    return "Open", "This work order is still being handled."
 
 
 @router.get("/wo-status", response_model=WoStatusResponse)
@@ -1845,12 +2959,15 @@ async def sentry_wo_status(
         notes = wo.get("notes") or ""
         if equipment_notes:
             notes = (notes + "\n" + equipment_notes).strip()
+        display_status, staff_summary = _staff_work_order_status(wo)
 
         return WoStatusResponse(
             success=True,
             found=True,
             code=wo.get("code") or "",
             status=wo.get("status") or "",
+            display_status=display_status,
+            staff_summary=staff_summary,
             priority=wo.get("priority") or "",
             category=wo.get("category") or "",
             title=wo.get("title") or "",
@@ -1860,6 +2977,8 @@ async def sentry_wo_status(
             created_at=str(wo.get("created_at") or ""),
             updated_at=str(wo.get("updated_at") or ""),
             completed_at=str(wo.get("completed_at") or ""),
+            resolved_at=str(wo.get("resolved_at") or ""),
+            closed_at=str(wo.get("closed_at") or ""),
         )
 
     except HTTPException:
@@ -1891,8 +3010,7 @@ async def sentry_work_order_detail(
         if not wo:
             return {"success": False, "found": False, "error": "Work order not found"}
 
-        # Resolve equipment_code from equipment_id if present
-        equipment_code = None
+        equipment = None
         equipment_id = wo.get("equipment_id")
         if equipment_id:
             try:
@@ -1900,17 +3018,26 @@ async def sentry_work_order_detail(
 
                 sb = get_supabase_client()
                 if sb:
-                    eq_result = sb.table("equipment").select("code").eq("id", equipment_id).limit(1).execute()
+                    eq_result = (
+                        sb.table("equipment").select("id, code, name, type").eq("id", equipment_id).limit(1).execute()
+                    )
                     if eq_result.data:
-                        equipment_code = eq_result.data[0].get("code")
+                        equipment = eq_result.data[0]
             except Exception:
                 pass
+
+        enriched = _normalise_work_order_row(wo, equipment)
 
         return {
             "success": True,
             "found": True,
-            "work_order": wo,
-            "equipment_code": equipment_code,
+            "work_order": enriched,
+            "equipment_code": enriched.get("equipment_code"),
+            "equipment_name": enriched.get("equipment_name"),
+            "equipment_type": enriched.get("equipment_type"),
+            "work_order_type": enriched.get("work_order_type"),
+            "closeout_tier": enriched.get("closeout_tier"),
+            "technician_status": enriched.get("technician_status"),
         }
 
     except HTTPException:
@@ -2053,6 +3180,26 @@ class WoMilestoneResponse(BaseModel):
     status: str = ""
 
 
+class TechnicianFollowUpRequest(BaseModel):
+    """Manager-triggered follow-up message to a technician."""
+
+    technician_telegram_id: str | None = Field(None, description="Technician Telegram chat ID")
+    technician_name: str | None = Field(None, description="Technician name fallback")
+    message: str = Field(..., min_length=1, description="Message to send to the technician")
+    wo_code: str = Field("", description="Related work order code")
+    source: str = Field("fm_agent", description="Source identifier for audit")
+
+
+class WorkOrderReassignRequest(BaseModel):
+    """Manager-triggered work-order reassignment."""
+
+    wo_code: str = Field(..., description="Work order code, e.g. WO-2026-0012")
+    technician_name: str = Field(..., description="Target active technician name")
+    reason: str = Field("", description="Reason for reassignment")
+    notify_technician: bool = Field(True, description="Send Telegram assignment notice when possible")
+    source: str = Field("fm_agent", description="Source identifier for audit")
+
+
 @router.get("/bot-state")
 async def get_bot_state(
     key: str = Query(..., description="State key (e.g. 'optimization-check', 'health-alert')"),
@@ -2119,6 +3266,158 @@ async def get_technician_by_telegram(
     if not tech:
         return {"found": False, "name": None, "telegram_id": telegram_id}
     return {"found": True, "name": tech.get("name"), "telegram_id": telegram_id}
+
+
+@router.post("/send-technician-message", status_code=status.HTTP_200_OK)
+async def send_technician_message(
+    req: TechnicianFollowUpRequest,
+    x_sentry_secret: str | None = Header(None),
+    x_sentry_api_key: str | None = Header(None),
+) -> dict:
+    """Send a manager-approved follow-up message through the technician bot."""
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="send_technician_message")
+
+    from app.database.supabase_client import get_supabase_client
+    from app.services.telegram_message_sender import TelegramMessageSender
+
+    telegram_id = req.technician_telegram_id
+    technician_name = req.technician_name or ""
+    sb = get_supabase_client()
+
+    if not telegram_id and technician_name:
+        tech_result = (
+            sb.table("technicians")
+            .select("name, telegram_id")
+            .ilike("name", technician_name)
+            .eq("active", True)
+            .limit(1)
+            .execute()
+        )
+        if tech_result.data:
+            technician_name = tech_result.data[0].get("name") or technician_name
+            telegram_id = tech_result.data[0].get("telegram_id")
+
+    if not telegram_id:
+        raise HTTPException(status_code=404, detail="Technician Telegram ID not found")
+    if not settings.sentry_tech_bot_token:
+        raise HTTPException(status_code=503, detail="Technician bot token is not configured")
+
+    prefix = f"{req.wo_code} — " if req.wo_code else ""
+    message = f"{prefix}{req.message}".strip()
+    sender = TelegramMessageSender(settings.sentry_tech_bot_token)
+    result = await sender.send_text(str(telegram_id), message, parse_mode=None)
+    if not result.get("ok"):
+        raise HTTPException(status_code=502, detail=f"Telegram send failed: {result}")
+
+    try:
+        sb.table("notification_delivery_log").insert(
+            {
+                "notification_type": "technician_follow_up",
+                "channel_type": "telegram",
+                "recipient_identifier": str(telegram_id),
+                "status": "sent",
+                "provider": "telegram",
+                "sent_at": datetime.now(UTC).isoformat(),
+                "message_text": message,
+                "delivery_status": "sent",
+                "reference_type": "work_order",
+                "reference_id": req.wo_code,
+                "severity": "info",
+            }
+        ).execute()
+    except Exception as exc:
+        logger.warning("Technician follow-up audit write failed for %s: %s", req.wo_code, exc)
+
+    return {
+        "success": True,
+        "sent": True,
+        "technician_name": technician_name,
+        "technician_telegram_id": str(telegram_id),
+        "wo_code": req.wo_code,
+    }
+
+
+@router.patch("/work-order/reassign", status_code=status.HTTP_200_OK)
+async def reassign_work_order(
+    req: WorkOrderReassignRequest,
+    x_sentry_secret: str | None = Header(None),
+    x_sentry_api_key: str | None = Header(None),
+) -> dict:
+    """Reassign an existing work order to another active technician."""
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="work_order_reassign")
+
+    from app.database.repositories.work_order_repository import WorkOrderRepository
+    from app.database.supabase_client import get_supabase_client
+    from app.services.telegram_message_sender import TelegramMessageSender
+
+    wo_repo = WorkOrderRepository()
+    wo = await wo_repo.get_work_order_by_code(req.wo_code.strip().upper())
+    if not wo:
+        raise HTTPException(status_code=404, detail="Work order not found")
+
+    sb = get_supabase_client()
+    tech_result = (
+        sb.table("technicians")
+        .select("id, name, specialty, telegram_id")
+        .ilike("name", req.technician_name.strip())
+        .eq("active", True)
+        .limit(1)
+        .execute()
+    )
+    if not tech_result.data:
+        raise HTTPException(status_code=404, detail=f"Active technician not found: {req.technician_name}")
+
+    technician = tech_result.data[0]
+    now_iso = datetime.now(UTC).isoformat()
+    previous = wo.get("assigned_to") or ""
+    note_parts = []
+    if wo.get("notes"):
+        note_parts.append(str(wo["notes"]))
+    reason = req.reason.strip() or "Manager reassignment"
+    note_parts.append(f"{now_iso}: Reassigned from {previous or 'unassigned'} to {technician['name']} ({reason}).")
+
+    updates: dict[str, Any] = {
+        "assigned_to": technician["name"],
+        "assigned_team": technician.get("specialty") or wo.get("assigned_team"),
+        "status": "scheduled",
+        "milestone_status": "assigned",
+        "assigned_at": now_iso,
+        "updated_at": now_iso,
+        "notes": "\n".join(note_parts),
+    }
+    if technician.get("telegram_id"):
+        try:
+            updates["notified_technician_telegram_id"] = int(technician["telegram_id"])
+        except (TypeError, ValueError):
+            pass
+
+    updated = await wo_repo.update_work_order(wo["id"], updates)
+    if not updated:
+        raise HTTPException(status_code=500, detail="Failed to update work order assignment")
+
+    notification_sent = False
+    telegram_id = technician.get("telegram_id")
+    if req.notify_technician and telegram_id and settings.sentry_tech_bot_token:
+        message = (
+            f"{updated.get('code') or req.wo_code} has been reassigned to you.\n"
+            f"{updated.get('title') or 'Work order'}\n"
+            f"Reason: {reason}"
+        )
+        result = await TelegramMessageSender(settings.sentry_tech_bot_token).send_text(
+            str(telegram_id),
+            message,
+            parse_mode=None,
+        )
+        notification_sent = bool(result.get("ok"))
+
+    return {
+        "success": True,
+        "wo_code": updated.get("code") or req.wo_code,
+        "previous_assigned_to": previous,
+        "assigned_to": technician["name"],
+        "technician_telegram_id": telegram_id,
+        "notification_sent": notification_sent,
+    }
 
 
 @router.patch("/wo-milestone", response_model=WoMilestoneResponse)
@@ -2386,6 +3685,18 @@ async def handle_telegram_message(
     secret = request.headers.get("X-Sentry-Secret") or request.headers.get("X-Telegram-Bot-Api-Secret-Token")
     _require_sentry_secret(secret, endpoint_name="telegram_message")
 
+    approval_rec_id = _extract_supervised_approval_rec_id(payload.text)
+    if approval_rec_id:
+        from app.services.telegram_message_sender import get_telegram_sender
+
+        sender = get_telegram_sender()
+        return await _handle_supervised_recommendation_approval(
+            chat_id=payload.chat_id,
+            user_id=payload.user_id,
+            rec_uuid=approval_rec_id,
+            sender=sender,
+        )
+
     # Prompt guard
     if payload.text:
         guard_result = score_prompt(payload.text, "webhook")
@@ -2426,6 +3737,33 @@ async def handle_telegram_message(
         telegram_file_id = payload.photo_file_id
     elif payload.has_document and payload.document_file_id:
         telegram_file_id = payload.document_file_id
+
+    try:
+        closeout_session = await _find_active_closeout_session(payload.user_id)
+    except Exception:
+        logger.exception("Closeout session lookup failed for Telegram message: user=%s", payload.user_id)
+        closeout_session = None
+    if closeout_session and closeout_session.get("status") == "awaiting_notes":
+        from app.services.telegram_message_sender import get_telegram_sender
+
+        sender = get_telegram_sender()
+        text_value = (payload.text or "").strip()
+        if telegram_file_id:
+            return await _finalize_closeout_session(
+                chat_id=payload.chat_id,
+                telegram_user_id=payload.user_id,
+                sender=sender,
+                final_notes=text_value,
+                photo_refs=[telegram_file_id],
+            )
+        if text_value.lower() in {"skip", "no", "none", "done"}:
+            text_value = ""
+        return await _finalize_closeout_session(
+            chat_id=payload.chat_id,
+            telegram_user_id=payload.user_id,
+            sender=sender,
+            final_notes=text_value,
+        )
 
     if telegram_file_id:
         from app.services.telegram_document_intake_service import get_telegram_document_intake_service
@@ -2503,12 +3841,20 @@ async def handle_telegram_callback(
     """
     _require_sentry_secret(x_sentry_secret, endpoint_name="telegram_callback")
 
-    # Dismiss spinner
-    from app.services.telegram_message_sender import get_telegram_sender
+    from app.services.telegram_message_sender import TelegramMessageSender
 
+    bot_token = (
+        getattr(settings, "sentry_manager_bot_token", None)
+        or getattr(settings, "telegram_bot_token", None)
+        or getattr(settings, "sentry_client_bot_token", None)
+    )
+    sender = TelegramMessageSender(bot_token) if bot_token else None
+
+    # The gateway auto-acknowledges callbacks. This backend acknowledgement is
+    # best-effort only and must not prevent the action handler from running.
     try:
-        sender = get_telegram_sender()
-        await sender.answer_callback_query(payload.callback_query_id)
+        if sender:
+            await sender.answer_callback_query(payload.callback_query_id)
     except Exception as e:
         logger.warning("Failed to answer callback query: %s", e)
 
@@ -2523,11 +3869,11 @@ async def handle_telegram_callback(
         if result["success"]:
             # Confirm to user
             try:
-                sender = get_telegram_sender()
-                await sender.send_text(
-                    chat_id=payload.chat_id,
-                    text="✅ Acknowledgement recorded.",
-                )
+                if sender:
+                    await sender.send_text(
+                        chat_id=payload.chat_id,
+                        text="✅ Acknowledgement recorded.",
+                    )
             except Exception:
                 pass
         return {"success": True, "intent": "certified_ack", "confirmed": result["success"]}
@@ -2542,11 +3888,11 @@ async def handle_telegram_callback(
         )
         if result["success"]:
             try:
-                sender = get_telegram_sender()
-                await sender.send_text(
-                    chat_id=payload.chat_id,
-                    text="✅ Prediction acknowledged.",
-                )
+                if sender:
+                    await sender.send_text(
+                        chat_id=payload.chat_id,
+                        text="✅ Prediction acknowledged.",
+                    )
             except Exception:
                 pass
         return {"success": True, "intent": "prediction_ack", "confirmed": result["success"]}
@@ -2567,13 +3913,13 @@ async def handle_telegram_callback(
             result = {"success": False, "error": "invalid_callback_data"}
 
         try:
-            sender = get_telegram_sender()
             if result["success"]:
                 work_order = result.get("work_order") or {}
                 text = f"🛠 Work order created: {work_order.get('code', 'created')}."
             else:
                 text = f"Could not create work order: {result.get('error', 'unknown_error')}"
-            await sender.send_text(chat_id=payload.chat_id, text=text)
+            if sender:
+                await sender.send_text(chat_id=payload.chat_id, text=text)
         except Exception:
             pass
         return {"success": True, "intent": "prediction_work_order", "confirmed": result["success"], "result": result}
@@ -2586,7 +3932,6 @@ async def handle_telegram_callback(
             requested_by_telegram_id=payload.user_id,
         )
         try:
-            sender = get_telegram_sender()
             if result["success"]:
                 action = result.get("action")
                 work_order = result.get("work_order") or {}
@@ -2603,10 +3948,176 @@ async def handle_telegram_callback(
                     text = f"Work Order Created #{wo_code}\nAssigned: {assigned}\nPriority: {priority}"
             else:
                 text = f"Could not create work order: {result.get('error', 'unknown_error')}"
-            await sender.send_text(chat_id=payload.chat_id, text=text)
+            if sender:
+                await sender.send_text(chat_id=payload.chat_id, text=text)
         except Exception:
             pass
         return {"success": True, "intent": "create_work_order", "confirmed": result["success"], "result": result}
+
+    # Supervised AI recommendation approval buttons from manager bot advisories.
+    # These are direct control approvals, so handle them before generic conversation routing.
+    if payload.data.startswith("devissue:approval:"):
+        return await _handle_telegram_developer_issue(
+            chat_id=payload.chat_id,
+            user_id=payload.user_id,
+            rec_uuid=payload.data.split(":")[-1],
+            sender=sender,
+        )
+
+    if payload.data.startswith("approve:rec_id:"):
+        return await _handle_supervised_recommendation_approval(
+            chat_id=payload.chat_id,
+            user_id=payload.user_id,
+            rec_uuid=payload.data.split(":")[-1],
+            sender=sender,
+        )
+
+    if payload.data.startswith("approvepkg:"):
+        return await _handle_supervised_package_approval(
+            chat_id=payload.chat_id,
+            user_id=payload.user_id,
+            site_id=payload.data.split(":", 1)[-1],
+            sender=sender,
+        )
+
+    # Coordinated AI recommendation approve/reject buttons. These are supervised
+    # control decisions, so do not route them through generic conversation flows.
+    if payload.data.startswith("coord:approve:") or payload.data.startswith("coord:reject:"):
+        parts = payload.data.split(":")
+        decision = parts[1] if len(parts) > 2 else ""
+        rec_uuid = parts[-1]
+        from app.api.optimization import (
+            _coordinated_bundle_from_record,
+            _coordinated_draft_decision_update,
+            _coordinated_execution_blocked_result,
+            _coordinated_execution_blockers,
+            _execute_coordinated_child_actions,
+            _find_bundle_by_id,
+            _load_coordinated_bundle_inputs,
+            _validate_coordinated_draft_record,
+            _validate_coordinated_execution_record,
+        )
+        from app.database.supabase_client import get_supabase_client
+        from app.models.recommendation import RecommendationStatus
+
+        supabase = get_supabase_client()
+        result = supabase.table("recommendations").select("*").eq("id", rec_uuid).limit(1).execute()
+        if not result.data:
+            await sender.send_text(chat_id=payload.chat_id, text="Coordinated AI recommendation not found.")
+            return {"success": True, "intent": "coordinated_optimization", "confirmed": False}
+
+        record = result.data[0]
+        site_id = record.get("site_id") or ""
+        try:
+            _validate_coordinated_draft_record(record, site_id)
+            updates = _coordinated_draft_decision_update(
+                record,
+                decision="approved" if decision == "approve" else "rejected",
+                user_id=f"telegram:{payload.user_id}",
+                reason="Decision via SENTRY Telegram coordinated optimization notification",
+            )
+            update_result = supabase.table("recommendations").update(updates).eq("id", rec_uuid).execute()
+            if not update_result.data:
+                await sender.send_text(
+                    chat_id=payload.chat_id,
+                    text="Could not update coordinated AI recommendation.",
+                )
+                return {"success": True, "intent": "coordinated_optimization", "confirmed": False}
+
+            updated = update_result.data[0]
+            status_value = updated.get("approval_status")
+            execution = updated.get("execution_result") or {}
+            if status_value == "approved":
+                _validate_coordinated_execution_record(updated, site_id)
+                inputs = _load_coordinated_bundle_inputs(site_id)
+                bundle = _coordinated_bundle_from_record(updated)
+                bundle_id = bundle.get("bundle_id")
+                live_bundle = _find_bundle_by_id(inputs["bundles"], bundle_id) if bundle_id else None
+                user_id = f"telegram:{payload.user_id}"
+                blockers = _coordinated_execution_blockers(
+                    record=updated,
+                    live_bundle=live_bundle,
+                    site_phase=inputs["site_phase"],
+                )
+                if blockers:
+                    execution_updates = _coordinated_execution_blocked_result(
+                        record=updated,
+                        blockers=blockers,
+                        user_id=user_id,
+                        reason="Approved via SENTRY Telegram coordinated optimization notification",
+                    )
+                    execution_update_result = (
+                        supabase.table("recommendations").update(execution_updates).eq("id", rec_uuid).execute()
+                    )
+                    updated = (
+                        execution_update_result.data[0]
+                        if execution_update_result.data
+                        else {**updated, **execution_updates}
+                    )
+                    execution = updated.get("execution_result") or execution_updates["execution_result"]
+                    text = (
+                        "✅ <b>AI recommendation approved</b>\n"
+                        "Not applied to the BMS because execution is still blocked.\n"
+                        f"<b>Blockers:</b> {', '.join(str(item) for item in blockers[:5])}\n"
+                        f"<b>Device writes:</b> {execution.get('device_writes', 0)}"
+                    )
+                else:
+                    execution = await _execute_coordinated_child_actions(
+                        bundle=bundle,
+                        user_id=user_id,
+                        recommendation_id=rec_uuid,
+                    )
+                    executed = bool(execution.get("executed"))
+                    execution_updates = {
+                        "status": RecommendationStatus.EXECUTED.value
+                        if executed
+                        else RecommendationStatus.FAILED.value,
+                        "execution_result": execution,
+                    }
+                    if executed:
+                        from datetime import datetime
+
+                        executed_at = datetime.utcnow().isoformat()
+                        execution_updates["executed_at"] = executed_at
+                        execution_updates["metadata"] = {
+                            **(updated.get("metadata") or {}),
+                            "lifecycle": "executed",
+                            "executed_by": user_id,
+                            "executed_at": executed_at,
+                        }
+                    supabase.table("recommendations").update(execution_updates).eq("id", rec_uuid).execute()
+                    text = (
+                        "✅ <b>AI recommendation approved and applied</b>\n"
+                        if executed
+                        else "❌ <b>AI recommendation approved but execution failed</b>\n"
+                    )
+                    text += f"<b>Device writes:</b> {execution.get('device_writes', 0)}"
+            else:
+                text = (
+                    "❌ <b>AI recommendation rejected</b>\n"
+                    "No control action was taken.\n"
+                    f"Device writes: {execution.get('device_writes', 0)}"
+                )
+            await sender.send_text(chat_id=payload.chat_id, text=text, parse_mode="HTML")
+            return {
+                "success": True,
+                "intent": "coordinated_optimization",
+                "confirmed": True,
+                "decision": decision,
+                "device_writes": execution.get("device_writes", 0),
+            }
+        except Exception:
+            from app.services.telegram_message_sender import InlineButton, InlineKeyboard
+
+            logger.exception("SENTRY coordinated AI recommendation decision failed for %s", rec_uuid)
+            keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{rec_uuid}")]])
+            await sender.send_text(
+                chat_id=payload.chat_id,
+                text=_approval_failed_message("Coordinated AI recommendation"),
+                keyboard=keyboard,
+                parse_mode="HTML",
+            )
+            return {"success": True, "intent": "coordinated_optimization", "confirmed": False}
 
     if payload.data.startswith("docintake:"):
         from app.services.telegram_document_intake_service import get_telegram_document_intake_service
@@ -2623,6 +4134,14 @@ async def handle_telegram_callback(
                 "intent": "document_intake",
                 "confidence": 1.0,
             }
+
+    if payload.data.startswith("closeout:"):
+        return await _handle_closeout_callback(
+            chat_id=payload.chat_id,
+            telegram_user_id=payload.user_id,
+            callback_data=payload.data,
+            sender=sender,
+        )
 
     # Residential onboarding — platform selection buttons (platform:solarman, platform:victron, etc.)
     if payload.data.startswith("platform:"):
@@ -2697,6 +4216,55 @@ async def handle_telegram_callback(
 # ---------------------------------------------------------------------------
 # Gateway observability — tool-level activity log
 # ---------------------------------------------------------------------------
+
+
+class FeedbackEventRequest(BaseModel):
+    """Durable staff/tech feedback event for weekly Sentry digest."""
+
+    batch_type: Literal["A", "B", "C"]
+    bot_workspace: Literal["staff", "tech"]
+    site_id: str
+    occurred_at: datetime | None = None
+    telegram_user_hash: str | None = None
+    intent: str | None = None
+    skill_name: str | None = None
+    flow_name: str | None = None
+    outcome: str | None = None
+    failure_category: str | None = None
+    feedback_category: str | None = None
+    sanitised_message: str | None = None
+    source_table: str | None = None
+    source_id: str | None = None
+    work_order_code: str | None = None
+    detector: str | None = None
+    classifier_confidence: float | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+@router.post("/feedback-event")
+async def log_feedback_event(
+    event: FeedbackEventRequest,
+    x_sentry_api_key: str | None = Header(None),
+    x_sentry_secret: str | None = Header(None),
+) -> dict[str, str]:
+    """Persist a feedback event. Insert failures are logged but never returned."""
+    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="feedback_event")
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        if not sb:
+            logger.warning("feedback_event skipped: Supabase client unavailable")
+            return {"status": "ok"}
+
+        payload = event.model_dump(exclude_none=True)
+        payload.setdefault("occurred_at", datetime.now(UTC).isoformat())
+        sb.table("sentry_feedback_events").insert(payload).execute()
+    except Exception as e:
+        logger.warning("feedback_event insert failed: %s", e)
+
+    return {"status": "ok"}
 
 
 class GatewayLogEntry(BaseModel):

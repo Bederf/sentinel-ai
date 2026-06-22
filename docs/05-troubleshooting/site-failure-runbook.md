@@ -90,8 +90,10 @@ Bridge connects to replica VPS at `10.99.0.1` via WireGuard.
 ```bash
 ping -c 3 10.99.0.1          # Is WireGuard up?
 wg show                       # Is handshake recent?
-ssh -i /etc/sentinel/backup-ssh-key bederf@10.99.0.1 "systemctl status simbiot-bridge"
+curl -s http://10.99.0.1:8080/health
 ```
+
+Operational access to the bridge is through the WireGuard bridge API. Do not assume SSH key access from the Sentinel host.
 
 ---
 
@@ -127,11 +129,8 @@ UNION ALL SELECT 'work_orders', count(*) FROM work_orders;"
 ### Offsite Recovery
 Encrypted backups on replica VPS (`10.99.0.1`):
 ```bash
-# List
-ssh -i /etc/sentinel/backup-ssh-key bederf@10.99.0.1 "ls -lt ~/backup/"
-
-# Fetch + decrypt + restore
-# Decryption key: age-encrypted, content in /etc/sentinel/backup-ssh-key
+# Use the documented backup transport for the active deployment.
+# Do not assume SSH key access from the Sentinel host.
 ```
 
 ---
@@ -176,12 +175,12 @@ curl -fsS http://127.0.0.1:9099/health
 | Prometheus | 9090 | `/-/healthy` |
 | Alertmanager | 9093 | `/alertmanager/-/healthy` |
 | WireGuard | — | `ping 10.99.0.1` |
-| Replica VPS | — | `ssh ... bederf@10.99.0.1` |
+| Bridge API | 8080 over WireGuard | `curl http://10.99.0.1:8080/health` |
 
 ## Contacts
 
 | Role | Contact |
 |------|---------|
 | Operations | Pieter — Telegram |
-| Replica VPS | root access via backup SSH key |
+| Bridge / remote endpoint | WireGuard bridge API; use deployment-specific operator access if host changes are required |
 | Alert Delivery | Telegram @bederf_bot |

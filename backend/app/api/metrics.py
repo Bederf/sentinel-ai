@@ -616,6 +616,69 @@ sentinel_energy_carbon_kg = Gauge(
     registry=REGISTRY,
 )
 
+sentinel_equipment_baseline_coverage_percent = Gauge(
+    "sentinel_equipment_baseline_coverage_percent",
+    "Percent of site equipment with an active onboarding/shadow baseline record",
+    labelnames=["site_id"],
+    registry=REGISTRY,
+)
+
+sentinel_equipment_phase_health_score_avg = Gauge(
+    "sentinel_equipment_phase_health_score_avg",
+    "Average equipment health score observed during each onboarding/control phase",
+    labelnames=["site_id", "phase"],
+    registry=REGISTRY,
+)
+
+sentinel_equipment_phase_health_delta_from_shadow = Gauge(
+    "sentinel_equipment_phase_health_delta_from_shadow",
+    "Average equipment health score delta from shadow or shadow_live baseline",
+    labelnames=["site_id", "phase"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_phase_avg_daily_kwh = Gauge(
+    "sentinel_energy_phase_avg_daily_kwh",
+    "Average daily site energy kWh observed during each onboarding/control phase",
+    labelnames=["site_id", "phase"],
+    registry=REGISTRY,
+)
+
+sentinel_energy_phase_delta_from_shadow_kwh = Gauge(
+    "sentinel_energy_phase_delta_from_shadow_kwh",
+    "Average daily site energy kWh delta from shadow or shadow_live baseline",
+    labelnames=["site_id", "phase"],
+    registry=REGISTRY,
+)
+
+sentinel_recommendation_baseline_energy_kwh = Gauge(
+    "sentinel_recommendation_baseline_energy_kwh",
+    "Measured baseline energy before recommendation execution in kWh",
+    labelnames=["site_id", "recommendation_id", "equipment_id"],
+    registry=REGISTRY,
+)
+
+sentinel_recommendation_actual_energy_kwh = Gauge(
+    "sentinel_recommendation_actual_energy_kwh",
+    "Measured energy after recommendation execution in kWh",
+    labelnames=["site_id", "recommendation_id", "equipment_id"],
+    registry=REGISTRY,
+)
+
+sentinel_recommendation_actual_saving_kwh = Gauge(
+    "sentinel_recommendation_actual_saving_kwh",
+    "Measured recommendation energy saving in kWh; negative values mean increased consumption",
+    labelnames=["site_id", "recommendation_id", "equipment_id"],
+    registry=REGISTRY,
+)
+
+sentinel_recommendation_actual_saving_zar = Gauge(
+    "sentinel_recommendation_actual_saving_zar",
+    "Measured recommendation Rand saving; negative values mean increased cost",
+    labelnames=["site_id", "recommendation_id", "equipment_id"],
+    registry=REGISTRY,
+)
+
 # Lighting — per zone
 sentinel_lighting_zone_lux = Gauge(
     "sentinel_lighting_zone_lux",
@@ -1093,6 +1156,148 @@ def _collect_discipline_metrics() -> None:
         sentinel_energy_carbon_kg.labels(site_id=SITE_ID).set(round(total_kw * grid_factor, 2))
     except Exception as e:
         logger.debug(f"Discipline metrics: cost/peak/carbon calc failed: {e}")
+
+    # — Onboarding/shadow baseline and phase comparison metrics —
+    try:
+        site_resp = client.table("sites").select("id, code, onboarding_phase").eq("code", SITE_ID).limit(1).execute()
+        site_row = (site_resp.data or [{}])[0]
+        site_uuid = str(site_row.get("id") or "")
+
+        equipment_resp = (
+            client.table("equipment").select("id").eq("site_id", site_uuid).execute() if site_uuid else None
+        )
+        equipment_ids = [str(row.get("id")) for row in (equipment_resp.data or []) if row.get("id")]
+        total_equipment = len(equipment_ids)
+        baseline_count = 0
+        if equipment_ids:
+            baseline_resp = (
+                client.table("equipment_baselines")
+                .select("equipment_id")
+                .in_("equipment_id", equipment_ids)
+                .eq("status", "active")
+                .execute()
+            )
+            baseline_count = len(
+                {str(row.get("equipment_id")) for row in (baseline_resp.data or []) if row.get("equipment_id")}
+            )
+        if total_equipment:
+            sentinel_equipment_baseline_coverage_percent.labels(site_id=SITE_ID).set(
+                round((baseline_count / total_equipment) * 100, 2)
+            )
+
+        transition_resp = (
+            client.table("phase_transition_log")
+            .select("to_phase, created_at")
+            .eq("site_id", SITE_ID)
+            .order("created_at", desc=False)
+            .execute()
+        )
+        transitions: list[tuple[datetime, str]] = []
+        for row in transition_resp.data or []:
+            ts_raw = row.get("created_at")
+            phase = str(row.get("to_phase") or "unknown")
+            if not ts_raw:
+                continue
+            transitions.append((datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00")), phase))
+
+        def phase_for(ts: datetime) -> str:
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            phase = "pre_onboarding"
+            for transition_ts, transition_phase in transitions:
+                if ts >= transition_ts:
+                    phase = transition_phase
+                else:
+                    break
+            return phase
+
+        # Energy phase averages from daily accumulated kWh.
+        energy_resp = (
+            client.table("energy_consumption_history").select("date,total_kwh").eq("site_id", SITE_ID).execute()
+        )
+        energy_by_phase: dict[str, list[float]] = {}
+        for row in energy_resp.data or []:
+            date_raw = row.get("date")
+            total_kwh = row.get("total_kwh")
+            if date_raw is None or total_kwh is None:
+                continue
+            day_ts = datetime.fromisoformat(f"{date_raw}T12:00:00+00:00")
+            energy_by_phase.setdefault(phase_for(day_ts), []).append(float(total_kwh))
+        energy_avg_by_phase = {phase: sum(values) / len(values) for phase, values in energy_by_phase.items() if values}
+        shadow_energy_values = [
+            value for phase, value in energy_avg_by_phase.items() if phase in {"shadow", "shadow_live"}
+        ]
+        shadow_energy_avg = sum(shadow_energy_values) / len(shadow_energy_values) if shadow_energy_values else None
+        for phase, avg_kwh in energy_avg_by_phase.items():
+            sentinel_energy_phase_avg_daily_kwh.labels(site_id=SITE_ID, phase=phase).set(round(avg_kwh, 3))
+            if shadow_energy_avg is not None:
+                sentinel_energy_phase_delta_from_shadow_kwh.labels(site_id=SITE_ID, phase=phase).set(
+                    round(avg_kwh - shadow_energy_avg, 3)
+                )
+
+        # Equipment health phase averages from asset health snapshots.
+        if site_uuid:
+            health_resp = (
+                client.table("asset_health_snapshots")
+                .select("snapshot_at,health_score")
+                .eq("site_id", site_uuid)
+                .execute()
+            )
+            health_by_phase: dict[str, list[float]] = {}
+            for row in health_resp.data or []:
+                ts_raw = row.get("snapshot_at")
+                score = row.get("health_score")
+                if ts_raw is None or score is None:
+                    continue
+                snapshot_ts = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+                health_by_phase.setdefault(phase_for(snapshot_ts), []).append(float(score))
+            health_avg_by_phase = {
+                phase: sum(values) / len(values) for phase, values in health_by_phase.items() if values
+            }
+            shadow_health_values = [
+                value for phase, value in health_avg_by_phase.items() if phase in {"shadow", "shadow_live"}
+            ]
+            shadow_health_avg = sum(shadow_health_values) / len(shadow_health_values) if shadow_health_values else None
+            for phase, avg_score in health_avg_by_phase.items():
+                sentinel_equipment_phase_health_score_avg.labels(site_id=SITE_ID, phase=phase).set(round(avg_score, 3))
+                if shadow_health_avg is not None:
+                    sentinel_equipment_phase_health_delta_from_shadow.labels(site_id=SITE_ID, phase=phase).set(
+                        round(avg_score - shadow_health_avg, 3)
+                    )
+    except Exception as e:
+        logger.debug(f"Discipline metrics: phase baseline comparison failed: {e}")
+
+    # — Measured recommendation energy feedback loop —
+    try:
+        rec_resp = (
+            client.table("recommendations")
+            .select(
+                "id, site_id, target_equipment, baseline_energy_kwh, actual_energy_kwh, "
+                "actual_saving_kwh, actual_saving_zar, executed_at"
+            )
+            .eq("site_id", SITE_ID)
+            .in_("status", ["executed", "auto_executed"])
+            .not_.is_("actual_saving_kwh", "null")
+            .order("executed_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+        for row in rec_resp.data or []:
+            labels = {
+                "site_id": row.get("site_id") or SITE_ID,
+                "recommendation_id": row.get("id") or "unknown",
+                "equipment_id": row.get("target_equipment") or "unknown",
+            }
+            if row.get("baseline_energy_kwh") is not None:
+                sentinel_recommendation_baseline_energy_kwh.labels(**labels).set(float(row["baseline_energy_kwh"]))
+            if row.get("actual_energy_kwh") is not None:
+                sentinel_recommendation_actual_energy_kwh.labels(**labels).set(float(row["actual_energy_kwh"]))
+            if row.get("actual_saving_kwh") is not None:
+                sentinel_recommendation_actual_saving_kwh.labels(**labels).set(float(row["actual_saving_kwh"]))
+            if row.get("actual_saving_zar") is not None:
+                sentinel_recommendation_actual_saving_zar.labels(**labels).set(float(row["actual_saving_zar"]))
+    except Exception as e:
+        logger.debug(f"Discipline metrics: recommendation energy feedback query failed: {e}")
 
     # — ESG: renewable %, energy intensity, water intensity, waste —
     try:

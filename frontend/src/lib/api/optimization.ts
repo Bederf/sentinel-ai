@@ -18,6 +18,14 @@ export interface Recommendation {
   source_module?: string
   recommendation_type?: string
   action_type: string
+  action?: {
+    point?: string
+    parameter?: string
+    value?: number | string | boolean
+    target_value?: number | string | boolean
+    unit?: string
+    description?: string
+  } | Record<string, unknown>
   risk_level: string
   priority?: string
   target_equipment: string
@@ -25,14 +33,20 @@ export interface Recommendation {
   description?: string
   reason: string
   expected_impact: Record<string, number>
+  baseline_energy_kwh?: number | null
+  actual_energy_kwh?: number | null
+  actual_saving_kwh?: number | null
   actual_saving_zar?: number
   outcome_validated?: boolean
+  outcome_notes?: string | null
   confidence: string | number
   profile: string
   multi_objective_score: number
   status: string
   timestamp: string
   executed_at?: string
+  approved_at?: string
+  execution_result?: Record<string, unknown> | null
   outcome?: Outcome
 }
 

@@ -41,6 +41,112 @@ class FireSystemService:
     def __init__(self):
         self._repo = get_fire_safety_repository()
 
+    def _get_fire_control_gate(self, site_id: str) -> dict[str, Any]:
+        """Return whether SENTINEL may execute fire cause/effect controls for a site."""
+        normalized_site = site_id.strip().lower().replace("_", "-")
+        if normalized_site.startswith("s") and len(normalized_site) == 4 and normalized_site[1:].isdigit():
+            normalized_site = f"site-{normalized_site[1:]}"
+
+        gate = {
+            "site_id": normalized_site,
+            "fire_module_active": False,
+            "auto_mode_enabled": False,
+            "commissioned_cause_effect": False,
+            "control_allowed": False,
+            "mode": "monitoring_only",
+            "authority": "fire_panel_and_bms",
+            "reason": "Fire module is not active for this site",
+        }
+
+        try:
+            from app.models.module_registry import ModuleType
+            from app.services.module_registry_service import module_registry
+
+            fire_module_active = module_registry.is_module_active(normalized_site, ModuleType.FIRE)
+            gate["fire_module_active"] = fire_module_active
+            if not fire_module_active:
+                return gate
+
+            module_config = {}
+            site_config = module_registry.get_site_config(normalized_site)
+            if site_config:
+                fire_module = next(
+                    (m for m in site_config.active_modules if m.module_type == ModuleType.FIRE),
+                    None,
+                )
+                if fire_module:
+                    module_config = fire_module.config or {}
+
+            auto_mode_enabled = bool(
+                module_config.get("auto_mode")
+                or module_config.get("automode")
+                or module_config.get("fire_auto_mode")
+                or module_config.get("coordinated_control_enabled")
+            )
+            commissioned_cause_effect = bool(
+                module_config.get("commissioned_cause_effect")
+                or module_config.get("cause_effect_commissioned")
+                or module_config.get("commissioned_fire_cause_effect")
+            )
+
+            gate.update(
+                {
+                    "auto_mode_enabled": auto_mode_enabled,
+                    "commissioned_cause_effect": commissioned_cause_effect,
+                    "control_allowed": fire_module_active and auto_mode_enabled and commissioned_cause_effect,
+                }
+            )
+
+            if gate["control_allowed"]:
+                gate["mode"] = "coordinated_control"
+                gate["reason"] = "Fire module active, auto mode enabled, commissioned cause/effect present"
+            elif not auto_mode_enabled:
+                gate["reason"] = "Fire module active but auto mode is disabled"
+            elif not commissioned_cause_effect:
+                gate["reason"] = "Fire module active but fire cause/effect is not commissioned"
+        except Exception as e:
+            gate["reason"] = f"Fire control gate unavailable: {e}"
+
+        return gate
+
+    async def _notify_fire_alarm(
+        self,
+        *,
+        site_id: str,
+        zone_id: str,
+        alarm_type: str,
+        gate: dict[str, Any],
+        zone: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Send an evacuation/fire alarm notification to the configured Telegram alert chat."""
+        try:
+            from app.config.settings import settings
+            from app.services.telegram_message_sender import get_telegram_sender
+
+            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
+            if not chat_id:
+                return {"sent": False, "reason": "telegram_chat_id_not_configured"}
+
+            mode = "Commissioned cause/effect coordination" if gate.get("control_allowed") else "Monitoring only"
+            text = "\n".join(
+                [
+                    "<b>SENTINEL FIRE / EVACUATION ALERT</b>",
+                    f"<b>Site:</b> {site_id}",
+                    f"<b>Zone:</b> {zone_id} - {zone.get('zone_name', 'Unknown')}",
+                    f"<b>Alarm:</b> {alarm_type.upper()}",
+                    f"<b>SENTINEL mode:</b> {mode}",
+                    "",
+                    "Follow the site evacuation procedure immediately.",
+                    "The fire panel/BMS remains authoritative.",
+                ]
+            )
+            sender = get_telegram_sender()
+            result = await sender.send_text(str(chat_id), text, parse_mode="HTML")
+            return {"sent": bool(result.get("ok")), "result": result}
+        except Exception as e:
+            logger.error("Fire alarm Telegram notification failed: %s", e, exc_info=True)
+            return {"sent": False, "reason": str(e)}
+
     def get_system_status(self) -> FireSystemStatus:
         """Get aggregate fire system status."""
         # Get panel info and local fallback state
@@ -257,12 +363,12 @@ class FireSystemService:
             overall_health=overall,
         )
 
-    async def trigger_alarm(self, zone_id: str, alarm_type: str) -> dict[str, Any]:
+    async def trigger_alarm(self, zone_id: str, alarm_type: str, site_id: str = "site-002") -> dict[str, Any]:
         """Trigger a fire alarm and execute cause-effect chain.
 
-        Creates a FireAlarm entry via repository, then calls
-        FireHVACCoordinator.execute_cause_effect() for the full
-        HVAC/damper/pressurization response.
+        Creates a FireAlarm entry via repository. Cause/effect controls only
+        execute when the Fire module is active, auto mode is enabled, and
+        fire cause/effect has been commissioned for the site.
 
         Returns combined result (alarm + effects executed).
         """
@@ -286,16 +392,67 @@ class FireSystemService:
         }
         self._repo.create_alarm(alarm_data)
 
-        # Execute cause-effect chain via coordinator
         coordinator = get_fire_hvac_coordinator()
+        fire_control_gate = self._get_fire_control_gate(site_id)
+        notification_result = await self._notify_fire_alarm(
+            site_id=fire_control_gate["site_id"],
+            zone_id=zone_id,
+            alarm_type=alarm_type,
+            gate=fire_control_gate,
+            zone=zone,
+        )
+        if not fire_control_gate["control_allowed"]:
+            self._repo.log_action(
+                {
+                    "action_type": "fire_alarm_monitoring_only",
+                    "zone_id": zone_id,
+                    "description": (
+                        f"Fire alarm received for {zone_id}; SENTINEL monitoring-only, "
+                        "no cause/effect controls executed"
+                    ),
+                    "mode": "monitoring_only",
+                    "details": fire_control_gate,
+                }
+            )
+            return {
+                "alarm_id": alarm_data["alarm_id"],
+                "alarm": alarm_data,
+                "zone": zone,
+                "fire_control_gate": fire_control_gate,
+                "authority": "fire_panel_and_bms",
+                "notification": notification_result,
+                "cause_effect": {
+                    "triggered_effects": [],
+                    "devices_affected": 0,
+                    "execution_time_ms": 0.0,
+                    "any_failures": False,
+                    "failures": [],
+                    "skipped": True,
+                    "skip_reason": fire_control_gate["reason"],
+                },
+                "coordinator_mode": "monitoring_only",
+                "operator_message": (
+                    "Fire alarm active. Follow the site evacuation procedure. "
+                    "SENTINEL is monitoring only; the fire panel/BMS remains authoritative."
+                ),
+            }
+
+        # Execute commissioned cause-effect chain via coordinator
         cause_effect_result = await coordinator.execute_cause_effect(zone_id, alarm_type)
 
         return {
             "alarm_id": alarm_data["alarm_id"],
             "alarm": alarm_data,
             "zone": zone,
+            "fire_control_gate": fire_control_gate,
+            "notification": notification_result,
             "cause_effect": cause_effect_result.to_dict(),
             "coordinator_mode": coordinator._mode,
+            "authority": "fire_panel_and_bms",
+            "operator_message": (
+                "Fire alarm active. SENTINEL executed the commissioned cause/effect coordination only. "
+                "The fire panel/BMS remains authoritative."
+            ),
         }
 
     async def clear_alarm(self, alarm_id: str) -> dict[str, Any]:

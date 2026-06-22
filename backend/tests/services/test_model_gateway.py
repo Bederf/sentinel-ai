@@ -21,9 +21,10 @@ class TestProfileResolution:
         mode, fallback_enabled, routes = self.gw._resolve("heavy")
         assert mode == "api"
         assert fallback_enabled is True
-        assert len(routes) >= 2
+        assert len(routes) >= 3
         assert routes[0][0] == "minimax"  # Primary
-        assert routes[1][0] == "anthropic"  # Fallback
+        assert routes[1][0] == "deepseek"  # Fallback
+        assert routes[2][0] == "openai"  # Final fallback
 
     def test_light_resolves_with_minimax_primary(self):
         mode, fallback_enabled, routes = self.gw._resolve("light")
@@ -154,10 +155,13 @@ class TestFallbackChainRetry:
                 stream=False,
                 tools=None,
                 source="test",
+                site_id="site-002",
             )
 
             assert result == "Anthropic response"
             assert mock_call.call_count == 2  # First failed, second succeeded
+            assert mock_call.call_args_list[0].kwargs["site_id"] == "site-002"
+            assert mock_call.call_args_list[1].kwargs["site_id"] == "site-002"
 
     @pytest.mark.asyncio
     async def test_fallback_disabled_raises_on_first_failure(self):
@@ -179,9 +183,11 @@ class TestFallbackChainRetry:
                     stream=False,
                     tools=None,
                     source="test",
+                    site_id="site-002",
                 )
 
             assert mock_call.call_count == 1  # Only tried first, no fallback
+            assert mock_call.call_args.kwargs["site_id"] == "site-002"
 
     @pytest.mark.asyncio
     async def test_all_routes_exhausted_raises_error(self):
@@ -202,9 +208,33 @@ class TestFallbackChainRetry:
                     stream=False,
                     tools=None,
                     source="test",
+                    site_id="site-002",
                 )
 
             assert mock_call.call_count == 2  # Tried both routes
+            assert mock_call.call_args_list[0].kwargs["site_id"] == "site-002"
+            assert mock_call.call_args_list[1].kwargs["site_id"] == "site-002"
+
+    @pytest.mark.asyncio
+    async def test_call_passes_site_id_to_try_routes(self):
+        """Public call() must preserve site_id for usage tracking and budget enforcement."""
+        gw = ModelGateway()
+
+        with patch("app.services.model_gateway.ModelGateway._resolve") as mock_resolve:
+            with patch("app.services.model_gateway.ModelGateway._try_routes", new_callable=AsyncMock) as mock_try:
+                mock_resolve.return_value = ("api", True, [("minimax", "MiniMax-M2.7")])
+                mock_try.return_value = "ok"
+
+                result = await gw.call(
+                    task_class="heavy",
+                    messages=[{"role": "user", "content": "test"}],
+                    source="ai_optimizer",
+                    site_id="site-002",
+                )
+
+        assert result == "ok"
+        mock_try.assert_called_once()
+        assert mock_try.call_args.kwargs["site_id"] == "site-002"
 
 
 class TestLocalFullHardFail:
@@ -250,5 +280,5 @@ class TestProfileSwitching:
             mode, fallback_enabled, routes = gw._resolve("medium")
             assert mode == "api"
             assert fallback_enabled is True  # Fallback enabled
-            assert routes[0][0] == "minimax"  # Primary
-            assert routes[1][0] == "anthropic"  # Fallback
+            assert routes[0][0] == "deepseek"  # Primary
+            assert routes[1][0] == "minimax"  # Fallback

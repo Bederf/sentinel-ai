@@ -10,7 +10,7 @@ import contextlib
 import logging
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from app.services.issue_classifier import (
@@ -833,14 +833,52 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
     value = action.get("value", "")
     reason = rec.get("reason", "") or rec.get("description", "")
     priority = rec.get("priority", "medium")
+    diagnostic_context = None
+    notify_service_type = "callout"
+    title = f"AI Optimization: {target} — {point}"
 
-    description = (
-        f"⚡ SENTINEL Advisory — site-002\n\n"
-        f"📋 {target}\n"
-        f"   What: Set {point} to {value}\n"
-        f"   Why: {reason[:500]}\n\n"
-        f"🆔 {rec_uuid}"
-    )
+    try:
+        from app.services.ai_maintenance_work_order_context import (
+            build_ai_maintenance_context,
+            build_ai_maintenance_description,
+            is_ai_maintenance_recommendation,
+        )
+
+        if is_ai_maintenance_recommendation(rec.get("action_type"), action):
+            diagnostic_context = build_ai_maintenance_context(
+                recommendation_id=rec_uuid,
+                site_id=rec.get("site_id", ""),
+                equipment_code=target,
+                action_type=rec.get("action_type"),
+                action=action,
+                reason=reason,
+                confidence_score=rec.get("confidence_score"),
+            )
+            description = build_ai_maintenance_description(
+                recommendation_id=rec_uuid,
+                equipment_code=target,
+                reason=reason,
+                diagnostic_context=diagnostic_context,
+            )
+            notify_service_type = "breakdown"
+            title = f"AI Maintenance Check: {target}"
+        else:
+            description = (
+                f"⚡ SENTINEL Advisory — site-002\n\n"
+                f"📋 {target}\n"
+                f"   What: Set {point} to {value}\n"
+                f"   Why: {reason[:500]}\n\n"
+                f"🆔 {rec_uuid}"
+            )
+    except Exception as e:
+        logger.warning("Advisory WO context build failed for %s: %s", rec_uuid, e)
+        description = (
+            f"⚡ SENTINEL Advisory — site-002\n\n"
+            f"📋 {target}\n"
+            f"   What: Set {point} to {value}\n"
+            f"   Why: {reason[:500]}\n\n"
+            f"🆔 {rec_uuid}"
+        )
 
     # Resolve site_id first for technician lookup
     site_id = rec.get("site_id", "")
@@ -934,7 +972,7 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
     tech_name = tech.get("name", "") if tech else ""
 
     wo_data = {
-        "title": f"AI Optimization: {target} — {point}",
+        "title": title,
         "description": description,
         "priority": priority,
         "status": "scheduled",
@@ -942,6 +980,8 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         "equipment_code": target,
         "recommendation_id": rec_uuid,
         "site_id": site_id or None,
+        "service_type": notify_service_type,
+        "notes": "AI-generated maintenance work order" if diagnostic_context else None,
     }
     if tech_name:
         wo_data["assigned_to"] = tech_name
@@ -964,6 +1004,12 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         sender,
     )
 
+    await _mark_recommendation_work_order_created(
+        recommendation_id=rec_uuid,
+        work_order_code=str(wo_code),
+        telegram_chat_id=str(chat_id),
+    )
+
     # Notify technician via Telegram + email
     if tech and tech.get("telegram_id"):
         try:
@@ -976,13 +1022,18 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
                     "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
                     "equipment_code": target,
                     "equipment_id": equipment_id or target,
-                    "equipment_name": f"AI Optimization: {target}",
+                    "equipment_name": target,
                     "site_id": site_id or "site-002",
                     "technician_id": tech.get("telegram_id"),
                     "technician_name": tech.get("name", "Technician"),
-                    "service_type": "callout",
+                    "service_type": notify_service_type,
                     "criticality": priority.upper(),
                     "problem_description": description,
+                    "description": description,
+                    "inspection_instructions": "\n".join(diagnostic_context.get("inspection_checklist", []))
+                    if diagnostic_context
+                    else "",
+                    "diagnostic_context": diagnostic_context,
                 }
             )
         except Exception as e:
@@ -999,6 +1050,100 @@ async def _handle_create_wo_from_rec(chat_id: str, rec_uuid: str, sender) -> Non
         tech_name,
         tech.get("email", "") if tech else "",
     )
+
+
+async def _mark_recommendation_work_order_created(
+    *,
+    recommendation_id: str,
+    work_order_code: str,
+    telegram_chat_id: str,
+) -> None:
+    """Record advisory approval when a human-action work order is created."""
+    try:
+        from app.database.repositories.recommendation_repository import get_recommendation_repository
+        from app.models.recommendation import RecommendationStatus
+
+        rec_repo = get_recommendation_repository()
+        rec = await rec_repo.get_by_id(recommendation_id)
+        if not rec:
+            return
+        if rec.status == RecommendationStatus.PENDING:
+            rec.status = RecommendationStatus.APPROVED
+        rec.approved_by = f"telegram:{telegram_chat_id}"
+        rec.approved_at = datetime.utcnow()
+        rec.approval_reason = f"Advisory work order created: {work_order_code}"
+        rec.external_ticket_id = work_order_code
+        await rec_repo.update(recommendation_id, rec)
+    except Exception as exc:
+        logger.warning(
+            "[ADVISORY-WO] Failed to mark recommendation %s as work-order-created: %s",
+            recommendation_id,
+            exc,
+        )
+
+
+async def _mark_recommendation_executed_from_work_order(wo: dict) -> None:
+    """Mark linked advisory recommendation executed and schedule outcome verification."""
+    recommendation_id = wo.get("recommendation_id")
+    if not recommendation_id:
+        return
+    try:
+        from app.database.repositories.recommendation_repository import get_recommendation_repository
+        from app.models.recommendation import RecommendationStatus
+
+        rec_repo = get_recommendation_repository()
+        rec = await rec_repo.get_by_id(recommendation_id)
+        if not rec:
+            return
+        if rec.status in (RecommendationStatus.PENDING, RecommendationStatus.APPROVED):
+            rec.status = RecommendationStatus.EXECUTED
+            rec.executed_at = datetime.utcnow()
+            rec.execution_result = {
+                **(rec.execution_result or {}),
+                "success": True,
+                "write_path": "manual_work_order",
+                "work_order_code": wo.get("code"),
+                "work_order_id": wo.get("id"),
+                "verification_status": "telemetry_pending",
+                "verification_note": "Manual advisory work order completed; outcome verification pending.",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            await rec_repo.update(recommendation_id, rec)
+
+        from app.services.background_scheduler import scheduler_service
+
+        verify_at = datetime.utcnow() + timedelta(minutes=30)
+        scheduler_service.scheduler.add_job(
+            func=_run_single_recommendation_verification_sync,
+            args=[recommendation_id],
+            trigger="date",
+            run_date=verify_at,
+            id=f"outcome_verify_{recommendation_id}",
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+        logger.info("[ADVISORY-WO] Outcome verification scheduled for recommendation %s", recommendation_id)
+    except Exception as exc:
+        logger.warning(
+            "[ADVISORY-WO] Failed to mark recommendation %s executed from WO %s: %s",
+            recommendation_id,
+            wo.get("code"),
+            exc,
+        )
+
+
+def _run_single_recommendation_verification_sync(recommendation_id: str) -> None:
+    """APScheduler wrapper for single recommendation outcome verification."""
+    import asyncio
+
+    from app.services.background_scheduler import scheduler_service
+    from app.services.recommendation_outcome_service import process_single_verification
+
+    main_loop = scheduler_service._main_loop
+    if main_loop and main_loop.is_running():
+        asyncio.run_coroutine_threadsafe(process_single_verification(recommendation_id), main_loop).result(timeout=60)
+    else:
+        logger.warning("[OUTCOME] Main event loop not available — skipping verification for %s", recommendation_id)
 
 
 # ===================================================================
@@ -1439,7 +1584,7 @@ async def _create_complaint_wo(
                         "work_order_id": str(wo_uuid) if wo_uuid else wo_code,
                         "equipment_code": equipment_code,
                         "equipment_id": equipment_code or "site-002",
-                        "equipment_name": title,
+                        "equipment_name": equipment_code,
                         "site_id": "site-002",
                         "technician_id": tech.get("telegram_id"),
                         "technician_name": tech.get("name", "Technician"),
@@ -1537,6 +1682,8 @@ async def _update_wo_status(wo_code: str, new_status: str) -> bool:
                 if reporter_telegram_id:
                     _notify_reporter_completed.delay(wo_code, reporter_telegram_id, wo.get("title", "Your report"))
 
+            await _mark_recommendation_executed_from_work_order(wo)
+
         return True
     except Exception as e:
         logger.warning("WO status update failed for %s: %s", wo_code, e)
@@ -1615,7 +1762,8 @@ async def _handle_staff_wo_status(
         )
         return
 
-    status = data.get("status", "unknown")
+    status = data.get("display_status") or data.get("status", "unknown")
+    staff_summary = data.get("staff_summary", "")
     priority = data.get("priority", "")
     category = data.get("category", "")
     title = data.get("title", "")
@@ -1624,14 +1772,18 @@ async def _handle_staff_wo_status(
     created_at = data.get("created_at", "")
     updated_at = data.get("updated_at", "")
     completed_at = data.get("completed_at", "")
+    resolved_at = data.get("resolved_at", "")
+    closed_at = data.get("closed_at", "")
 
-    status_emoji = {"completed": "✅", "in_progress": "🔄", "scheduled": "📋", "blocked": "⛔"}.get(status, "📋")
+    status_emoji = {"Closed": "✅", "Resolved": "✅", "Open": "📋", "blocked": "⛔"}.get(status, "📋")
 
     lines = [
         f"{status_emoji} Work Order {wo_code}",
         "",
         f"**Status:** {status.title()}",
     ]
+    if staff_summary:
+        lines.append(staff_summary)
     if priority:
         lines.append(f"**Priority:** {priority.title()}")
     if category:
@@ -1644,8 +1796,12 @@ async def _handle_staff_wo_status(
         lines.append(f"**Created:** {created_at[:16] if len(created_at) > 16 else created_at}")
     if updated_at:
         lines.append(f"**Updated:** {updated_at[:16] if len(updated_at) > 16 else updated_at}")
+    if resolved_at:
+        lines.append(f"**Resolved:** {resolved_at[:16] if len(resolved_at) > 16 else resolved_at}")
     if completed_at:
         lines.append(f"**Completed:** {completed_at[:16] if len(completed_at) > 16 else completed_at}")
+    if closed_at:
+        lines.append(f"**Closed:** {closed_at[:16] if len(closed_at) > 16 else closed_at}")
     if notes:
         lines.append(f"**Notes:** {notes}")
 

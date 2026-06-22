@@ -107,7 +107,7 @@ export function SplashScreen({ onComplete, minDisplayTime = 8500 }: SplashScreen
       style={{ background: "#ffffff" }}
     >
       <div className="flex flex-col items-center">
-        {/* Video Container - Large */}
+        {/* Video Container */}
         <div className="w-[400px] h-[400px] md:w-[500px] md:h-[500px] lg:w-[600px] lg:h-[600px] flex items-center justify-center">
           <video
             ref={videoRef}

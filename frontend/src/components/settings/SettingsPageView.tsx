@@ -23,6 +23,7 @@ import { NotificationSettingsPanel } from "./NotificationSettingsPanel";
 import { OperatingScheduleEditor } from "./OperatingScheduleEditor";
 import { SimbiotBridgeSettings } from "./SimbiotBridgeSettings";
 import { SpaceOptimizationSettings } from "./SpaceOptimizationSettings";
+import { StaffRosterRegistry } from "./StaffRosterRegistry";
 import { SystemHealthDashboard } from "./SystemHealthDashboard";
 import { TariffManager } from "./TariffManager";
 import { TechnicianRegistry } from "./TechnicianRegistry";
@@ -202,6 +203,13 @@ function SettingsSections({
       />
       <ManagerRegistry
         key={`mgr-${controller.selectedSiteId}`}
+        siteId={controller.selectedSiteId ?? undefined}
+        onError={onError}
+        onSuccess={controller.handleSuccess}
+        readOnly={controller.readOnly}
+      />
+      <StaffRosterRegistry
+        key={`staff-${controller.selectedSiteId}`}
         siteId={controller.selectedSiteId ?? undefined}
         onError={onError}
         onSuccess={controller.handleSuccess}

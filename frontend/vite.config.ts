@@ -39,10 +39,16 @@ export default defineConfig(({ mode }) => ({
         manualChunks(id) {
           if (!id.includes('node_modules')) return undefined
 
-          // Heavy 3D dependencies — only loaded when 3D components render
-          if (id.includes('three-stdlib') || id.includes('OrbitControls')) return 'vendor-3d-controls'
-          if (id.includes('@react-three/fiber') || id.includes('/three/')) return 'vendor-3d-core'
-          if (id.includes('@react-three/drei')) return 'vendor-3d-drei'
+          // Heavy 3D dependencies share imports; keep them together to avoid circular chunks.
+          if (
+            id.includes('@react-three/fiber') ||
+            id.includes('@react-three/drei') ||
+            id.includes('three-stdlib') ||
+            id.includes('/three/') ||
+            id.includes('OrbitControls')
+          ) {
+            return 'vendor-3d'
+          }
 
           // Visualization
           if (id.includes('cytoscape')) return 'vendor-graph'

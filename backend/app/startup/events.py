@@ -595,6 +595,13 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ AI cost report job initialization failed: {e}")
 
+    # Weekly Sentry staff/tech feedback digest email (Monday 07:00 SAST)
+    try:
+        scheduler_service.add_sentry_feedback_digest_job()
+        _logger.info("✅ Sentry feedback digest job initialized (Monday 07:00 SAST → info@sentinel-ai.co.za)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Sentry feedback digest job initialization failed: {e}")
+
     # LLM Judge evaluation (every 60 min, INTERIM — replace with iDNa AI Testing Framework)
     try:
         scheduler_service.add_llm_judge_job()
@@ -617,10 +624,10 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Orphan alert cleanup job initialization failed: {e}")
 
-    # Morning recommendation digest — top 5 pending by severity, sent to FM Telegram at 07:45 SAST Mon-Fri
+    # Morning recommendation digest — top 5 pending by severity, sent to FM Telegram at 07:00 SAST Mon-Fri
     try:
         scheduler_service.add_recommendation_digest_job()
-        _logger.info("✅ Recommendation digest job initialized (07:45 SAST Mon-Fri → FM Telegram)")
+        _logger.info("✅ Recommendation digest job initialized (07:00 SAST Mon-Fri → FM Telegram)")
     except Exception as e:
         _logger.warning(f"⚠️ Recommendation digest job initialization failed: {e}")
 
@@ -963,6 +970,24 @@ async def startup_event(_: FastAPI) -> None:
         _logger.info("Event intelligence job initialized (2 min interval)")
     except Exception as e:
         _logger.warning(f"Event intelligence job initialization failed: {e}")
+
+    # Zone occupancy trigger event recording (every minute)
+    # Read-only/inert: records zone occupancy transitions only. It does not
+    # invoke optimization; future ReflexReconciliationService will consume it.
+    try:
+        scheduler_service.add_zone_occupancy_trigger_job(interval_seconds=60)
+        _logger.info("Zone occupancy trigger job initialized (60s interval)")
+    except Exception as e:
+        _logger.warning(f"Zone occupancy trigger job initialization failed: {e}")
+
+    # Reflex reconciliation current-state scan (every 5 minutes)
+    # Deterministic zone/system mismatch checks. This is separate from AI
+    # optimization and does not call analyze_building().
+    try:
+        scheduler_service.add_reflex_reconciliation_job(interval_seconds=300)
+        _logger.info("Reflex reconciliation job initialized (300s interval)")
+    except Exception as e:
+        _logger.warning(f"Reflex reconciliation job initialization failed: {e}")
 
     # BMS simulation service - DISABLED for demo stability
     # try:

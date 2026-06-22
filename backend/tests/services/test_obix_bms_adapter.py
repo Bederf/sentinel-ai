@@ -33,7 +33,7 @@ class TestObixBmsAdapter:
         assert caps.supports_device_discovery is False
         assert caps.supports_point_discovery is True
         assert caps.supports_reads is True
-        assert caps.supports_writes is False
+        assert caps.supports_writes is True
         assert caps.supports_subscriptions is False
         assert caps.supports_history is True
 
@@ -311,10 +311,13 @@ class TestObixBmsAdapter:
     # write_point
     # -------------------------------------------------------------------------
     @pytest.mark.asyncio
-    async def test_write_point_not_implemented(self):
+    async def test_write_point_success(self):
+        mock_client = MagicMock()
+        mock_client.write_point = MagicMock(return_value=True)
+
         adapter = ObixBmsAdapter()
         adapter._connected = True
-        adapter._obix_client = MagicMock()
+        adapter._obix_client = mock_client
 
         request = BmsWriteRequest(
             device_id="obix-broker",
@@ -322,7 +325,88 @@ class TestObixBmsAdapter:
             value=22.0,
         )
 
-        with pytest.raises(NotImplementedError):
+        result = await adapter.write_point(request)
+
+        assert result is True
+        # verify=True is passed by the adapter for read-back verification
+        mock_client.write_point.assert_called_once_with("config/points/setpoint1", 22.0, True)
+
+    @pytest.mark.asyncio
+    async def test_write_point_verification_failure_returns_false(self):
+        """Write returns False when read-back doesn't match (silent no-op)."""
+        mock_client = MagicMock()
+        # write_point returns False when read-back doesn't match the written value
+        mock_client.write_point = MagicMock(return_value=False)
+
+        adapter = ObixBmsAdapter()
+        adapter._connected = True
+        adapter._obix_client = mock_client
+
+        request = BmsWriteRequest(
+            device_id="obix-broker",
+            point_id="config/points/setpoint1",
+            value=22.0,
+        )
+
+        result = await adapter.write_point(request)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_write_point_not_found_returns_false(self):
+        from app.services.niagara.obix_client import OBIXPointNotFoundError
+
+        mock_client = MagicMock()
+        mock_client.write_point = MagicMock(side_effect=OBIXPointNotFoundError("Not found"))
+
+        adapter = ObixBmsAdapter()
+        adapter._connected = True
+        adapter._obix_client = mock_client
+
+        request = BmsWriteRequest(
+            device_id="obix-broker",
+            point_id="config/points/nonexistent",
+            value=22.0,
+        )
+
+        result = await adapter.write_point(request)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_write_point_connection_error_returns_false(self):
+        from app.services.niagara.obix_client import OBIXConnectionError
+
+        mock_client = MagicMock()
+        mock_client.write_point = MagicMock(side_effect=OBIXConnectionError("Connection failed"))
+
+        adapter = ObixBmsAdapter()
+        adapter._connected = True
+        adapter._obix_client = mock_client
+
+        request = BmsWriteRequest(
+            device_id="obix-broker",
+            point_id="config/points/setpoint1",
+            value=22.0,
+        )
+
+        result = await adapter.write_point(request)
+
+        assert result is False
+
+    @pytest.mark.asyncio
+    async def test_write_point_not_connected_raises(self):
+        adapter = ObixBmsAdapter()
+        adapter._connected = False
+        adapter._obix_client = None
+
+        request = BmsWriteRequest(
+            device_id="obix-broker",
+            point_id="config/points/setpoint1",
+            value=22.0,
+        )
+
+        with pytest.raises(ConnectionError, match="not connected"):
             await adapter.write_point(request)
 
     # -------------------------------------------------------------------------

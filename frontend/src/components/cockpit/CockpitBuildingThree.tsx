@@ -852,7 +852,7 @@ export function CockpitBuildingThree({ state, className, onZoneSelect }: Cockpit
     oc.update()
   }, [computedTarget, defaultCam])
 
-  const viewportHeight = 'clamp(380px, 52vh, 580px)'
+  const viewportHeight = 'clamp(520px, 68vh, 760px)'
 
   return (
     <div className={`relative w-full ${className ?? ''}`} style={{ height: viewportHeight }}>

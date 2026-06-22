@@ -397,8 +397,7 @@ class DemandResponseService:
             if not equipment_codes:
                 return 0.0
 
-            # Sum power readings for this equipment
-            # Normalize to Supabase format: site-002 → S002
+            # Sum power readings for this equipment using canonical site-### ids.
             from app.core.site_resolver import normalize_site_id
 
             supabase_site_id = normalize_site_id(site_id, to_supabase=True)

@@ -2,9 +2,9 @@
 title: "Monitoring Stack Operations"
 type: "guide"
 status: "draft"
-version: "1.0.0"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-06-14"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -23,11 +23,15 @@ The monitoring stack runs on the shared `/opt/aimthelaw` infrastructure alongsid
 
 | Service | Port | Purpose |
 |---------|------|---------|
-| Prometheus | 9090 | Metrics scraping (SENTINEL, node-exporter, self) |
-| Grafana | 3001 (→3000) | Dashboards, alerting, visualization |
+| Prometheus | 9090 | Metrics scraping (6 targets: SENTINEL backend ×2, node-exporter, cadvisor, sentry-bridge, self) |
+| Grafana | 3000 | Dashboards, alerting, visualization |
+| Alertmanager | 9093 | Alert routing, silencing, aggregation |
 | Loki | 3100 | Log aggregation and querying |
 | Promtail | 9080 | Log collection agent (tails files, ships to Loki) |
 | Node Exporter | 9100 | System-level metrics (CPU, memory, disk, network) |
+| cAdvisor | 8080 | Container-level metrics (CPU, memory, network per container) |
+| PgBouncer | 6432 | Connection pooler for background workers |
+| PgBouncer Exporter* | 9127 | PgBouncer metrics for Prometheus (not yet deployed) |
 
 ## Configuration Files
 
@@ -39,7 +43,8 @@ All configs live at `/opt/aimthelaw/config/`:
 | `promtail-config.yml` | Scrape jobs, label extraction, file paths |
 | `grafana/provisioning/dashboards/*.json` | Auto-provisioned Grafana dashboards |
 | `grafana/provisioning/alerting/*.yml` | Alert rules |
-| `prometheus.yml` | Prometheus scrape targets (sentinel-backend, node, self) |
+| `prometheus.yml` | Prometheus scrape targets (6 targets: sentinel-governance, sentinel-discipline, node-exporter, cadvisor, sentry-bridge, self) |
+| `alertmanager.yml` | Alertmanager routing, receivers, inhibition rules |
 | `docker-compose.monitoring.yml` | Container orchestration |
 
 **Repo copies** (version-controlled, may differ from deployed):
@@ -49,6 +54,55 @@ All configs live at `/opt/aimthelaw/config/`:
 | `infrastructure/promtail/promtail-config.yaml` | `/opt/aimthelaw/config/promtail-config.yml` |
 | `infrastructure/grafana/provisioning/dashboards/` | `/opt/aimthelaw/config/grafana/provisioning/dashboards/` |
 | `infrastructure/loki/loki-config.yaml` | `/opt/aimthelaw/config/loki-config.yml` |
+| `infrastructure/prometheus/` | `/opt/aimthelaw/config/prometheus.yml` |
+
+### Recommendation Energy Feedback Panels
+
+Executed recommendation outcomes must show measured impact, not projected savings. The recommendation feedback loop exports actual before/after telemetry values from the backend `/metrics` endpoint:
+
+| Metric | Source | Meaning |
+|--------|--------|---------|
+| `sentinel_recommendation_baseline_energy_kwh` | `recommendations.baseline_energy_kwh` | Actual kWh measured before implementation |
+| `sentinel_recommendation_actual_energy_kwh` | `recommendations.actual_energy_kwh` | Actual kWh measured after implementation |
+| `sentinel_recommendation_actual_saving_kwh` | `recommendations.actual_saving_kwh` | Before kWh minus after kWh |
+| `sentinel_recommendation_actual_saving_zar` | `recommendations.actual_saving_zar` | Measured kWh delta multiplied by tariff |
+
+Provisioned panels:
+
+| Dashboard file | Panels |
+|----------------|--------|
+| `sentinel-energy.json` | Measured Rec kWh Saved; Measured Rec R Saved; Recommendation Before vs After kWh |
+| `sentinel-ai-governance-live.json` | Verified Rec kWh Impact; Verified Rec R Impact; Verified Recommendation Energy Outcome |
+
+Operator UI visibility:
+
+| Product area | View | Purpose |
+|--------------|------|---------|
+| System Health | AI Actions tab | Summary of AI recommendations suggested, actioned, and measured outcome |
+| Optimization pages | Execution history | Same recommendation lifecycle audit in the optimization workflow |
+
+Negative kWh or Rand values are expected when an action increases measured consumption. Do not clamp these to zero; they are evidence that the recommendation did not deliver savings during the verification window.
+
+### Onboarding Baseline and Phase Comparison Panels
+
+Grafana must also expose the baseline established during onboarding/shadow operation and compare later phases against it. This is broader than energy: it covers formal equipment baseline coverage, equipment health, and energy where daily kWh history is available.
+
+| Metric | Source | Meaning |
+|--------|--------|---------|
+| `sentinel_equipment_baseline_coverage_percent` | `equipment_baselines` vs `equipment` | Percent of equipment with an active formal baseline record |
+| `sentinel_equipment_phase_health_score_avg` | `asset_health_snapshots` + `phase_transition_log` | Average equipment health score per phase |
+| `sentinel_equipment_phase_health_delta_from_shadow` | Derived from phase health averages | Health delta versus `shadow` / `shadow_live` baseline |
+| `sentinel_energy_phase_avg_daily_kwh` | `energy_consumption_history` + `phase_transition_log` | Average daily kWh per phase |
+| `sentinel_energy_phase_delta_from_shadow_kwh` | Derived from phase energy averages | Daily kWh delta versus `shadow` / `shadow_live` baseline |
+
+Provisioned panels:
+
+| Dashboard file | Panels |
+|----------------|--------|
+| `sentinel-energy.json` | Energy Phase Baseline vs Current Phases; Energy Delta from Shadow Baseline |
+| `sentinel-ai-governance-live.json` | Equipment Baseline Coverage; Equipment Health by Phase; Equipment Health Delta from Shadow |
+
+For site-002, the formal `equipment_baselines` table is currently empty, so baseline coverage correctly reports `0%`. Historical phase energy and health are still visible where telemetry exists, but formal equipment baseline capture must be completed during onboarding/shadow for future sites before promotion to advisory/supervised/auto.
 
 ## Common Operations
 
@@ -67,9 +121,80 @@ docker restart promtail  # Log collector
 docker restart grafana   # Dashboards
 ```
 
+## PgBouncer Monitoring
+
+PgBouncer exposes pool statistics via its admin console. For Prometheus scraping, a `pgbouncer_exporter` sidecar can be deployed:
+
+### Key metrics to monitor
+
+| Metric | Source | Warning | Critical |
+|--------|--------|---------|----------|
+| Pool utilization | `SHOW POOLS` → `sv_active + sv_idle` vs pool_size | >80% | >95% |
+| Connection wait time | `SHOW STATS` → `total_wait_time` | >100ms avg | >500ms avg |
+| Client connections | `SHOW POOLS` → `cl_active + cl_waiting` | >80% of max_client_conn | >95% |
+| Server connections | `SHOW POOLS` → `sv_active + sv_idle` | — | = default_pool_size (fully saturated) |
+
+### Manual pool inspection
+
+```bash
+# Pool state
+psql -h 127.0.0.1 -p 6432 -U postgres -d pgbouncer -c "SHOW POOLS;"
+
+# Transaction stats
+psql -h 127.0.0.1 -p 6432 -U postgres -d pgbouncer -c "SHOW STATS;"
+
+# Active server connections
+psql -h 127.0.0.1 -p 6432 -U postgres -d pgbouncer -c "SHOW SERVERS;"
+
+# Client connections
+psql -h 127.0.0.1 -p 6432 -U postgres -d pgbouncer -c "SHOW CLIENTS;"
+```
+
+### Pgbouncer Exporter (deployed)
+
+```bash
+docker run -d --name pgbouncer-exporter \
+  --network host \
+  -e PGBOUNCER_EXPORTER_CONNECTION_STRING="postgres://postgres:postgres@127.0.0.1:6432/pgbouncer?sslmode=disable" \
+  prometheuscommunity/pgbouncer-exporter:latest
+```
+
+**Env var**: `PGBOUNCER_EXPORTER_CONNECTION_STRING` (not `PGBOUNCER_DSN` or `PGBOUNCER_URI`).
+
+Prometheus scrapes at `192.168.48.1:9127` (Docker gateway IP). Requires UFW rule:
+```bash
+sudo ufw allow from 192.168.48.0/24 to any port 9127 proto tcp
+```
+
+Prometheus config (`infrastructure/prometheus/prometheus.yml`):
+```yaml
+- job_name: 'pgbouncer'
+  static_configs:
+    - targets: ['192.168.48.1:9127']
+  metrics_path: '/metrics'
+  scrape_interval: 15s
+```
+
+Available metrics:
+- `pgbouncer_up` — exporter connected to PgBouncer
+- `pgbouncer_pools_client_active_connections` — active clients
+- `pgbouncer_pools_client_waiting_connections` — queued clients
+- `pgbouncer_pools_server_idle_connections` — available pool capacity
+- `pgbouncer_pools_server_active_connections` — connections in use
+- `pgbouncer_pools_client_maxwait_seconds` — longest client wait time
+
+### PgBouncer alert rules
+
+Add to Grafana alerting:
+| Rule | Trigger | Severity |
+|------|---------|----------|
+| Pool Saturation | `default_pool_size - sv_idle < 2` for 5min | Warning |
+| Connection Wait Spike | `rate(pgbouncer_avg_wait_time[5m]) > 0.1` | Warning |
+| Pool Exhausted | `sv_active >= default_pool_size` | Critical |
+
 ## Infrastructure Health Check
 
-`infra/scripts/health-check.sh` runs a comprehensive check of all Sentinel infrastructure. It covers: systemd services, HTTP endpoints, Docker containers (Supabase), MQTT broker, data stores (Redis, Postgres), and streaming WAL replica.
+`infra/scripts/health-check.sh` runs a comprehensive check of all Sentinel infrastructure. It covers: systemd services, HTTP endpoints, Docker containers (Supabase), MQTT broker, data stores (Redis, Postgres), PgBouncer, and streaming WAL replica.
 
 ### Run the health check
 
@@ -100,11 +225,18 @@ REPLICA_HOST=164.90.235.216 REPLICA_PORT=55432 ./infra/scripts/health-check.sh
 # Prometheus healthy
 curl -s http://localhost:9090/-/healthy
 
-# Prometheus scrape targets
+# Prometheus scrape targets (6 targets)
 curl -s http://localhost:9090/api/v1/targets | python3 -c "
 import sys, json; d = json.load(sys.stdin)
 for t in d['data']['activeTargets']:
-    print(f\"{t['labels']['job']:25s} health={t['health']}\")"
+    print(f\"{t['labels']['job']:30s} health={t['health']:10s} {t['labels']['instance']}\")"
+
+# Active alerts
+curl -s http://localhost:9090/api/v1/alerts | python3 -c "
+import sys, json
+for a in json.load(sys.stdin)['data']['alerts']:
+    if a['state'] == 'firing':
+        print(f\"FIRING: {a['labels']['alertname']}\")"
 
 # Loki readiness
 curl -s http://localhost:3100/ready
@@ -113,10 +245,10 @@ curl -s http://localhost:3100/ready
 curl -s http://localhost:9080/targets | grep READY
 
 # Grafana health
-curl -s http://localhost:3001/api/health
+curl -s http://localhost:3000/api/health
 
-# SENTINEL /metrics endpoint
-curl -s http://localhost:9095/metrics | grep "^sentinel_" | head -20
+# Alertmanager status
+curl -s http://localhost:9093/-/healthy
 ```
 
 ### View service logs
@@ -168,17 +300,32 @@ asyncio.run(main())
 PY
 ```
 
-## Prometheus Metrics (Phases 127, 125)
+## Prometheus Metrics
 
-The SENTINEL backend exposes 16 Prometheus metric families at `GET /metrics` (Prometheus text exposition format).
+The SENTINEL backend exposes Prometheus metric families at `GET /metrics`. The endpoint is **Bearer-token authenticated** — Prometheus uses an auth token configured in `prometheus.yml`. Direct curl access requires the token:
+
+```bash
+# Requires auth token
+curl -s -H "Authorization: Bearer <token>" http://localhost:9095/metrics | grep "^sentinel_"
+
+# Via Prometheus (already has the token)
+curl -s http://localhost:9090/api/v1/targets | python3 -c "
+import sys, json
+for t in json.load(sys.stdin)['data']['activeTargets']:
+    print(f\"{t['labels']['job']:30s} {t['health']:10s} {t['labels']['instance']}\")"
+```
 
 ### Scrape Targets
 
-| Target | Job Name | Endpoint | Interval |
-|--------|----------|----------|----------|
-| SENTINEL Backend | `sentinel-backend` | `localhost:9095/metrics` | 30s |
-| Node Exporter | `node` | `localhost:9100/metrics` | 15s |
-| Prometheus Self | `prometheus` | `localhost:9090/metrics` | 15s |
+| Target | Job Name | Endpoint | Interval | Auth |
+|--------|----------|----------|----------|------|
+| SENTINEL Backend (governance) | `sentinel-governance` | `192.168.48.1:9095/metrics` | 10s | Bearer token |
+| SENTINEL Backend (discipline) | `sentinel-discipline` | `192.168.48.1:9095/metrics` | 60s | Bearer token |
+| Node Exporter | `node-exporter` | `node-exporter:9100/metrics` | 15s | None |
+| cAdvisor | `cadvisor` | `cadvisor:8080/metrics` | 15s | None |
+| sentry-bridge | `sentry-bridge` | `sentry-bridge:9099/metrics` | 60s | None |
+| Prometheus Self | `prometheus` | `localhost:9090/metrics` | 15s | None |
+| PgBouncer | `pgbouncer` | `localhost:9127/metrics` | 15s | None |
 
 ### SENTINEL Metric Families
 
@@ -287,26 +434,63 @@ If `/var/log/sentinel/` is not available, the backend falls back to `backend/app
 
 ## Alert Rules
 
-Alert rules are provisioned in two files under `/opt/aimthelaw/config/grafana/provisioning/alerting/`:
+Alert rules are defined in `/opt/aimthelaw/config/prometheus/alerting-rules.yml` (Prometheus rule files) and provisioned via Grafana. **16 rules across 7 groups** are currently deployed:
 
-**Security alert rules** (`sentinel-security-alert-rules.yml`):
+### safety-critical
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `SentinelSafetyViolation` | Critical | Any safety violation in 5min |
+| `SentinelQualityGateBlockWrites` | Critical | Block writes enforcement active |
 
-| Rule | Trigger | Severity |
-|------|---------|----------|
-| Brute Force Attempt | >5 failed logins in 5min | Critical |
-| MFA Brute Force | >3 failed MFA in 5min | Critical |
-| Error Spike | >10 ERROR/CRITICAL in 5min | Warning |
-| Suspicious Request Pattern | SQLi/scanner in 15min | Warning |
-| Audit Log Flow Check | No audit data in 24h | Warning |
+### ai-governance-warning
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `SentinelModelDriftPersistent` | Warning | Drift alerts active for 1hr |
+| `SentinelHighRollbackRate` | Warning | High rollback volume in 1hr |
+| `SentinelQualityGateWarning` | Warning | Quality gate approaching threshold |
+| `SentinelCreditExhaustion` | Warning | AI credit budget near exhaustion |
+| `SchedulerJobSlow` | Warning | Scheduled job taking longer than expected |
 
-**AI governance alert rules** (`sentinel-ai-governance-alert-rules.yml`):
+### security-warning
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `SentinelBruteForceAttempt` | Warning | >5 failed logins in 5min |
+| `SentinelSuspiciousUserAgent` | Warning | Suspicious UA pattern detected |
 
-| Rule | Trigger | Severity |
-|------|---------|----------|
-| AI Safety Violation | Any safety violation in 5min | Critical |
-| Quality Gate BLOCK_WRITES | Block writes enforcement active | Critical |
-| Model Drift Persistent | Drift alerts active for 1hr | Warning |
-| Rollback Spike | High rollback volume in 1hr | Warning |
+### bridge-health
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `SentinelAlertBridgeDown` | Critical | Sentry alert bridge unreachable |
+
+### scheduler-health
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `SchedulerJobSlow` | Warning | Job execution time exceeded threshold |
+| `SchedulerJobStuck` | Critical | Job not completing within max duration |
+
+### prometheus-health
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `PrometheusHighCardinality` | Warning | Metric series count approaching limit |
+
+### system-info
+| Rule | Severity | Description |
+|------|----------|-------------|
+| `SentinelMetricsStale` | Warning | No metrics received from backend |
+| `PrometheusTargetDown` | Critical | Scrape target unreachable |
+| `SentinelMLGateCleared` | Info | ML advisory gate cleared |
+| `HighErrorRate` | Warning | API error rate above threshold |
+
+### Currently Firing Alerts
+
+Check active alerts at any time:
+```bash
+curl -s http://localhost:9090/api/v1/alerts | python3 -c "
+import sys, json
+for a in json.load(sys.stdin)['data']['alerts']:
+    if a['state'] == 'firing':
+        print(f\"{a['labels']['alertname']:40s} severity={a['labels'].get('severity','?'):10s} since={a['activeAt']}\")"
+```
 
 ## Related Docs
 

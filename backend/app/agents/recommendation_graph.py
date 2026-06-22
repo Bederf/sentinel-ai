@@ -46,6 +46,7 @@ from app.agents.recommendation_formatters import (
     format_execution_result,
 )
 from app.agents.recommendation_tools import (
+    check_recommendation_action_still_needed,
     check_equipment_health,
     check_maintenance_calendar,
     check_recommendation_freshness,
@@ -60,6 +61,17 @@ from app.agents.recommendation_tools import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+MAINTENANCE_ACTION_TYPES = {
+    "health_maintenance",
+    "maintenance",
+    "maintenance_schedule",
+    "inspect",
+    "repair",
+    "replace",
+    "schedule_maintenance",
+}
 
 
 # ---------------------------------------------------------------------------
@@ -183,14 +195,35 @@ async def validate_relevance_node(state: RecommendationAgentState) -> dict:
     equipment_code = rec.get("target_equipment", "")
     if equipment_code:
         health = await check_equipment_health(equipment_code)
-        # If equipment has recovered (health >= 80), recommendation may be moot
-        if health["health_score"] >= 80:
+        health_score = health.get("health_score")
+        health_checked = health.get("checked", True) is not False
+        action_type = str(rec.get("action_type") or "")
+        if (
+            health_checked
+            and health_score is not None
+            and health_score >= 80
+            and action_type in MAINTENANCE_ACTION_TYPES
+        ):
+            reason = f"Equipment {equipment_code} health recovered to {health_score}%; maintenance recommendation no longer valid"
+            logger.info("[RecAgent] Recommendation %s is moot: %s", rec.get("id"), reason)
+            return {
+                "is_relevant": False,
+                "relevance_reason": reason,
+            }
+        # Non-maintenance optimization can still be useful after health recovery.
+        if health_checked and health_score is not None and health_score >= 80:
             logger.info(
-                f"[RecAgent] Equipment {equipment_code} health recovered to "
-                f"{health['health_score']}%, recommendation may be moot"
+                f"[RecAgent] Equipment {equipment_code} health recovered to {health_score}%, recommendation may be moot"
             )
-            # Still relevant — the recommendation may improve efficiency even if health is OK
-            # Only skip if status is explicitly "expired" or similar
+
+    action_check = await check_recommendation_action_still_needed(rec)
+    if not action_check["is_needed"]:
+        reason = action_check["reason"]
+        logger.info("[RecAgent] Recommendation %s is no longer needed: %s", rec.get("id"), reason)
+        return {
+            "is_relevant": False,
+            "relevance_reason": reason,
+        }
 
     return {
         "is_relevant": True,
@@ -307,16 +340,18 @@ def check_schedule_conflict(state: RecommendationAgentState) -> str:
 
 
 async def defer_node(state: RecommendationAgentState) -> dict:
-    """Defer recommendation due to schedule conflict."""
+    """Expire recommendation when an active schedule conflict makes it invalid."""
     rec_id = state.get("recommendation_id", "")
     conflict = state.get("conflict_details", "Schedule conflict")
 
-    logger.info(f"[RecAgent] Deferring recommendation {rec_id}: {conflict}")
+    if rec_id:
+        await update_recommendation_status(rec_id, "expired")
+        logger.info(f"[RecAgent] Expired recommendation {rec_id} due to schedule conflict: {conflict}")
 
     return {
-        "response": f"Recommendation {rec_id} deferred: {conflict}",
+        "response": f"Recommendation {rec_id} expired: {conflict}",
         "processing_complete": True,
-        "messages": [AIMessage(content=f"Deferred: {conflict}")],
+        "messages": [AIMessage(content=f"Expired: {conflict}")],
     }
 
 

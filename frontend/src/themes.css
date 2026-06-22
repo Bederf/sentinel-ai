@@ -3,8 +3,8 @@
 /* Maps Grafana-style variables to SENTINEL theme variables       */
 /* ═══════════════════════════════════════════════════════════════ */
 
-/* Base fonts — used by sentinel, ops, and glass themes */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+/* Base and theme fonts. CSS @import must stay at top-level before style rules. */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&family=Syne:wght@400;500;600;700;800&display=swap');
 
 :root {
   --color-grafana-text-primary: var(--color-sentinel-text-primary, #e2e8f0);
@@ -193,8 +193,6 @@
   --sentinel-font-body: 'Share Tech Mono', 'JetBrains Mono', monospace;
   --sentinel-font-mono: 'Share Tech Mono', 'JetBrains Mono', monospace;
 
-  /* Matrix-specific fonts — loaded only for this theme */
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;500;600;700;800;900&display=swap');
 }
 
 @layer components {
@@ -935,7 +933,6 @@
   --sentinel-font-body: 'Syne', -apple-system, sans-serif;
 
   /* Teal-specific font — loaded only for this theme */
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&display=swap');
 }
 
 @layer components {

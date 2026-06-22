@@ -200,6 +200,30 @@ class TestEquipmentModelGeneration:
         assert len(model["points"]) > 0
         assert model["metadata"]["auto_generated"] is True
 
+    def test_generate_equipment_model_preserves_bacnet_device_id(self, mapping_service):
+        mapping = EquipmentMapping(
+            equipment_id="S002-MTR-B01",
+            equipment_type="meter",
+            site_id="site-002",
+            points=[
+                {
+                    "original_name": "S002-MTR-B01.total_energy",
+                    "point_category": "energy",
+                    "point_type": "sensor",
+                    "object_type": "analogInput",
+                    "instance": 1076,
+                    "bacnet_device_id": 1234,
+                    "unit": "kWh",
+                    "writable": False,
+                    "present_value": 12345.6,
+                }
+            ],
+        )
+
+        model = mapping_service.generate_equipment_model(mapping)
+
+        assert model["metadata"]["bacnet_device_id"] == 1234
+
     def test_model_has_bacnet_references(self, mapping_service, sample_classified_points):
         """Test that equipment model includes BACnet references."""
         mappings = mapping_service.map_points_to_equipment(sample_classified_points, "site-002")

@@ -285,6 +285,20 @@ class RecommendationService:
             if rec.status != RecommendationStatus.PENDING:
                 raise ValueError(f"Can only approve PENDING recommendations, got {rec.status.value}")
 
+            if rec.action_type == "coordinated_optimization":
+                raise ValueError(
+                    "Coordinated optimization bundles require the dedicated coordinated approval/execution path"
+                )
+
+            if self._is_ai_maintenance_recommendation(rec):
+                return await self._approve_maintenance_recommendation_as_work_order(
+                    rec_id=rec_id,
+                    rec=rec,
+                    user_id=user_id,
+                    reason=reason,
+                    repo=repo,
+                )
+
             # Update status and metadata
             rec.status = RecommendationStatus.APPROVED
             rec.approved_by = user_id
@@ -305,6 +319,145 @@ class RecommendationService:
         except Exception as e:
             logger.error(f"Error approving recommendation {rec_id}: {e}")
             raise ValueError(f"Failed to approve recommendation: {e}") from e
+
+    def _is_ai_maintenance_recommendation(self, rec: Recommendation) -> bool:
+        """Check whether approval should create a maintenance work order."""
+        from app.services.ai_maintenance_work_order_context import is_ai_maintenance_recommendation
+
+        return is_ai_maintenance_recommendation(rec.action_type, rec.action)
+
+    async def _approve_maintenance_recommendation_as_work_order(
+        self,
+        *,
+        rec_id: str,
+        rec: Recommendation,
+        user_id: str,
+        reason: str | None,
+        repo,
+    ) -> Recommendation:
+        """Approve an AI maintenance recommendation by creating a normal WO.
+
+        This is intentionally separate from BMS execution. The work order is a
+        regular work order, but it carries AI diagnostic context for technician
+        briefing and closeout prompts.
+        """
+        from app.models.module_registry import ModuleType
+        from app.services.ai_maintenance_work_order_context import (
+            build_ai_maintenance_context,
+            build_ai_maintenance_description,
+        )
+        from app.services.module_registry_service import module_registry
+
+        if not module_registry.is_module_active(rec.site_id, ModuleType.MAINTENANCE):
+            raise ValueError(f"Maintenance module is not active for {rec.site_id}")
+
+        diagnostic_context = build_ai_maintenance_context(
+            recommendation_id=rec_id,
+            site_id=rec.site_id,
+            equipment_code=rec.target_equipment,
+            action_type=rec.action_type,
+            action=rec.action,
+            reason=rec.reason,
+            confidence_score=rec.confidence_score or rec.get_numeric_confidence(),
+        )
+        description = build_ai_maintenance_description(
+            recommendation_id=rec_id,
+            equipment_code=rec.target_equipment,
+            reason=rec.reason,
+            diagnostic_context=diagnostic_context,
+        )
+
+        tech_telegram_id = None
+        tech_email = None
+        tech_name = None
+        assigned_team = None
+        try:
+            from app.database.repositories.technician_repository import TechnicianRepository
+
+            technician = await TechnicianRepository().get_technician_for_equipment_code(rec.target_equipment)
+            if technician:
+                tech_name = technician.get("name")
+                tech_telegram_id = technician.get("telegram_id") or technician.get("telegram_chat_id")
+                tech_email = technician.get("email")
+                assigned_team = technician.get("specialty")
+        except Exception as tech_err:
+            logger.warning("Could not resolve technician for AI maintenance WO %s: %s", rec_id, tech_err)
+
+        priority_map = {
+            ActionRiskLevel.LOW: "low",
+            ActionRiskLevel.MEDIUM: "medium",
+            ActionRiskLevel.HIGH: "high",
+            ActionRiskLevel.CRITICAL: "urgent",
+        }
+        priority = priority_map.get(rec.risk_level, "medium")
+
+        from app.database.repositories.work_order_repository import get_work_order_repository
+
+        wo_repo = get_work_order_repository()
+        created_wo = await wo_repo.create_work_order(
+            {
+                "title": f"SENTINEL Maintenance Check: {rec.target_equipment or 'Equipment'}",
+                "description": description,
+                "priority": priority,
+                "status": "scheduled",
+                "equipment_code": rec.target_equipment,
+                "site_id": rec.site_id,
+                "created_by": user_id,
+                "milestone_status": "assigned",
+                "estimated_duration_hours": 1,
+                "assigned_to": tech_name,
+                "assigned_team": assigned_team,
+                "recommendation_id": rec_id,
+                "service_type": "breakdown",
+                "notes": "AI-generated maintenance work order",
+            }
+        )
+        if not created_wo:
+            raise ValueError("Failed to create maintenance work order")
+
+        notification_result = None
+        try:
+            from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+            notifier = WorkOrderNotifier()
+            notification_result = await notifier.notify_technician(
+                {
+                    "work_order_id": created_wo.get("id"),
+                    "code": created_wo.get("code"),
+                    "site_id": rec.site_id,
+                    "equipment_code": rec.target_equipment,
+                    "equipment_id": created_wo.get("equipment_id") or rec.target_equipment,
+                    "equipment_name": rec.target_equipment,
+                    "criticality": priority.upper(),
+                    "service_type": "breakdown",
+                    "technician_id": tech_telegram_id or tech_email or tech_name or "pending",
+                    "technician_name": tech_name or "Pending",
+                    "description": description,
+                    "problem_description": description,
+                    "inspection_instructions": "\n".join(diagnostic_context.get("inspection_checklist", [])),
+                    "diagnostic_context": diagnostic_context,
+                    "technician_email": tech_email,
+                    "create_service_record": True,
+                }
+            )
+        except Exception as notify_err:
+            logger.warning("AI maintenance WO %s created but technician notification failed: %s", rec_id, notify_err)
+
+        rec.status = RecommendationStatus.APPROVED
+        rec.approved_by = user_id
+        rec.approved_at = datetime.utcnow()
+        rec.approval_reason = reason or f"Work order created: {created_wo.get('code')}"
+        rec.execution_result = {
+            "status": "work_order_created",
+            "work_order_id": created_wo.get("id"),
+            "work_order_code": created_wo.get("code"),
+            "diagnostic_context": diagnostic_context,
+            "notification_result": notification_result,
+        }
+
+        await repo.update(rec_id, rec)
+        logger.info("Approved AI maintenance recommendation %s as work order %s", rec_id, created_wo.get("code"))
+        return rec
 
     async def reject_recommendation(self, rec_id: str, user_id: str, reason: str) -> Recommendation:
         """Operator rejects recommendation (Tier 2).
@@ -401,6 +554,11 @@ class RecommendationService:
         """
         try:
             logger.info(f"Executing recommendation {rec_id}: {rec.action_type} on {rec.target_equipment}")
+
+            if rec.action_type == "coordinated_optimization":
+                raise ValueError(
+                    "Coordinated optimization bundles require the dedicated coordinated approval/execution path"
+                )
 
             # Call device manager to apply action
             result = await device_manager.apply_action(rec.target_equipment, rec.action)

@@ -10,7 +10,7 @@ import json
 import logging
 import os
 import subprocess
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Optional
@@ -21,6 +21,20 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 BACKUP_DIR = REPO_ROOT / "backups" / "postgres"
 BACKUP_SCRIPT = REPO_ROOT / "scripts" / "backup" / "postgres_logical_backup.sh"
 STATUS_FILE = REPO_ROOT / "backups" / "logs" / "postgres_backup_status.json"
+REFRESH_STATUS_FILE = REPO_ROOT / "backups" / "logs" / "postgres_backup_refresh_status.json"
+RESTORE_FRESHNESS_MAX_HOURS = 24 * 7
+CRITICAL_RESTORE_TABLES = {
+    "sites",
+    "recommendations",
+    "work_orders",
+    "technicians",
+    "equipment",
+    "alerts",
+    "audit_log",
+    "adapter_health",
+    "site_module_configs",
+    "system_settings",
+}
 
 
 class BackupService:
@@ -109,6 +123,169 @@ class BackupService:
                 logger.warning(f"Error scanning backup directory: {e}")
 
         return status
+
+    def get_dr_status(self) -> dict:
+        """Return read-only disaster recovery readiness for the Settings UI."""
+        backup_status = self.get_status()
+        refresh_status = self._read_json_file(REFRESH_STATUS_FILE)
+
+        restored_at = refresh_status.get("refreshed_at")
+        restored_dt = self._parse_datetime(restored_at)
+        restore_age_hours = None
+        if restored_dt is not None:
+            restore_age_hours = round((datetime.now(UTC) - restored_dt).total_seconds() / 3600, 2)
+
+        restore_result = refresh_status.get("result")
+        restore_fresh = (
+            restore_result == "success"
+            and restore_age_hours is not None
+            and restore_age_hours <= RESTORE_FRESHNESS_MAX_HOURS
+        )
+
+        local_rpo_minutes = round(restore_age_hours * 60, 1) if restore_age_hours is not None else None
+        duration_seconds = refresh_status.get("duration_seconds")
+        database_size_bytes = refresh_status.get("database_size_bytes")
+        critical_row_counts = refresh_status.get("critical_row_counts") or {}
+        missing_critical_tables = sorted(CRITICAL_RESTORE_TABLES - set(critical_row_counts))
+        empty_critical_tables = sorted(
+            table
+            for table in CRITICAL_RESTORE_TABLES
+            if table in critical_row_counts and self._safe_int(critical_row_counts.get(table)) <= 0
+        )
+        integrity_ok = restore_fresh and not missing_critical_tables and not empty_critical_tables
+
+        checks = {
+            "local_restore_fresh": {
+                "status": "healthy" if restore_fresh else "critical",
+                "message": "Local restore target refreshed within 7 days"
+                if restore_fresh
+                else "Local restore target is stale, failed, or has no evidence",
+            },
+            "critical_row_counts": {
+                "status": "healthy" if integrity_ok else "critical",
+                "message": "Critical table row counts present and non-empty"
+                if integrity_ok
+                else "Critical table row-count evidence is missing or contains empty required tables",
+                "missing_tables": missing_critical_tables,
+                "empty_tables": empty_critical_tables,
+            },
+            "remote_wal_alerting": {
+                "status": "degraded",
+                "message": "Remote pg_receivewal watchdog uses a 15-minute WAL freshness threshold; remote alert file is not ingested locally yet",
+            },
+            "fencing": {
+                "status": "degraded",
+                "message": "Standby promotion still requires manual primary isolation/fencing approval",
+            },
+        }
+
+        if not restore_fresh or not integrity_ok:
+            overall_status = "critical"
+            overall_score = 45
+        else:
+            overall_status = "degraded"
+            overall_score = 75
+
+        return {
+            "status": overall_status,
+            "score": overall_score,
+            "generated_at": datetime.now(UTC).isoformat(),
+            "local_restore_target": {
+                "container": refresh_status.get("container_name") or "sentinel-postgres-backup-db",
+                "database": refresh_status.get("database") or "sentinel_backup",
+                "last_result": restore_result,
+                "last_restored_at": restored_at,
+                "restore_age_hours": restore_age_hours,
+                "freshness_max_hours": RESTORE_FRESHNESS_MAX_HOURS,
+                "table_count": refresh_status.get("table_count"),
+                "critical_row_counts": critical_row_counts,
+                "missing_critical_tables": missing_critical_tables,
+                "empty_critical_tables": empty_critical_tables,
+                "database_size_bytes": database_size_bytes,
+                "database_size_mb": round(database_size_bytes / (1024 * 1024), 2)
+                if isinstance(database_size_bytes, int)
+                else None,
+                "backup_dir": refresh_status.get("backup_dir"),
+                "message": refresh_status.get("message"),
+            },
+            "rpo": {
+                "local_restore_exposure_minutes": local_rpo_minutes,
+                "local_restore_exposure_label": self._format_minutes(local_rpo_minutes),
+                "remote_wal_exposure_label": "remote status not ingested locally; remote watchdog threshold is 15 minutes",
+                "best_recovery_path": "local_restore_target" if local_rpo_minutes is not None else "unknown",
+            },
+            "rto": {
+                "last_database_layer_seconds": duration_seconds,
+                "last_database_layer_label": self._format_seconds(duration_seconds),
+                "estimate_basis": "last measured local dump + restore duration only",
+                "full_chain_steps": [
+                    "declare incident and freeze writes",
+                    "validate restore target or choose remote recovery path",
+                    "stop or redirect affected services",
+                    "restore or promote database target",
+                    "repoint connection strings and secrets",
+                    "restart dependent services",
+                    "run post-recovery validation and smoke tests",
+                ],
+            },
+            "backup_sets": {
+                "last_backup": backup_status.get("last_backup"),
+                "last_backup_age_hours": backup_status.get("last_backup_age_hours"),
+                "file_count": backup_status.get("file_count"),
+                "total_size_mb": backup_status.get("total_size_mb"),
+            },
+            "checks": checks,
+            "open_actions": [
+                "Ingest remote /tmp/pg_replication_alert and /tmp/pg_receivewal_alert into this status view",
+                "Decide whether remote pg_receivewal watchdog should auto-restart or remain alert-only",
+                "Drill and document remote standby promotion with explicit fencing approval",
+                "Create post_recovery_validate.sh to compare critical row counts and service connectivity after incident recovery",
+            ],
+        }
+
+    def _read_json_file(self, path: Path) -> dict:
+        if not path.exists():
+            return {}
+        try:
+            with open(path) as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+        except Exception as e:
+            logger.warning("Failed to read %s: %s", path, e)
+            return {}
+
+    def _parse_datetime(self, value: str | None) -> datetime | None:
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                return parsed.replace(tzinfo=UTC)
+            return parsed.astimezone(UTC)
+        except ValueError:
+            return None
+
+    def _format_minutes(self, minutes: float | None) -> str:
+        if minutes is None:
+            return "unknown"
+        if minutes < 1:
+            return "< 1 minute"
+        if minutes < 60:
+            return f"{round(minutes)} minutes"
+        return f"{round(minutes / 60, 1)} hours"
+
+    def _format_seconds(self, seconds: float | int | None) -> str:
+        if seconds is None:
+            return "unknown"
+        if seconds < 60:
+            return f"{round(seconds)} seconds"
+        return f"{round(seconds / 60, 1)} minutes"
+
+    def _safe_int(self, value: object) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
 
     def run_backup(self) -> dict:
         """Run the backup script synchronously. Returns result dict."""

@@ -37,6 +37,7 @@ router = APIRouter(
 class TriggerAlarmRequest(BaseModel):
     """Request to trigger a fire alarm."""
 
+    site_id: str = Field(..., description="Site ID for module/cause-effect gating")
     zone_id: str = Field(..., description="Fire zone ID (e.g., FZ-L1-C)")
     alarm_type: str = Field("smoke", description="Alarm type: smoke, heat, manual, flow, fault")
 
@@ -248,7 +249,7 @@ async def trigger_alarm(request: TriggerAlarmRequest):
         )
 
     svc = get_fire_system_service()
-    result = await svc.trigger_alarm(request.zone_id, request.alarm_type)
+    result = await svc.trigger_alarm(request.zone_id, request.alarm_type, site_id=request.site_id)
 
     if "error" in result:
         raise HTTPException(status_code=404, detail=result["error"])

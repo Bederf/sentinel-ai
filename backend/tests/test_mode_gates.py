@@ -150,6 +150,116 @@ class TestAdvisoryModeVisibility:
         assert d["shadow_mode"] is False
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "phase,expected_shadow",
+    [
+        ("shadow_live", True),
+        ("advisory", False),
+    ],
+)
+async def test_optimization_analyze_persists_shadow_flag_from_phase(monkeypatch, phase, expected_shadow):
+    """Direct /optimization/analyze persistence must set shadow_mode explicitly."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+
+    import app.api.optimization as optimization_api
+
+    created = []
+
+    class _FakeOptimizationRecommendation:
+        confidence = 0.74
+        profile = "test-profile"
+        projected_savings = {}
+
+        @property
+        def timestamp(self):
+            return "2026-06-18T10:00:00Z"
+
+        @property
+        def recommendations(self):
+            return self.to_dict()["recommendations"]
+
+        def to_dict(self):
+            return {
+                "timestamp": self.timestamp,
+                "recommendations": [
+                    {
+                        "system": "HVAC",
+                        "equipment_code": "S002-FCU-101",
+                        "point_name": "room_temp_setpoint",
+                        "value": 22.0,
+                        "confidence": 0.74,
+                        "reason": "Test setpoint optimization",
+                        "expected_impact": {"energy_kwh": 1.0},
+                    }
+                ],
+                "projected_savings": {},
+                "cross_system_recommendations": [],
+            }
+
+    class _FakeOptimizer:
+        async def analyze_building(self, **_kwargs):
+            return _FakeOptimizationRecommendation()
+
+        async def validate_recommendation(self, *_args, **_kwargs):
+            return {"allowed": True}
+
+    class _FakeRecommendationRepository:
+        async def expire_superseded_setpoints(self, *_args, **_kwargs):
+            return 0
+
+        async def create(self, rec):
+            created.append(rec)
+            return rec
+
+    class _FakeWorkOrderRepository:
+        async def get_open_urgent_work_orders(self, *_args, **_kwargs):
+            return []
+
+    class _FakeTier:
+        value = "tier1_advisory"
+
+    class _FakeDecision:
+        tier = _FakeTier()
+        action = "advisory"
+        reason = "test advisory"
+        system = "HVAC"
+        effective_confidence = 0.74
+        original_confidence = 0.74
+
+    class _FakeTierRouter:
+        def resolve_control_tier(self, **_kwargs):
+            return "advisory"
+
+        def route_recommendation(self, **_kwargs):
+            return _FakeDecision()
+
+        def get_routing_summary(self, *_args, **_kwargs):
+            return SimpleNamespace(blocked=0, advisory=1, pending_approval=0, auto_executed=0)
+
+    monkeypatch.setattr(optimization_api, "get_ai_optimizer", lambda: _FakeOptimizer())
+    monkeypatch.setattr(optimization_api, "load_sites", AsyncMock(return_value=[]))
+    monkeypatch.setattr(optimization_api, "save_sites", AsyncMock())
+    monkeypatch.setattr(optimization_api, "RecommendationRepository", lambda: _FakeRecommendationRepository())
+    monkeypatch.setattr(optimization_api, "get_tier_router", lambda: _FakeTierRouter())
+    monkeypatch.setattr(optimization_api, "get_approval_service", lambda: object())
+    monkeypatch.setattr(optimization_api, "_controls_module_active", lambda _site_id: False)
+    monkeypatch.setattr(optimization_api, "_resolve_site_phase", lambda _site_id, _fallback: phase)
+    monkeypatch.setattr(optimization_api, "emit_decision_event", lambda *_args, **_kwargs: None)
+
+    import app.database.repositories.work_order_repository as work_order_module
+
+    monkeypatch.setattr(work_order_module, "WorkOrderRepository", lambda: _FakeWorkOrderRepository())
+
+    result = await optimization_api.analyze_optimization(optimization_api.AnalyzeRequest(site_id="site-002"))
+
+    assert result["success"] is True
+    assert len(created) == 1
+    assert created[0].source == "ai_optimizer"
+    assert created[0].shadow_mode is expected_shadow
+
+
 class TestStageTransitions:
     """Valid and invalid stage transitions per policy stage_order."""
 

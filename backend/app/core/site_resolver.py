@@ -32,6 +32,28 @@ _cache_source: str | None = None
 _connected_sites_cache: tuple[float, list[str]] | None = None
 
 
+def _load_bridge_configs(site_ids: list[str]) -> dict[str, dict]:
+    """Return enabled per-site bridge connection configs keyed by site code."""
+    if not site_ids:
+        return {}
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        result = (
+            client.table("site_adapter_config")
+            .select("site_id, connection_config")
+            .eq("protocol", "bridge")
+            .eq("enabled", True)
+            .in_("site_id", site_ids)
+            .execute()
+        )
+        return {row["site_id"]: row.get("connection_config") or {} for row in (result.data or []) if row.get("site_id")}
+    except Exception as exc:
+        logger.debug("Bridge config query failed for connected site resolution: %s", exc)
+        return {}
+
+
 def _load_from_supabase() -> list[dict] | None:
     """Attempt to load sites from Supabase.
 
@@ -136,25 +158,40 @@ def get_connected_site_ids() -> list[str]:
         logger.warning("httpx unavailable for connected site resolution: %s", exc)
         return []
 
-    base = settings.simbiot_api_url.rstrip("/")
-    headers: dict[str, str] = {}
-    if settings.simbiot_api_key:
-        headers["Authorization"] = f"Bearer {settings.simbiot_api_key}"
-        headers["X-API-Key"] = settings.simbiot_api_key
+    bridge_configs = _load_bridge_configs(site_ids)
+    sites_to_probe = [site_id for site_id in site_ids if site_id in bridge_configs] if bridge_configs else site_ids
 
-    auth = None
+    global_base = settings.simbiot_api_url.rstrip("/")
+    global_headers: dict[str, str] = {}
+    if settings.simbiot_api_key:
+        global_headers["Authorization"] = f"Bearer {settings.simbiot_api_key}"
+        global_headers["X-API-Key"] = settings.simbiot_api_key
+
+    global_auth = None
     if settings.simbiot_username and settings.simbiot_password:
-        auth = (settings.simbiot_username, settings.simbiot_password)
+        global_auth = (settings.simbiot_username, settings.simbiot_password)
 
     try:
-        with httpx.Client(timeout=2.0, auth=auth) as client:
-            for site_id in site_ids:
+        with httpx.Client(timeout=2.0) as client:
+            for site_id in sites_to_probe:
                 try:
-                    response = client.get(f"{base}/api/sites/{site_id}/health", headers=headers)
+                    config = bridge_configs.get(site_id) or {}
+                    base = (config.get("base_url") or global_base).rstrip("/")
+                    token = config.get("token")
+                    if token:
+                        headers = {"Authorization": f"Bearer {token}"}
+                        auth = None
+                    else:
+                        headers = global_headers
+                        auth = global_auth
+
+                    response = client.get(f"{base}/api/sites/{site_id}/health", headers=headers, auth=auth)
                     if response.status_code != 200:
                         continue
                     payload = response.json()
-                    if isinstance(payload, dict) and payload.get("status") == "ok":
+                    if isinstance(payload, dict) and (
+                        payload.get("status") in ("connected", "ok") or payload.get("site_available") is True
+                    ):
                         connected.append(site_id)
                 except Exception:
                     continue
@@ -198,34 +235,32 @@ def get_primary_site_code() -> str | None:
 def normalize_site_id(site_id: str, to_supabase: bool = True) -> str:
     """Normalize site ID format.
 
-    Internal/config format:  site-002  (site_resolver canonical)
-    Supabase/DB format:      S002      (database primary key)
+    Canonical site format: site-002.
+
+    Equipment identifiers may still use prefixes such as S002-CHILLER-B01,
+    but site_id values in application logic and database tables should use
+    site-###. The ``to_supabase`` flag is kept for backwards-compatible
+    call sites; both directions now return the canonical site-### format.
 
     Args:
         site_id: Site identifier in either format.
-        to_supabase: True  → internal  → Supabase format (S002)
-                     False → Supabase → internal format (site-002)
+        to_supabase: Deprecated compatibility flag.
     """
-    if to_supabase:
-        # internal → Supabase: "site-002" → "S002"
-        if site_id.startswith("site-"):
-            return f"S{site_id.split('-')[1]}"
-        return site_id  # already S002
-    else:
-        # Supabase → internal: "S002" → "site-002"
-        if site_id.startswith("S"):
-            num = site_id[1:]  # "002"
-            return f"site-{num}"
-        return site_id  # already site-XXX
+    value = str(site_id or "").strip()
+    if value.startswith("site-"):
+        return value
+    if value.startswith("S") and value[1:].isdigit():
+        return f"site-{value[1:]}"
+    return value
 
 
 def _to_supabase_site_id(site_id: str) -> str:
-    """Convert internal site ID to Supabase format (alias for normalize_site_id(x, to_supabase=True))."""
+    """Return canonical site_id for Supabase tables."""
     return normalize_site_id(site_id, to_supabase=True)
 
 
 def _from_supabase_site_id(site_id: str) -> str:
-    """Convert Supabase site ID to internal format (alias for normalize_site_id(x, to_supabase=False))."""
+    """Return canonical site_id from a Supabase value."""
     return normalize_site_id(site_id, to_supabase=False)
 
 

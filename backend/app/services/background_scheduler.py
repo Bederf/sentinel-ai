@@ -8,11 +8,13 @@ Handles periodic background tasks such as:
 """
 
 import asyncio
+import fcntl
 import functools
+import json
 import logging
 import os
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -25,8 +27,272 @@ from app.services.audit_logger import AuditLogger
 from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
 
 EXPIRY_HOURS = 24  # Expire pending recommendations older than 24 hours
+PROTECTED_PENDING_RECOMMENDATION_ACTION_TYPES = {"coordinated_optimization"}
+PROTECTED_PENDING_AI_ACTION_TYPES = {"ai_optimization", "coordinated_optimization"}
 
 logger = logging.getLogger(__name__)
+
+SAST = timezone(timedelta(hours=2))
+WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
+
+
+def _clean_equipment_code(value: str | None) -> str:
+    return str(value or "").strip().strip("*`").upper()
+
+
+def _parameter_type_is_writable(parameter_type: str | None) -> bool:
+    text = (parameter_type or "").lower()
+    if text in {"command", "setpoint", "writable"}:
+        return True
+    if text.startswith(("command:", "setpoint:", "writable:")):
+        return True
+    return any(token in text for token in ("analogoutput", "binaryoutput", "multistateoutput"))
+
+
+def _recommendation_has_verified_write_path(
+    *,
+    site_id: str,
+    equipment_id: str | None,
+    point_name: str | None,
+) -> bool:
+    equipment_code = _clean_equipment_code(equipment_id)
+    requested_point = str(point_name or "").strip().lower()
+    if not equipment_code or not requested_point:
+        return False
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        config_rows = (
+            sb.table("site_adapter_config")
+            .select("protocol,connection_config")
+            .eq("site_id", site_id)
+            .eq("enabled", True)
+            .execute()
+        )
+        has_write_adapter = False
+        for row in config_rows.data or []:
+            protocol = str(row.get("protocol") or "").strip().lower()
+            config = row.get("connection_config") or {}
+            if protocol in {"bacnet", "knx", "modbus", "obix"}:
+                has_write_adapter = True
+                break
+            if protocol == "bridge" and config.get("supports_writes") is True and config.get("write_enabled") is True:
+                has_write_adapter = True
+                break
+        if not has_write_adapter:
+            return False
+
+        site_row = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+        if not site_row.data:
+            return False
+
+        mapping_rows = (
+            sb.table("point_asset_mappings")
+            .select("bms_point_id,parameter_name,parameter_type")
+            .eq("site_id", site_row.data[0]["id"])
+            .eq("extracted_asset_id", equipment_code)
+            .eq("is_verified", True)
+            .execute()
+        )
+        for mapping in mapping_rows.data or []:
+            if not _parameter_type_is_writable(mapping.get("parameter_type")):
+                continue
+            parameter_name = str(mapping.get("parameter_name") or "").strip().lower()
+            bms_point_id = str(mapping.get("bms_point_id") or "").strip().lower()
+            suffix = bms_point_id.rsplit(".", 1)[-1] if "." in bms_point_id else bms_point_id
+            if requested_point in {parameter_name, suffix}:
+                return True
+    except Exception as exc:
+        logger.warning(
+            "[AI-OPT] Could not verify write path for %s.%s at %s: %s",
+            equipment_id,
+            point_name,
+            site_id,
+            exc,
+        )
+    return False
+
+
+def _parse_hhmm_minutes(value: str, fallback: str = "07:00") -> int:
+    raw = str(value or fallback).strip()
+    try:
+        hour_text, minute_text = raw.split(":", 1)
+        return int(hour_text) * 60 + int(minute_text[:2])
+    except (ValueError, TypeError):
+        hour_text, minute_text = fallback.split(":", 1)
+        return int(hour_text) * 60 + int(minute_text)
+
+
+def _time_window_contains(now_minutes: int, start_minutes: int, end_minutes: int) -> bool:
+    if start_minutes == end_minutes:
+        return False
+    if start_minutes < end_minutes:
+        return start_minutes <= now_minutes < end_minutes
+    return now_minutes >= start_minutes or now_minutes < end_minutes
+
+
+def _normalise_site_operating_schedule(raw_schedule: Any) -> dict[str, Any] | None:
+    if not isinstance(raw_schedule, dict) or not raw_schedule:
+        return None
+
+    # Settings page schedule shape: {monday: {start_time, end_time, is_operational}, ...}
+    if any(day in raw_schedule for day in WEEKDAY_NAMES):
+        return raw_schedule
+
+    # Site profile compact shape: {weekday_start, weekday_end, saturday_start, ...}
+    if "weekday_start" in raw_schedule or "weekday_end" in raw_schedule:
+        weekday_start = raw_schedule.get("weekday_start") or "07:00"
+        weekday_end = raw_schedule.get("weekday_end") or "18:00"
+        saturday_active = bool(raw_schedule.get("saturday_active", False))
+        sunday_active = bool(raw_schedule.get("sunday_active", False))
+        schedule = {
+            day: {
+                "start_time": weekday_start,
+                "end_time": weekday_end,
+                "is_operational": True,
+            }
+            for day in WEEKDAY_NAMES[:5]
+        }
+        schedule["saturday"] = {
+            "start_time": raw_schedule.get("saturday_start") or weekday_start,
+            "end_time": raw_schedule.get("saturday_end") or weekday_end,
+            "is_operational": saturday_active,
+        }
+        schedule["sunday"] = {
+            "start_time": raw_schedule.get("sunday_start") or raw_schedule.get("saturday_start") or weekday_start,
+            "end_time": raw_schedule.get("sunday_end") or raw_schedule.get("saturday_end") or weekday_end,
+            "is_operational": sunday_active,
+        }
+        if raw_schedule.get("is_24_7"):
+            for day in WEEKDAY_NAMES:
+                schedule[day] = {"start_time": "00:00", "end_time": "23:59", "is_operational": True}
+        return schedule
+
+    # Legacy sites.operating_hours shape: {"weekday": "07:00-18:00", "weekend": "closed"}
+    weekday_hours = str(raw_schedule.get("weekday") or raw_schedule.get("weekdays") or "")
+    if "-" in weekday_hours:
+        start_text, end_text = weekday_hours.split("-", 1)
+    else:
+        start_text, end_text = "07:00", "18:00"
+    weekend = str(raw_schedule.get("weekend") or "closed").lower()
+    weekend_open = "closed" not in weekend
+    schedule = {
+        day: {"start_time": start_text.strip(), "end_time": end_text.strip(), "is_operational": True}
+        for day in WEEKDAY_NAMES[:5]
+    }
+    schedule["saturday"] = {
+        "start_time": start_text.strip(),
+        "end_time": end_text.strip(),
+        "is_operational": weekend_open,
+    }
+    schedule["sunday"] = {
+        "start_time": start_text.strip(),
+        "end_time": end_text.strip(),
+        "is_operational": weekend_open,
+    }
+    return schedule
+
+
+def _legacy_operating_hours_to_schedule(value: Any) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return _normalise_site_operating_schedule(value)
+    if not isinstance(value, str) or "-" not in value:
+        return None
+    start_text, end_text = value.split("-", 1)
+    return {
+        day: {
+            "start_time": start_text.strip(),
+            "end_time": end_text.strip(),
+            "is_operational": day not in {"saturday", "sunday"},
+        }
+        for day in WEEKDAY_NAMES
+    }
+
+
+def _load_file_operating_schedule(site_code: str) -> dict[str, Any] | None:
+    app_dir = Path(__file__).resolve().parent.parent
+    for folder in ("buildings", "sites"):
+        path = app_dir / "data" / folder / site_code / "building.json"
+        if not path.exists():
+            continue
+        try:
+            building = json.loads(path.read_text())
+        except Exception as exc:
+            logger.warning("Could not read operating schedule from %s: %s", path, exc)
+            continue
+        schedule = _normalise_site_operating_schedule(building.get("operating_schedule"))
+        if schedule:
+            return schedule
+        metadata = building.get("metadata") if isinstance(building.get("metadata"), dict) else {}
+        schedule = _legacy_operating_hours_to_schedule(metadata.get("operating_hours"))
+        if schedule:
+            return schedule
+    return None
+
+
+def _resolve_site_code_for_schedule(sb: Any, site_id: str | None) -> str:
+    if not site_id:
+        return "site-002"
+    site_text = str(site_id)
+    if site_text.startswith("site-"):
+        return site_text
+    try:
+        result = sb.table("sites").select("code").eq("id", site_text).limit(1).execute()
+        if result.data:
+            return str(result.data[0].get("code") or site_text)
+    except Exception as exc:
+        logger.warning("Could not resolve site code for SLA notification window: %s", exc)
+    return site_text
+
+
+def _load_db_operating_schedule(sb: Any, site_code: str, site_id: str | None) -> dict[str, Any] | None:
+    try:
+        query = sb.table("sites").select("id, operating_hours").eq("code", site_code).limit(1)
+        site_result = query.execute()
+        if not site_result.data and site_id:
+            site_result = sb.table("sites").select("id, operating_hours").eq("id", str(site_id)).limit(1).execute()
+        if site_result.data:
+            site_row = site_result.data[0]
+            schedule = _normalise_site_operating_schedule(site_row.get("operating_hours"))
+            if schedule:
+                return schedule
+            profile_result = (
+                sb.table("site_profiles")
+                .select("operating_schedule")
+                .eq("site_id", site_row.get("id"))
+                .limit(1)
+                .execute()
+            )
+            if profile_result.data:
+                return _normalise_site_operating_schedule(profile_result.data[0].get("operating_schedule"))
+    except Exception as exc:
+        logger.warning("Could not load DB operating schedule for %s: %s", site_code, exc)
+    return None
+
+
+def _site_sla_notify_window(sb: Any, site_id: str | None, now_utc: datetime) -> bool:
+    """SLA Telegram notifications should land during this site's operating hours."""
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.replace(tzinfo=UTC)
+    now_sast = now_utc.astimezone(SAST)
+
+    site_code = _resolve_site_code_for_schedule(sb, site_id)
+    schedule = _load_file_operating_schedule(site_code) or _load_db_operating_schedule(sb, site_code, site_id)
+    if not schedule:
+        logger.warning("No operating schedule found for %s; deferring SLA notification", site_code)
+        return False
+
+    day_name = WEEKDAY_NAMES[now_sast.weekday()]
+    day_schedule = schedule.get(day_name)
+    if not isinstance(day_schedule, dict) or not day_schedule.get("is_operational", False):
+        return False
+
+    now_minutes = now_sast.hour * 60 + now_sast.minute
+    start_minutes = _parse_hhmm_minutes(str(day_schedule.get("start_time") or "07:00"), "07:00")
+    end_minutes = _parse_hhmm_minutes(str(day_schedule.get("end_time") or "18:00"), "18:00")
+    return _time_window_contains(now_minutes, start_minutes, end_minutes)
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +377,136 @@ def _normalize_value_for_dedup(value: Any) -> str:
         return str(value).strip().lower()
 
 
+def _numeric_equal(left: Any, right: Any, *, tolerance: float = 0.01) -> bool:
+    """Return True when two recommendation values are effectively identical."""
+    if left is None or right is None:
+        return False
+    try:
+        return abs(float(left) - float(right)) <= tolerance
+    except (TypeError, ValueError):
+        return str(left).strip().lower() == str(right).strip().lower()
+
+
+def _is_noop_recommendation(current_value: Any, target_value: Any) -> bool:
+    """No recommendation should be emitted when it asks for the current state."""
+    return _numeric_equal(current_value, target_value)
+
+
+def _recent_executed_action_exists(
+    *,
+    site_id: str,
+    equipment_id: str,
+    point_name: str,
+    action_value: Any,
+    verification_window_minutes: int = 30,
+) -> bool:
+    """Suppress repeated pending recs for an action already submitted.
+
+    A recommendation may be repeated while it is still pending. Once the same
+    site/equipment/point/value has been executed, it should not be emitted again
+    until the outcome verification window has passed. If verification later
+    fails or conditions materially change, a new recommendation can be created.
+    """
+    if not site_id or not equipment_id or not point_name or action_value is None:
+        return False
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        since = (datetime.now(UTC) - timedelta(minutes=verification_window_minutes)).isoformat()
+        result = (
+            get_supabase_client()
+            .table("recommendations")
+            .select("id,action,executed_at,timestamp,status")
+            .eq("site_id", site_id)
+            .eq("target_equipment", equipment_id)
+            .in_("status", ["executed", "auto_executed"])
+            .gte("executed_at", since)
+            .order("executed_at", desc=True)
+            .limit(25)
+            .execute()
+        )
+        target_value = _normalize_value_for_dedup(action_value)
+        requested_point = str(point_name or "").strip().lower()
+        for row in result.data or []:
+            action = row.get("action") or {}
+            if not isinstance(action, dict):
+                continue
+            row_point = str(action.get("point") or "").strip().lower()
+            row_value = _normalize_value_for_dedup(action.get("value"))
+            if row_point == requested_point and row_value == target_value:
+                return True
+    except Exception as exc:
+        logger.warning(
+            "[AI-OPT] Could not check recent executed action for %s.%s=%s at %s: %s",
+            equipment_id,
+            point_name,
+            action_value,
+            site_id,
+            exc,
+        )
+    return False
+
+
+def _recent_executed_action_context(
+    *,
+    site_id: str,
+    equipment_id: str,
+    point_name: str,
+    action_value: Any,
+    lookback_hours: int = 4,
+) -> dict[str, Any] | None:
+    """Return recent same-action execution context for operator messaging."""
+    if not site_id or not equipment_id or not point_name or action_value is None:
+        return None
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        since = (datetime.now(UTC) - timedelta(hours=lookback_hours)).isoformat()
+        result = (
+            get_supabase_client()
+            .table("recommendations")
+            .select(
+                "id,action,executed_at,status,outcome_validated,outcome_notes,"
+                "actual_saving_kwh,actual_saving_zar,actual_value_set"
+            )
+            .eq("site_id", site_id)
+            .eq("target_equipment", equipment_id)
+            .in_("status", ["executed", "auto_executed"])
+            .gte("executed_at", since)
+            .order("executed_at", desc=True)
+            .limit(25)
+            .execute()
+        )
+        target_value = _normalize_value_for_dedup(action_value)
+        requested_point = str(point_name or "").strip().lower()
+        for row in result.data or []:
+            action = row.get("action") or {}
+            if not isinstance(action, dict):
+                continue
+            row_point = str(action.get("point") or "").strip().lower()
+            row_value = _normalize_value_for_dedup(action.get("value"))
+            if row_point == requested_point and row_value == target_value:
+                return {
+                    "recommendation_id": row.get("id"),
+                    "executed_at": row.get("executed_at"),
+                    "outcome_validated": row.get("outcome_validated"),
+                    "outcome_notes": row.get("outcome_notes"),
+                    "actual_saving_kwh": row.get("actual_saving_kwh"),
+                    "actual_saving_zar": row.get("actual_saving_zar"),
+                    "actual_value_set": row.get("actual_value_set"),
+                }
+    except Exception as exc:
+        logger.warning(
+            "[AI-OPT] Could not load recent executed context for %s.%s=%s at %s: %s",
+            equipment_id,
+            point_name,
+            action_value,
+            site_id,
+            exc,
+        )
+    return None
+
+
 def _log_rec_dedup_status(equipment_id: str, point_name: str, action_value: Any, recent_keys: set) -> None:
     """Log dedup decision per recommendation for traceability."""
     if not equipment_id or not point_name:
@@ -121,6 +517,101 @@ def _log_rec_dedup_status(equipment_id: str, point_name: str, action_value: Any,
         f"[DEDUP-B] Checking rec: {equipment_id} {point_name}={action_value} "
         f"→ normalized={rec_key[2]} "
         f"in recent_keys={rec_key in recent_keys}"
+    )
+
+
+def _is_protected_pending_recommendation(action_type: str | None) -> bool:
+    return bool(action_type in PROTECTED_PENDING_RECOMMENDATION_ACTION_TYPES)
+
+
+def _build_manual_advisory_recommendation(
+    *,
+    site_id: str,
+    rec_dict: dict[str, Any],
+    equipment_id: str,
+    action_value: Any,
+    confidence_num: float,
+    optimization_profile: str,
+    projected_savings: dict[str, Any] | None,
+    current_stage: str,
+    validation_results: list[dict[str, Any]] | None,
+) -> Any:
+    """Create the persisted manual advisory row for non-writable operational findings."""
+    from app.models.recommendation import ActionRiskLevel, Recommendation, RecommendationStatus
+
+    action = rec_dict.get("action") or {}
+    adjustments = rec_dict.get("adjustments") or []
+    first_adjustment = adjustments[0] if adjustments and isinstance(adjustments[0], dict) else {}
+    metadata = rec_dict.get("metadata", {}) or {}
+    rule = metadata.get("rule")
+
+    if rule in {"after_hours_zero_occupancy_hvac_load", "closed_empty_building_hvac_running"}:
+        manual_prefix = "After-hours HVAC plant operation requires operator review."
+        blocker = "missing_verified_plant_enable_or_schedule_point"
+        operator_label = "Correct BMS closed-hours HVAC schedule"
+    else:
+        manual_prefix = "No writable BACnet point resolved — manual operator action required."
+        blocker = "unresolved_bms_point"
+        operator_label = "Manual action recommended — no BACnet write available"
+
+    manual_reason = rec_dict.get("reason", "")
+    if manual_prefix not in manual_reason:
+        manual_reason = f"{manual_prefix} {manual_reason}".strip()
+
+    current_value = rec_dict.get("current_value")
+    if current_value is None:
+        current_value = action.get("current_value")
+    if current_value is None:
+        current_value = first_adjustment.get("current_value")
+    unit_value = rec_dict.get("unit") or action.get("unit", "") or first_adjustment.get("unit", "")
+    point_resolution = rec_dict.get("point_resolution") or {
+        "raw": None,
+        "resolved": None,
+        "method": "validation",
+        "confidence": "not_applicable",
+        "note": blocker,
+    }
+    projected_savings = projected_savings or {}
+
+    return Recommendation(
+        site_id=site_id,
+        timestamp=datetime.utcnow(),
+        action_type=rec_dict.get("action_type") or "ai_optimization",
+        risk_level=ActionRiskLevel.LOW,
+        target_equipment=equipment_id,
+        action={
+            "point": None,
+            "value": action_value,
+            "execution_blocked": True,
+            "blocker": blocker,
+        },
+        reason=manual_reason,
+        expected_impact={
+            "current_value": current_value,
+            "recommended_value": action_value,
+            "unit": unit_value,
+            "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+            "cost_zar": projected_savings.get("cost_zar_per_hour"),
+        },
+        confidence=str(confidence_num),
+        confidence_score=confidence_num,
+        profile=optimization_profile or "",
+        source="ai_optimizer",
+        source_type="ml_model",
+        status=RecommendationStatus.PENDING,
+        requires_approval=True,
+        shadow_mode=(current_stage == "shadow_live"),
+        point_resolution=point_resolution,
+        metadata={
+            "execution_status": "manual_action_required",
+            "blocker": blocker,
+            "manual_action_required": True,
+            "operator_label": operator_label,
+            "point_resolution": point_resolution,
+            "validation_results": validation_results or [],
+            "equipment_name": rec_dict.get("equipment_name") or metadata.get("equipment_name"),
+            "source_metadata": metadata,
+        },
     )
 
 
@@ -144,7 +635,11 @@ class BackgroundSchedulerService:
         self._initialized = True
         self.scheduler = BackgroundScheduler()
         self._main_loop = None  # Will be set during startup
+        self._leader_lock_file = None
+        self._is_scheduler_leader = False
         self._feedback_retraining_last_trigger: dict[str, datetime] = {}
+        self._last_after_hours_hvac_analysis: dict[str, datetime] = {}
+        self._last_optimization_analysis_at: dict[str, datetime] = {}
         self._feedback_retraining_policy = {
             "min_records": 10,
             "min_success_rate": 70.0,
@@ -159,6 +654,9 @@ class BackgroundSchedulerService:
 
     def start(self):
         """Start the background scheduler."""
+        if not self._acquire_leader_lock():
+            logger.info("Background scheduler not started in this worker; another worker owns the scheduler lock")
+            return
         if not self.scheduler.running:
             self.scheduler.start()
             logger.info("Background scheduler started")
@@ -166,8 +664,37 @@ class BackgroundSchedulerService:
     def stop(self):
         """Stop the background scheduler."""
         if self.scheduler.running:
-            self.scheduler.shutdown()
+            self.scheduler.shutdown(wait=False)
             logger.info("Background scheduler stopped")
+        self._release_leader_lock()
+
+    def _acquire_leader_lock(self) -> bool:
+        """Ensure only one uvicorn worker owns APScheduler jobs."""
+        if self._is_scheduler_leader:
+            return True
+        lock_path = Path(os.getenv("SENTINEL_SCHEDULER_LOCK_FILE", "/tmp/sentinel-background-scheduler.lock"))
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = open(lock_path, "w")
+        try:
+            fcntl.flock(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock_file.close()
+            return False
+        lock_file.write(f"{os.getpid()}\n")
+        lock_file.flush()
+        self._leader_lock_file = lock_file
+        self._is_scheduler_leader = True
+        return True
+
+    def _release_leader_lock(self) -> None:
+        if not self._leader_lock_file:
+            return
+        try:
+            fcntl.flock(self._leader_lock_file, fcntl.LOCK_UN)
+        finally:
+            self._leader_lock_file.close()
+            self._leader_lock_file = None
+            self._is_scheduler_leader = False
 
     def add_demo_data_job(self, interval_seconds: int = 60):
         """
@@ -350,6 +877,31 @@ class BackgroundSchedulerService:
     # Previous conditions for change detection gate
     _last_conditions: dict[str, Any] = {}
 
+    def _should_trigger_after_hours_hvac_analysis(
+        self,
+        site_id: str,
+        occupancy: float,
+        hvac_kw: float,
+        is_occupied_hours: bool,
+        now: datetime | None = None,
+    ) -> bool:
+        """Trigger analysis for sustained after-hours HVAC load in an empty building."""
+        from app.config.settings import settings
+
+        if is_occupied_hours or occupancy != 0:
+            return False
+        if hvac_kw <= float(getattr(settings, "after_hours_hvac_load_threshold_kw", 15.0)):
+            return False
+
+        now = now or datetime.now()
+        cooldown_hours = float(getattr(settings, "after_hours_hvac_advisory_cooldown_hours", 2) or 2)
+        last = self._last_after_hours_hvac_analysis.get(site_id)
+        if last and (now - last).total_seconds() < cooldown_hours * 3600:
+            return False
+
+        self._last_after_hours_hvac_analysis[site_id] = now
+        return True
+
     def add_optimization_analysis_job(self, interval_seconds: int = 900):
         """
         Add a job to run optimization analysis periodically.
@@ -441,6 +993,27 @@ class BackgroundSchedulerService:
 
         return False
 
+    def _get_scheduler_site_phase(self, site_id: str) -> str:
+        """Read site phase synchronously from Supabase for scheduler threads.
+
+        The optimization scheduler runs outside the main asyncio loop. Submitting
+        effective_phase() back onto the loop can fail during startup/restart churn,
+        which incorrectly blocks production recommendations as "commissioning".
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+            from app.models.onboarding_phase import normalise_stage
+
+            client = get_supabase_client()
+            result = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+            if result.data:
+                raw = result.data[0].get("onboarding_phase") or "commissioning"
+                return normalise_stage(raw)
+        except Exception as exc:
+            logger.warning("[AI-OPT] Could not resolve onboarding_phase for %s: %s", site_id, exc)
+
+        return "commissioning"
+
     def _run_optimization_analysis(self):
         """
         Run AI optimization analysis for all registered sites and persist
@@ -487,16 +1060,9 @@ class BackgroundSchedulerService:
             for site_id in site_ids:
                 try:
                     # Mode gate: Supabase onboarding_phase is authoritative.
-                    # Use effective_phase() which reads sites.onboarding_phase and
-                    # normalises legacy names (shadow→shadow_live, auto→automatic).
-                    try:
-                        from app.models.onboarding_phase import effective_phase
-
-                        current_stage = asyncio.run_coroutine_threadsafe(
-                            effective_phase(site_id), self._main_loop
-                        ).result(timeout=30)
-                    except Exception:
-                        current_stage = "commissioning"
+                    # Use synchronous lookup here: this method runs in the APScheduler
+                    # thread, and should not depend on main-loop coroutine scheduling.
+                    current_stage = self._get_scheduler_site_phase(site_id)
 
                     GENERATION_ALLOWED = {"advisory", "supervised", "automatic"}
                     if current_stage not in GENERATION_ALLOWED:
@@ -530,17 +1096,24 @@ class BackgroundSchedulerService:
                             data = resp.json()
                             power = data.get("power", {})
                             current_kw = power.get("total_kw") or 0
+                            current_hvac_kw = float(power.get("hvac_kw") or 0)
                             current_temp = (
                                 data.get("chiller", {}).get("supply_temp_c")
                                 or data.get("ahu", {}).get("ahu1_supply_temp_c")
                                 or 0
                             )
+                            security_entries = data.get("security", {}).get("entries", 0)
+                            aggregate_occupancy = data.get("site_aggregate", {}).get("total_occupancy")
+                            if aggregate_occupancy is None:
+                                aggregate_occupancy = data.get("occupancy", {}).get("total_occupancy")
                             current_occ = (
-                                100
-                                if data.get("security", {}).get("entries", 0) > 500
+                                float(aggregate_occupancy)
+                                if aggregate_occupancy is not None
+                                else 100
+                                if security_entries > 500
                                 else 50
-                                if data.get("security", {}).get("entries", 0) > 100
-                                else 10
+                                if security_entries > 100
+                                else 0
                             )
                             h = datetime.now().hour
                             current_tariff = "peak" if (7 <= h < 10) or (17 <= h < 20) else "off_peak"
@@ -585,21 +1158,38 @@ class BackgroundSchedulerService:
                                 logger.info("[AI-OPT] Building entered occupied hours — triggering cycle")
                                 changed = True
 
-                            # 6. Force refresh every 6 hours to prevent indefinite gate lock
-                            if not changed and self._last_optimization_sim_time is not None:
-                                hours_since_analysis = (
-                                    datetime.now() - self._last_optimization_sim_time
-                                ).total_seconds() / 3600
-                                if hours_since_analysis >= 6:
-                                    logger.info(
-                                        "[AI-OPT] Force refresh — %d hours since last analysis",
-                                        int(hours_since_analysis),
-                                    )
+                            # 6. Sustained after-hours HVAC load in an empty building
+                            if not changed and self._should_trigger_after_hours_hvac_analysis(
+                                site_id,
+                                current_occ,
+                                current_hvac_kw,
+                                is_occupied,
+                            ):
+                                logger.info(
+                                    "[AI-OPT] After-hours HVAC load %.1f kW with zero occupancy — triggering cycle",
+                                    current_hvac_kw,
+                                )
+                                changed = True
+
+                            # 7. Force refresh every 6 hours to prevent indefinite gate lock
+                            last_analysis = self._last_optimization_analysis_at.get(site_id)
+                            if not changed:
+                                if last_analysis is None:
+                                    logger.info("[AI-OPT] Force refresh — no previous analysis recorded")
                                     changed = True
+                                else:
+                                    hours_since_analysis = (datetime.now() - last_analysis).total_seconds() / 3600
+                                    if hours_since_analysis >= 6:
+                                        logger.info(
+                                            "[AI-OPT] Force refresh — %d hours since last analysis",
+                                            int(hours_since_analysis),
+                                        )
+                                        changed = True
 
                             # Store current conditions
                             self._last_conditions[site_id] = {
                                 "total_kw": current_kw,
+                                "hvac_kw": current_hvac_kw,
                                 "outdoor_temp": current_temp,
                                 "occupancy": current_occ,
                                 "tariff_band": current_tariff,
@@ -614,6 +1204,7 @@ class BackgroundSchedulerService:
 
                     try:
                         optimization_result = asyncio.run(get_ai_optimizer().analyze_building(site_id))
+                        self._last_optimization_analysis_at[site_id] = datetime.now()
                     except Exception:
                         logger.exception(f"[AI-OPT] analyze_building failed for {site_id}")
                         continue
@@ -627,6 +1218,18 @@ class BackgroundSchedulerService:
                         for hrec in holistic_recs:
                             hrec_equipment = hrec.get("target_equipment", "")
                             hrec_action = hrec.get("action", {})
+                            hrec_point = hrec_action.get("point") if isinstance(hrec_action, dict) else None
+                            hrec_value = hrec_action.get("value") if isinstance(hrec_action, dict) else None
+                            if not hrec_equipment or not hrec_point or hrec_value is None:
+                                logger.info(
+                                    "[HOLISTIC] Skipping incomplete rec for %s: equipment=%r point=%r value=%r",
+                                    site_id,
+                                    hrec_equipment,
+                                    hrec_point,
+                                    hrec_value,
+                                )
+                                skipped_count += 1
+                                continue
                             try:
                                 hrec_model = Recommendation(
                                     site_id=site_id,
@@ -791,11 +1394,20 @@ class BackgroundSchedulerService:
                             status=RecommendationStatus.PENDING,
                             requires_approval=False,
                         )
-                        asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
+                        rec = asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
                             timeout=30
                         )
                         created_count += 1
                         existing_maint_keys.add(dedup_key)
+                        try:
+                            if current_stage in {
+                                "advisory",
+                                "supervised",
+                                "automatic",
+                            } and self._is_sendable_ai_recommendation(rec):
+                                self._pending_advisories.setdefault(site_id, []).append(rec)
+                        except Exception:
+                            pass
 
                     if not control_recs:
                         logger.info(f"[AI-OPT] {site_id}: all recs were maintenance, skipping validation")
@@ -835,8 +1447,284 @@ class BackgroundSchedulerService:
                         if vr.get("allowed", False):
                             allowed_keys.add((vr.get("equipment_id", ""), vr.get("point_name", "")))
 
+                    if allowed_keys:
+                        try:
+                            existing_pending = asyncio.run_coroutine_threadsafe(
+                                recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500),
+                                self._main_loop,
+                            ).result(timeout=30)
+                            unresolved_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
+                            unresolved_keys: set[tuple[str, str, str]] = set()
+                            for existing in existing_pending:
+                                ts = existing.timestamp
+                                if isinstance(ts, str):
+                                    try:
+                                        ts = datetime.fromisoformat(ts)
+                                    except (ValueError, TypeError):
+                                        continue
+                                if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+                                    ts = ts.replace(tzinfo=None)
+                                if ts < unresolved_cutoff or existing.action_type != "ai_optimization":
+                                    continue
+                                existing_value = ""
+                                if isinstance(existing.action, dict):
+                                    existing_value = _normalize_value_for_dedup(existing.action.get("value", ""))
+                                unresolved_keys.add((existing.target_equipment, "", existing_value))
+
+                            validation_results = validation.get("validation_results", [])
+                            for rec_dict in control_recs:
+                                action = rec_dict.get("action") or {}
+                                point_name = rec_dict.get("point_name") or action.get("point") or ""
+                                if point_name:
+                                    continue
+
+                                equipment_id = rec_dict.get("target_equipment") or rec_dict.get("equipment_id", "")
+                                adjustments = rec_dict.get("adjustments") or []
+                                first_adjustment = (
+                                    adjustments[0] if adjustments and isinstance(adjustments[0], dict) else {}
+                                )
+                                if not equipment_id:
+                                    equipment_id = first_adjustment.get("equipment_id", "")
+                                if not equipment_id:
+                                    skipped_count += 1
+                                    continue
+                                if urgent_equipment and equipment_id in urgent_equipment:
+                                    logger.warning(
+                                        "[GATE] Skipping non-executable advisory for %s — active urgent/critical work order exists",
+                                        equipment_id,
+                                    )
+                                    continue
+
+                                action_value = rec_dict.get("recommended_value")
+                                if action_value is None:
+                                    action_value = action.get("value")
+                                if action_value is None:
+                                    action_value = first_adjustment.get("recommended_value")
+                                if action_value is None:
+                                    skipped_count += 1
+                                    continue
+
+                                dedup_key = (equipment_id, "", _normalize_value_for_dedup(action_value))
+                                if dedup_key in unresolved_keys:
+                                    skipped_count += 1
+                                    continue
+
+                                confidence_raw = rec_dict.get("confidence") or optimization_result.confidence
+                                try:
+                                    confidence_num = max(0.0, min(1.0, float(confidence_raw)))
+                                except (TypeError, ValueError):
+                                    confidence_num = 0.7
+
+                                rec = _build_manual_advisory_recommendation(
+                                    site_id=site_id,
+                                    rec_dict=rec_dict,
+                                    equipment_id=equipment_id,
+                                    action_value=action_value,
+                                    confidence_num=confidence_num,
+                                    optimization_profile=optimization_result.profile or "",
+                                    projected_savings=optimization_result.projected_savings,
+                                    current_stage=current_stage,
+                                    validation_results=validation_results,
+                                )
+                                rec = asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.create(rec), self._main_loop
+                                ).result(timeout=30)
+                                created_count += 1
+                                unresolved_keys.add(dedup_key)
+                                if current_stage != "shadow_live" and self._is_sendable_ai_recommendation(rec):
+                                    self._pending_advisories.setdefault(site_id, []).append(rec)
+                        except Exception:
+                            logger.exception(
+                                "[AI-OPT] Failed to persist mixed-cycle non-executable advisory for %s", site_id
+                            )
+
                     if not allowed_keys:
-                        logger.info(f"No recommendations passed safety validation for {site_id}")
+                        unresolved_count = 0
+                        try:
+                            existing_pending = asyncio.run_coroutine_threadsafe(
+                                recommendation_repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=500),
+                                self._main_loop,
+                            ).result(timeout=30)
+                            unresolved_cutoff = datetime.now().replace(tzinfo=None) - timedelta(hours=48)
+                            unresolved_keys: set[tuple[str, str, str]] = set()
+                            for existing in existing_pending:
+                                ts = existing.timestamp
+                                if isinstance(ts, str):
+                                    try:
+                                        ts = datetime.fromisoformat(ts)
+                                    except (ValueError, TypeError):
+                                        continue
+                                if hasattr(ts, "tzinfo") and ts.tzinfo is not None:
+                                    ts = ts.replace(tzinfo=None)
+                                if ts < unresolved_cutoff or existing.action_type != "ai_optimization":
+                                    continue
+                                existing_point = ""
+                                existing_value = ""
+                                if isinstance(existing.action, dict):
+                                    existing_point = existing.action.get("point") or ""
+                                    existing_value = _normalize_value_for_dedup(existing.action.get("value", ""))
+                                unresolved_keys.add((existing.target_equipment, existing_point, existing_value))
+
+                            validation_results = validation.get("validation_results", [])
+                            advisory_recs: list[dict] = []
+                            for rec_dict in control_recs:
+                                nested_recs = rec_dict.get("recommendations")
+                                if isinstance(nested_recs, list):
+                                    parent_context = {
+                                        "building_assessment": rec_dict.get("building_assessment"),
+                                        "no_action_reasons": rec_dict.get("no_action_reasons"),
+                                        "data_requests": rec_dict.get("data_requests"),
+                                        "quality_gate_status": rec_dict.get("quality_gate_status"),
+                                        "enforcement_action": rec_dict.get("enforcement_action"),
+                                    }
+                                    for nested in nested_recs:
+                                        if isinstance(nested, dict):
+                                            merged = dict(nested)
+                                            merged_metadata = dict(merged.get("metadata") or {})
+                                            merged_metadata.update(
+                                                {
+                                                    key: value
+                                                    for key, value in parent_context.items()
+                                                    if value is not None
+                                                }
+                                            )
+                                            merged["metadata"] = merged_metadata
+                                            advisory_recs.append(merged)
+                                    continue
+                                advisory_recs.append(rec_dict)
+
+                            for rec_dict in advisory_recs:
+                                equipment_id = rec_dict.get("target_equipment") or rec_dict.get("equipment_id", "")
+                                action = rec_dict.get("action") or {}
+                                adjustments = rec_dict.get("adjustments") or []
+                                first_adjustment = (
+                                    adjustments[0] if adjustments and isinstance(adjustments[0], dict) else {}
+                                )
+                                if not equipment_id:
+                                    equipment_id = first_adjustment.get("equipment_id", "")
+                                if not equipment_id:
+                                    logger.warning(
+                                        "[AI-OPT] Skipping non-executable advisory with no target_equipment: %s",
+                                        list(rec_dict.keys()),
+                                    )
+                                    skipped_count += 1
+                                    continue
+                                point_name = rec_dict.get("point_name") or action.get("point") or ""
+                                raw_point = point_name or first_adjustment.get("point", "")
+                                if point_name:
+                                    continue
+                                if urgent_equipment and equipment_id in urgent_equipment:
+                                    logger.warning(
+                                        "[GATE] Skipping non-executable advisory for %s — active urgent/critical work order exists",
+                                        equipment_id,
+                                    )
+                                    continue
+                                action_value = rec_dict.get("recommended_value")
+                                if action_value is None:
+                                    action_value = action.get("value")
+                                if action_value is None:
+                                    action_value = first_adjustment.get("recommended_value")
+                                if action_value is None:
+                                    logger.info(
+                                        "[AI-OPT] Skipping non-executable advisory for %s with no recommended action",
+                                        equipment_id,
+                                    )
+                                    skipped_count += 1
+                                    continue
+                                dedup_key = (equipment_id, "", _normalize_value_for_dedup(action_value))
+                                if dedup_key in unresolved_keys:
+                                    skipped_count += 1
+                                    continue
+
+                                confidence_raw = rec_dict.get("confidence") or optimization_result.confidence
+                                try:
+                                    confidence_num = max(0.0, min(1.0, float(confidence_raw)))
+                                except (TypeError, ValueError):
+                                    confidence_num = 0.7
+
+                                current_value = rec_dict.get("current_value")
+                                if current_value is None:
+                                    current_value = action.get("current_value")
+                                if current_value is None:
+                                    current_value = first_adjustment.get("current_value")
+                                unit_value = (
+                                    rec_dict.get("unit") or action.get("unit", "") or first_adjustment.get("unit", "")
+                                )
+                                point_resolution = rec_dict.get("point_resolution") or {
+                                    "raw": raw_point,
+                                    "resolved": None,
+                                    "method": "validation",
+                                    "confidence": "dropped",
+                                    "note": "unresolved or unlicensed BMS point",
+                                }
+
+                                manual_reason = rec_dict.get("reason", "")
+                                manual_prefix = "No writable BACnet point resolved — manual operator action required."
+                                if manual_prefix not in manual_reason:
+                                    manual_reason = f"{manual_prefix} {manual_reason}".strip()
+
+                                rec = Recommendation(
+                                    site_id=site_id,
+                                    timestamp=datetime.utcnow(),
+                                    action_type=rec_dict.get("action_type") or "ai_optimization",
+                                    risk_level=ActionRiskLevel.LOW,
+                                    target_equipment=equipment_id,
+                                    action={
+                                        "point": None,
+                                        "value": action_value,
+                                        "execution_blocked": True,
+                                        "blocker": "unresolved_bms_point",
+                                    },
+                                    reason=manual_reason,
+                                    expected_impact={
+                                        "current_value": current_value,
+                                        "recommended_value": action_value,
+                                        "unit": unit_value,
+                                        "energy_savings_percent": rec_dict.get("savings_kwh", 5),
+                                        "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
+                                    },
+                                    confidence=str(confidence_num),
+                                    confidence_score=confidence_num,
+                                    profile=optimization_result.profile or "",
+                                    source="ai_optimizer",
+                                    source_type="ml_model",
+                                    status=RecommendationStatus.PENDING,
+                                    requires_approval=True,
+                                    shadow_mode=(current_stage == "shadow_live"),
+                                    point_resolution=point_resolution,
+                                    metadata={
+                                        "execution_status": "manual_action_required",
+                                        "blocker": "unresolved_bms_point",
+                                        "manual_action_required": True,
+                                        "operator_label": "Manual action recommended — no BACnet write available",
+                                        "point_resolution": point_resolution,
+                                        "validation_results": validation_results,
+                                        "equipment_name": rec_dict.get("equipment_name")
+                                        or rec_dict.get("metadata", {}).get("equipment_name"),
+                                        "source_metadata": rec_dict.get("metadata", {}),
+                                    },
+                                )
+                                asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.create(rec), self._main_loop
+                                ).result(timeout=30)
+                                created_count += 1
+                                unresolved_count += 1
+                                unresolved_keys.add(dedup_key)
+                                if current_stage != "shadow_live" and self._is_sendable_ai_recommendation(rec):
+                                    self._pending_advisories.setdefault(site_id, []).append(rec)
+                        except Exception:
+                            logger.exception(
+                                "[AI-OPT] Failed to persist non-executable advisory evidence for %s", site_id
+                            )
+
+                        if unresolved_count:
+                            logger.info(
+                                "[AI-OPT] Stored %d non-executable advisory recommendation(s) for %s",
+                                unresolved_count,
+                                site_id,
+                            )
+                        else:
+                            logger.info(f"No recommendations passed safety validation for {site_id}")
                         continue
 
                     # Fetch existing PENDING recs for dedup — 24h window, higher limit
@@ -906,6 +1794,15 @@ class BackgroundSchedulerService:
                         raw_value = rec_dict.get("recommended_value", "")
                         if raw_value == "":
                             raw_value = rec_dict.get("action", {}).get("value", "")
+                        if not equipment_id or not point_name or raw_value in ("", None):
+                            logger.info(
+                                "[AI-OPT] Skipping incomplete executable rec: equipment=%r point=%r value=%r",
+                                equipment_id,
+                                point_name,
+                                raw_value,
+                            )
+                            skipped_count += 1
+                            continue
                         rec_value = _normalize_value_for_dedup(raw_value)
                         if (equipment_id, point_name, rec_value) in recent_keys:
                             skipped_count += 1
@@ -964,6 +1861,39 @@ class BackgroundSchedulerService:
                         if not unit_value:
                             unit_value = rec_dict.get("action", {}).get("unit", "")
 
+                        if _is_noop_recommendation(current_value, action_value):
+                            logger.info(
+                                "[AI-OPT] Skipping no-op recommendation for %s.%s: current=%s target=%s",
+                                equipment_id,
+                                point_name,
+                                current_value,
+                                action_value,
+                            )
+                            skipped_count += 1
+                            continue
+
+                        if _recent_executed_action_exists(
+                            site_id=site_id,
+                            equipment_id=equipment_id,
+                            point_name=point_name,
+                            action_value=action_value,
+                        ):
+                            logger.info(
+                                "[AI-OPT] Skipping recently executed recommendation for %s.%s=%s",
+                                equipment_id,
+                                point_name,
+                                action_value,
+                            )
+                            skipped_count += 1
+                            continue
+
+                        previous_action_context = _recent_executed_action_context(
+                            site_id=site_id,
+                            equipment_id=equipment_id,
+                            point_name=point_name,
+                            action_value=action_value,
+                        )
+
                         # Gate: skip recommendations for equipment with active urgent/critical WO
                         if urgent_equipment and equipment_id in urgent_equipment:
                             logger.warning(
@@ -1002,6 +1932,8 @@ class BackgroundSchedulerService:
                             metadata={
                                 "group_recommendation": is_grouped,
                                 "affected_equipment": affected,
+                                "point_resolution": rec_dict.get("point_resolution"),
+                                "previous_action_context": previous_action_context,
                                 # Best-effort name for grouped recommendations; pick first affected item with a name
                                 "equipment_name": (
                                     affected[0].get("name")
@@ -1017,9 +1949,13 @@ class BackgroundSchedulerService:
                                 else rec_dict.get("metadata", {}).get("equipment_name"),
                             }
                             if is_grouped
-                            else {"equipment_name": rec_dict.get("metadata", {}).get("equipment_name")},
+                            else {
+                                "equipment_name": rec_dict.get("metadata", {}).get("equipment_name"),
+                                "point_resolution": rec_dict.get("point_resolution"),
+                                "previous_action_context": previous_action_context,
+                            },
                         )
-                        asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
+                        rec = asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
                             timeout=30
                         )
                         created_count += 1
@@ -1063,16 +1999,244 @@ class BackgroundSchedulerService:
 
             # Send AI-OPT recommendations to FM Telegram — advisory mode
             if self._pending_advisories:
-                import asyncio
                 from app.config.settings import settings
                 from app.services.telegram_message_sender import (
                     InlineButton,
                     InlineKeyboard,
-                    get_telegram_sender,
+                    TelegramMessageSender,
                 )
+                from app.models.recommendation import RecommendationStatus
 
                 async def _send_advisories():
-                    sender = get_telegram_sender()
+                    def _trim_text(value: str | None, max_chars: int = 160) -> str:
+                        text = " ".join(str(value or "").split())
+                        if len(text) <= max_chars:
+                            return text
+                        trimmed = text[: max_chars - 1].rsplit(" ", 1)[0]
+                        return f"{trimmed or text[: max_chars - 1]}…"
+
+                    def _extract_context(reason: str) -> list[str]:
+                        import re
+
+                        context: list[str] = []
+                        patterns = [
+                            (r"Outdoor temp \(([^)]+)\)", "outdoor air {}"),
+                            (r"indoor setpoint \(([^)]+)\)", "indoor setpoint {}"),
+                            (r"building has ([0-9.]+) occupancy", "occupancy {}"),
+                            (r"HVAC load \(([^)]+)\)", "HVAC load {}"),
+                        ]
+                        for pattern, template in patterns:
+                            match = re.search(pattern, reason or "", flags=re.IGNORECASE)
+                            if match:
+                                context.append(template.format(match.group(1)))
+                        return context[:4]
+
+                    def _expected_effect(point: str | None, reason: str | None) -> str | None:
+                        point_key = str(point or "").strip().lower()
+                        reason_lower = str(reason or "").lower()
+                        if point_key == "damper_position":
+                            if (
+                                "free cooling" in reason_lower
+                                or "outdoor" in reason_lower
+                                or "economiser" in reason_lower
+                            ):
+                                return "Bring in more cool outside air so the AHU can cool the building with less chiller load."
+                            return "Change outside-air flow through the AHU and affect zone cooling demand."
+                        if point_key == "sat_setpoint":
+                            return "Adjust supply-air temperature so zones stay comfortable while avoiding unnecessary overcooling."
+                        if point_key == "chilled_water_setpoint":
+                            return "Make chilled water warmer so the chiller compressor works less while cooling remains available."
+                        if point_key in {"setpoint", "temperature_setpoint", "zone_setpoint"}:
+                            return "Move the zone target temperature and reduce heating/cooling demand if comfort remains stable."
+                        if point_key == "fan_speed":
+                            return "Reduce fan energy and airflow, with zone temperatures monitored for comfort drift."
+                        if point_key == "on_off":
+                            return (
+                                "Switch the load state and reduce unnecessary energy use when the area is unoccupied."
+                            )
+                        return None
+
+                    def _manual_effect(r) -> str | None:
+                        metadata = r.metadata or {}
+                        source_metadata = metadata.get("source_metadata") or {}
+                        reason_lower = str(r.reason or "").lower()
+                        if source_metadata.get("rule") in {
+                            "after_hours_zero_occupancy_hvac_load",
+                            "closed_empty_building_hvac_running",
+                        }:
+                            return "Stop repeat closed-hours waste by correcting the BMS schedule or override, not only this single event."
+                        if "free cooling" in reason_lower or "economiser" in reason_lower:
+                            return "Use outside-air cooling and reduce mechanical cooling demand after an operator applies the BMS change."
+                        return None
+
+                    def _manual_action_line(r) -> tuple[str, str | None, str | None, str | None]:
+                        action_data = r.action or {}
+                        impact = r.expected_impact or {}
+                        metadata = r.metadata or {}
+                        source_metadata = metadata.get("source_metadata") or {}
+                        val = action_data.get("value")
+                        unit = impact.get("unit") or ""
+                        current = impact.get("current_value")
+                        recommended = impact.get("recommended_value")
+                        target = recommended if recommended is not None else val
+                        target_text = f"{target}{unit}" if target is not None else "recommended setting"
+
+                        reason = r.reason or ""
+                        reason = reason.replace("Manual BMS adjustment needed.", "").strip()
+                        reason_lower = reason.lower()
+                        if source_metadata.get("rule") in {
+                            "after_hours_zero_occupancy_hvac_load",
+                            "closed_empty_building_hvac_running",
+                        }:
+                            action = str(val or "Correct BMS closed-hours HVAC schedule or override")
+                        elif "economiser" in reason_lower or "free cooling" in reason_lower:
+                            action = (
+                                f"manually raise cooling target to {target_text} and enable economiser/free cooling"
+                            )
+                        elif target is not None:
+                            action = f"manually adjust target to {target_text}"
+                        else:
+                            action = "manual BMS review/action required"
+
+                        if current is not None and target is not None:
+                            action = f"{action} (current {current}{unit})"
+
+                        context = _extract_context(reason)
+                        if source_metadata.get("rule") in {
+                            "after_hours_zero_occupancy_hvac_load",
+                            "closed_empty_building_hvac_running",
+                        }:
+                            why = _trim_text(
+                                reason.replace("After-hours HVAC plant operation requires operator review.", ""), 160
+                            )
+                        else:
+                            why = ", ".join(context) if context else _trim_text(reason, 120)
+                        saving = source_metadata.get("saving")
+                        if not saving and impact.get("cost_zar"):
+                            saving = f"R{impact['cost_zar']:.2f}/h"
+                        return action, why, _manual_effect(r), saving
+
+                    def _format_value(value, unit: str | None = None) -> str:
+                        if value is None:
+                            return "target"
+                        if isinstance(value, float):
+                            value_text = f"{value:g}"
+                        else:
+                            value_text = str(value)
+                        return f"{value_text}{unit or ''}"
+
+                    def _human_point(point: str | None) -> str:
+                        labels = {
+                            "damper_position": "economiser damper",
+                            "chilled_water_setpoint": "chilled-water setpoint",
+                            "sat_setpoint": "supply-air temperature setpoint",
+                            "on_off": "lighting on/off command",
+                            "fan_speed": "fan speed",
+                            "setpoint": "temperature setpoint",
+                        }
+                        cleaned = str(point or "").strip()
+                        if not cleaned:
+                            return "control point"
+                        return labels.get(cleaned, cleaned.replace("_", " "))
+
+                    def _human_action(r) -> tuple[str, str | None, str | None, str | None]:
+                        action_data = r.action or {}
+                        impact = r.expected_impact or {}
+                        point = str(action_data.get("point") or "")
+                        point_label = _human_point(point)
+                        val = action_data.get("value")
+                        unit = impact.get("unit") or ""
+                        current = impact.get("current_value")
+                        target_text = _format_value(val, unit)
+                        current_text = _format_value(current, unit) if current is not None else None
+                        reason = r.reason or ""
+                        reason_lower = reason.lower()
+
+                        if point in {
+                            "damper_position",
+                            "chilled_water_setpoint",
+                            "sat_setpoint",
+                            "fan_speed",
+                            "setpoint",
+                        }:
+                            label = point_label[:1].upper() + point_label[1:]
+                            if current_text:
+                                action_text = f"{label}: {current_text} -> {target_text}"
+                            else:
+                                action_text = f"{label}: set to {target_text}"
+                        elif point == "on_off":
+                            target_state = "Off" if str(val) in {"0", "0.0", "False", "false"} else "On"
+                            action_text = f"Lighting command: {target_state}"
+                        elif point:
+                            label = point_label[:1].upper() + point_label[1:]
+                            action_text = (
+                                f"{label}: {current_text} -> {target_text}"
+                                if current_text
+                                else f"{label}: set to {target_text}"
+                            )
+                        else:
+                            action_text = "Review recommendation"
+
+                        savings = impact.get("cost_zar")
+                        savings_text = f"R{savings:.2f}/h" if isinstance(savings, (int, float)) and savings else None
+
+                        why = _trim_text(reason, 150)
+                        if point == "damper_position" and ("free cooling" in reason_lower or "outdoor" in reason_lower):
+                            context = _extract_context(reason)
+                            why = ", ".join(context) if context else _trim_text(reason, 150)
+                        elif point == "on_off" and "unoccupied" in reason_lower:
+                            why = "Building unoccupied; lighting load is unnecessary."
+
+                        return action_text, why, _expected_effect(point, reason), savings_text
+
+                    def _previous_action_status(r) -> str | None:
+                        metadata = r.metadata or {}
+                        previous = metadata.get("previous_action_context")
+                        if not isinstance(previous, dict) or not previous:
+                            return None
+
+                        executed_at = previous.get("executed_at")
+                        time_text = "recently"
+                        if executed_at:
+                            try:
+                                parsed = datetime.fromisoformat(str(executed_at).replace("Z", "+00:00"))
+                                if parsed.tzinfo is None:
+                                    parsed = parsed.replace(tzinfo=UTC)
+                                time_text = parsed.astimezone(SAST).strftime("%H:%M SAST")
+                            except (TypeError, ValueError):
+                                time_text = str(executed_at)
+
+                        saving_kwh = previous.get("actual_saving_kwh")
+                        saving_zar = previous.get("actual_saving_zar")
+                        if isinstance(saving_kwh, (int, float)) and saving_kwh < 0:
+                            loss = f"{abs(saving_kwh):.2f} kWh"
+                            if isinstance(saving_zar, (int, float)):
+                                loss = f"{loss} / R{abs(saving_zar):.2f}"
+                            return (
+                                f"Same action was applied at {time_text}, but measured energy worsened by {loss}. "
+                                "This is a retry because current telemetry still shows the old state."
+                            )
+                        if previous.get("outcome_validated") is True:
+                            actual = previous.get("actual_value_set")
+                            measured = f" (measured {actual})" if actual not in (None, "") else ""
+                            return f"Same action was applied at {time_text} and the control point verified{measured}."
+                        if previous.get("outcome_validated") is False:
+                            return (
+                                f"Same action was applied at {time_text}, but outcome verification failed. "
+                                "Approval will retry the control action."
+                            )
+                        return (
+                            f"Same action was applied at {time_text}; outcome verification is not complete. "
+                            "Approval will retry only if the action is still current."
+                        )
+
+                    bot_token = getattr(settings, "sentry_manager_bot_token", None) or getattr(
+                        settings, "telegram_bot_token", None
+                    )
+                    if not bot_token:
+                        logger.warning("[AI-OPT] No manager Telegram bot token configured for advisory notifications")
+                        return
+                    sender = TelegramMessageSender(bot_token)
                     chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
                         settings, "sentry_fm_chat_id", None
                     )
@@ -1087,38 +2251,188 @@ class BackgroundSchedulerService:
                         from app.models.onboarding_phase import effective_phase
 
                         phase = await effective_phase(_site_id)
+                        if phase not in {"advisory", "supervised", "automatic"}:
+                            logger.info(
+                                "[AI-OPT] Notification suppressed for %s in %s mode",
+                                _site_id,
+                                phase,
+                            )
+                            continue
 
-                        lines = ["*SENTINEL AI — Operational Advisory*"]
-                        lines.append(f"*Site:* {_site_id}")
-                        lines.append(f"*Mode:* {phase}")
-                        lines.append(f"*Recommendations:* {len(_recs)}")
+                        active_recs = [
+                            r
+                            for r in _recs
+                            if getattr(r, "status", None)
+                            in {
+                                RecommendationStatus.PENDING,
+                                RecommendationStatus.ADVISORY_INFO,
+                            }
+                            and not _is_noop_recommendation(
+                                (r.expected_impact or {}).get("current_value"),
+                                (r.action or {}).get("value"),
+                            )
+                        ]
+                        if not active_recs:
+                            continue
+
+                        control_not_ready_ids = {
+                            str(r.id)
+                            for r in active_recs[:5]
+                            if (r.action or {}).get("point")
+                            and (r.action or {}).get("value") is not None
+                            and not (r.action or {}).get("execution_blocked")
+                            and not _recommendation_has_verified_write_path(
+                                site_id=_site_id,
+                                equipment_id=r.target_equipment,
+                                point_name=(r.action or {}).get("point"),
+                            )
+                        }
+                        has_manual_action = any(
+                            getattr(r, "status", None) == RecommendationStatus.ADVISORY_INFO
+                            or (
+                                (r.action or {}).get("execution_blocked")
+                                and (r.metadata or {}).get("manual_action_required")
+                            )
+                            or str(r.id) in control_not_ready_ids
+                            for r in active_recs
+                        )
+                        has_executable_actions = any(
+                            (r.action or {}).get("point")
+                            and (r.action or {}).get("value") is not None
+                            and not (r.action or {}).get("execution_blocked")
+                            and str(r.id) not in control_not_ready_ids
+                            for r in active_recs
+                        )
+                        if phase == "supervised" and has_executable_actions:
+                            lines = ["*SENTINEL AI — Supervised Actions Pending*"]
+                        else:
+                            lines = ["*SENTINEL AI — Operational Advisory*"]
+                        if has_manual_action:
+                            lines.append("*Manual action recommended — no BACnet write available*")
+                        lines.append(f"*Site:* {_site_id}  |  *Mode:* {phase}")
+                        lines.append(f"*Actions pending:* {len(active_recs)}")
                         lines.append("")
-                        for r in _recs[:5]:
+                        for idx, r in enumerate(active_recs[:5], start=1):
                             equip = r.target_equipment or "Unknown"
                             action_data = r.action or {}
-                            point = action_data.get("point", "parameter")
-                            val = action_data.get("value", "?")
+                            point = action_data.get("point")
+                            val = action_data.get("value")
                             impact = r.expected_impact or {}
                             savings = impact.get("cost_zar")
                             savings_str = f" — R{savings:.2f}/h" if savings else ""
-                            lines.append(f"● *{equip}*: set {point} to {val}{savings_str}")
-                        if len(_recs) > 5:
-                            lines.append(f"  +{len(_recs) - 5} more")
-                        lines.append(f"\n_{_recs[0].reason[:200] if _recs and _recs[0].reason else ''}_")
-
-                        if phase == "supervised":
-                            keyboard = InlineKeyboard(
-                                rows=[
-                                    [
-                                        InlineButton(
-                                            label=f"✅ Approve — {r.target_equipment or 'Action'}",
-                                            callback_data=f"approve:rec_id:{r.id}",
-                                        )
-                                    ]
-                                    for r in _recs[:5]
-                                ]
+                            manual_marker = (
+                                " [manual]"
+                                if action_data.get("execution_blocked")
+                                or r.status == RecommendationStatus.ADVISORY_INFO
+                                or str(r.id) in control_not_ready_ids
+                                else ""
                             )
-                        else:
+                            if point and val is not None:
+                                action_text, why_text, effect_text, saving_text = _human_action(r)
+                                lines.append(f"*{idx}. {equip}*")
+                                lines.append(f"Change: {action_text}{manual_marker}")
+                                previous_status = _previous_action_status(r)
+                                if previous_status:
+                                    lines.append(f"Status: {previous_status}")
+                                if why_text:
+                                    lines.append(f"Why: {why_text}")
+                                if effect_text:
+                                    lines.append(f"Effect: {effect_text}")
+                                if saving_text:
+                                    lines.append(f"Savings: {saving_text}")
+                                if str(r.id) in control_not_ready_ids:
+                                    lines.append(
+                                        "Note: Supervised control readiness is incomplete; use manual BMS action or create a work order."
+                                    )
+                            elif action_data.get("execution_blocked") or r.status == RecommendationStatus.ADVISORY_INFO:
+                                action_text, why_text, effect_text, saving_text = _manual_action_line(r)
+                                lines.append(f"*{idx}. {equip}*")
+                                lines.append(f"Change: {action_text}")
+                                if why_text:
+                                    lines.append(f"Why: {why_text}")
+                                if effect_text:
+                                    lines.append(f"Effect: {effect_text}")
+                                if saving_text:
+                                    lines.append(f"Savings: {saving_text}")
+                            else:
+                                action = val or action_data.get("type") or r.action_type or "review"
+                                lines.append(f"*{idx}. {equip}*")
+                                lines.append(f"Change: {str(action).replace('_', ' ')}{savings_str}{manual_marker}")
+                            lines.append("")
+                        if len(active_recs) > 5:
+                            lines.append(f"+{len(active_recs) - 5} more")
+                        if has_manual_action:
+                            lines.append(
+                                "\n_Sentinel cannot apply one or more actions automatically until the site's write path is enabled and verified._"
+                            )
+
+                        keyboard = None
+                        manual_recs = [
+                            r
+                            for r in active_recs[:5]
+                            if r.status == RecommendationStatus.ADVISORY_INFO
+                            or (r.action or {}).get("execution_blocked")
+                            or str(r.id) in control_not_ready_ids
+                        ]
+                        if phase == "supervised":
+                            executable_recs = [
+                                r
+                                for r in active_recs[:5]
+                                if (r.action or {}).get("point")
+                                and (r.action or {}).get("value") is not None
+                                and not (r.action or {}).get("execution_blocked")
+                                and str(r.id) not in control_not_ready_ids
+                            ]
+                            if manual_recs:
+                                keyboard = InlineKeyboard(
+                                    rows=[
+                                        [
+                                            InlineButton(
+                                                label=f"Create WO — {r.target_equipment or 'Action'}",
+                                                callback_data=f"wo:rec_id:{r.id}",
+                                            )
+                                        ]
+                                        for r in manual_recs
+                                    ]
+                                )
+                            else:
+                                if len(executable_recs) > 1:
+                                    keyboard = InlineKeyboard(
+                                        rows=[
+                                            [
+                                                InlineButton(
+                                                    label="✅ Approve package",
+                                                    callback_data=f"approvepkg:{_site_id}",
+                                                )
+                                            ],
+                                            *[
+                                                [
+                                                    InlineButton(
+                                                        label=f"Approve only — {r.target_equipment or 'Action'}",
+                                                        callback_data=f"approve:rec_id:{r.id}",
+                                                    )
+                                                ]
+                                                for r in executable_recs
+                                            ],
+                                        ]
+                                    )
+                                else:
+                                    keyboard = (
+                                        InlineKeyboard(
+                                            rows=[
+                                                [
+                                                    InlineButton(
+                                                        label=f"✅ Approve — {r.target_equipment or 'Action'}",
+                                                        callback_data=f"approve:rec_id:{r.id}",
+                                                    )
+                                                ]
+                                                for r in executable_recs
+                                            ]
+                                        )
+                                        if executable_recs
+                                        else None
+                                    )
+                        elif phase == "advisory":
                             keyboard = InlineKeyboard(
                                 rows=[
                                     [
@@ -1127,7 +2441,7 @@ class BackgroundSchedulerService:
                                             callback_data=f"wo:rec_id:{r.id}",
                                         )
                                     ]
-                                    for r in _recs[:5]
+                                    for r in active_recs[:5]
                                 ]
                             )
                         await sender.send_text(str(chat_id), "\n".join(lines), parse_mode="Markdown", keyboard=keyboard)
@@ -1697,7 +3011,7 @@ class BackgroundSchedulerService:
     def add_wo_sla_breach_job(self, interval_seconds: int = 300):
         """Check work order SLA deadlines every 5 minutes.
 
-        When a resolved WO passes its sla_deadline_at without being verified:
+        When an assigned/in-progress WO passes its sla_deadline_at without resolution:
         - Notify the manager bot (FM escalation)
         - Re-notify the assigned technician via tech bot
 
@@ -1724,6 +3038,8 @@ class BackgroundSchedulerService:
     def _check_wo_sla_breaches(self):
         """Background job: SLA reminders (1h before deadline) + breach (past deadline)."""
         try:
+            import uuid
+
             from app.database.supabase_client import get_supabase_client
 
             sb = get_supabase_client()
@@ -1744,11 +3060,84 @@ class BackgroundSchedulerService:
                 TelegramMessageSender(settings.sentry_manager_bot_token) if settings.sentry_manager_bot_token else None
             )
 
+            def _resolve_technician_chat_id(wo: dict) -> int | None:
+                raw_id = wo.get("notified_technician_telegram_id")
+                if raw_id:
+                    try:
+                        return int(raw_id)
+                    except (TypeError, ValueError):
+                        pass
+
+                tech_name = wo.get("assigned_to")
+                if tech_name:
+                    try:
+                        tech = (
+                            sb.table("technicians")
+                            .select("telegram_id")
+                            .eq("name", tech_name)
+                            .eq("active", True)
+                            .limit(1)
+                            .execute()
+                        )
+                        if tech.data:
+                            telegram_id = tech.data[0].get("telegram_id")
+                            if telegram_id:
+                                return int(telegram_id)
+                    except Exception as e:
+                        logger.warning("Technician lookup failed for %s: %s", tech_name, e)
+
+                return 8359288792
+
+            def _notice_already_sent(notification_type: str | list[str], code: str, deadline: str) -> bool:
+                """Return True when this exact SLA notice was already sent."""
+                try:
+                    types = [notification_type] if isinstance(notification_type, str) else notification_type
+                    existing = (
+                        sb.table("notification_delivery_log")
+                        .select("id")
+                        .in_("notification_type", types)
+                        .eq("reference_type", "work_order_sla")
+                        .ilike("message_text", f"%{code}%{deadline}%")
+                        .limit(1)
+                        .execute()
+                    )
+                    return bool(existing.data)
+                except Exception as exc:
+                    logger.warning("SLA notice dedup check failed for %s: %s", code, exc)
+                    return False
+
+            def _record_sla_notice(notification_type: str, wo: dict, recipient: str, message: str) -> None:
+                """Record Telegram SLA notice delivery so scheduler cycles do not resend it."""
+                try:
+                    sb.table("notification_delivery_log").insert(
+                        {
+                            "id": str(uuid.uuid4()),
+                            "notification_type": notification_type,
+                            "channel_type": "telegram",
+                            "recipient_identifier": recipient,
+                            "status": "sent",
+                            "provider": "telegram",
+                            "sent_at": datetime.now(UTC).isoformat(),
+                            "site_id": str(wo.get("site_id") or ""),
+                            "message_text": message,
+                            "delivery_status": "sent",
+                            "reference_type": "work_order_sla",
+                            "severity": "warning",
+                        }
+                    ).execute()
+                except Exception as exc:
+                    logger.warning("SLA notice delivery audit failed for %s: %s", wo.get("code"), exc)
+
             # --- Pre-deadline reminders (1 hour before) ---
             reminding = (
                 sb.table("work_orders")
-                .select("code, title, assigned_to, sla_deadline_at, milestone_status")
-                .in_("milestone_status", ["assigned", "in_progress", "resolved"])
+                .select(
+                    "code, title, assigned_to, notified_technician_telegram_id, "
+                    "sla_deadline_at, milestone_status, status, closed_at, site_id"
+                )
+                .in_("milestone_status", ["assigned", "in_progress"])
+                .not_.in_("status", ["resolved", "completed", "closed", "cancelled"])
+                .is_("closed_at", "null")
                 .gte("sla_deadline_at", now_iso)
                 .lte("sla_deadline_at", remind_from)
                 .execute()
@@ -1758,12 +3147,33 @@ class BackgroundSchedulerService:
                 title = wo.get("title", "")
                 deadline = wo.get("sla_deadline_at", "")
                 milestone = wo.get("milestone_status", "unknown")
-                msg = f"⏰ SLA REMINDER: {code}\n{title}\nStatus: {milestone}\nDeadline: {deadline}\nDue within 1 hour."
+                msg = (
+                    f"⏰ SLA REMINDER: {code}\n"
+                    f"{title}\n"
+                    f"State: Open\n"
+                    f"Internal stage: {milestone}\n"
+                    f"Deadline: {deadline}\n"
+                    f"Due within 1 hour."
+                )
+                if _notice_already_sent("sla_reminder", code, deadline):
+                    logger.debug("SLA reminder already sent for %s deadline %s", code, deadline)
+                    continue
+                if not _site_sla_notify_window(sb, wo.get("site_id"), now):
+                    logger.info(
+                        "Deferring technician SLA reminder for %s until site operating hours",
+                        code,
+                    )
+                    continue
                 if tech_sender:
                     try:
+                        tech_chat_id = _resolve_technician_chat_id(wo)
+                        if not tech_chat_id:
+                            logger.warning("No technician Telegram ID for SLA reminder %s", code)
+                            continue
                         asyncio.run_coroutine_threadsafe(
-                            tech_sender.send_text(8359288792, msg), self._main_loop
+                            tech_sender.send_text(tech_chat_id, msg), self._main_loop
                         ).result(timeout=10)
+                        _record_sla_notice("sla_reminder", wo, str(tech_chat_id), msg)
                         logger.info("SLA reminder sent for %s", code)
                     except Exception as e:
                         logger.warning("SLA reminder failed for %s: %s", code, e)
@@ -1773,8 +3183,13 @@ class BackgroundSchedulerService:
             # is not a breach; the SLA was met at resolution time.
             overdue = (
                 sb.table("work_orders")
-                .select("code, title, assigned_to, sla_deadline_at, milestone_status")
+                .select(
+                    "code, title, assigned_to, notified_technician_telegram_id, "
+                    "sla_deadline_at, milestone_status, status, closed_at, site_id"
+                )
                 .in_("milestone_status", ["assigned", "in_progress"])
+                .not_.in_("status", ["resolved", "completed", "closed", "cancelled"])
+                .is_("closed_at", "null")
                 .lt("sla_deadline_at", now_iso)
                 .execute()
             )
@@ -1788,25 +3203,52 @@ class BackgroundSchedulerService:
                     f"⚠️ SLA BREACH: {code}\n"
                     f"{title}\n"
                     f"Assigned to: {tech_name}\n"
-                    f"Status: {milestone}\n"
+                    f"State: Open\n"
+                    f"Internal stage: {milestone}\n"
                     f"Deadline was: {deadline}\n"
                     f"Action required."
                 )
+                if not _site_sla_notify_window(sb, wo.get("site_id"), now):
+                    logger.info(
+                        "Deferring SLA breach notifications for %s until site operating hours",
+                        code,
+                    )
+                    continue
+
+                if tech_sender and not _notice_already_sent("sla_breach_technician", code, deadline):
+                    try:
+                        tech_chat_id = _resolve_technician_chat_id(wo)
+                        if not tech_chat_id:
+                            logger.warning("No technician Telegram ID for SLA breach %s", code)
+                        else:
+                            tech_msg = (
+                                f"⚠️ SLA BREACH: {code}\n"
+                                f"{title}\n"
+                                f"State: Open\n"
+                                f"Internal stage: {milestone}\n"
+                                f"Deadline was: {deadline}\n"
+                                f"Action required."
+                            )
+                            asyncio.run_coroutine_threadsafe(
+                                tech_sender.send_text(tech_chat_id, tech_msg), self._main_loop
+                            ).result(timeout=10)
+                            _record_sla_notice("sla_breach_technician", wo, str(tech_chat_id), tech_msg)
+                            logger.info("SLA breach technician notification sent for %s", code)
+                    except Exception as e:
+                        logger.warning("Technician SLA breach notify failed for %s: %s", code, e)
+
+                if _notice_already_sent(["sla_breach", "sla_breach_manager"], code, deadline):
+                    logger.debug("Manager SLA breach already sent for %s deadline %s", code, deadline)
+                    continue
                 if mgr_sender:
                     try:
                         asyncio.run_coroutine_threadsafe(mgr_sender.send_text(8359288792, msg), self._main_loop).result(
                             timeout=10
                         )
+                        _record_sla_notice("sla_breach", wo, "8359288792", msg)
+                        logger.info("SLA breach manager escalation sent for %s", code)
                     except Exception as e:
                         logger.warning("Manager SLA breach notify failed for %s: %s", code, e)
-                if tech_sender:
-                    try:
-                        asyncio.run_coroutine_threadsafe(
-                            tech_sender.send_text(8359288792, msg), self._main_loop
-                        ).result(timeout=10)
-                    except Exception as e:
-                        logger.warning("Tech SLA breach notify failed for %s: %s", code, e)
-                logger.info("SLA breach notifications sent for %s", code)
 
         except Exception as e:
             logger.error("WO SLA breach check failed: %s", e)
@@ -1872,10 +3314,10 @@ class BackgroundSchedulerService:
             logger.error("Orphan alert cleanup job failed: %s", e)
 
     async def _run_orphan_alert_cleanup_async() -> int:
-        """Delete orphaned fault alerts and stale active alerts with no equipment FK.
+        """Delete orphaned fault alerts and stale active alerts with no site/equipment FK.
 
         Removes:
-          1. fault alerts with null equipment_id older than 1 hour (COV monitoring artifacts)
+          1. fault alerts with null site_id and null equipment_id older than 1 hour (COV monitoring artifacts)
           2. Any alert (any type) with null site_id AND null equipment_id older than 7 days
 
         Returns:
@@ -1887,13 +3329,15 @@ class BackgroundSchedulerService:
         deleted = 0
 
         try:
-            # 1. Orphaned fault alerts (null equipment_id, >1h old)
+            # 1. Orphaned fault alerts (no site/equipment linkage, >1h old).
+            # Site-linked BACnet bridge alarms may have null equipment_id but are
+            # still valid active source identities, so do not delete them here.
             cutoff_1h = datetime.now(UTC) - timedelta(hours=1)
             result1 = await asyncio.to_thread(
                 lambda: (
                     sb.table("alerts")
                     .delete()
-                    .not_.eq("equipment_id", "00000000-0000-0000-0000-000000000000")  # not null in Postgres needs this
+                    .is_("site_id", None)
                     .is_("equipment_id", None)
                     .eq("type", "fault")
                     .eq("status", "active")
@@ -1936,11 +3380,102 @@ class BackgroundSchedulerService:
         """
         import asyncio
 
+        from app.config.settings import settings
         from app.database.supabase_client import get_supabase_client
+        from app.models.recommendation import RecommendationStatus
 
         sb = get_supabase_client()
         expired_total = 0
         dedup_total = 0
+
+        try:
+            blocked_result = await asyncio.to_thread(
+                lambda: (
+                    sb.table("recommendations")
+                    .update({"status": "expired"})
+                    .eq("status", "pending")
+                    .not_.in_("action_type", list(PROTECTED_PENDING_AI_ACTION_TYPES))
+                    .filter("action->>execution_blocked", "eq", "true")
+                    .execute()
+                )
+            )
+            blocked_count = len(blocked_result.data or [])
+            if blocked_count:
+                expired_total += blocked_count
+                logger.info("[REC-EXPIRY] Expired %d execution-blocked recommendations", blocked_count)
+        except Exception as e:
+            logger.warning("[REC-EXPIRY] Execution-blocked cleanup failed: %s", e)
+
+        try:
+            advisory_retention_days = max(
+                1,
+                int(getattr(settings, "recommendation_advisory_info_retention_days", 7) or 7),
+            )
+            advisory_cutoff = datetime.now(UTC) - timedelta(days=advisory_retention_days)
+            advisory_age_result = await asyncio.to_thread(
+                lambda: (
+                    sb.table("recommendations")
+                    .update({"status": RecommendationStatus.EXPIRED.value})
+                    .eq("status", RecommendationStatus.ADVISORY_INFO.value)
+                    .lt("timestamp", advisory_cutoff.isoformat())
+                    .execute()
+                )
+            )
+            advisory_age_count = len(advisory_age_result.data or [])
+            if advisory_age_count:
+                expired_total += advisory_age_count
+                logger.info(
+                    "[REC-EXPIRY] Expired %d advisory_info recommendations older than %d days",
+                    advisory_age_count,
+                    advisory_retention_days,
+                )
+        except Exception as e:
+            logger.warning("[REC-EXPIRY] advisory_info age cleanup failed: %s", e)
+
+        try:
+            advisory_result = await asyncio.to_thread(
+                lambda: (
+                    sb.table("recommendations")
+                    .select("id, site_id, target_equipment, timestamp")
+                    .eq("status", RecommendationStatus.ADVISORY_INFO.value)
+                    .eq("action_type", "ai_optimization")
+                    .order("timestamp", desc=True)
+                    .limit(1000)
+                    .execute()
+                )
+            )
+            seen_equipment: set[tuple[str, str]] = set()
+            superseded_ids: list[str] = []
+            for row in advisory_result.data or []:
+                equipment_key = row.get("target_equipment") or ""
+                if not equipment_key:
+                    continue
+                key = (row.get("site_id") or "", equipment_key)
+                if key in seen_equipment:
+                    superseded_ids.append(row["id"])
+                else:
+                    seen_equipment.add(key)
+
+            for i in range(0, len(superseded_ids), 100):
+                chunk = superseded_ids[i : i + 100]
+                result = await asyncio.to_thread(
+                    lambda c=chunk: (
+                        sb.table("recommendations")
+                        .update({"status": RecommendationStatus.EXPIRED.value})
+                        .in_("id", c)
+                        .execute()
+                    )
+                )
+                count = len(result.data or chunk)
+                expired_total += count
+                dedup_total += count
+            if superseded_ids:
+                logger.info(
+                    "[REC-EXPIRY] Superseded %d older advisory_info recommendations for same equipment",
+                    len(superseded_ids),
+                )
+        except Exception as e:
+            logger.warning("[REC-EXPIRY] advisory_info supersede cleanup failed: %s", e)
 
         try:
             sites_result = await asyncio.to_thread(lambda: sb.table("sites").select("code").execute())
@@ -1979,6 +3514,8 @@ class BackgroundSchedulerService:
                 ids_to_expire: set[str] = set()
 
                 for _action_type, typed_records in by_type.items():
+                    if _is_protected_pending_recommendation(_action_type):
+                        continue
                     for r in typed_records[3:]:
                         ids_to_expire.add(r["id"])
 
@@ -2106,61 +3643,9 @@ class BackgroundSchedulerService:
             at_risk = len([eq for eq in all_equipment if (eq.get("health_score") or 100) < 90])
             logger.info(f"Generating recommendations for {len(all_equipment)} equipment ({at_risk} at-risk)")
 
-            # Phase 227 — maintenance gap detection (runs once per eligible site)
-            from app.services.maintenance_gap_detector import build_gap_recommendation_id, detect_maintenance_gaps
-
+            # Maintenance advisories should not be bulk-generated from routine health sweeps.
+            # Actionable maintenance should enter through alert/work-order workflows instead.
             gap_member_codes: set[str] = set()
-            for gap_site in generation_site_ids or []:
-                try:
-                    gaps = detect_maintenance_gaps(gap_site)
-                except Exception as e:
-                    logger.warning("Maintenance gap detection failed for %s: %s", gap_site, e)
-                    continue
-                for gap in gaps:
-                    gap_member_codes.update(gap.get("member_codes", []))
-                    try:
-                        rec_id = build_gap_recommendation_id(gap["site_id"], gap["equipment_type"])
-                        client.table("recommendations").upsert(
-                            {
-                                "id": rec_id,
-                                "site_id": gap["site_id"],
-                                "timestamp": datetime.utcnow().isoformat(),
-                                "action_type": "maintenance_gap",
-                                "risk_level": "medium",
-                                "target_equipment": f"{gap['equipment_type'].upper()}",
-                                "action": {"inspection": "priority"},
-                                "reason": (
-                                    f"{gap['member_count']} {gap['equipment_type']} units at "
-                                    f"health_score <= 65 with no recorded maintenance history."
-                                ),
-                                "expected_impact": {},
-                                "confidence": "medium",
-                                "confidence_score": 0.7,
-                                "profile": "maintenance_gap",
-                                "multi_objective_score": 0.0,
-                                "status": "pending",
-                                "requires_approval": True,
-                                "shadow_mode": False,
-                                "metadata": {
-                                    "equipment_type": gap["equipment_type"],
-                                    "member_count": gap["member_count"],
-                                    "member_ids": gap["member_ids"],
-                                    "member_codes": gap["member_codes"],
-                                    "avg_health_score": gap["avg_health_score"],
-                                    "detection": gap["detection"],
-                                },
-                            },
-                            on_conflict="id",
-                        ).execute()
-                        logger.info(
-                            "Maintenance gap: %d %s units at health %s (rec_id=%s)",
-                            gap["member_count"],
-                            gap["equipment_type"],
-                            gap["avg_health_score"],
-                            rec_id,
-                        )
-                    except Exception as e:
-                        logger.warning("Failed to persist gap recommendation: %s", e)
 
             generated = 0
             for eq in all_equipment:
@@ -2279,51 +3764,15 @@ class BackgroundSchedulerService:
                     is_healthy = health >= 90
 
                     if is_healthy:
-                        # HEALTHY equipment: Preventive maintenance & optimization
-                        risk_level = "low"
-                        rec_type = RecommendationType.OPTIMIZATION
-
-                        # Generate preventive actions based on equipment type and service history
-                        enhanced_actions = []
-                        eq_type = eq.get("type", "").lower()
-
-                        # Service-based recommendations
-                        if days_since_service:
-                            if days_since_service > 90:
-                                enhanced_actions.append(
-                                    f"Schedule preventive maintenance (last service {days_since_service} days ago)"
-                                )
-                            if days_since_service > 180:
-                                enhanced_actions.append("Filter/belt inspection recommended")
-                        else:
-                            enhanced_actions.append("Establish maintenance schedule")
-
-                        # Type-specific optimization suggestions
-                        if "chiller" in eq_type:
-                            enhanced_actions.extend(
-                                [
-                                    "Review chilled water setpoint for optimization",
-                                    "Check condenser approach temperature",
-                                ]
-                            )
-                        elif "ahu" in eq_type or "fcu" in eq_type:
-                            enhanced_actions.extend(
-                                [
-                                    "Verify economizer operation",
-                                    "Check supply air temperature setpoint",
-                                ]
-                            )
-                        elif "vav" in eq_type:
-                            enhanced_actions.append("Review zone airflow minimums")
-                        elif "lighting" in eq_type or "luminaire" in eq_type:
-                            enhanced_actions.append("Verify daylight harvesting settings")
-                        elif "generator" in eq_type:
-                            enhanced_actions.append("Schedule monthly test run")
-                        else:
-                            enhanced_actions.append("Verify operational parameters")
-
-                        priority = RecommendationPriority.LOW
-                        title_prefix = "Optimization"
+                        # Healthy routine service-history gaps are not AI optimization
+                        # recommendations. They belong in maintenance/work-order
+                        # workflows only when there is an actual alert, fault, or
+                        # degraded health driver.
+                        logger.debug(
+                            "[AI-REC] Skipping healthy routine health_monitor recommendation for %s",
+                            eq.get("code") or equipment_id,
+                        )
+                        continue
 
                     else:
                         # DEGRADED equipment: Maintenance recommendations
@@ -2372,7 +3821,7 @@ class BackgroundSchedulerService:
                         related_modules=[],
                         telemetry_context={
                             "equipment_id": eq.get("code", eq["id"]),
-                            "equipment_name": eq.get("name"),
+                            "equipment_name": eq.get("code"),
                             "equipment_type": eq.get("type", "unknown"),
                             "health_score": health,
                             "site_id": f"site-{site_code[1:]}"
@@ -2429,19 +3878,74 @@ class BackgroundSchedulerService:
                             if ai_rec.recommendation_type and ai_rec.recommendation_type.name == "OPTIMIZATION"
                             else "maintenance"
                         )
+                        if _action_type == "maintenance":
+                            logger.info(
+                                "[AI-REC] Skipping routine maintenance recommendation persistence for %s",
+                                _eq_id or eq.get("code") or equipment_id,
+                            )
+                            generated += 1
+                            continue
 
-                        client.table("recommendations").insert(
-                            {
-                                "id": str(uuid.uuid4()),
-                                "site_id": f"site-{site_code[1:]}"
-                                if site_code.startswith("S") and site_code[1:].isdigit()
-                                else site_code,
+                        recommendation_site_id = (
+                            f"site-{site_code[1:]}"
+                            if site_code.startswith("S") and site_code[1:].isdigit()
+                            else site_code
+                        )
+                        reason = (ai_rec.title + ": " + ai_rec.description)[:500]
+                        recommendation_id = str(uuid.uuid4())
+                        existing_pending = []
+                        open_work_orders = []
+                        if _action_type == "maintenance":
+                            recommendation_id = str(
+                                uuid.uuid5(
+                                    uuid.NAMESPACE_URL,
+                                    f"{recommendation_site_id}:maintenance:{_eq_id}",
+                                )
+                            )
+                            existing_resp = (
+                                client.table("recommendations")
+                                .select("id,status,metadata")
+                                .eq("id", recommendation_id)
+                                .limit(1)
+                                .execute()
+                            )
+                            existing_pending = [
+                                row for row in (existing_resp.data or []) if str(row.get("status") or "") == "pending"
+                            ]
+                            if equipment_id:
+                                wo_resp = (
+                                    client.table("work_orders")
+                                    .select("id,code,status")
+                                    .eq("equipment_id", equipment_id)
+                                    .not_.in_("status", ["completed", "closed", "cancelled"])
+                                    .limit(1)
+                                    .execute()
+                                )
+                                open_work_orders = wo_resp.data or []
+
+                        if _action_type == "maintenance" and (existing_pending or open_work_orders):
+                            logger.info(
+                                "[AI-REC] Maintenance issue already open for %s; rec_exists=%s wo_exists=%s",
+                                _eq_id,
+                                bool(existing_pending),
+                                bool(open_work_orders),
+                            )
+                        else:
+                            metadata = {
+                                "source": "health_monitor",
+                                "dedupe_key": f"{recommendation_site_id}:maintenance:{_eq_id}"
+                                if _action_type == "maintenance"
+                                else None,
+                            }
+                            payload = {
+                                "id": recommendation_id,
+                                "site_id": recommendation_site_id,
                                 "timestamp": datetime.utcnow().isoformat(),
                                 "action_type": _action_type,
                                 "risk_level": _priority_map.get(ai_rec.priority, ActionRiskLevel.MEDIUM).value,
                                 "target_equipment": _eq_id,
                                 "action": ai_rec.suggested_action or {},
-                                "reason": (ai_rec.title + ": " + ai_rec.description)[:500],
+                                "reason": reason,
                                 "expected_impact": {},
                                 "confidence": _conf_str,
                                 "confidence_score": ai_rec.confidence or 0.0,
@@ -2450,8 +3954,79 @@ class BackgroundSchedulerService:
                                 "status": RecommendationStatus.PENDING.value,
                                 "requires_approval": True,
                                 "shadow_mode": is_shadow_site,
+                                "metadata": metadata,
                             }
-                        ).execute()
+                            client.table("recommendations").upsert(payload, on_conflict="id").execute()
+
+                            if _action_type == "maintenance" and not is_shadow_site:
+                                try:
+                                    from app.config.settings import settings
+                                    from app.services.telegram_message_sender import (
+                                        InlineButton,
+                                        InlineKeyboard,
+                                        TelegramMessageSender,
+                                    )
+
+                                    bot_token = getattr(settings, "sentry_manager_bot_token", None) or getattr(
+                                        settings, "telegram_bot_token", None
+                                    )
+                                    chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(
+                                        settings, "sentry_fm_chat_id", None
+                                    )
+                                    if bot_token and chat_id:
+                                        priority_label = payload["risk_level"].upper()
+                                        message = "\n".join(
+                                            [
+                                                "*SENTINEL Maintenance Issue*",
+                                                f"*Site:* {recommendation_site_id}",
+                                                f"*Equipment:* `{_eq_id or 'Unknown'}`",
+                                                f"*Priority:* {priority_label}",
+                                                "",
+                                                reason[:700],
+                                                "",
+                                                "Use the button to create a work order if this needs technician action.",
+                                            ]
+                                        )
+                                        keyboard = InlineKeyboard(
+                                            rows=[
+                                                [
+                                                    InlineButton(
+                                                        label=f"Create WO - {_eq_id or 'Equipment'}",
+                                                        callback_data=f"wo:rec_id:{recommendation_id}",
+                                                    )
+                                                ]
+                                            ]
+                                        )
+
+                                        async def _send_manager_notification(
+                                            _bot_token: str = bot_token,
+                                            _chat_id: str = chat_id,
+                                            _message: str = message,
+                                            _keyboard=keyboard,
+                                        ) -> None:
+                                            sender = TelegramMessageSender(_bot_token)
+                                            await sender.send_text(
+                                                str(_chat_id),
+                                                _message,
+                                                parse_mode="Markdown",
+                                                keyboard=_keyboard,
+                                            )
+
+                                        loop = asyncio.new_event_loop()
+                                        try:
+                                            loop.run_until_complete(_send_manager_notification())
+                                        finally:
+                                            loop.close()
+                                        metadata["notification_sent_at"] = datetime.utcnow().isoformat()
+                                        client.table("recommendations").update({"metadata": metadata}).eq(
+                                            "id", recommendation_id
+                                        ).execute()
+                                    else:
+                                        logger.warning(
+                                            "[AI-REC] Manager bot token/chat missing; maintenance notification skipped"
+                                        )
+                                except Exception as notify_err:
+                                    logger.warning("[AI-REC] Maintenance manager notification failed: %s", notify_err)
                     except Exception as e:
                         logger.warning("Failed to persist recommendation to DB: %s", e)
 
@@ -2467,17 +4042,43 @@ class BackgroundSchedulerService:
 
     def _is_sendable_ai_recommendation(self, rec) -> bool:
         """Gate: only send notifications that meet the advisory standard."""
-        if rec.action_type != "ai_optimization":
-            logger.warning(f"[NOTIFY] Suppressed — not ai_optimization: {rec.action_type}")
+        action_type = rec.action_type or ""
+        maintenance_actions = {
+            "health_maintenance",
+            "maintenance",
+            "maintenance_schedule",
+            "inspect",
+            "repair",
+            "replace",
+            "schedule_maintenance",
+        }
+        is_maintenance_advisory = action_type in maintenance_actions
+        if action_type != "ai_optimization" and not is_maintenance_advisory:
+            logger.warning(f"[NOTIFY] Suppressed — unsupported action type: {rec.action_type}")
             return False
         if rec.target_equipment and "DALI" in rec.target_equipment.upper():
             logger.warning(f"[NOTIFY] Suppressed — DALI equipment: {rec.target_equipment}")
             return False
         action = rec.action or {}
-        if not action.get("point") or action.get("value") is None:
+        metadata = rec.metadata or {}
+        is_non_executable_advisory = (
+            action_type == "ai_optimization"
+            and bool(action.get("execution_blocked"))
+            and metadata.get("execution_status") in {"non_executable_advisory", "manual_action_required"}
+        )
+        if is_non_executable_advisory and not (rec.target_equipment and rec.reason and action.get("value") is not None):
+            logger.warning(f"[NOTIFY] Suppressed — incomplete non-executable advisory: {rec.target_equipment}")
+            return False
+        if (
+            not is_maintenance_advisory
+            and not is_non_executable_advisory
+            and (not action.get("point") or action.get("value") is None)
+        ):
             logger.warning(f"[NOTIFY] Suppressed — no specific action: {rec.target_equipment}")
             return False
         reason = rec.reason or ""
+        if is_maintenance_advisory:
+            return bool(rec.target_equipment and reason)
         GENERIC_PHRASES = [
             "health score",
             "failure probability",
@@ -2580,13 +4181,13 @@ class BackgroundSchedulerService:
 
         self.scheduler.add_job(
             func=_run_recommendation_digest_sync,
-            trigger=CronTrigger(hour=5, minute=0, day_of_week="mon-fri"),
+            trigger=CronTrigger(hour=7, minute=0, day_of_week="mon-fri", timezone="Africa/Johannesburg"),
             id="recommendation_digest",
             name="Recommendation Digest (07:00 SAST)",
             replace_existing=True,
             misfire_grace_time=3600,
         )
-        logger.info("recommendation_digest job registered — 05:00 UTC (07:00 SAST) Mon-Fri")
+        logger.info("recommendation_digest job registered — 07:00 SAST Mon-Fri")
 
     def add_daily_health_sweep_job(self):
         """Run a full equipment health sweep every weekday at 08:00 SAST.
@@ -3481,6 +5082,13 @@ class BackgroundSchedulerService:
                 ("system_health_snapshots", "created_at", 30),
             ]:
                 cursor.execute(f"DELETE FROM {table} WHERE {col} < now() - interval '{days} days'")
+            cursor.execute(
+                """
+                DELETE FROM alerts
+                WHERE status = 'resolved'
+                  AND COALESCE(resolved_at, updated_at, created_at) < now() - interval '7 days'
+                """
+            )
             conn.commit()
             cursor.close()
             conn.close()
@@ -3748,11 +5356,7 @@ class BackgroundSchedulerService:
         logger.info(f"Added site mode policy dry-run job for {site_id} with {interval_seconds}s interval")
 
     def add_phase_promotion_job(self, interval_hours: int = 1):
-        """Add periodic Trust Ladder phase promotion evaluation.
-
-        Evaluates all sites for promotion eligibility and auto-promotes
-        via the PATCH /api/sites/{site_id}/phase endpoint when gates pass.
-        """
+        """Add periodic Trust Ladder phase readiness evaluation."""
         job_id = "phase_promotion_evaluator"
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
@@ -3784,15 +5388,15 @@ class BackgroundSchedulerService:
             else:
                 results = asyncio.run(evaluator.evaluate_all_sites())
 
-            promoted = [r for r in results if r.promoted]
-            if promoted:
+            ready = [r for r in results if r.eligible and r.reason == "ready_for_manual_promotion"]
+            if ready:
                 logger.info(
-                    "Phase promotion: %d site(s) promoted (%s)",
-                    len(promoted),
-                    ", ".join(f"{r.from_phase}→{r.to_phase}" for r in promoted),
+                    "Phase promotion readiness: %d site(s) ready for manual review (%s)",
+                    len(ready),
+                    ", ".join(f"{r.from_phase}→{r.to_phase}" for r in ready),
                 )
             else:
-                logger.debug("Phase promotion evaluation complete: no sites promoted")
+                logger.debug("Phase promotion readiness evaluation complete: no sites ready")
         except Exception as e:
             logger.error("Phase promotion evaluation failed: %s", e, exc_info=True)
 
@@ -4728,6 +6332,136 @@ class BackgroundSchedulerService:
             logger.info("Event intelligence cycle complete: %d events across %d sites", total_events, len(site_ids))
 
     # -----------------------------------------------------------------
+    # Zone Occupancy Trigger — inert event surface for reflex reconciliation
+    # -----------------------------------------------------------------
+
+    def add_zone_occupancy_trigger_job(self, interval_seconds: int = 60):
+        """Add read-only zone occupancy transition detection.
+
+        This job only records zone occupancy-change events. It intentionally
+        does not invoke ``analyze_building()`` or any optimization/control path.
+        TODO: Future ReflexReconciliationService should consume these events.
+        """
+        job_id = "zone_occupancy_trigger"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        first_run = datetime.now() + timedelta(seconds=45)
+        self.scheduler.add_job(
+            func=self._run_zone_occupancy_trigger,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Zone Occupancy Trigger Event Recording",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added zone occupancy trigger job: %ds interval (first run at %s)",
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    @track_job_metrics("zone_occupancy_trigger")
+    def _run_zone_occupancy_trigger(self):
+        """Sync wrapper for async zone occupancy trigger evaluation."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_zone_occupancy_trigger_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=60)
+            else:
+                asyncio.run(self._run_zone_occupancy_trigger_async())
+        except Exception as e:
+            logger.error("Zone occupancy trigger evaluation failed: %s", e, exc_info=True)
+
+    async def _run_zone_occupancy_trigger_async(self):
+        """Record zone occupancy-change events for all registered sites."""
+        from app.core.site_resolver import get_registered_site_ids
+        from app.services.zone_occupancy_trigger_service import get_zone_occupancy_trigger_service
+
+        site_ids = get_registered_site_ids()
+        if not site_ids:
+            return
+
+        svc = get_zone_occupancy_trigger_service()
+        total_events = 0
+        for site_id in site_ids:
+            try:
+                events = await svc.process_site(site_id)
+                if events:
+                    total_events += len(events)
+                    logger.info(
+                        "Zone occupancy trigger recorded %d event(s) for %s",
+                        len(events),
+                        site_id,
+                    )
+            except Exception as e:
+                logger.warning("Zone occupancy trigger failed for %s: %s", site_id, e)
+
+        if total_events:
+            logger.info("Zone occupancy trigger cycle complete: %d event(s)", total_events)
+
+    # -----------------------------------------------------------------
+    # Reflex Reconciliation — deterministic current-state checks
+    # -----------------------------------------------------------------
+
+    def add_reflex_reconciliation_job(self, interval_seconds: int = 300):
+        """Add deterministic zone/system current-state reconciliation.
+
+        This job evaluates current state on each tick. It does not call
+        ``analyze_building()`` and does not depend on discrete occupancy-change
+        events, so the 10-minute zone-trigger cooldown cannot suppress reflex
+        coverage.
+        """
+        job_id = "reflex_reconciliation"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        first_run = datetime.now() + timedelta(seconds=75)
+        self.scheduler.add_job(
+            func=self._run_reflex_reconciliation,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id=job_id,
+            name="Reflex Reconciliation Current-State Scan",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(
+            "Added reflex reconciliation job: %ds interval (first run at %s)",
+            interval_seconds,
+            first_run.strftime("%H:%M:%S"),
+        )
+
+    @track_job_metrics("reflex_reconciliation")
+    def _run_reflex_reconciliation(self):
+        """Sync wrapper for async reflex reconciliation."""
+        try:
+            if self._main_loop and self._main_loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(
+                    self._run_reflex_reconciliation_async(),
+                    self._main_loop,
+                )
+                future.result(timeout=120)
+            else:
+                asyncio.run(self._run_reflex_reconciliation_async())
+        except Exception as e:
+            logger.error("Reflex reconciliation failed: %s", e, exc_info=True)
+
+    async def _run_reflex_reconciliation_async(self):
+        """Run deterministic current-state reconciliation for registered sites."""
+        from app.services.reflex_reconciliation_service import get_reflex_reconciliation_service
+
+        svc = get_reflex_reconciliation_service()
+        counts = await svc.reconcile_all_sites()
+        created_total = sum(counts.values())
+        if created_total:
+            logger.info("Reflex reconciliation created %d recommendation(s): %s", created_total, counts)
+
+    # -----------------------------------------------------------------
     # Space Occupancy — Sensor health monitor
     # -----------------------------------------------------------------
 
@@ -4919,7 +6653,7 @@ class BackgroundSchedulerService:
     # ------------------------------------------------------------------
 
     def add_db_archival_job(self, interval_seconds: int = 86400):
-        """Add daily job to archive resolved alerts/predictions older than 90 days."""
+        """Add daily job to purge resolved raw alerts and archive old predictions."""
         job_id = "db_archival"
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
@@ -4927,24 +6661,25 @@ class BackgroundSchedulerService:
             func=self._run_db_archival,
             trigger=IntervalTrigger(seconds=interval_seconds),
             id=job_id,
-            name="Database Archival (resolved alerts/predictions >90d)",
+            name="Database Archival (raw alerts >7d after clear, predictions >90d)",
             replace_existing=True,
         )
         logger.info("Added DB archival job (%ds interval)", interval_seconds)
 
     @track_job_metrics("db_archival")
     def _run_db_archival(self):
-        """Run database archival for old resolved records."""
+        """Run database retention for old resolved raw alerts and predictions."""
         try:
             from app.services.db_archival_service import archive_old_records
 
             result = archive_old_records(dry_run=False)
-            total = result.get("alerts", 0) + result.get("predictions", 0)
+            total = result.get("alerts_deleted", 0) + result.get("predictions_deleted", 0)
             if total > 0:
                 logger.info(
-                    "DB archival: removed %d alerts + %d predictions (cutoff %s)",
-                    result["alerts"],
-                    result["predictions"],
+                    "DB archival: deleted %d raw alerts + archived/deleted %d predictions (alert_cutoff=%s prediction_cutoff=%s)",
+                    result["alerts_deleted"],
+                    result["predictions_deleted"],
+                    result["alert_cutoff"],
                     result["cutoff"],
                 )
         except Exception as e:
@@ -4976,6 +6711,158 @@ class BackgroundSchedulerService:
             usage_tracker.send_daily_report_email("info@sentinel-ai.co.za")
         except Exception as e:
             logger.error("AI cost report email failed: %s", e, exc_info=True)
+
+    def add_sentry_feedback_digest_job(self):
+        """Add weekly Sentry feedback digest email job. Runs Monday 07:00 SAST."""
+        from apscheduler.triggers.cron import CronTrigger
+
+        if self.scheduler.get_job("sentry_feedback_digest"):
+            self.scheduler.remove_job("sentry_feedback_digest")
+
+        self.scheduler.add_job(
+            func=self._send_sentry_feedback_digest,
+            trigger=CronTrigger(day_of_week="mon", hour=5, minute=0),
+            id="sentry_feedback_digest",
+            name="Weekly Sentry Feedback Digest Email",
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info("Added Sentry feedback digest job (Monday 05:00 UTC / 07:00 SAST)")
+
+    @track_job_metrics("sentry_feedback_digest")
+    def _send_sentry_feedback_digest(self):
+        """Build and send the weekly Sentry feedback digest."""
+        try:
+            from collections import Counter, defaultdict
+            from datetime import timezone
+            import sys
+
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            if not sb:
+                logger.warning("Sentry feedback digest skipped: Supabase unavailable")
+                return
+
+            now_utc = datetime.now(UTC)
+            start_utc = now_utc - timedelta(days=7)
+            result = (
+                sb.table("sentry_feedback_events")
+                .select("*")
+                .gte("occurred_at", start_utc.isoformat())
+                .order("occurred_at", desc=True)
+                .limit(5000)
+                .execute()
+            )
+            events = result.data or []
+
+            sast = timezone(timedelta(hours=2))
+            start_sast = start_utc.astimezone(sast)
+            end_sast = now_utc.astimezone(sast)
+            subject = (
+                f"SENTINEL Sentry Feedback Digest — {start_sast.date().isoformat()} to {end_sast.date().isoformat()}"
+            )
+
+            lines = [
+                "SENTINEL Sentry Feedback Digest",
+                f"Period: {start_sast.isoformat(timespec='minutes')} to {end_sast.isoformat(timespec='minutes')}",
+                "Scope: Staff bot + Tech bot",
+                "",
+            ]
+
+            if not events:
+                lines.append("No interactions recorded this week.")
+            else:
+                failures: dict[str, Counter] = defaultdict(Counter)
+                successes: dict[str, Counter] = defaultdict(Counter)
+                feedback_rows = []
+                ratio_counts = {bot: {"A": 0, "B": 0} for bot in ("staff", "tech")}
+                intent_counts: dict[str, dict[str, int]] = defaultdict(lambda: {"A": 0, "B": 0})
+                abuse_count = 0
+
+                for event in events:
+                    bot = event.get("bot_workspace") or "unknown"
+                    batch = event.get("batch_type")
+                    if bot in ratio_counts and batch in ("A", "B"):
+                        ratio_counts[bot][batch] += 1
+                    intent = event.get("intent")
+                    if intent and batch in ("A", "B"):
+                        intent_counts[intent][batch] += 1
+                    if batch == "A":
+                        category = event.get("failure_category") or "unknown"
+                        failures[bot][category] += 1
+                        if category == "policy_or_abuse":
+                            abuse_count += 1
+                    elif batch == "B":
+                        key = f"{event.get('skill_name') or 'unknown'} / {event.get('outcome') or 'success'}"
+                        successes[bot][key] += 1
+                    elif batch == "C":
+                        feedback_rows.append(event)
+
+                lines.append("1. COULD NOT PROCESS")
+                for bot in ("staff", "tech"):
+                    lines.append(f"{bot.title()} bot:")
+                    if failures.get(bot):
+                        for category, count in failures[bot].most_common():
+                            lines.append(f"  {category}: {count}")
+                    else:
+                        lines.append("  none")
+                lines.append(f"Abuse / policy flags: {abuse_count} total")
+                lines.append("")
+
+                lines.append("2. SUCCESSFULLY PROCESSED")
+                for bot in ("staff", "tech"):
+                    lines.append(f"{bot.title()} bot:")
+                    if successes.get(bot):
+                        for key, count in successes[bot].most_common():
+                            lines.append(f"  {key}: {count}")
+                    else:
+                        lines.append("  none")
+                lines.append("")
+
+                lines.append("3. OPERATOR FEEDBACK")
+                for label, category in (
+                    ("Complaints", "complaint"),
+                    ("Improvement suggestions", "improvement_suggestion"),
+                ):
+                    lines.append(f"{label}:")
+                    rows = [r for r in feedback_rows if r.get("feedback_category") == category]
+                    if rows:
+                        for row in rows[:50]:
+                            ts = str(row.get("occurred_at") or "")[:19]
+                            flow = row.get("flow_name") or "unknown flow"
+                            msg = row.get("sanitised_message") or ""
+                            lines.append(f'  [{row.get("bot_workspace")}] "{msg}" ({flow}, {ts})')
+                    else:
+                        lines.append("  none")
+                lines.append("")
+
+                lines.append("4. SUCCESS VS FAILURE RATIO")
+                for bot in ("staff", "tech"):
+                    success = ratio_counts[bot]["B"]
+                    failure = ratio_counts[bot]["A"]
+                    total = success + failure
+                    rate = (success / total) if total else 0
+                    lines.append(f"{bot.title()} bot: {success} success / {failure} failure ({rate:.0%} success rate)")
+                lines.append("")
+
+                lines.append("5. INCONSISTENT HANDLING (same intent, mixed outcomes)")
+                inconsistent = [
+                    (intent, counts) for intent, counts in intent_counts.items() if counts["A"] and counts["B"]
+                ]
+                if inconsistent:
+                    for intent, counts in sorted(inconsistent):
+                        lines.append(f"  {intent}: {counts['B']} success, {counts['A']} failure")
+                else:
+                    lines.append("  none")
+
+            if "/home/bederf/.sentry/tools" not in sys.path:
+                sys.path.insert(0, "/home/bederf/.sentry/tools")
+            from gmail_helper import send_email
+
+            send_email(to="info@sentinel-ai.co.za", subject=subject, body="\n".join(lines))
+        except Exception as e:
+            logger.error("Sentry feedback digest email failed: %s", e, exc_info=True)
 
     # ------------------------------------------------------------------
     # Phase 189 — LLM Judge Loop (INTERIM)
@@ -5630,6 +7517,103 @@ class BackgroundSchedulerService:
             first_run.strftime("%H:%M:%S"),
         )
 
+    @staticmethod
+    def _canonical_bridge_equipment_id(equipment_id: str, known_codes: set[str]) -> str:
+        """Map raw bridge equipment IDs onto SENTINEL equipment codes when possible."""
+        import re
+
+        raw = (equipment_id or "").strip()
+        if not raw:
+            return ""
+        if raw in known_codes:
+            return raw
+
+        normalised = raw
+
+        match = re.match(r"^(S\d+)-(\w+)-L(\d+)-([A-Z])$", raw)
+        if match:
+            site, equip_type, floor, letter = match.groups()
+            letter_num = ord(letter.upper()) - ord("A") + 1
+            numeric_floor = int(floor)
+            normalised_seq = f"{letter_num:03d}" if numeric_floor == 0 else numeric_floor * 100 + letter_num
+            normalised = f"{site}-{equip_type}-{normalised_seq}"
+        else:
+            match = re.match(r"^(S\d+)-(\w+)-L(\d+)-(\d+)$", raw)
+            if match:
+                site, equip_type, floor, seq = match.groups()
+                numeric_floor = int(floor)
+                normalised_seq = f"{int(seq):03d}" if numeric_floor == 0 else numeric_floor * 100 + int(seq)
+                normalised = f"{site}-{equip_type}-{normalised_seq}"
+            else:
+                match = re.match(r"^(S\d+)-(\w+)-B(\d+)-(\d+)$", raw)
+                if match:
+                    site, equip_type, basement, _seq = match.groups()
+                    normalised = f"{site}-{equip_type}-B{basement.zfill(2)}"
+                else:
+                    match = re.match(r"^(S\d+)-(\w+)-G-(\d+)$", raw)
+                    if match:
+                        site, equip_type, seq = match.groups()
+                        normalised = f"{site}-{equip_type}-{seq.zfill(3)}"
+                    else:
+                        match = re.match(r"^(S\d+)-(\w+)-R-(\d+)$", raw)
+                        if match:
+                            site, equip_type, seq = match.groups()
+                            normalised = f"{site}-{equip_type}-R{int(seq):02d}"
+
+        return normalised
+
+    @staticmethod
+    def _build_bridge_point_mappings(
+        site_uuid: str,
+        objects: list[dict],
+        known_codes: set[str],
+    ) -> list[dict]:
+        """Convert bridge /objects catalog rows into point_asset_mappings rows."""
+        mappings: list[dict] = []
+        seen_point_ids: set[str] = set()
+        for obj in objects:
+            object_id = (obj.get("object_id") or "").strip()
+            if not object_id or object_id in seen_point_ids:
+                continue
+            seen_point_ids.add(object_id)
+
+            equipment_id = (obj.get("equipment_id") or "").strip()
+            canonical_equipment_id = BackgroundSchedulerService._canonical_bridge_equipment_id(
+                equipment_id,
+                known_codes,
+            )
+            object_name = (obj.get("object_name") or "").strip()
+            object_type = (obj.get("object_type") or "").strip()
+            instance = obj.get("instance")
+            unit = obj.get("unit")
+            bridge_writable = obj.get("writable") is True
+            parameter_type = (obj.get("point_type") or "").strip()
+            if not parameter_type and bridge_writable:
+                parameter_type = "writable"
+            if not parameter_type:
+                parameter_type = (obj.get("equipment_type") or "").strip()
+            parameter_type = parameter_type or None
+
+            if object_type and instance is not None:
+                parameter_type = f"{parameter_type or 'bacnet'}:{object_type},{instance}"
+            if unit:
+                parameter_type = f"{parameter_type or 'point'}:{unit}"
+
+            canonical_known = canonical_equipment_id in known_codes
+            mappings.append(
+                {
+                    "site_id": site_uuid,
+                    "bms_point_id": object_id,
+                    "extracted_asset_id": canonical_equipment_id or None,
+                    "parameter_name": object_name or object_id.rsplit(".", 1)[-1],
+                    "parameter_type": parameter_type,
+                    "match_confidence": "exact" if canonical_known else "unmatched",
+                    "is_verified": canonical_known and bridge_writable,
+                    "mapping_source": "bridge_objects",
+                }
+            )
+        return mappings
+
     @track_job_metrics("bacnet_discovery")
     def _run_bacnet_discovery(self, site_id: str = "site-002"):
         """Query the bridge for BACnet objects and detect equipment changes.
@@ -5729,36 +7713,50 @@ class BackgroundSchedulerService:
             except Exception as db_err:
                 logger.warning("[BACNET-DISCOVERY] DB query failed: %s", db_err)
 
-            new_equipment = bridge_equipment_ids - known_codes
-            missing_equipment = known_codes - bridge_equipment_ids
-
-            if new_equipment:
-                logger.warning(
-                    "[BACNET-DISCOVERY] NEW equipment detected on %s (%d): %s",
-                    site_id,
-                    len(new_equipment),
-                    sorted(new_equipment)[:20],
+            mappings = self._build_bridge_point_mappings(site_uuid, objects, known_codes)
+            if mappings:
+                existing_verified = (
+                    sb.table("point_asset_mappings")
+                    .select("bms_point_id")
+                    .eq("site_id", site_uuid)
+                    .eq("is_verified", True)
+                    .execute()
                 )
-            if missing_equipment:
-                logger.warning(
-                    "[BACNET-DISCOVERY] MISSING equipment on %s (%d): %s",
-                    site_id,
-                    len(missing_equipment),
-                    sorted(missing_equipment)[:20],
-                )
+                verified_point_ids = {
+                    row.get("bms_point_id") for row in (existing_verified.data or []) if row.get("bms_point_id")
+                }
+                if verified_point_ids:
+                    mappings = [row for row in mappings if row["bms_point_id"] not in verified_point_ids]
 
-            if not new_equipment and not missing_equipment:
+            if mappings:
+                upserted = 0
+                for i in range(0, len(mappings), 500):
+                    chunk = mappings[i : i + 500]
+                    sb.table("point_asset_mappings").upsert(
+                        chunk,
+                        on_conflict="site_id,bms_point_id",
+                    ).execute()
+                    upserted += len(chunk)
                 logger.info(
-                    "[BACNET-DISCOVERY] No equipment changes detected for %s",
+                    "[BACNET-DISCOVERY] Upserted %d bridge object point mappings for %s",
+                    upserted,
                     site_id,
                 )
 
+            raw_exact_matches = bridge_equipment_ids & known_codes
             logger.info(
-                "[BACNET-DISCOVERY] Summary for %s: %d total, %d new, %d missing",
+                "[BACNET-DISCOVERY] Raw bridge catalog for %s references %d equipment IDs (%d raw exact DB matches). "
+                "Canonical equipment naming is handled by SIMBIOT mapping.",
                 site_id,
                 len(bridge_equipment_ids),
-                len(new_equipment),
-                len(missing_equipment),
+                len(raw_exact_matches),
+            )
+
+            logger.info(
+                "[BACNET-DISCOVERY] Summary for %s: %d objects across %d raw equipment IDs captured",
+                site_id,
+                len(objects),
+                len(bridge_equipment_ids),
             )
 
         except httpx.ConnectError:
@@ -5945,8 +7943,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
     """Send morning building digest to FM Telegram — health, alerts, work orders, AI recommendations."""
     import asyncio
     import logging
-
-    from app.services.recommendation_service import get_recommendation_service
+    from uuid import uuid4
 
     logger = logging.getLogger(__name__)
 
@@ -5967,11 +7964,46 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
 
         async def _send():
             from app.config.settings import settings
-            from app.services.telegram_message_sender import get_telegram_sender
+            from app.database.supabase_client import get_supabase_client
+            from app.services.telegram_message_sender import TelegramMessageSender
 
-            sender = get_telegram_sender()
+            def _record_delivery(status: str, message: str, chat: str | None = None, error: str | None = None) -> None:
+                try:
+                    sb = get_supabase_client()
+                    sb.table("notification_delivery_log").insert(
+                        {
+                            "notification_type": "morning_digest",
+                            "id": str(uuid4()),
+                            "channel_type": "telegram",
+                            "recipient_identifier": str(chat or ""),
+                            "status": status,
+                            "provider": "telegram",
+                            "sent_at": datetime.utcnow().isoformat() if status == "sent" else None,
+                            "site_id": site_id,
+                            "message_text": message[:4000],
+                            "delivery_status": status,
+                            "reference_type": "morning_digest",
+                            "severity": "info",
+                            "error_message": error,
+                        }
+                    ).execute()
+                except Exception as audit_err:
+                    logger.warning("[DIGEST] Could not write delivery audit row: %s", audit_err)
+
+            bot_token = getattr(settings, "sentry_manager_bot_token", None) or getattr(
+                settings, "telegram_bot_token", None
+            )
+            if not bot_token:
+                msg = "No manager Telegram bot token configured for morning digest"
+                logger.warning("[DIGEST] %s", msg)
+                _record_delivery("failed", msg, error=msg)
+                return
+            sender = TelegramMessageSender(bot_token)
             chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
             if not chat_id:
+                msg = "No Telegram chat ID configured for morning digest"
+                logger.warning("[DIGEST] %s", msg)
+                _record_delivery("failed", msg, error=msg)
                 return
 
             # --- 1. Equipment health from Supabase ---
@@ -5981,10 +8013,22 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             total_assets = 0
             site_uuid = None
             try:
-                from app.config.health_config import PASSIVE_TYPES
                 from app.database.supabase_client import get_supabase_client
 
                 sb = get_supabase_client()
+                HEALTH_SCORED_EQUIPMENT_TYPES = {
+                    "ahu",
+                    "bess",
+                    "chiller",
+                    "cooling_tower",
+                    "ct",
+                    "fcu",
+                    "generator",
+                    "inverter",
+                    "pump",
+                    "ups",
+                    "vav",
+                }
                 # Resolve site UUID from resolver ID (site-002 format matches DB)
                 site_code = site_id.lower()  # site-002, site-005, etc.
                 site_resp = sb.table("sites").select("id").eq("code", site_code).limit(1).execute()
@@ -5994,22 +8038,23 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 else:
                     resp = (
                         sb.table("equipment")
-                        .select("code,name,type,health_score,location,status,manufacturer")
+                        .select("code,type,health_score,status,manufacturer")
                         .eq("site_id", site_uuid)
                         .execute()
                     )
                     if resp.data:
                         for eq in resp.data:
-                            if eq.get("type") and str(eq.get("type", "")).lower() in PASSIVE_TYPES:
+                            eq_type = str(eq.get("type") or "").lower()
+                            if eq_type not in HEALTH_SCORED_EQUIPMENT_TYPES:
                                 logger.debug(
-                                    "[DIGEST] Skipping passive device: %s (%s)", eq.get("code"), eq.get("type")
+                                    "[DIGEST] Skipping non-health-scored device: %s (%s)", eq.get("code"), eq_type
                                 )
                                 continue
                             total_assets += 1
-                            hs = eq.get("health_score") or 100
-                            if hs < 70:
+                            health_status = str(eq.get("status") or "normal").lower()
+                            if health_status in {"critical", "fault"}:
                                 critical_assets.append(eq)
-                            elif hs < 90:
+                            elif health_status in {"warning", "maintenance", "needs_attention", "offline"}:
                                 warning_assets.append(eq)
                             else:
                                 healthy_count += 1
@@ -6019,52 +8064,166 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             # --- 2. Active alerts ---
             alert_count = 0
             critical_alerts = []
+            static_alert_groups_excluded = 0
             try:
-                from app.database.repositories.alert_repository import AlertRepository
+                if site_uuid:
+                    alerts_resp = (
+                        sb.table("alerts")
+                        .select("id,equipment_id,severity,status,message,created_at,source_dedupe_key")
+                        .eq("site_id", site_uuid)
+                        .eq("status", "active")
+                        .in_("severity", ["high", "critical"])
+                        .execute()
+                    )
+                    alert_groups: dict[tuple[str, str, str], dict[str, Any]] = {}
+                    static_alert_groups: dict[tuple[str, str, str], dict[str, Any]] = {}
+                    for alert in alerts_resp.data or []:
+                        message = str(alert.get("message") or "").strip()
+                        key = (
+                            str(alert.get("source_dedupe_key") or alert.get("equipment_id") or "site"),
+                            str(alert.get("severity") or "unknown"),
+                            message,
+                        )
+                        is_static_alert = message.lower().startswith(("sensor.", "zone."))
+                        target = static_alert_groups if is_static_alert else alert_groups
+                        group = target.setdefault(
+                            key,
+                            {
+                                "severity": alert.get("severity"),
+                                "message": message,
+                                "occurrences": 0,
+                                "latest_seen_at": alert.get("created_at"),
+                            },
+                        )
+                        group["occurrences"] += 1
+                        created_at = alert.get("created_at")
+                        if created_at and (not group.get("latest_seen_at") or created_at > group["latest_seen_at"]):
+                            group["latest_seen_at"] = created_at
 
-                alert_repo = AlertRepository()
-                all_alerts = await alert_repo.get_all(status="active", site_id=site_uuid)
-                if all_alerts:
-                    alert_count = len(all_alerts)
+                    active_alert_groups = sorted(
+                        alert_groups.values(),
+                        key=lambda item: (item.get("severity") == "critical", item.get("latest_seen_at") or ""),
+                        reverse=True,
+                    )
+                    alert_count = len(active_alert_groups)
                     critical_alerts = [
-                        a for a in all_alerts if str(a.get("severity", "") or "").lower() in ("critical", "high")
+                        alert
+                        for alert in active_alert_groups
+                        if str(alert.get("severity") or "").lower() in {"critical", "high"}
                     ][:5]
+                    static_alert_groups_excluded = len(static_alert_groups)
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch active alerts: {e}")
 
             # --- 3. Open work orders ---
             open_wo_count = 0
+            open_wos = []
             try:
-                from app.services.csv_loader import WorkOrderData
-
-                # CSV uses SITE-002 format (uppercase), not site-002
-                site_wo_id = site_id.upper() if site_id.lower().startswith("site-") else site_id
-                site_wos = WorkOrderData.get_by_site(site_wo_id) if site_id else WorkOrderData.load()
-                open_wo_count = sum(1 for wo in site_wos if not wo.get("completed_date") and not wo.get("closed_date"))
+                if site_uuid:
+                    wo_resp = (
+                        sb.table("work_orders")
+                        .select("code,title,priority,status,milestone_status,assigned_to,created_at")
+                        .eq("site_id", site_uuid)
+                        .not_.in_("status", ["completed", "closed", "cancelled"])
+                        .is_("closed_at", "null")
+                        .order("created_at", desc=True)
+                        .limit(10)
+                        .execute()
+                    )
+                    open_wos = wo_resp.data or []
+                    open_wo_count = len(open_wos)
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch work orders: {e}")
 
             # --- 4. Pending AI recommendations ---
-            # Advisory posture (Phase 225): morning digest is read-only. Only
-            # HIGH/CRITICAL optimisation recs justify waking the FM at 05:00 UTC
-            # (07:00 SAST). LOW/MEDIUM are noise. Inline advisory messages own
-            # the "Create WO" action — the digest does not carry Accept/Dismiss
-            # buttons (see Change 2 below in the send loop).
-            ai_recs = []
-            try:
-                from app.models.recommendation import ActionRiskLevel
+            # Morning digest is read-only. "AI Recommendations" means
+            # control/optimization advisories only; maintenance/service-history
+            # items belong in work-order and maintenance sections.
+            def _trim_digest_text(value: str | None, max_chars: int = 96) -> str:
+                text = " ".join(str(value or "").split())
+                if len(text) <= max_chars:
+                    return text
+                trimmed = text[: max_chars - 1].rsplit(" ", 1)[0]
+                return f"{trimmed or text[: max_chars - 1]}…"
 
-                svc = get_recommendation_service()
-                # Use site-002 format directly (matches DB column)
-                pending = await svc.get_pending_recommendations(site_id, limit=20)
-                ADVISORY_TYPES = {"ai_optimization"}
-                ALLOWED_RISK_LEVELS = {ActionRiskLevel.HIGH, ActionRiskLevel.CRITICAL}
-                ai_recs = [
-                    r
-                    for r in pending
-                    if (getattr(r, "action_type", "") or "") in ADVISORY_TYPES
-                    and getattr(r, "risk_level", None) in ALLOWED_RISK_LEVELS
-                ]
+            ai_recs = []
+            schedule_defects = []
+            advisory_total = 0
+            optimization_total = 0
+            try:
+                schedule_defects_resp = (
+                    sb.table("recommendations")
+                    .select("id,target_equipment,action_type,risk_level,reason,timestamp,shadow_mode,profile,status")
+                    .eq("site_id", site_id)
+                    .in_("status", ["pending", "advisory_info"])
+                    .eq("shadow_mode", False)
+                    .eq("action_type", "schedule_defect")
+                    .order("timestamp", desc=True)
+                    .limit(10)
+                    .execute()
+                )
+                schedule_defects = schedule_defects_resp.data or []
+
+                OPTIMIZATION_TYPES = {
+                    "ai_optimization",
+                    "coordinated_optimization",
+                }
+                rec_query = (
+                    sb.table("recommendations")
+                    .select("id,target_equipment,action_type,risk_level,reason,timestamp,shadow_mode,profile")
+                    .eq("site_id", site_id)
+                    .eq("status", "pending")
+                    .eq("shadow_mode", False)
+                    .in_("action_type", sorted(OPTIMIZATION_TYPES))
+                    .in_("risk_level", ["medium", "high", "critical"])
+                    .order("timestamp", desc=True)
+                    .limit(1000)
+                    .execute()
+                )
+                grouped_recs: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+                severity_rank = {"critical": 3, "high": 2, "medium": 1}
+                for rec in rec_query.data or []:
+                    reason = _trim_digest_text(rec.get("reason"), 140)
+                    key = (
+                        str(rec.get("target_equipment") or "?"),
+                        str(rec.get("action_type") or "advisory"),
+                        str(rec.get("risk_level") or "info"),
+                        reason,
+                    )
+                    group = grouped_recs.setdefault(key, {**rec, "reason": reason, "occurrences": 0})
+                    group["occurrences"] += 1
+                    if str(rec.get("timestamp") or "") > str(group.get("timestamp") or ""):
+                        group.update({**rec, "reason": reason, "occurrences": group["occurrences"]})
+
+                ai_recs = sorted(
+                    grouped_recs.values(),
+                    key=lambda rec: (
+                        severity_rank.get(str(rec.get("risk_level") or "").lower(), 0),
+                        str(rec.get("timestamp") or ""),
+                    ),
+                    reverse=True,
+                )
+                advisory_total = len(ai_recs)
+                optimization_total = len(ai_recs)
+                opt_count_query = (
+                    sb.table("recommendations")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .eq("status", "pending")
+                    .eq("shadow_mode", False)
+                    .in_("action_type", sorted(OPTIMIZATION_TYPES))
+                    .in_("risk_level", ["medium", "high", "critical"])
+                    .limit(1)
+                    .execute()
+                )
+                raw_optimization_total = opt_count_query.count or 0
+
+                if raw_optimization_total > optimization_total:
+                    logger.info(
+                        "[DIGEST] Deduped AI optimization backlog: optimization %s→%s",
+                        raw_optimization_total,
+                        optimization_total,
+                    )
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch recommendations: {e}")
 
@@ -6111,29 +8270,42 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 lines.append("\n*Critical equipment:*")
                 for eq in critical_assets[:5]:
                     hs = eq.get("health_score", 0)
-                    name = eq.get("name", eq.get("code", "?"))
-                    loc = eq.get("location", "")
-                    loc_str = f" @ {loc}" if loc else ""
-                    lines.append(f"  ● {name} ({hs}%){loc_str}")
+                    code = eq.get("code", "?")
+                    lines.append(f"  ● `{code}` ({hs}%)")
             if warning_assets:
                 lines.append("\n*Warning:*")
                 for eq in warning_assets[:3]:
                     hs = eq.get("health_score", 0)
-                    name = eq.get("name", eq.get("code", "?"))
-                    lines.append(f"  ○ {name} ({hs}%)")
+                    code = eq.get("code", "?")
+                    lines.append(f"  ○ `{code}` ({hs}%)")
 
             # Alerts section
             lines.append("")
             if alert_count > 0:
-                lines.append(f"*Active Alerts:* {alert_count} ({len(critical_alerts)} critical)")
+                lines.append(f"*Active Alert Groups:* {alert_count} ({len(critical_alerts)} high/critical)")
+                if static_alert_groups_excluded:
+                    lines.append(f"  Static endpoint groups excluded: {static_alert_groups_excluded}")
                 for a in critical_alerts[:3]:
-                    msg = a.get("message", "Alert")[:60]
-                    lines.append(f"  [{a.get('severity', '?').upper()}] {msg}")
+                    msg = _trim_digest_text(a.get("message", "Alert"), 72)
+                    occ = a.get("occurrences") or 1
+                    suffix = f" ({occ} rows)" if occ > 1 else ""
+                    lines.append(f"  [{str(a.get('severity', '?')).upper()}] {msg}{suffix}")
             else:
-                lines.append("*Active Alerts:* 0")
+                if static_alert_groups_excluded:
+                    lines.append(
+                        f"*Active Alert Groups:* 0 ({static_alert_groups_excluded} static endpoint groups excluded)"
+                    )
+                else:
+                    lines.append("*Active Alert Groups:* 0")
 
             # Work orders section
             lines.append(f"*Open Work Orders:* {open_wo_count}")
+            for wo in open_wos[:3]:
+                code = wo.get("code") or "WO"
+                title = (wo.get("title") or "")[:70]
+                assigned = wo.get("assigned_to") or "unassigned"
+                priority = (wo.get("priority") or "medium").upper()
+                lines.append(f"  `{code}` — {priority} — {assigned} — {title}")
 
             # Savings section
             if verified_savings > 0 or estimated_savings > 0:
@@ -6152,21 +8324,43 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             # read the digest and either go to Cockpit or wait for the
             # advisory to surface there.
             lines.append("")
-            if ai_recs:
-                lines.append(f"*AI Recommendations:* {len(ai_recs)} pending approval")
+            if schedule_defects:
+                lines.append(f"*Schedule Defects:* {len(schedule_defects)} open")
+                for rec in schedule_defects[:5]:
+                    eq = rec.get("target_equipment") or "site"
+                    sev = rec.get("risk_level") or "info"
+                    reason = _trim_digest_text(rec.get("reason"), 110)
+                    lines.append(f"  `{eq}` — {sev}: {reason}")
+                if len(schedule_defects) > 5:
+                    lines.append(f"  + {len(schedule_defects) - 5} more schedule defects")
 
+            if ai_recs:
+                lines.append(f"*AI Recommendations:* {optimization_total} pending review")
+
+                lines.append("*Top AI recommendations:*")
                 for rec in ai_recs[:5]:
-                    eq = getattr(rec, "target_equipment", "?") or "?"
-                    reason = (getattr(rec, "reason", "") or "")[:65]
-                    sev = getattr(rec.risk_level, "value", None) if hasattr(rec, "risk_level") else None
-                    sev = sev or getattr(rec, "risk_level", "info") or "info"
-                    body = f"`{eq}` — {reason}\nSeverity: {sev}"
-                    await sender.send_text(str(chat_id), body, parse_mode="Markdown")
+                    eq = rec.get("target_equipment") or "?"
+                    action_type = str(rec.get("action_type") or "advisory").replace("_", " ")
+                    reason = _trim_digest_text(rec.get("reason"), 96)
+                    sev = rec.get("risk_level") or "info"
+                    occ = rec.get("occurrences") or 1
+                    suffix = f" ({occ} duplicate rows)" if occ > 1 else ""
+                    lines.append(f"  `{eq}` — {action_type} — {sev}: {reason}{suffix}")
+
+                if advisory_total and advisory_total > len(ai_recs):
+                    lines.append(f"  + {advisory_total - len(ai_recs)} more pending advisories")
             else:
                 lines.append("*AI Recommendations:* None pending")
 
             digest = "\n".join(lines)
-            await sender.send_text(str(chat_id), digest, parse_mode="Markdown")
+            result = await sender.send_text(str(chat_id), digest, parse_mode="Markdown")
+            if result.get("ok"):
+                logger.info("[DIGEST] Morning digest sent to Telegram for %s", site_id)
+                _record_delivery("sent", digest, chat=str(chat_id))
+            else:
+                error = str(result)
+                logger.warning("[DIGEST] Morning digest Telegram send failed for %s: %s", site_id, error)
+                _record_delivery("failed", digest, chat=str(chat_id), error=error[:1000])
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

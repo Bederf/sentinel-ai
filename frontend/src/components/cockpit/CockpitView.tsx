@@ -620,6 +620,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
   const railRef = useRef<HTMLDivElement | null>(null)
   const queueRef = useRef<HTMLDivElement | null>(null)
   const twinContainerRef = useRef<HTMLDivElement | null>(null)
+  const twinScaleRef = useRef<HTMLDivElement | null>(null)
 
   const palette = useMemo(() => tonePalette(state), [state])
   const waiting = isWaitingState(state)
@@ -642,6 +643,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
   }, [issuesPayload, state.systemFilter])
 
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [twinBaseHeight, setTwinBaseHeight] = useState<number | null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null)
 
@@ -694,6 +696,26 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
     return () => document.removeEventListener('fullscreenchange', sync)
   }, [])
 
+  useLayoutEffect(() => {
+    const node = twinScaleRef.current
+    if (!node) return
+
+    const updateHeight = () => {
+      setTwinBaseHeight(node.offsetHeight)
+    }
+
+    updateHeight()
+
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight)
+      return () => window.removeEventListener('resize', updateHeight)
+    }
+
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [canvas])
+
   // Clear selected zone when switching to a module that doesn't contain its zone
   useEffect(() => {
     if (selectedZone && state.systemFilter) {
@@ -736,7 +758,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
   return (
     <section
       ref={shellRef}
-      className={`sentinel-shell rounded-[30px] border border-white/8 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.96),rgba(2,6,23,0.98)_58%)] p-5 text-slate-100 md:p-6 ${isFullscreen ? 'h-[100dvh] overflow-y-auto' : ''}`}
+      className={`sentinel-shell rounded-2xl border border-white/8 bg-[radial-gradient(circle_at_top,rgba(15,23,42,0.96),rgba(2,6,23,0.98)_58%)] p-3 text-slate-100 sm:p-4 md:rounded-[30px] md:p-6 ${isFullscreen ? 'h-[100dvh] overflow-y-auto' : ''}`}
       data-cockpit-root
       data-render-mode={renderMode}
       data-site-id={state.site.id}
@@ -746,18 +768,18 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
         initial={motionReduced() ? false : { opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.45, ease: FRAMER_EASE }}
-        className="rounded-[26px] border border-white/8 bg-[linear-gradient(180deg,rgba(10,16,28,0.94),rgba(4,9,20,0.92))] px-5 py-4 md:px-6"
+        className="rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(10,16,28,0.94),rgba(4,9,20,0.92))] px-4 py-4 md:rounded-[26px] md:px-6"
       >
         {/* Row 1 — Hero */}
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-3 sm:gap-4">
           <div className={`mt-1.5 h-2.5 w-2.5 rounded-full ${palette.dot} ${palette.glow}`} />
           <div className="min-w-0 flex-1">
-            <div className="text-[10px] uppercase tracking-[0.34em] text-slate-500">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-slate-500 sm:tracking-[0.34em]">
               Sentinel Cockpit · {state.site.name}
             </div>
             <h1
-              className={`mt-3 max-w-none overflow-hidden text-ellipsis whitespace-nowrap font-semibold tracking-[-0.045em] text-white ${
-                largeHeadline ? 'text-4xl' : 'text-[2rem] leading-[1.02]'
+              className={`mt-3 max-w-none font-semibold tracking-normal text-white md:overflow-hidden md:text-ellipsis md:whitespace-nowrap ${
+                largeHeadline ? 'text-2xl leading-tight md:text-4xl' : 'text-2xl leading-tight md:text-[2rem] md:leading-[1.02]'
               }`}
             >
               {heroHeadline(state)}
@@ -770,13 +792,13 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
 
         {/* Row 2 — Chrome strip */}
         <div className="mt-5 flex flex-wrap items-center gap-3 border-t border-white/8 pt-4">
-          <div className="flex flex-wrap items-center gap-3 text-[10px] uppercase tracking-[0.22em] text-slate-500">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3 text-[10px] uppercase tracking-[0.16em] text-slate-500 sm:tracking-[0.22em]">
             <span>{summary}</span>
             <span className="text-slate-700">/</span>
             <span className={palette.text}>{modeLabel(state.site.mode, state.site.onboardingPhase)}</span>
           </div>
 
-          <div className="ml-auto flex flex-wrap items-center gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:ml-auto">
             {state.site.posture && state.site.posture !== state.primaryMetric.value && (
               <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.22em] ${palette.chip}`}>
                 {state.site.posture}
@@ -803,7 +825,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
               </span>
             )}
 
-            <span className="h-4 w-px bg-white/8" />
+            <span className="hidden h-4 w-px bg-white/8 sm:inline-block" />
 
             <button
               type="button"
@@ -829,12 +851,12 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
               <Maximize2 className="h-3 w-3" />
             </button>
 
-            <span className="h-4 w-px bg-white/8" />
+            <span className="hidden h-4 w-px bg-white/8 sm:inline-block" />
 
             <button
               type="button"
               onClick={toggleFullscreen}
-              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.22em] text-slate-200 transition hover:border-white/40"
+              className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-slate-200 transition hover:border-white/40 sm:tracking-[0.22em]"
               aria-label={isFullscreen ? 'Exit full screen' : 'Enter full screen'}
             >
               {isFullscreen ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
@@ -844,8 +866,8 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
         </div>
 
         {/* Row 3 — Tab bar */}
-        <div className="mt-4 flex items-center gap-1 border-t border-white/8 pt-4 overflow-x-auto">
-          <div className="flex items-center gap-1 flex-1">
+        <div className="mt-4 flex items-center gap-1 overflow-x-auto border-t border-white/8 pt-4">
+          <div className="flex min-w-max items-center gap-1">
             {BUILDING_TAB_ITEMS.filter((tab) => {
               if (tab.requiredModule && !isModuleActive(tab.requiredModule)) return false
               if (tab.id === 'controls') {
@@ -862,7 +884,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
                   key={tab.id}
                   type="button"
                   onClick={() => onMainTabChange(tab.id)}
-                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.16em] transition flex-shrink-0"
+                  className="flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] transition sm:tracking-[0.16em]"
                   style={{
                     background: isActive ? 'rgba(34,211,238,0.15)' : 'rgba(255,255,255,0.04)',
                     color: isActive ? '#22d3ee' : '#64748b',
@@ -887,16 +909,21 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
         >
           <div
             ref={twinContainerRef}
-            className="origin-top"
+            className="relative origin-top"
             style={{
-              transform: `scale(${zoomLevel})`,
-              transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
-              transformOrigin: '50% 0',
               width: '100%',
-              height: `${260 * zoomLevel}px`,
+              height: twinBaseHeight ? `${twinBaseHeight * zoomLevel}px` : undefined,
             }}
           >
-            <div className="w-full h-full">
+            <div
+              ref={twinScaleRef}
+              className="w-full"
+              style={{
+                transform: `scale(${zoomLevel})`,
+                transition: 'transform 0.2s cubic-bezier(0.4,0,0.2,1)',
+                transformOrigin: '50% 0',
+              }}
+            >
               <CockpitTwinErrorBoundary>
                 {canvas}
               </CockpitTwinErrorBoundary>
@@ -918,7 +945,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             initial={motionReduced() ? false : { opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, delay: 0.14, ease: FRAMER_EASE }}
-            className="rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(8,12,22,0.9),rgba(3,7,16,0.95))] p-5 md:p-6"
+            className="rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(8,12,22,0.9),rgba(3,7,16,0.95))] p-4 md:rounded-[28px] md:p-6"
           >
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
@@ -943,7 +970,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
           initial={motionReduced() ? false : { opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, delay: 0.1, ease: FRAMER_EASE }}
-          className="overflow-hidden rounded-[28px] border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,39,0.96),rgba(8,12,22,0.98))]"
+          className="overflow-hidden rounded-2xl border border-white/8 bg-[linear-gradient(180deg,rgba(16,23,39,0.96),rgba(8,12,22,0.98))] md:rounded-[28px]"
         >
           <div className="flex items-center justify-between gap-3 border-b border-white/8 px-5 py-4">
             <div>
@@ -1044,7 +1071,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
       </div>
 
       {!waiting && (
-        <div className="mt-5 flex items-center gap-4 rounded-[20px] border border-white/8 bg-black/30 px-5 py-3">
+        <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-white/8 bg-black/30 px-4 py-3 md:gap-4 md:rounded-[20px] md:px-5">
           <div className="flex items-center gap-2">
             <span className={`h-2 w-2 rounded-full ${palette.dot} animate-pulse`} />
             <span className="font-mono text-xs text-slate-200 tabular-nums">
@@ -1052,7 +1079,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             </span>
           </div>
 
-          <span className="h-4 w-px bg-white/8" />
+          <span className="hidden h-4 w-px bg-white/8 sm:inline-block" />
 
           <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.22em] text-slate-500">
             <TimerReset className="h-3 w-3" />
@@ -1061,7 +1088,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             </span>
           </div>
 
-          <span className="h-4 w-px bg-white/8" />
+          <span className="hidden h-4 w-px bg-white/8 sm:inline-block" />
 
           <div className="flex items-center gap-2">
             {activeModuleLabels(state).map((mod) => (
@@ -1075,7 +1102,7 @@ export function CockpitView({ state, renderMode, spatialCanvas, onApprove, selec
             ))}
           </div>
 
-          <div className="ml-auto text-[10px] uppercase tracking-[0.22em] text-slate-500">
+          <div className="w-full text-[10px] uppercase tracking-[0.22em] text-slate-500 sm:ml-auto sm:w-auto">
             {state.evidence.refs.length} evidence refs
           </div>
         </div>

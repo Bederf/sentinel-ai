@@ -12,7 +12,7 @@
  */
 
 import { useState, useCallback, useMemo } from 'react';
-import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Upload, FileCheck } from 'lucide-react';
+import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, Plus, Trash2, Upload, FileCheck, Wand2 } from 'lucide-react';
 import type { ZoneConfig, DeskConfig, BuildingConfigResponse } from '@/lib/api/zone_ingestion';
 import { zoneIngestionApi, floorPlanApi } from '@/lib/api/zone_ingestion';
 
@@ -38,9 +38,18 @@ const ZONE_TYPES = [
   'comms_room',
   'mechanical',
   'electrical',
+  'ward',
+  'theatre',
+  'icu',
+  'consulting_room',
+  'retail',
+  'food_court',
+  'back_of_house',
+  'public_area',
 ];
 
-const VALID_FLOORS = ['B1', 'B2', 'G', 'L0', 'L1', 'L2', 'R'];
+const FLOOR_CODE_PATTERN = /^(B[1-9]\d*|G|L\d+|R)$/;
+const DEFAULT_FLOORS = ['B1', 'B2', 'G', 'L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8', 'L9', 'R'];
 
 interface IngestionWizardState {
   step: 1 | 2 | 3 | 4 | 5;
@@ -53,6 +62,8 @@ interface IngestionWizardState {
   success: boolean;
   extractedConfig: BuildingConfigResponse | null;
   uploadingFloorPlan: boolean;
+  autoPlanLoading: boolean;
+  autoPlanMessage: string | null;
 }
 
 export function ZoneIngestionWizard({
@@ -72,6 +83,8 @@ export function ZoneIngestionWizard({
     success: false,
     extractedConfig: null,
     uploadingFloorPlan: false,
+    autoPlanLoading: false,
+    autoPlanMessage: null,
   });
 
   // Validate zone data
@@ -79,7 +92,7 @@ export function ZoneIngestionWizard({
     if (!zone.zone_id?.trim()) return 'Zone ID is required';
     if (!zone.zone_name?.trim()) return 'Zone name is required';
     if (!zone.floor) return 'Floor is required';
-    if (!VALID_FLOORS.includes(zone.floor)) return `Floor must be one of: ${VALID_FLOORS.join(', ')}`;
+    if (!FLOOR_CODE_PATTERN.test(zone.floor)) return 'Floor must be G, R, L# or B#';
     if (!zone.zone_type) return 'Zone type is required';
 
     // Check for duplicates
@@ -167,6 +180,24 @@ export function ZoneIngestionWizard({
       extractedConfig: null,
     }));
   }, [state.extractedConfig]);
+
+  const generateAutoPlan = useCallback(async () => {
+    setState((s) => ({ ...s, autoPlanLoading: true, autoPlanMessage: null, errors: {} }));
+    try {
+      const plan = await zoneIngestionApi.generateAutoPlan(siteId);
+      setState((s) => ({
+        ...s,
+        zones: plan.zones,
+        desks: plan.desks,
+        autoPlanLoading: false,
+        autoPlanMessage: `${plan.strategy.replace(/_/g, ' ')} generated ${plan.zones.length} zones and ${plan.desks.length} desks. Review before submit.`,
+        step: 2,
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Auto zone generation failed';
+      setState((s) => ({ ...s, autoPlanLoading: false, errors: { autoPlan: message } }));
+    }
+  }, [siteId]);
 
   const addZone = () => {
     const error = validateZone(state.draftZone);
@@ -342,35 +373,67 @@ export function ZoneIngestionWizard({
               <h2 className="text-xl font-bold mb-4">Step 1: Floor Plan (Optional)</h2>
 
               {!state.extractedConfig ? (
-                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-                  <p className="text-gray-600 mb-4">Upload a floor plan to auto-populate zones and equipment</p>
-                  <input
-                    type="file"
-                    accept=".pdf,.dxf,image/*"
-                    className="hidden"
-                    id="floor-plan-input"
-                    onChange={handleFloorPlanUpload}
-                  />
-                  <label
-                    htmlFor="floor-plan-input"
-                    className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition disabled:opacity-50"
-                  >
-                    {state.uploadingFloorPlan ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Extracting...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="w-4 h-4" />
-                        Choose File
-                      </>
+                <div className="space-y-4">
+                  <div className="border border-blue-200 bg-blue-50 rounded-lg p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <p className="font-semibold text-blue-950">Generate from site settings</p>
+                        <p className="text-sm text-blue-800 mt-1">
+                          Uses building type, floors, desks, and area to create an editable zone draft.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={generateAutoPlan}
+                        disabled={state.autoPlanLoading}
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition disabled:opacity-50"
+                      >
+                        {state.autoPlanLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Wand2 className="w-4 h-4" />
+                        )}
+                        Auto Generate
+                      </button>
+                    </div>
+                    {state.autoPlanMessage && (
+                      <p className="text-sm text-blue-800 mt-3">{state.autoPlanMessage}</p>
                     )}
-                  </label>
-                  <p className="text-sm text-gray-500 mt-4">PDF or DXF floor plan · Click Next to skip</p>
-                  {state.errors.floorPlan && (
-                    <p className="text-red-600 mt-2 text-sm">{state.errors.floorPlan}</p>
-                  )}
+                    {state.errors.autoPlan && (
+                      <p className="text-red-600 mt-2 text-sm">{state.errors.autoPlan}</p>
+                    )}
+                  </div>
+
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                    <p className="text-gray-600 mb-4">Upload a floor plan to auto-populate zones and equipment</p>
+                    <input
+                      type="file"
+                      accept=".pdf,.dxf,image/*"
+                      className="hidden"
+                      id="floor-plan-input"
+                      onChange={handleFloorPlanUpload}
+                    />
+                    <label
+                      htmlFor="floor-plan-input"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg cursor-pointer hover:bg-blue-700 transition disabled:opacity-50"
+                    >
+                      {state.uploadingFloorPlan ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Extracting...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4" />
+                          Choose File
+                        </>
+                      )}
+                    </label>
+                    <p className="text-sm text-gray-500 mt-4">PDF or DXF floor plan · Click Next to skip</p>
+                    {state.errors.floorPlan && (
+                      <p className="text-red-600 mt-2 text-sm">{state.errors.floorPlan}</p>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -406,6 +469,12 @@ export function ZoneIngestionWizard({
           {state.step === 2 && (
             <div>
               <h2 className="text-xl font-bold mb-4">Step 2: Define Zones</h2>
+
+              {state.autoPlanMessage && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-sm text-blue-800">
+                  {state.autoPlanMessage}
+                </div>
+              )}
 
               {/* Zone Form */}
               <div className="bg-gray-50 p-4 rounded-lg mb-4 space-y-3">
@@ -448,7 +517,7 @@ export function ZoneIngestionWizard({
                     className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Floor</option>
-                    {VALID_FLOORS.map((f) => (
+                    {DEFAULT_FLOORS.map((f) => (
                       <option key={f} value={f}>
                         {f}
                       </option>

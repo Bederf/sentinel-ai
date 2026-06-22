@@ -179,3 +179,4 @@ Deviation classification is baseline-specific (independent of health thresholds)
 - [Asset Health Baseline Feature](../04-features/109A-asset-health-baseline.md) — Feature specification
 - [Health Scoring System](../04-features/health-scoring-system.md) — How health scores are calculated
 - [Equipment API](equipment.md) — Base equipment endpoints
+- [RSI Threshold Tuning Schema](../07-database/rsi-threshold-tuning-schema.md) — Threshold tables, tuner role, promote/rollback endpoints, human-in-the-loop enforcement

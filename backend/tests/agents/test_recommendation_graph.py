@@ -8,6 +8,7 @@ and multi-turn Tier 2 approval flow.
 import os
 import sys
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -104,6 +105,63 @@ class TestCheckRecommendationFreshness:
         # At exactly 30 minutes, may be slightly over due to test execution time
         # The important thing is the boundary is respected
         assert isinstance(result["is_fresh"], bool)
+
+
+# ===================================================================
+# Tool: check_recommendation_action_still_needed
+# ===================================================================
+
+
+class TestCheckRecommendationActionStillNeeded:
+    """Tests for runtime action validity checking."""
+
+    @pytest.mark.asyncio
+    async def test_not_needed_when_current_value_matches_target(self):
+        from app.agents.recommendation_tools import check_recommendation_action_still_needed
+
+        rec = make_recommendation()
+
+        with patch("app.services.device_abstraction.device_manager") as mock_device_manager:
+            mock_device_manager.read_device_value = AsyncMock(return_value=SimpleNamespace(value=18.05))
+
+            result = await check_recommendation_action_still_needed(rec)
+
+        assert result["is_needed"] is False
+        assert result["checked"] is True
+        assert "already at recommended value" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_read_failure_keeps_recommendation_active(self):
+        from app.agents.recommendation_tools import check_recommendation_action_still_needed
+
+        rec = make_recommendation()
+
+        with patch("app.services.device_abstraction.device_manager") as mock_device_manager:
+            mock_device_manager.read_device_value = AsyncMock(side_effect=ValueError("not connected"))
+
+            result = await check_recommendation_action_still_needed(rec)
+
+        assert result["is_needed"] is True
+        assert result["checked"] is False
+        assert "Current value unavailable" in result["reason"]
+
+    @pytest.mark.asyncio
+    async def test_execution_blocked_recommendation_is_not_needed(self):
+        from app.agents.recommendation_tools import check_recommendation_action_still_needed
+
+        rec = make_recommendation()
+        rec["action"] = {
+            "point": None,
+            "value": 20.0,
+            "execution_blocked": True,
+            "blocker": "unresolved_bms_point",
+        }
+
+        result = await check_recommendation_action_still_needed(rec)
+
+        assert result["is_needed"] is False
+        assert result["checked"] is True
+        assert "unresolved_bms_point" in result["reason"]
 
 
 # ===================================================================

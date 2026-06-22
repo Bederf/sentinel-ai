@@ -18,6 +18,7 @@ class RecommendationStatus(StrEnum):
     APPROVED = "approved"  # Operator approved (Tier 2)
     REJECTED = "rejected"  # Operator rejected (Tier 2)
     AUTO_EXECUTED = "auto_executed"  # Auto-executed (Tier 3)
+    ADVISORY_INFO = "advisory_info"  # Informational advisory, manual action required
     EXPIRED = "expired"  # Time window passed, no action
     EXECUTED = "executed"  # Successfully applied to BMS
     ROLLED_BACK = "rolled_back"  # Previously executed change was rolled back
@@ -94,6 +95,7 @@ class Recommendation:
     multi_objective_score: float = 0.0
     status: RecommendationStatus = RecommendationStatus.PENDING
     requires_approval: bool = False
+    approval_status: str | None = None
     approved_by: str | None = None
     approved_at: datetime | None = None
     approval_reason: str | None = None
@@ -106,6 +108,12 @@ class Recommendation:
     outcome_validated: bool | None = None
     outcome_notes: str | None = None
     outcome_validated_at: datetime | None = None
+    power_at_creation_kw: float | None = None
+    tariff_rate_at_creation: float | None = None
+    baseline_energy_kwh: float | None = None
+    actual_energy_kwh: float | None = None
+    actual_saving_kwh: float | None = None
+    actual_saving_zar: float | None = None
     shadow_mode: bool = False  # If True, stored but hidden from frontend UI
     metadata: dict[str, Any] = field(
         default_factory=dict
@@ -174,6 +182,7 @@ class Recommendation:
             "multi_objective_score": self.multi_objective_score,
             "status": self.status.value if isinstance(self.status, RecommendationStatus) else self.status,
             "requires_approval": self.requires_approval,
+            "approval_status": self.approval_status,
             "approved_by": self.approved_by,
             "approved_at": self.approved_at.isoformat() if isinstance(self.approved_at, datetime) else self.approved_at,
             "approval_reason": self.approval_reason,
@@ -189,6 +198,12 @@ class Recommendation:
                 if isinstance(self.outcome_validated_at, datetime)
                 else self.outcome_validated_at
             ),
+            "power_at_creation_kw": self.power_at_creation_kw,
+            "tariff_rate_at_creation": self.tariff_rate_at_creation,
+            "baseline_energy_kwh": self.baseline_energy_kwh,
+            "actual_energy_kwh": self.actual_energy_kwh,
+            "actual_saving_kwh": self.actual_saving_kwh,
+            "actual_saving_zar": self.actual_saving_zar,
             "shadow_mode": self.shadow_mode,
             "metadata": self.metadata,
             "milestone_status": self.milestone_status.value
@@ -310,6 +325,7 @@ class Recommendation:
             multi_objective_score=float(data.get("multi_objective_score", 0.0)),
             status=status,
             requires_approval=data.get("requires_approval", False),
+            approval_status=data.get("approval_status"),
             approved_by=data.get("approved_by"),
             approved_at=approved_at,
             approval_reason=data.get("approval_reason"),
@@ -319,6 +335,12 @@ class Recommendation:
             outcome_validated=data.get("outcome_validated"),
             outcome_notes=data.get("outcome_notes"),
             outcome_validated_at=outcome_validated_at,
+            power_at_creation_kw=data.get("power_at_creation_kw"),
+            tariff_rate_at_creation=data.get("tariff_rate_at_creation"),
+            baseline_energy_kwh=data.get("baseline_energy_kwh"),
+            actual_energy_kwh=data.get("actual_energy_kwh"),
+            actual_saving_kwh=data.get("actual_saving_kwh"),
+            actual_saving_zar=data.get("actual_saving_zar"),
             shadow_mode=data.get("shadow_mode", False),
             metadata=data.get("metadata", {}),
             # 4-milestone SLA fields

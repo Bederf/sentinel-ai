@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Activity, ExternalLink, Archive, Download } from "lucide-react";
+import { Activity, ExternalLink, Archive, Download, ShieldCheck, CheckCircle2, AlertTriangle } from "lucide-react";
 import { authorizedFetch } from "../../lib/api/client";
 
 interface BackupStatus {
@@ -11,6 +11,51 @@ interface BackupStatus {
   last_result: string | null;
 }
 
+interface DrStatus {
+  status: "healthy" | "degraded" | "critical";
+  score: number;
+  local_restore_target: {
+    last_result: string | null;
+    last_restored_at: string | null;
+    restore_age_hours: number | null;
+    freshness_max_hours: number;
+    table_count: number | null;
+    critical_row_counts?: Record<string, number>;
+    missing_critical_tables?: string[];
+    empty_critical_tables?: string[];
+    database_size_mb: number | null;
+  };
+  rpo: {
+    local_restore_exposure_label: string;
+    remote_wal_exposure_label: string;
+  };
+  rto: {
+    last_database_layer_label: string;
+  };
+}
+
+interface PhaseReadinessGate {
+  gate: string;
+  passed: boolean;
+  value?: number | string | boolean | null;
+  threshold?: number | null;
+}
+
+interface PhaseReadinessSite {
+  site_id: string;
+  site_name: string;
+  current_phase: string;
+  target_phase: string | null;
+  eligible: boolean;
+  gates_passed: number;
+  gates_total: number;
+  gates: PhaseReadinessGate[];
+}
+
+interface PhaseReadinessResponse {
+  sites: PhaseReadinessSite[];
+}
+
 interface SystemHealthDashboardProps {
   onError?: (error: string) => void;
   onNavigate?: (view: import("../../lib/navigation").View) => void;
@@ -18,12 +63,18 @@ interface SystemHealthDashboardProps {
 
 export function SystemHealthDashboard({ onError, onNavigate }: SystemHealthDashboardProps) {
   const [backup, setBackup] = useState<BackupStatus | null>(null);
+  const [drStatus, setDrStatus] = useState<DrStatus | null>(null);
+  const [phaseReadiness, setPhaseReadiness] = useState<PhaseReadinessResponse | null>(null);
   const [backupTriggering, setBackupTriggering] = useState(false);
 
   const fetchBackupStatus = useCallback(async () => {
     try {
       const res = await authorizedFetch("/api/system/backup-status");
       if (res.ok) setBackup(await res.json());
+      const dr = await authorizedFetch("/api/system/dr-status");
+      if (dr.ok) setDrStatus(await dr.json());
+      const phase = await authorizedFetch("/api/system/phase-readiness");
+      if (phase.ok) setPhaseReadiness(await phase.json());
     } catch { /* ignore */ }
   }, []);
 
@@ -149,6 +200,87 @@ export function SystemHealthDashboard({ onError, onNavigate }: SystemHealthDashb
                 </p>
               </div>
             </div>
+            {drStatus && (
+              <div className="mt-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <ShieldCheck className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+                  <h3 className="text-xs font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>DR Readiness</h3>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                  <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Status</p>
+                    <p className="text-xs font-medium" style={{
+                      color: drStatus.status === "healthy" ? "var(--color-sentinel-green)"
+                        : drStatus.status === "degraded" ? "var(--color-sentinel-amber)"
+                          : "var(--color-sentinel-red)",
+                    }}>
+                      {drStatus.status} · {drStatus.score}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>RPO Exposure</p>
+                    <p className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {drStatus.rpo.local_restore_exposure_label}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>DB Layer Time</p>
+                    <p className="text-xs font-medium" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      {drStatus.rto.last_database_layer_label}
+                    </p>
+                  </div>
+                  <div className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                    <p className="text-[10px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>Restore Target</p>
+                    <p className="text-xs font-medium" style={{
+                      color: drStatus.local_restore_target.last_result === "success"
+                        ? "var(--color-sentinel-green)"
+                        : "var(--color-sentinel-red)",
+                    }}>
+                      {drStatus.local_restore_target.table_count ?? 0} tables · {Object.keys(drStatus.local_restore_target.critical_row_counts ?? {}).length} checks
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            {phaseReadiness && phaseReadiness.sites.length > 0 && (
+              <div className="mt-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <CheckCircle2 className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+                  <h3 className="text-xs font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Phase Readiness</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {phaseReadiness.sites
+                    .filter((site) => site.target_phase)
+                    .slice(0, 4)
+                    .map((site) => {
+                      const failed = site.gates.filter((gate) => !gate.passed);
+                      const accent = site.eligible ? "var(--color-sentinel-green)" : "var(--color-sentinel-amber)";
+                      return (
+                        <div key={site.site_id} className="p-2 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-xs font-medium truncate" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {site.site_id} · {site.current_phase} → {site.target_phase}
+                            </p>
+                            {site.eligible ? (
+                              <CheckCircle2 className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
+                            ) : (
+                              <AlertTriangle className="h-3.5 w-3.5 shrink-0" style={{ color: accent }} />
+                            )}
+                          </div>
+                          <p className="text-[10px] mt-1" style={{ color: accent }}>
+                            {site.gates_passed}/{site.gates_total} gates passed
+                          </p>
+                          {failed.length > 0 && (
+                            <p className="text-[10px] mt-1 truncate" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                              Blocking: {failed.slice(0, 2).map((gate) => gate.gate.replace(/_/g, " ")).join(", ")}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="text-center py-4">

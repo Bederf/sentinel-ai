@@ -41,6 +41,7 @@ import { CommissioningGatePanel } from './system/CommissioningGatePanel';
 import { PhaseProgressCard } from './system/PhaseProgressCard';
 import { TabBar } from './TabBar';
 import type { TabDef } from './TabBar';
+import { RecommendationHistory } from './optimization/RecommendationHistory';
 
 interface FreshnessSource {
   data_source: string;
@@ -77,6 +78,21 @@ interface MonthlyUptimeRow {
   slo_target: number;
 }
 
+interface DiscoveredEquipment {
+  id: string;
+  site_id: string;
+  bridge_code: string;
+  canonical_code: string;
+  equipment_type: string | null;
+  derived_zone_id: string | null;
+  status: string;
+  reason: string;
+  last_seen_at: string | null;
+  seen_count: number;
+  zone_onboardable: boolean;
+  zone_message: string | null;
+}
+
 export default function SystemHealthPage() {
   useServerEvents();
 
@@ -91,6 +107,8 @@ export default function SystemHealthPage() {
   const [qualityGate, setQualityGate] = useState<QualityGateStatus | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('site-002');
+  const [discoveredEquipment, setDiscoveredEquipment] = useState<DiscoveredEquipment[]>([]);
+  const [discoveryActionId, setDiscoveryActionId] = useState<string | null>(null);
 
   // Load sites list
   useEffect(() => {
@@ -113,6 +131,7 @@ export default function SystemHealthPage() {
     loadDataFreshness();
     loadUptimeData();
     loadGateData();
+    loadDiscoveredEquipment();
   }, [selectedSiteId]);
 
   useEffect(() => {
@@ -121,11 +140,13 @@ export default function SystemHealthPage() {
     const freshnessInterval = setInterval(loadDataFreshness, 300000);
     const uptimeInterval = setInterval(loadUptimeData, 600000);
     const gateInterval = setInterval(loadGateData, 60000);
+    const discoveryInterval = setInterval(loadDiscoveredEquipment, 60000);
     return () => {
       clearInterval(healthInterval);
       clearInterval(freshnessInterval);
       clearInterval(uptimeInterval);
       clearInterval(gateInterval);
+      clearInterval(discoveryInterval);
     };
   }, [loadAllData]);
 
@@ -208,6 +229,42 @@ export default function SystemHealthPage() {
       }
     } catch (err) {
       console.error('Gate data fetch error:', err);
+    }
+  };
+
+  const loadDiscoveredEquipment = async () => {
+    try {
+      const res = await authorizedFetch(`/api/system/sites/${selectedSiteId}/discovered-equipment`);
+      if (res.ok) {
+        const data = await res.json();
+        setDiscoveredEquipment(data.items || []);
+      }
+    } catch (err) {
+      console.error('Discovered equipment fetch error:', err);
+    }
+  };
+
+  const handleDiscoveryAction = async (item: DiscoveredEquipment, action: 'onboard' | 'dismiss') => {
+    try {
+      setDiscoveryActionId(item.id);
+      const res = await authorizedFetch(
+        `/api/system/sites/${selectedSiteId}/discovered-equipment/${item.id}/${action}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: action === 'onboard' ? JSON.stringify({}) : undefined,
+        },
+      );
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.detail || `Failed to ${action} discovered equipment`);
+      }
+      await loadDiscoveredEquipment();
+      await loadHealthData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : `Failed to ${action} discovered equipment`);
+    } finally {
+      setDiscoveryActionId(null);
     }
   };
 
@@ -325,6 +382,7 @@ export default function SystemHealthPage() {
   const tabDefs: TabDef[] = [
     { id: 'health', label: 'Health' },
     { id: 'historical', label: 'Historical' },
+    { id: 'ai-actions', label: 'AI Actions' },
   ];
 
   return (
@@ -481,6 +539,109 @@ export default function SystemHealthPage() {
               />
 
               <AdapterHealthCard siteId={selectedSiteId} key={selectedSiteId} />
+
+              <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Equipment Onboarding
+                    </p>
+                    <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Bridge discoveries requiring review
+                    </h2>
+                    <p className="mt-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      New bridge equipment is held here until it is onboarded into the Supabase site inventory.
+                    </p>
+                  </div>
+                  <span
+                    className="inline-flex items-center rounded px-2 py-1 text-xs font-medium"
+                    style={{
+                      background: discoveredEquipment.length > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                      border: discoveredEquipment.length > 0 ? "1px solid rgba(245, 158, 11, 0.35)" : "1px solid rgba(16, 185, 129, 0.35)",
+                      color: discoveredEquipment.length > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)",
+                    }}
+                  >
+                    {discoveredEquipment.length} pending
+                  </span>
+                </div>
+
+                {discoveredEquipment.length === 0 && (
+                  <div className="mt-4 rounded p-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      No bridge-only equipment is waiting for onboarding.
+                    </p>
+                  </div>
+                )}
+
+                {discoveredEquipment.length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {discoveredEquipment.map((item) => (
+                      <div
+                        key={item.id}
+                        className="rounded-lg p-3"
+                        style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
+                      >
+                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-mono text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                {item.canonical_code}
+                              </p>
+                              <span className="rounded px-2 py-0.5 text-[11px] uppercase" style={{ background: "rgba(148, 163, 184, 0.16)", color: "var(--color-sentinel-text-secondary)" }}>
+                                {item.equipment_type || 'unknown'}
+                              </span>
+                              {!item.zone_onboardable && (
+                                <span className="rounded px-2 py-0.5 text-[11px] uppercase" style={{ background: "rgba(220, 38, 38, 0.14)", color: "var(--color-sentinel-red)" }}>
+                                  Zone missing
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-2 grid gap-1 text-xs md:grid-cols-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                              <p>Bridge code: <span className="font-mono">{item.bridge_code}</span></p>
+                              <p>Derived zone: <span className="font-mono">{item.derived_zone_id || 'none'}</span></p>
+                              <p>Reason: {item.reason.replace(/_/g, ' ')}</p>
+                              <p>Seen: {item.seen_count} time(s), last {formatRelativeTime(item.last_seen_at)}</p>
+                            </div>
+                            {item.zone_message && (
+                              <p className="mt-2 text-xs" style={{ color: "var(--color-sentinel-red)" }}>
+                                {item.zone_message}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex shrink-0 gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleDiscoveryAction(item, 'onboard')}
+                              disabled={!item.zone_onboardable || discoveryActionId === item.id}
+                              className="rounded px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                              style={{
+                                background: "rgba(16, 185, 129, 0.15)",
+                                border: "1px solid rgba(16, 185, 129, 0.35)",
+                                color: "var(--color-sentinel-green)",
+                              }}
+                            >
+                              Onboard
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDiscoveryAction(item, 'dismiss')}
+                              disabled={discoveryActionId === item.id}
+                              className="rounded px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                              style={{
+                                background: "rgba(148, 163, 184, 0.12)",
+                                border: "1px solid var(--color-sentinel-border)",
+                                color: "var(--color-sentinel-text-secondary)",
+                              }}
+                            >
+                              Dismiss
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {Object.entries(currentHealth.components || {}).map(
@@ -759,6 +920,12 @@ export default function SystemHealthPage() {
               <CriticalPathCard siteId={selectedSiteId} key={`cp-${selectedSiteId}`} />
             </>
           )}
+        </div>
+      )}
+
+      {selectedTab === 'ai-actions' && (
+        <div className="space-y-6 mt-6">
+          <RecommendationHistory siteId={selectedSiteId} />
         </div>
       )}
     </div>

@@ -205,13 +205,14 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 - **[Tridium Niagara Integration](07-integrations/tridium-niagara-integration.md)** - BACnet/IP, oBIX, AI point discovery for Niagara JACE/Supervisor
 - **[SIMBIOT Concept Connector](07-integrations/simbiot-concept-connector.md)** - MRI Evolution CAFM integration via FSI API (auto work orders, status polling, asset sync)
 - **[SIMBIOT Concept Evolution Connector](05-integrations/README.md)** - Integration module for MRI Evolution via FSI Public API
-- **[SIMBIOT Universal Adapter Pattern](05-integrations/simbiot-universal-adapter-pattern.md)** - One SBC, any building: SIMBIOT translates any BMS format (Desigo, Trane, JCI, BACnet, Modbus, simulation) to SENTINEL's fixed Supabase schema without code changes
+- **[SIMBIOT Universal Adapter Pattern](05-integrations/simbiot-universal-adapter-pattern.md)** - One SBC, any building: SIMBIOT translates any BMS format (Desigo, Trane, JCI, BACnet, Modbus, oBIX, KNX, simulation) to SENTINEL's fixed Supabase schema without code changes. 5 adapters registered: bacnet, obix, modbus, bridge, knx.
 - **[Semantic Control Foundation — Classifier & Validation](05-integrations/162-semantic-classifier.md)** - Deterministic Haystack-inspired point classifier with weighted evidence scoring, safety-class gating, and static validation engine for blind site onboarding (Phase 162)
 - **[Asset Workflow Architecture](05-integrations/asset-workflow-architecture.md)** - SIMBIOT + Baseline + Inspection + ML integration (Phase 53-01)
 - **[Asset Lifecycle State Machine](05-integrations/asset-lifecycle-state-machine.md)** - 13 states from onboarding to monitoring (Phase 53-01)
 - **[Workflow Triggers & Automation](05-integrations/workflow-triggers.md)** - 5 automated triggers for ML → Inspection → Repair → Validation (Phase 53-02)
 - [AEGIS Site-002 Discovery](05-integrations/aegis-site-002-discovery.md) - Site-level BESS control boundaries, interfaces, and pre-live confirmation points
 - **[ServiceNow Integration](05-integrations/servicenow-integration.md)** - Read-only ITSM client with auto-discovery, 10 API endpoints, 4 chat tools, config-ready (Phase 138)
+- **[Sentry Desk Complaint Agent](05-integrations/sentry-desk-complaint-agent-spec.md)** - Site-002 Staff bot intake, roster-based self-registration, channel binding, desk context, and work order creation
 - **[Maintenance Intake Architecture](05-integrations/maintenance-intake-architecture.md)** - Generic maintenance/work-order adapter layer — one `maintenance_events` table, one adapter per site (MRI Evolution, ServiceNow, CSV, etc.), source-agnostic SLA breach detection and P1-P4 priority normalisation
 - **[Visitor Management Integrations](05-integrations/visitor-management-integrations.md)** - Google Calendar (Pub/Sub webhook), Microsoft Graph (webhook), Email intake (n8n IMAP), WhatsApp (Twilio), Active Directory (JSON), C-CURE, SMTP — Accept-First visitor flow (Phase 178)
 
@@ -220,6 +221,7 @@ Comprehensive documentation for the SENTINEL BMS Intelligence Platform.
 
 ### 🗄️ Database
 - [Service Records Schema](07-database/SERVICE_RECORDS_SCHEMA.md) - Service records table structure
+- **[RSI Threshold Tuning Schema](07-database/rsi-threshold-tuning-schema.md)** - Tuner tables, functions, RLS, human-in-the-loop grant enforcement (Phase 230-R)
 - **[Daily Sustainability Metrics](07-database/daily-sustainability-metrics.md)** - Energy/water/diesel/solar daily snapshots with computed emissions (Phase 111)
 - **[Security Module Schema](07-database/69-security-module-schema.md)** - access_rules table, occupancy capacity, camera stream URLs (Phase 69)
 

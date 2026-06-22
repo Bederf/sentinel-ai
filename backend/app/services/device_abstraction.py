@@ -8,6 +8,8 @@ The simulator adapter (SimulatedDeviceAdapter) is loaded lazily so that the
 bms_simulator package can be removed without breaking SENTINEL core.
 """
 
+import asyncio
+import contextlib
 import logging
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -136,6 +138,10 @@ class DeviceAdapter(ABC):
 
     async def disconnect(self) -> None:
         """Disconnect from device with error handling."""
+        if not self._connected:
+            logger.debug(f"Device {self.device.id} adapter was not connected; skipping protocol disconnect")
+            return
+
         try:
             await self._protocol_disconnect()
             self._connected = False
@@ -292,6 +298,7 @@ class DeviceManager:
     _instance = None
     _devices: dict[str, Device] = {}
     _adapters: dict[str, DeviceAdapter] = {}
+    _connection_tasks: set[asyncio.Task] = set()
     _initialized = False
 
     def __new__(cls):
@@ -361,11 +368,18 @@ class DeviceManager:
         adapter = adapter_class(device)
         self._adapters[device.id] = adapter
 
-        # Try to connect
+        task = asyncio.create_task(self._connect_adapter(adapter), name=f"connect-device-{device.id}")
+        self._connection_tasks.add(task)
+        task.add_done_callback(self._connection_tasks.discard)
+
+    async def _connect_adapter(self, adapter: DeviceAdapter) -> None:
+        """Connect an adapter without blocking DeviceManager initialization."""
         try:
             await adapter.connect()
+        except asyncio.CancelledError:
+            raise
         except Exception as e:
-            logger.error(f"Failed to connect device {device.id}: {e}")
+            logger.error(f"Failed to connect device {adapter.device.id}: {e}")
 
     async def get_device(self, device_id: str) -> Device | None:
         """Get device by ID."""
@@ -461,12 +475,26 @@ class DeviceManager:
     async def shutdown(self) -> None:
         """Shutdown all device connections."""
         logger.info("Shutting down DeviceManager")
+        for task in list(self._connection_tasks):
+            task.cancel()
+        for task in list(self._connection_tasks):
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        self._connection_tasks.clear()
+
         for device_id, adapter in self._adapters.items():
             try:
                 await adapter.disconnect()
                 logger.debug(f"Disconnected device {device_id}")
             except Exception as e:
                 logger.error(f"Error disconnecting device {device_id}: {e}")
+
+        try:
+            from app.services.niagara.bacnet_client import get_bacnet_client
+
+            await get_bacnet_client().stop()
+        except Exception as e:
+            logger.warning("Error stopping shared BACnet client: %s", e)
 
         self._adapters.clear()
         self._initialized = False

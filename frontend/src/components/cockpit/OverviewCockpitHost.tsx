@@ -296,20 +296,25 @@ function mapIssuesPayload(raw: RawDecisionResponse): CockpitIssuesPayload | null
 function useCockpitIssues(siteId: string) {
   const [issuesPayload, setIssuesPayload] = useState<CockpitIssuesPayload | null>(null)
 
+  const refreshIssues = useCallback(async () => {
+    try {
+      const res = await authorizedFetch(`/api/cockpit/decision/${encodeURIComponent(siteId)}`)
+      if (res.ok) {
+        const data = await res.json() as RawDecisionResponse
+        setIssuesPayload(mapIssuesPayload(data))
+      }
+    } catch {
+      // Issues failures are silent — cockpit continues with existing state
+    }
+  }, [siteId])
+
   useEffect(() => {
     let mounted = true
     let timer: ReturnType<typeof setInterval> | null = null
 
     async function load() {
-      try {
-        const res = await authorizedFetch(`/api/cockpit/decision/${encodeURIComponent(siteId)}`)
-        if (res.ok && mounted) {
-          const data = await res.json() as RawDecisionResponse
-          setIssuesPayload(mapIssuesPayload(data))
-        }
-      } catch {
-        // Issues failures are silent — cockpit continues with existing state
-      }
+      if (!mounted) return
+      await refreshIssues()
     }
 
     load()
@@ -319,9 +324,9 @@ function useCockpitIssues(siteId: string) {
       mounted = false
       if (timer) clearInterval(timer)
     }
-  }, [siteId])
+  }, [refreshIssues])
 
-  return issuesPayload
+  return { issuesPayload, refreshIssues }
 }
 
 function buildCockpitSummary(
@@ -367,7 +372,7 @@ export function OverviewCockpitHost({
   isModuleActive,
 }: OverviewCockpitHostProps) {
   const { payload, hvacOverview, energyTelemetry, equipment, lastUpdatedAt, loading } = useBuildingStatePayload(siteId)
-  const issuesPayload = useCockpitIssues(siteId)
+  const { issuesPayload, refreshIssues } = useCockpitIssues(siteId)
   const waterTelemetry = useWaterTelemetry(siteId, onboardingPhase)
   const [selectedZone, setSelectedZone] = useState<CockpitTwinZoneSignal | null>(null)
   const [modelReadiness, setModelReadiness] = useState<ModelReadiness | null>(null)
@@ -408,13 +413,14 @@ export function OverviewCockpitHost({
 
   const handleApprove = useCallback(async () => {
     try {
-      await authorizedFetch(`/api/cockpit/decision/approve/${encodeURIComponent(siteId)}`, {
+      const res = await authorizedFetch(`/api/cockpit/decision/approve/${encodeURIComponent(siteId)}`, {
         method: 'POST',
       })
+      if (res.ok) await refreshIssues()
     } catch {
       // Approval failure is silent — operator sees no state change; backend logs it
     }
-  }, [siteId])
+  }, [siteId, refreshIssues])
 
   const handleAdvancePhase = useCallback(async () => {
     const nextPhase = onboardingPhase === 'shadow' ? 'advisory' : onboardingPhase === 'advisory' ? 'supervised' : 'auto'
@@ -431,7 +437,7 @@ export function OverviewCockpitHost({
 
   const handleIssueAction = useCallback(async (issueId: string, action: CockpitIssueActionType) => {
     try {
-      await authorizedFetch(
+      const res = await authorizedFetch(
         `/api/cockpit/issues/${encodeURIComponent(siteId)}/${encodeURIComponent(issueId)}/action`,
         {
           method: 'POST',
@@ -444,10 +450,11 @@ export function OverviewCockpitHost({
           }),
         },
       )
+      if (res.ok) await refreshIssues()
     } catch {
       // Action failures are silent — operator sees no state change; backend logs it
     }
-  }, [siteId])
+  }, [siteId, refreshIssues])
 
   // Load thresholds from canonical API
   const [siteThresholds, setSiteThresholds] = useState<{ health: { healthy: number; warning: number; critical: number }; risk: { medium: number; high: number; critical: number } } | null>(null)

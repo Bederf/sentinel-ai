@@ -105,6 +105,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         super().__init__(device)
         self._bacnet_device_id: int | None = None
         self._client = get_bacnet_client()
+        self._last_status_message: str | None = None
 
     @property
     def bacnet_device_id(self) -> int:
@@ -130,6 +131,14 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         is not yet started, it is started here.
         """
         try:
+            if self.device.metadata.get("bacnet_device_id") is None:
+                self._last_status_message = "skipped: missing bacnet_device_id"
+                logger.info(
+                    "BACnet device %s has no bacnet_device_id metadata; leaving adapter disconnected",
+                    self.device.id,
+                )
+                return False
+
             if not self._client.is_running:
                 if self._client._bac0_unavailable:
                     return False
@@ -148,8 +157,10 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                     self.device.id,
                     self.bacnet_device_id,
                 )
+                self._last_status_message = None
                 return True
             except BACnetTimeoutError:
+                self._last_status_message = "BACnet timeout while reading device objectName"
                 logger.warning(
                     "BACnet device %s (instance %d) not responding",
                     self.device.id,
@@ -157,6 +168,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                 )
                 return False
             except BACnetException as e:
+                self._last_status_message = str(e)
                 logger.warning(
                     "Could not verify BACnet device %s: %s",
                     self.device.id,
@@ -166,6 +178,7 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                 return True
 
         except BACnetException as e:
+            self._last_status_message = str(e)
             # Only log if this is NOT the expected missing-library case
             # (the client itself logs the missing-library message once)
             if not self._client._bac0_unavailable:
@@ -178,6 +191,13 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         The shared BACnet client is NOT stopped here because other
         adapters may be using it. It is stopped at DeviceManager shutdown.
         """
+        if self.device.metadata.get("bacnet_device_id") is None:
+            self._last_status_message = "skipped: missing bacnet_device_id"
+            logger.debug(
+                "BACnet device %s has no bacnet_device_id metadata; no protocol disconnect needed", self.device.id
+            )
+            return
+
         # Cancel any COV subscriptions for this device
         for sub in list(self._client.list_subscriptions()):
             if sub.device_id == self.bacnet_device_id:
@@ -297,6 +317,11 @@ class NiagaraBACnetAdapter(DeviceAdapter):
         the device is ONLINE. If it times out, it is OFFLINE.
         """
         try:
+            if self.device.metadata.get("bacnet_device_id") is None:
+                self._last_status_message = "skipped: missing bacnet_device_id"
+                self.device.status = DeviceStatus.OFFLINE
+                return self.device.status
+
             await self._client.read_point(
                 self.bacnet_device_id,
                 "device",
@@ -304,9 +329,12 @@ class NiagaraBACnetAdapter(DeviceAdapter):
                 property_name="objectName",
             )
             self.device.status = DeviceStatus.ONLINE
+            self._last_status_message = None
         except BACnetTimeoutError:
             self.device.status = DeviceStatus.OFFLINE
-        except BACnetException:
+            self._last_status_message = "BACnet timeout while reading device objectName"
+        except BACnetException as e:
             self.device.status = DeviceStatus.FAULT
+            self._last_status_message = str(e)
 
         return self.device.status

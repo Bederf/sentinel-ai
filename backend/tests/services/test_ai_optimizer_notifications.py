@@ -78,6 +78,31 @@ class TestNotifyPendingRecommendations:
 
         svc._notify_recommendation_alert("S002", ai_rec)
 
+    def test_manual_action_advisory_is_sendable(self):
+        """Blocked write-back advisories remain operator-visible."""
+        from app.models.recommendation import ActionRiskLevel, Recommendation, RecommendationStatus
+        from app.services.background_scheduler import BackgroundSchedulerService
+
+        svc = BackgroundSchedulerService.__new__(BackgroundSchedulerService)
+        rec = Recommendation(
+            site_id="site-002",
+            action_type="ai_optimization",
+            risk_level=ActionRiskLevel.LOW,
+            target_equipment="S002-CHILLER-B01",
+            action={
+                "point": None,
+                "value": "Apply after-hours HVAC setback",
+                "execution_blocked": True,
+            },
+            reason="No writable BACnet point resolved — manual operator action required.",
+            expected_impact={},
+            confidence="0.72",
+            status=RecommendationStatus.ADVISORY_INFO,
+            metadata={"execution_status": "manual_action_required", "manual_action_required": True},
+        )
+
+        assert svc._is_sendable_ai_recommendation(rec) is True
+
     @pytest.mark.asyncio
     async def test_notify_skips_healthy_severity(self):
         """Healthy severity rec does NOT trigger Telegram alert."""

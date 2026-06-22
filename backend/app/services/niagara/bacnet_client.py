@@ -8,6 +8,7 @@ Reference: BAC0 documentation (https://bac0.readthedocs.io/en/latest/)
 """
 
 import asyncio
+import inspect
 import logging
 import os
 import uuid
@@ -440,12 +441,24 @@ class NiagaraBACnetClient:
     async def _do_read(self, read_string: str) -> Any:
         """Execute a single BAC0 read operation."""
         try:
-            if os.getenv("TESTING", "").lower() == "true":
-                return self._bacnet.read(read_string)
-            result = await asyncio.get_event_loop().run_in_executor(None, self._bacnet.read, read_string)
-            return result
+            return await self._call_bac0("read", read_string)
         except Exception as e:
             raise BACnetReadError(f"Read failed for '{read_string}': {e}")
+
+    async def _call_bac0(self, method_name: str, *args: Any) -> Any:
+        """Call a BAC0 method whether the installed BAC0 API is sync or async."""
+        method = getattr(self._bacnet, method_name)
+        if inspect.iscoroutinefunction(method):
+            return await method(*args)
+
+        if os.getenv("TESTING", "").lower() == "true":
+            result = method(*args)
+        else:
+            result = await asyncio.get_event_loop().run_in_executor(None, method, *args)
+
+        if inspect.isawaitable(result):
+            return await result
+        return result
 
     async def read_multiple_points(
         self,
@@ -503,11 +516,7 @@ class NiagaraBACnetClient:
 
         logger.info(f"Discovering points on device {device_id}...")
         try:
-            raw_list = await asyncio.get_event_loop().run_in_executor(
-                None,
-                self._bacnet.read,
-                f"{device_id} device {device_id} objectList",
-            )
+            raw_list = await self._call_bac0("read", f"{device_id} device {device_id} objectList")
         except Exception as e:
             logger.error(f"Failed to read object list from device {device_id}: {e}")
             raise BACnetException(f"Failed to read object list: {e}", device_id=str(device_id))
@@ -644,7 +653,7 @@ class NiagaraBACnetClient:
     ) -> bool:
         """Execute a single BAC0 write operation."""
         try:
-            await asyncio.get_event_loop().run_in_executor(None, self._bacnet.write, write_string)
+            await self._call_bac0("write", write_string)
             return True
         except Exception as e:
             raise BACnetWriteError(f"Write failed for '{write_string}': {e}")
@@ -729,7 +738,7 @@ class NiagaraBACnetClient:
         write_ok = False
         error_msg: str | None = None
         try:
-            await asyncio.get_event_loop().run_in_executor(None, self._bacnet.write, write_string)
+            await self._call_bac0("write", write_string)
             write_ok = True
         except Exception as e:
             write_ok = False
@@ -809,7 +818,7 @@ class NiagaraBACnetClient:
             # Wrap in executor for thread safety
             for obj_type, instance in sub.points:
                 read_str = f"{sub.device_id} {obj_type},{instance} presentValue"
-                await asyncio.get_event_loop().run_in_executor(None, self._bacnet.read, read_str)
+                await self._call_bac0("read", read_str)
         except ImportError:
             logger.warning("BAC0 COV module not available - subscription will use polling fallback")
         except Exception as e:

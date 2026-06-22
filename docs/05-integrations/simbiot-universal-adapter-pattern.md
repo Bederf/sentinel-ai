@@ -2,9 +2,9 @@
 title: "SIMBIOT Universal Adapter Pattern"
 type: "architecture"
 status: "ready"
-version: "1.0.0"
+version: "2.0.0"
 created: "2026-03-18"
-updated: "2026-03-18"
+updated: "2026-06-19"
 author: "Sentinel Development Team"
 tags: [simbiot, adapter, universal, bms, integration, architecture, multi-site]
 related:
@@ -183,6 +183,35 @@ class BmsAdapter(ABC):
     def disconnect() -> None
         """Cleanly disconnect from BMS"""
 ```
+
+### Write Verification
+
+All write-capable adapters implement write verification to catch silent
+no-ops where the protocol layer accepts the write (returns success) but
+the physical point doesn't change. This is critical for Niagara oBIX
+where a higher-priority override in the priority array can cause a PUT
+to return HTTP 200 while the point value stays unchanged.
+
+- **Modbus**: Write → read back → compare raw values → log mismatch
+- **oBIX**: Write → read back → compare with type-aware tolerance →
+  return `False` if mismatch (logs "possible priority-array override")
+- **KNX**: No read-back (KNX writes are fire-and-forget), but emergency/
+  fire/evacuation group addresses are blocked before the protocol call
+
+### Safety: Emergency Group Write-Block (KNX)
+
+The KNX adapter enforces a two-layer safety check on emergency/fire
+group addresses:
+
+1. **Discovery layer**: Points whose description matches emergency
+   patterns (`emergency`, `fire`, `evacuation`, `alarm`, `panic`) are
+   marked `writable=False` in `discover_points()`.
+2. **Write layer**: `write_point()` checks `_is_emergency_group()` before
+   calling the protocol client — if blocked, returns `False` without
+   calling `write_group_address()`.
+
+This prevents SENTINEL from accidentally writing to fire alarm, evacuation
+lighting, or panic button group addresses.
 
 ### Standardized Data Shapes
 
@@ -436,20 +465,20 @@ class NewBrandAdapter(BmsAdapter):
 
 ### ✅ Production Ready
 
-| Adapter | Status | BMS Types | Protocols |
-|---------|--------|-----------|-----------|
-| BACnet | ✅ Ready | Siemens Desigo, JCI Metasys, Trane Tracer | BACnet/IP, BACnet MS/TP |
-| Simulation | ✅ Ready | Site-002 simulator | JSON files |
-| CSV Import | ⚠️ Partial | Custom/legacy systems | CSV files |
+| Adapter | Status | BMS Types | Protocols | Notes |
+|---------|--------|-----------|-----------|-------|
+| BACnet | ✅ Ready | Siemens Desigo, JCI Metasys, Trane Tracer | BACnet/IP, BACnet MS/TP | Wraps Niagara BACnet client; read + write |
+| Simulation | ✅ Ready | Site-002 simulator | JSON files | Via Shadow Bridge REST proxy |
+| CSV Import | ⚠️ Partial | Custom/legacy systems | CSV files | |
 
-### 🚧 In Development
+### ✅ Implemented (SIMBIOT BmsAdapter Contract)
 
-| Adapter | Status | BMS Types | Protocols |
-|---------|--------|-----------|-----------|
-| Modbus TCP | 🚧 WIP | Generic Modbus devices | Modbus TCP/IP |
-| Niagara oBIX | 🚧 WIP | Trid Niagara AX/N4 | oBIX/XML |
-| oBIX | 🚧 WIP | oBIX-compliant systems | oBIX/REST |
-| KNX | 🚧 Research | KNX building systems | KNXnet/IP |
+| Adapter | Status | BMS Types | Protocols | Notes |
+|---------|--------|-----------|-----------|-------|
+| Modbus TCP | ✅ Ready | Generic Modbus devices (generators, UPS, ATS) | Modbus TCP/IP | 16/32-bit data types (uint16/uint32/int32/float32), configurable word order, write verification |
+| Niagara oBIX | ✅ Ready | Tridium Niagara AX/N4 | oBIX/XML over HTTP | Read + write with read-back verification (catches priority-array silent no-ops) |
+| Bridge | ✅ Ready | Shadow Bridge REST proxy | HTTP REST | Read-only (bridges to BACnet/Desigo) |
+| KNX | ✅ Ready | KNX building systems | KNXnet/IP via xknx | Read + write with emergency/fire group write-block safety; group addresses from ETS export |
 
 ### 📋 Planned
 
@@ -724,6 +753,6 @@ The SIMBIOT Universal Adapter Pattern is the **core architectural decision** tha
 
 ---
 
-**Last Updated:** 2026-03-18
-**Version:** 1.0.0
+**Last Updated:** 2026-06-19
+**Version:** 2.0.0
 **Status:** Production Ready

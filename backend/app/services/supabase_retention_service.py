@@ -14,8 +14,8 @@ Retention schedules:
 - adapter_health_current: 7 days (transient state, POPIA S14(1))
 - adapter_health_alerts: 7 days (ML training data, POPIA S14(1))
 - space_occupancy_events: 7 days (ML training data, POPIA S14(1))
-- equipment_sensor_readings: 7 days (raw telemetry, POPIA S14(1))
-- alerts: 7 days (raw fault events — noise, not decisions, POPIA S14(1))
+- equipment_sensor_readings: 90 days (raw telemetry aggregation window)
+- alerts: active until cleared, then 7 days (raw fault events — noise, not decisions, POPIA S14(1))
 - asset_health_snapshots: 30 days (operational snapshots, POPIA S14(1))
 - system_health_snapshots: 30 days (operational snapshots, POPIA S14(1))
 - recommendations: 5 years (audit trail, POPIA S14(2))
@@ -40,6 +40,7 @@ from urllib.parse import quote
 import httpx
 
 logger = logging.getLogger(__name__)
+RAW_ALERT_RETENTION_DAYS = 7
 
 
 def _utc_now() -> datetime:
@@ -119,13 +120,6 @@ ML_TRAINING_SCHEDULES: list[RetentionSchedule] = [
         tier="ML_TRAINING",
         date_column="recorded_at",
         description="Raw sensor telemetry — delete after 90-day aggregation window (tiered retention)",
-    ),
-    RetentionSchedule(
-        table_name="alerts",
-        retention_days=7,
-        tier="ML_TRAINING",
-        date_column="created_at",
-        description="Raw fault events — noise, not decisions (POPIA S14(1))",
     ),
 ]
 
@@ -294,10 +288,70 @@ class SupabaseRetentionService:
                 logger.warning("Failed to write retention enforcement log for %s: %s", result.table_name, exc)
 
     def run_ml_training_deletion(self, dry_run: bool = True) -> DeletionRun:
-        """Delete ML training data older than 7 days. POPIA Section 14(1)."""
+        """Delete ML training data older than its processing window. POPIA Section 14(1)."""
         run = self._run_deletion(ML_TRAINING_SCHEDULES, dry_run)
+        alert_run = self.run_raw_alert_deletion(dry_run=dry_run)
+        run.results.extend(alert_run.results)
+        run.total_reviewed += alert_run.total_reviewed
+        run.total_deleted += alert_run.total_deleted
+        run.errors.extend(alert_run.errors)
         if not dry_run:
             self._write_enforcement_log(run)
+        return run
+
+    def run_raw_alert_deletion(self, dry_run: bool = True) -> DeletionRun:
+        """Delete resolved raw alert rows 7 days after clear; never age-delete active alerts."""
+        now = _utc_now()
+        cutoff = now - timedelta(days=RAW_ALERT_RETENTION_DAYS)
+        run = DeletionRun(executed_at=_iso(now), dry_run=dry_run)
+        result = DeletionResult(
+            table_name="alerts",
+            tier="ML_TRAINING",
+            reviewed=0,
+            deleted=0,
+        )
+        query = """
+            FROM alerts
+            WHERE status = 'resolved'
+              AND COALESCE(resolved_at, updated_at, created_at) < %s
+        """
+        try:
+            import psycopg2
+
+            conn = psycopg2.connect(
+                host="127.0.0.1",
+                port=55322,
+                dbname="postgres",
+                user="postgres",
+                password="postgres",
+            )
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(f"SELECT count(*) {query}", (cutoff,))
+                    result.reviewed = int(cursor.fetchone()[0] or 0)
+                    if not dry_run:
+                        cursor.execute(f"DELETE {query}", (cutoff,))
+                        result.deleted = cursor.rowcount
+                        conn.commit()
+                    else:
+                        result.deleted = result.reviewed
+            finally:
+                conn.close()
+            logger.info(
+                "Retention [ML_TRAINING] alerts: reviewed=%s deleted=%s dry_run=%s cutoff=%s",
+                result.reviewed,
+                result.deleted,
+                dry_run,
+                cutoff.isoformat(),
+            )
+        except Exception as exc:
+            result.error = str(exc)
+            run.errors.append({"table": "alerts", "tier": "ML_TRAINING", "error": str(exc)})
+            logger.error("Retention [ML_TRAINING] alerts FAILED: %s", exc)
+
+        run.results.append(result)
+        run.total_reviewed += result.reviewed
+        run.total_deleted += result.deleted
         return run
 
     def run_snapshot_deletion(self, dry_run: bool = True) -> DeletionRun:
@@ -361,6 +415,18 @@ class SupabaseRetentionService:
         """Return status summary across all schedules without deleting."""
         now = _utc_now()
         categories = []
+
+        raw_alert_cutoff = quote((_utc_now() - timedelta(days=RAW_ALERT_RETENTION_DAYS)).isoformat())
+        categories.append(
+            {
+                "table": "alerts",
+                "tier": "ML_TRAINING",
+                "retention_days": RAW_ALERT_RETENTION_DAYS,
+                "description": "Raw fault events — keep active rows, delete resolved rows 7 days after clear",
+                "overdue_count": self.run_raw_alert_deletion(dry_run=True).total_reviewed,
+                "cutoff": raw_alert_cutoff,
+            }
+        )
 
         for schedule in ML_TRAINING_SCHEDULES + SNAPSHOT_SCHEDULES + AUDIT_TRAIL_SCHEDULES:
             cutoff = self._get_cutoff(schedule.retention_days)

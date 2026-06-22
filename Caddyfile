@@ -1,4 +1,4 @@
-{
+ fr{
     http_port 8090
     https_port 8443
 }

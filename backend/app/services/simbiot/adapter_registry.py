@@ -21,6 +21,8 @@ _ADAPTER_ALIASES: dict[str, str] = {
     "generic": "bacnet",
     "obix": "obix",
     "modbus": "modbus",
+    "knx": "knx",
+    "knxnet": "knx",
 }
 
 
@@ -60,8 +62,10 @@ def _register_default_adapters() -> None:
 
     from .bacnet_bms_adapter import BacnetBmsAdapter
     from .bridge_bms_adapter import BridgeBmsAdapter
+    from .knx_bms_adapter import KnxBmsAdapter
 
     register_bms_adapter("bacnet", BacnetBmsAdapter)
     register_bms_adapter("obix", ObixBmsAdapter)
     register_bms_adapter("modbus", ModbusBmsAdapter)
     register_bms_adapter("bridge", BridgeBmsAdapter)
+    register_bms_adapter("knx", KnxBmsAdapter)

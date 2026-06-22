@@ -62,6 +62,7 @@ class ClassifiedPoint:
         tags: list[str] | None = None,
         object_type: str = "",
         instance: int = 0,
+        bacnet_device_id: int | None = None,
         present_value: Any = None,
         writable: bool = False,
     ):
@@ -78,6 +79,7 @@ class ClassifiedPoint:
         self.tags = tags or []
         self.object_type = object_type
         self.instance = instance
+        self.bacnet_device_id = bacnet_device_id
         self.present_value = present_value
         self.writable = writable
 
@@ -96,6 +98,7 @@ class ClassifiedPoint:
             "tags": self.tags,
             "object_type": self.object_type,
             "instance": self.instance,
+            "bacnet_device_id": self.bacnet_device_id,
             "present_value": self.present_value,
             "writable": self.writable,
         }
@@ -153,6 +156,7 @@ class PointClassifier:
         point_description: str = "",
         object_type: str = "",
         instance: int = 0,
+        bacnet_device_id: int | None = None,
         units: str = "",
         present_value: Any = None,
         writable: bool = False,
@@ -176,6 +180,7 @@ class PointClassifier:
             point_description: Point description text
             object_type: BACnet object type (e.g., "analogInput")
             instance: BACnet object instance number
+            bacnet_device_id: Parent BACnet device instance number
             units: Engineering units string
             present_value: Current point value
             writable: Whether the point is writable
@@ -264,6 +269,7 @@ class PointClassifier:
             tags=tags,
             object_type=object_type,
             instance=instance,
+            bacnet_device_id=bacnet_device_id,
             present_value=present_value,
             writable=writable,
         )
@@ -288,6 +294,7 @@ class PointClassifier:
                 point_description=p.get("description", ""),
                 object_type=p.get("object_type", ""),
                 instance=p.get("instance", 0),
+                bacnet_device_id=p.get("bacnet_device_id"),
                 units=p.get("units", ""),
                 present_value=p.get("present_value"),
                 writable=p.get("writable", False),

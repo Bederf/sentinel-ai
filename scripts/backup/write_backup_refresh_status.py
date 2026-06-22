@@ -1,28 +1,50 @@
 #!/usr/bin/env python3
-"""Persist the latest standby refresh status for the health dashboard."""
+"""Persist the latest local backup restore status for the health dashboard."""
 
 from __future__ import annotations
 
 import json
-import sys
+import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 
 
 def main() -> int:
-    if len(sys.argv) != 6:
-        print(
-            "usage: write_backup_refresh_status.py <status-file> <result> <refreshed-at> <database> <container-name>",
-            file=sys.stderr,
-        )
-        return 1
+    parser = argparse.ArgumentParser()
+    parser.add_argument("status_file")
+    parser.add_argument("result")
+    parser.add_argument("refreshed_at")
+    parser.add_argument("database")
+    parser.add_argument("container_name")
+    parser.add_argument("--backup-dir")
+    parser.add_argument("--duration-seconds", type=float)
+    parser.add_argument("--table-count", type=int)
+    parser.add_argument("--database-size-bytes", type=int)
+    parser.add_argument("--critical-row-counts-json")
+    parser.add_argument("--message")
+    args = parser.parse_args()
 
-    status_file = Path(sys.argv[1])
+    critical_row_counts = {}
+    if args.critical_row_counts_json:
+        try:
+            parsed = json.loads(args.critical_row_counts_json)
+            if isinstance(parsed, dict):
+                critical_row_counts = parsed
+        except json.JSONDecodeError:
+            critical_row_counts = {"_parse_error": args.critical_row_counts_json}
+
+    status_file = Path(args.status_file)
     payload = {
-        "result": sys.argv[2],
-        "refreshed_at": sys.argv[3],
-        "database": sys.argv[4],
-        "container_name": sys.argv[5],
+        "result": args.result,
+        "refreshed_at": args.refreshed_at,
+        "database": args.database,
+        "container_name": args.container_name,
+        "backup_dir": args.backup_dir,
+        "duration_seconds": args.duration_seconds,
+        "table_count": args.table_count,
+        "database_size_bytes": args.database_size_bytes,
+        "critical_row_counts": critical_row_counts,
+        "message": args.message,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 

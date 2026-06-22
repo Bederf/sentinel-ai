@@ -14,6 +14,9 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 import app.services.niagara.bacnet_client as bacnet_module
+from app.models.device import Device, DeviceEquipment, DeviceLocation, DeviceType, ProtocolType
+from app.services.niagara import bacnet_adapter as bacnet_adapter_module
+from app.services.niagara.bacnet_adapter import NiagaraBACnetAdapter
 from app.services.niagara.bacnet_client import (
     BACnetException,
     BACnetObjectType,
@@ -103,6 +106,46 @@ class TestClientLifecycle:
             await client.stop()
         finally:
             bacnet_module._BAC0 = original
+
+
+class TestNiagaraBACnetAdapter:
+    """Tests for BACnet adapter lifecycle behavior."""
+
+    @pytest.mark.asyncio
+    async def test_missing_bacnet_device_id_does_not_start_client(self, monkeypatch):
+        """Devices without BACnet metadata should stay disconnected, not bind BACnet."""
+        mock_client = MagicMock()
+        mock_client.is_running = False
+        mock_client._bac0_unavailable = False
+        mock_client.start = AsyncMock()
+        mock_client.list_subscriptions.return_value = []
+        monkeypatch.setattr(bacnet_adapter_module, "get_bacnet_client", lambda: mock_client)
+
+        device = Device(
+            id="S002-NO-BACNET-METADATA",
+            name="No BACnet Metadata",
+            device_type=DeviceType.HVAC,
+            protocol=ProtocolType.BACNET,
+            site_id="site-002",
+            device_location=DeviceLocation(
+                building="Test",
+                floor="FL1",
+                zone="Q1",
+                room="MR1",
+                description="Test",
+            ),
+            equipment=DeviceEquipment(manufacturer="Test", model="Test"),
+            metadata={},
+        )
+        adapter = NiagaraBACnetAdapter(device)
+
+        connected = await adapter.connect()
+        await adapter.disconnect()
+
+        assert connected is False
+        assert adapter._connected is False
+        assert adapter._last_status_message == "skipped: missing bacnet_device_id"
+        mock_client.start.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_stop_disconnects(self):
@@ -216,6 +259,16 @@ class TestPointRead:
 
         value = await started_client.read_point(1234, "analogValue", 0)
         assert value == 22.5
+
+    @pytest.mark.asyncio
+    async def test_read_point_supports_async_bac0_read(self, started_client, mock_bac0):
+        """Some BAC0 versions expose read as an async method."""
+        mock_bac0.read = AsyncMock(return_value=22.5)
+
+        value = await started_client.read_point(1234, "analogValue", 0)
+
+        assert value == 22.5
+        mock_bac0.read.assert_awaited_once_with("1234 analogValue,0 presentValue")
 
     @pytest.mark.asyncio
     async def test_read_multiple_points(self, started_client, mock_bac0):

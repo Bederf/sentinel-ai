@@ -120,7 +120,12 @@ done
 if [[ "${RETENTION_DAYS}" =~ ^[0-9]+$ ]] && [[ "${RETENTION_DAYS}" -gt 0 ]]; then
   echo
   echo "Applying retention policy: ${RETENTION_DAYS} days"
-  find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime +"${RETENTION_DAYS}" -print -exec rm -rf {} +
+  while IFS= read -r expired_dir; do
+    echo "${expired_dir}"
+    if ! rm -rf "${expired_dir}"; then
+      echo "WARNING: failed to remove expired backup directory: ${expired_dir}" >&2
+    fi
+  done < <(find "${BACKUP_ROOT}" -mindepth 1 -maxdepth 1 -type d -mtime +"${RETENTION_DAYS}" | sort)
 fi
 
 echo

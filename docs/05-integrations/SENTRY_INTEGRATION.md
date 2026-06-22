@@ -524,20 +524,20 @@ Each response ends with clickable next-step buttons (excluding the command just 
 | `/WO-{code}` | Formal maintenance work order (asks FM for title/desc/priority) | WO confirmation + buttons: `/reset-`, `/info-`, `/inspect-`, `/note-` |
 | `/note-{code}` | Add maintenance note to equipment record | Confirmation + buttons: `/info-`, `/reset-`, `/inspect-`, `/WO-` |
 
-**Telegram command format:** Equipment dashes become underscores (`S002-FCU-301` → `/info-S002_FCU_301`). Bot converts back when calling API.
+**Telegram command format:** Equipment dashes become underscores (`S002-FCU-201` → `/info-S002_FCU_201`). Bot converts back when calling API.
 
 ### `/inspect-` — Dispatch Flow
 
 The `/inspect-` command is a **silent dispatch** — it creates a work order and notifies the technician without verbose output to the FM:
 
-1. FM sends `/inspect-S002_FCU_301`
+1. FM sends `/inspect-S002_FCU_201`
 2. Bot calls `POST /api/sentry/create-work-order` with `telegram_user_id` for audit
 3. Bot sends tech a Telegram message via `sentry message send --target {technician_telegram_id}`:
    ```
-   #WO-2026-0030 — S002-FCU-301
+   #WO-2026-0030 — S002-FCU-201
    ━━━━━━━━━━━━━━━━━━
-   /info-S002_FCU_301 - Equipment details
-   /note-S002_FCU_301 - Add note
+   /info-S002_FCU_201 - Equipment details
+   /note-S002_FCU_201 - Add note
    ```
 4. Bot replies to FM: `✅ #WO-2026-0030 sent to John Smith` (one line, no buttons)
 
@@ -777,14 +777,14 @@ The inspection skill is a complete end-to-end workflow: FM dispatches, tech insp
 ### Full Flow
 
 ```
-FM: /inspect-S002_FCU_301
+FM: /inspect-S002_FCU_201
     ↓
 Bot: Creates WO via POST /api/sentry/create-work-order
     ↓
-Bot → Tech (Telegram): "#WO-2026-0030 — S002-FCU-301" + /info- + /note-
+Bot → Tech (Telegram): "#WO-2026-0030 — S002-FCU-201" + /info- + /note-
 Bot → FM: "✅ #WO-2026-0030 sent to John Smith"
     ↓
-Tech: /info-S002_FCU_301 (sees equipment details + inspection checklist)
+Tech: /info-S002_FCU_201 (sees equipment details + inspection checklist)
     ↓
 Tech inspects on-site
     ↓

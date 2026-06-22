@@ -65,7 +65,7 @@ class TrainRequest(BaseModel):
     """Training request."""
 
     epochs: int = 50
-    use_demo_data: bool = True
+    use_demo_data: bool = False
 
 
 class TrainResponse(BaseModel):

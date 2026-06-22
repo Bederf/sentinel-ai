@@ -502,11 +502,6 @@ class HealthSnapshotService:
                 )
                 continue
 
-            # Skip synthetic fallback types (VAV/FCU) — static placeholder until real service data
-            if score_cfg.get("method") == "synthetic_fallback":
-                logger.debug(f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): synthetic fallback (no service data)")
-                continue
-
             # Skip if no baseline
             if equip.get("health_score") is None:
                 logger.debug(f"[HEALTH-SNAP] Skipping {eq_code} ({eq_type}): no baseline")

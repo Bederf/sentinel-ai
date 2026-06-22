@@ -28,6 +28,22 @@ class TestFormatProfileIntent:
             result = service._format_profile_intent(profile, energy_prices)
             assert len(result) > 0, f"Profile '{profile}' returned empty string"
 
+    def test_public_holiday_uses_weekend_schedule(self, service):
+        energy_prices = {"current_rate": 1.50, "band": "standard", "schedule": [], "weekday_only": True}
+        result = service._format_profile_intent(
+            "balanced",
+            energy_prices,
+            schedule_context={
+                "uses_weekend_schedule": False,
+                "is_public_holiday": True,
+                "holiday_name": "Youth Day",
+            },
+        )
+
+        assert "Weekend schedule: NO - weekday schedule active" in result
+        assert "Public holiday: YES" in result
+        assert "Youth Day" in result
+
 
 class TestFiveLayerPromptStructure:
     """Tests for the 5-layer prompt structure in _build_optimization_prompt."""
@@ -114,6 +130,41 @@ class TestFiveLayerPromptStructure:
         )
         assert "WASTE OPPORTUNITIES DETECTED" in prompt
         assert "S002-FCU-201" in prompt
+
+    def test_public_holiday_is_included_in_decision_context(self, service, site, equipment_inventory, monkeypatch):
+        """Public holidays must be explicit in the optimizer prompt."""
+
+        monkeypatch.setattr(
+            service,
+            "_get_site_schedule_context",
+            lambda site_id, current_time=None: {
+                "date": "2026-06-16",
+                "weekday": "Tuesday",
+                "is_weekend": False,
+                "is_public_holiday": True,
+                "holiday_name": "Youth Day",
+                "uses_weekend_schedule": False,
+            },
+        )
+
+        prompt = service._build_optimization_prompt(
+            site=site,
+            current_conditions={"occupancy": "low"},
+            weather_forecast={},
+            energy_prices={"current_rate": 1.50, "band": "standard", "schedule": []},
+            equipment_inventory=equipment_inventory,
+            profile={"name": "balanced"},
+            precomputed_context=None,
+        )
+
+        assert "Calendar: PUBLIC HOLIDAY - Youth Day; explain occupancy deviations using live telemetry" in prompt
+        assert (
+            "**Calendar Status:** PUBLIC HOLIDAY - Youth Day; explain occupancy deviations using live telemetry"
+            in prompt
+        )
+        assert "Public holidays are explanatory calendar context for occupancy changes" in prompt
+        assert "Live occupancy: Occupancy telemetry reports low" in prompt
+        assert "Scheduled status: Occupied hours" in prompt
 
 
 class TestDataRequestsExtraction:

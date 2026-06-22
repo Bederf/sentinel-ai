@@ -4,7 +4,7 @@ type: "reference"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-06-11"
+updated: "2026-06-16"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -17,11 +17,13 @@ estimated_read_time: 10
 
 ## Overview
 
-> **Phase 147 Update (2026-03-07):** Free-text complaint routing from Telegram is now handled by the backend conversation system via `POST /api/sentry/telegram/message` and `POST /api/sentry/telegram/callback`. These new endpoints handle intent classification, multi-step conversation flows with inline keyboards, and work order creation automatically. The call log endpoints below remain available for WhatsApp, mobile app, and email channels, and as a programmatic API for direct WO creation from classified complaints.
+> **Phase 147 Update (2026-03-07):** Free-text complaint routing from the Sentry Staff Telegram adapter is handled by the backend conversation system via `POST /api/sentry/telegram/message` and `POST /api/sentry/telegram/callback`. These endpoints handle intent classification, multi-step conversation flows with inline keyboards, and work order creation automatically. The call log endpoints below remain available for WhatsApp, mobile app, and email channels, and as a programmatic API for direct WO creation from classified complaints.
 
-Call log endpoints support the Sentry bot's general staff defect reporting workflow. Non-technical users (office workers, cleaners, security guards) report building issues via Telegram, WhatsApp, mobile app, or email. The bot classifies the complaint against a fixed taxonomy and creates an inspection work order.
+Call log endpoints support Sentry's general staff defect reporting workflow. Non-technical users report building issues through the Staff bot/channel: Telegram today, with WhatsApp or a custom app interface planned. The bot classifies the complaint against a fixed taxonomy and creates an inspection work order.
 
-Six endpoints:
+SENTINEL is the facilities/BMS platform. Sentry is the bot interface layer for site staff, technicians, and the site manager. Current Staff bot scope is site-002 only.
+
+Core endpoints:
 
 1. **`POST /api/sentry/call-log`** — Create an inspection work order from a classified complaint
 2. **`POST /api/sentry/call-log/escalate`** — Escalate an unclassifiable complaint to the facilities supervisor
@@ -29,6 +31,10 @@ Six endpoints:
 4. **`POST /api/sentry/call-log/location-memory`** — Save/update reporter location memory after a WO is created
 5. **`GET /api/sentry/work-order/detail`** — Full WO details including resolved equipment_code (for closeout branching)
 6. **`GET/POST /api/sentry/inspection-session`** — Persist/resume Tier 3 checklist state across restarts
+
+Phase 223 also adds a fire-and-forget feedback event endpoint for staff/tech bot outcome reporting:
+
+7. **`POST /api/sentry/feedback-event`** — Record Sentry feedback loop events for weekly digest reporting
 
 ### Key implementation details (Phase 227):
 - **Equipment code gating**: `_derive_equipment_code_from_desk()` is only called when `specialty == "HVAC"` or `category in ("HVAC", "Air Conditioning")`. Lighting/plumbing WOs get empty equipment_code, routing closeout to Tier 1.
@@ -84,7 +90,7 @@ X-Sentry-API-Key: <configured API key>
 | `title` | string | Yes | Brief issue title (uses controlled taxonomy values) |
 | `description` | string | Yes | Full description with context |
 | `reported_by` | string | No | Reporter display name |
-| `reporter_telegram_id` | string | No | Reporter Telegram ID for audit |
+| `reporter_telegram_id` | string | No | Current Telegram channel binding for audit. Do not use as the canonical staff identity. |
 | `reporter_phone` | string | No | Reporter mobile number for location memory |
 | `channel` | string | No | Source channel (`telegram`, `whatsapp`, `mobile`, `email`) |
 | `original_message` | string | No | Raw user message (stored for context, not used for routing) |
@@ -101,7 +107,7 @@ Location memory is used to reduce repeat questions:
 
 1. First report: user supplies desk/location manually
 2. Backend stores reporter-to-location memory after successful log
-3. Next report: client can query `GET /api/sentry/call-log/location-memory` using `reporter_phone` or `reporter_telegram_id`
+3. Next report: client can query `GET /api/sentry/call-log/location-memory` using `reporter_phone` or the current channel binding (`reporter_telegram_id` for Telegram today)
 4. Bot/app pre-fills the location and asks for confirmation before creating the next WO
 
 Current limitation: location is still user-confirmed. AD profile location and access-card-based location are not integrated in the current version.
@@ -178,7 +184,7 @@ Escalates an unmatched complaint to the facilities supervisor. Called by the cal
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `reporter_name` | string | No | Reporter display name |
-| `reporter_telegram_id` | string | No | Reporter Telegram ID |
+| `reporter_telegram_id` | string | No | Current Telegram channel binding. Prefer phone/staff roster identity for cross-channel flows. |
 | `original_message` | string | Yes | The complaint text that couldn't be classified |
 | `reason` | string | No | Why it was escalated |
 | `site_id` | string | No | Site identifier (default: `site-002`) |
@@ -234,14 +240,21 @@ Escalates an unmatched complaint to the facilities supervisor. Called by the cal
 
 Lookup endpoint for reporter last-known location memory, used to prefill manual location confirmation on mobile channels.
 
+Identity model:
+
+- Staff number/HR identity is the canonical staff identity for onboarding.
+- `reporter_phone` is the preferred cross-channel lookup key and aligns with HR roster verification.
+- `reporter_telegram_id` is the current Telegram adapter binding only.
+- WhatsApp/custom app adapters should add an explicit channel-binding field or table instead of overloading Telegram-specific columns.
+
 **Authentication:** Required — both `X-Sentry-Secret` and `X-Sentry-API-Key` headers.
 
 **Query parameters:**
 
 | Param | Type | Required | Description |
 |-------|------|----------|-------------|
-| `reporter_phone` | string | Conditional | Mobile number (recommended) |
-| `reporter_telegram_id` | string | Conditional | Telegram reporter ID |
+| `reporter_phone` | string | Conditional | Mobile number; preferred cross-channel lookup and roster verification key |
+| `reporter_telegram_id` | string | Conditional | Current Telegram channel binding only |
 
 At least one of `reporter_phone` or `reporter_telegram_id` must be provided.
 
@@ -329,6 +342,74 @@ python3 $SENTRY_HOME/tools/call_log.py categories
 
 ---
 
+## POST /api/sentry/feedback-event (Phase 223)
+
+Records a fire-and-forget feedback event from the Sentry staff or technician bot. This endpoint is used by `$SENTRY_HOME/tools/feedback_logger.py`; it must never block or break the operational bot flow.
+
+**Authentication:** Required -- `X-Sentry-API-Key` or `X-Sentry-Secret` header.
+
+**Request Body:**
+
+```json
+{
+  "batch_type": "C",
+  "bot_workspace": "staff",
+  "site_id": "site-002",
+  "intent": "call_log",
+  "skill_name": "call_logging",
+  "flow_name": "staff_call_log",
+  "outcome": "call_log_submitted",
+  "feedback_category": "complaint",
+  "sanitised_message": "this was not helpful",
+  "detector": "keyword",
+  "classifier_confidence": 1.0,
+  "metadata": {"matched": "not helpful"}
+}
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `batch_type` | string | Yes | `A` could not process, `B` successfully processed, `C` operator feedback |
+| `bot_workspace` | string | Yes | `staff` or `tech`; manager bot is excluded |
+| `site_id` | string | Yes | Site identifier |
+| `occurred_at` | timestamp | No | Event time; defaults to backend insert time |
+| `telegram_user_hash` | string | No | SHA-256 hash of Telegram user ID; raw IDs must not be stored |
+| `intent` | string | No | Detected intent, if known |
+| `skill_name` | string | No | Tool or skill that handled the interaction |
+| `flow_name` | string | No | Higher-level flow name, if known |
+| `outcome` | string | No | Success outcome for Batch B |
+| `failure_category` | string | No | Failure category for Batch A |
+| `feedback_category` | string | No | `complaint` or `improvement_suggestion` for Batch C |
+| `sanitised_message` | string | No | User message after PII/secrets redaction and 500-character truncation |
+| `source_table` / `source_id` | string | No | Optional source reference |
+| `work_order_code` | string | No | Related WO code, if any |
+| `detector` | string | No | `keyword`, `facilities_thesaurus`, `context_after_failure`, `llm`, or `manual` |
+| `classifier_confidence` | number | No | LLM or detector confidence |
+| `metadata` | object | No | Additional structured context |
+
+**Response:**
+
+```json
+{"status": "ok"}
+```
+
+Database insert errors are logged server-side but still return `{"status": "ok"}` so feedback logging cannot fail the bot action.
+
+### Sanitisation Contract
+
+The bot-side logger must sanitise `sanitised_message` before posting:
+
+- Redact email addresses as `[redacted-email]`
+- Redact phone numbers as `[redacted-phone]`
+- Redact token-bearing URLs as `[redacted-url]`
+- Redact secret assignments while preserving the key name, for example `token=[redacted]`
+- Collapse newlines/nulls to spaces
+- Truncate to 500 characters
+
+Implementation note: the secret-assignment regex must capture the key name before using the replacement backreference. A non-capturing pattern with `\1` raises `re.error`, and because the logger is intentionally fire-and-forget, that failure would otherwise be swallowed.
+
+---
+
 ## POST /api/sentry/telegram/message (Phase 147)
 
 Delegates a free-text Telegram message to the backend conversation system. The backend classifies intent, manages conversation sessions, runs the appropriate flow, and sends the reply (with inline keyboards) directly to Telegram. The caller should NOT send any additional reply.
@@ -365,7 +446,7 @@ Delegates a free-text Telegram message to the backend conversation system. The b
 ```json
 {
   "success": true,
-  "intent": "client_complaint",
+  "intent": "staff_complaint",
   "confidence": 0.85
 }
 ```
@@ -446,7 +527,7 @@ Handles inline keyboard button taps (Telegram `callback_query`). Dismisses the b
 
 When `detect_and_route()` cannot match a message to any structured command or workflow, it returns `route=general`. The `route_to_handler()` then routes to `_get_llm_response()`, which calls `ClaudeService.stream_response_with_tools()` with the BMS chat tools (`get_chat_tools(site_id="site-002")`).
 
-**Active bots:** manager (main) + technician Telegram bots. Staff/client bot is out-of-scope for this Sprint.
+**Active bots:** Sentry manager, technician, and staff bots. The staff bot is scoped to site-002 and should use roster-based self-registration before normal staff functions are exposed.
 
 **Tools available to Claude:**
 - `get_equipment_status` — current status, mode, alarms, key metrics

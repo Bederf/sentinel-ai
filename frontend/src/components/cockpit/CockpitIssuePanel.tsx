@@ -76,8 +76,8 @@ function slaLabel(minsRemaining: number): string {
 
 const POSTURE_ACTIONS: Record<string, CockpitIssueActionType[]> = {
   advisory: ['acknowledge'],
-  supervised: ['acknowledge', 'assign', 'create_work_order'],
-  auto: ['acknowledge', 'assign', 'create_work_order', 'escalate'],
+  supervised: ['acknowledge', 'create_work_order'],
+  auto: ['acknowledge', 'create_work_order'],
 }
 
 function actionsForPosture(posture: string | null): CockpitIssueActionType[] {
@@ -247,7 +247,7 @@ export function CockpitIssuePanel({
     selectedIssue.sla_due_at ? slaMinsRemaining(selectedIssue.sla_due_at) : null
   const showSlaBadge = slaMinutes !== null && slaMinutes <= 60
 
-  const ALL_ACTIONS: CockpitIssueActionType[] = ['acknowledge', 'assign', 'create_work_order', 'escalate']
+  const ALL_ACTIONS: CockpitIssueActionType[] = ['acknowledge', 'create_work_order']
 
   return (
     <div className="flex flex-col divide-y divide-white/8">

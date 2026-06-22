@@ -75,6 +75,12 @@ class ApprovalService:
             if recommendation.status != RecommendationStatus.PENDING:
                 return False, f"Recommendation is {recommendation.status.value}, not pending approval"
 
+            if recommendation.action_type == "coordinated_optimization":
+                return (
+                    False,
+                    "Coordinated optimization bundles require the dedicated coordinated approval/execution path",
+                )
+
             if not approved_by or not approved_by.strip():
                 return False, "Approver ID must be provided"
 
@@ -174,6 +180,36 @@ class ApprovalService:
                     error_message=f"Recommendation is {recommendation.status.value}, not pending",
                 )
 
+            if recommendation.action_type == "coordinated_optimization":
+                return ApprovalResult(
+                    success=False,
+                    recommendation_id=recommendation_id,
+                    status="failed",
+                    error_message="Coordinated optimization bundles require the dedicated coordinated approval/execution path",
+                )
+
+            # Mode gate: human approval execution is controlled by the site phase.
+            # A site in supervised/automatic mode has passed the promotion gate for
+            # live operator-controlled writes, even if the global ingestion mode
+            # remains shadow_live for telemetry ingestion.
+            EXECUTION_ALLOWED = {"supervised", "automatic"}
+            current_stage = "unknown"
+            try:
+                from app.models.onboarding_phase import effective_phase
+
+                site_id = recommendation.site_id or "unknown"
+                current_stage = await effective_phase(site_id)
+
+                if current_stage not in EXECUTION_ALLOWED:
+                    return ApprovalResult(
+                        success=False,
+                        recommendation_id=recommendation_id,
+                        status="failed",
+                        error_message=f"EXECUTION_BLOCKED: Approval not permitted in {current_stage} mode (requires {EXECUTION_ALLOWED})",
+                    )
+            except Exception as e:
+                logger.warning(f"Mode gate check failed for approval {recommendation_id}, proceeding: {e}")
+
             # Phase 109: Quality gate check before execution
             try:
                 from app.services.quality_gate_policy import GateStatus
@@ -181,8 +217,9 @@ class ApprovalService:
                 gate_result = await self._check_quality_gate(recommendation.site_id or "unknown")
                 mode = settings.resolved_ingestion_mode.value
 
-                # shadow_live: always block execution (writes are shadow-only)
-                if mode == "shadow_live":
+                # shadow_live: block only when the site itself has not been
+                # promoted to a live execution phase.
+                if mode == "shadow_live" and current_stage not in EXECUTION_ALLOWED:
                     self._audit_gate_block(recommendation_id, "SHADOW_MODE_NO_EXEC", gate_result)
                     return ApprovalResult(
                         success=False,
@@ -215,32 +252,18 @@ class ApprovalService:
             except Exception as e:
                 logger.warning(f"Quality gate check failed for approval {recommendation_id}, proceeding: {e}")
 
-            # Mode gate: execution requires supervised or automatic mode
-            # Commissioning/shadow_live modes block execution (generation is still allowed)
-            EXECUTION_ALLOWED = {"supervised", "automatic"}
-            try:
-                from app.models.onboarding_phase import effective_phase
-
-                site_id = recommendation.site_id or "unknown"
-                current_stage = await effective_phase(site_id)
-
-                if current_stage not in EXECUTION_ALLOWED:
-                    return ApprovalResult(
-                        success=False,
-                        recommendation_id=recommendation_id,
-                        status="failed",
-                        error_message=f"EXECUTION_BLOCKED: Approval not permitted in {current_stage} mode (requires {EXECUTION_ALLOWED})",
-                    )
-            except Exception as e:
-                logger.warning(f"Mode gate check failed for approval {recommendation_id}, proceeding: {e}")
-
             # CRITICAL: Run SafetyEngine validation AGAIN before write
             # (Defense-in-depth: validate at both recommendation creation and approval time)
             equipment_id = recommendation.target_equipment
             proposed_value = recommendation.action.get("value")
 
             logger.info(f"Running SafetyEngine validation for {equipment_id} = {proposed_value}")
-            safety_result = await self._validate_safety(equipment_id, proposed_value)
+            safety_result = await self._validate_safety(
+                equipment_id,
+                proposed_value,
+                site_id=recommendation.site_id,
+                point_name=recommendation.action.get("point"),
+            )
 
             if not safety_result["is_safe"]:
                 logger.warning(f"SafetyEngine rejected approval for {recommendation_id}: {safety_result.get('reason')}")
@@ -293,6 +316,7 @@ class ApprovalService:
                     "reason": "AEGIS_WRITE_BLOCKED: No Modbus writer configured",
                 }
                 cov_verified = False
+                verification_status = "blocked"
             else:
                 # Execute write via unified execution pipeline (write → verify → audit)
                 from app.services.execution_service import execute_command
@@ -308,7 +332,15 @@ class ApprovalService:
                     sentinel_tool=sentinel_tool,
                 )
 
-                write_result = {"success": exec_result["success"]}
+                write_result = {
+                    "success": exec_result["success"],
+                    "write_path": exec_result.get("write_path"),
+                    "adapter_id": exec_result.get("adapter_id"),
+                    "bridge_point_id": exec_result.get("bridge_point_id"),
+                    "bridge_write_response": exec_result.get("bridge_write_response"),
+                    "whitelist_passed": exec_result.get("whitelist_passed"),
+                    "bacnet_priority": exec_result.get("bacnet_priority"),
+                }
                 if not exec_result["success"]:
                     logger.error(f"Device write failed: {exec_result.get('error')}")
                     return ApprovalResult(
@@ -321,6 +353,7 @@ class ApprovalService:
                 cov_verified = exec_result["verified"]
                 if not cov_verified:
                     logger.warning(f"COV feedback verification failed for {equipment_id}.{control_point}")
+                verification_status = "verified" if cov_verified else "telemetry_pending"
 
             # Update recommendation status
             # BESS dispatch stays APPROVED (not EXECUTED) since write is blocked
@@ -333,6 +366,12 @@ class ApprovalService:
                 "success": True,
                 "device_write": write_result,
                 "cov_verified": cov_verified,
+                "verification_status": verification_status,
+                "verification_note": (
+                    "Write accepted; outcome verification pending next telemetry poll."
+                    if verification_status == "telemetry_pending"
+                    else None
+                ),
                 "original_value": original_value,
                 "target_value": target_value,
                 "control_point": control_point,
@@ -783,7 +822,13 @@ class ApprovalService:
                 error_message=f"Rollback error: {e!s}",
             )
 
-    async def _validate_safety(self, equipment_id: str, proposed_value: Any) -> dict[str, Any]:
+    async def _validate_safety(
+        self,
+        equipment_id: str,
+        proposed_value: Any,
+        site_id: str | None = None,
+        point_name: str | None = None,
+    ) -> dict[str, Any]:
         """Pre-flight safety check before device write.
 
         Note: The device adapter also runs safety validation during write_value().
@@ -808,6 +853,19 @@ class ApprovalService:
                     "is_safe": result.get("allowed", True),
                     "reason": ", ".join(result.get("reasons", [])) or "Passed safety check",
                 }
+            if (
+                site_id
+                and point_name
+                and await self._has_verified_site_adapter_write_path(
+                    site_id=site_id,
+                    equipment_id=equipment_id,
+                    point_name=point_name,
+                )
+            ):
+                return {
+                    "is_safe": True,
+                    "reason": "Passed bridge write-path precheck with verified writable mapping",
+                }
             # SAFETY-001: Fail-closed — no adapter means device is unregistered.
             # Allowing the write would bypass all safety rules. Reject.
             logger.warning(
@@ -821,6 +879,67 @@ class ApprovalService:
         except Exception as e:
             logger.error(f"Error in safety validation: {e!s}")
             return {"is_safe": False, "reason": f"Safety validation error: {e!s}"}
+
+    async def _has_verified_site_adapter_write_path(
+        self,
+        *,
+        site_id: str,
+        equipment_id: str,
+        point_name: str,
+    ) -> bool:
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            config_rows = (
+                sb.table("site_adapter_config")
+                .select("protocol,connection_config")
+                .eq("site_id", site_id)
+                .eq("enabled", True)
+                .execute()
+            )
+            has_write_adapter = False
+            for row in config_rows.data or []:
+                protocol = str(row.get("protocol") or "").strip().lower()
+                config = row.get("connection_config") or {}
+                if protocol in {"bacnet", "knx", "modbus", "obix"} or (
+                    protocol == "bridge"
+                    and config.get("supports_writes") is True
+                    and config.get("write_enabled") is True
+                ):
+                    has_write_adapter = True
+            if not has_write_adapter:
+                return False
+
+            site_row = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if not site_row.data:
+                return False
+            requested = str(point_name or "").strip().lower()
+            mapping_rows = (
+                sb.table("point_asset_mappings")
+                .select("bms_point_id,parameter_name,parameter_type")
+                .eq("site_id", site_row.data[0]["id"])
+                .eq("extracted_asset_id", equipment_id)
+                .eq("is_verified", True)
+                .execute()
+            )
+            for mapping in mapping_rows.data or []:
+                parameter_type = str(mapping.get("parameter_type") or "").lower()
+                is_writable = (
+                    parameter_type in {"command", "setpoint", "writable"}
+                    or parameter_type.startswith(("command:", "setpoint:", "writable:"))
+                    or "analogoutput" in parameter_type
+                    or "binaryoutput" in parameter_type
+                    or "multistateoutput" in parameter_type
+                )
+                parameter_name = str(mapping.get("parameter_name") or "").strip().lower()
+                bms_point_id = str(mapping.get("bms_point_id") or "").strip().lower()
+                suffix = bms_point_id.rsplit(".", 1)[-1] if "." in bms_point_id else bms_point_id
+                if is_writable and requested in {parameter_name, suffix}:
+                    return True
+        except Exception as exc:
+            logger.warning("Bridge write-path precheck failed for %s.%s: %s", equipment_id, point_name, exc)
+        return False
 
     async def _execute_device_write(self, equipment_id: str, point_name: str, target_value: Any) -> dict[str, Any]:
         """Execute write to device via adapter (BACnet, Modbus, or simulated).
@@ -1077,7 +1196,12 @@ class ApprovalService:
                 f"Tier 3 auto-execute: Running SafetyEngine validation for {equipment_id} = {proposed_value} "
                 f"(decision_id: {routing_result.decision_id})"
             )
-            safety_result = await self._validate_safety(equipment_id, proposed_value)
+            safety_result = await self._validate_safety(
+                equipment_id,
+                proposed_value,
+                site_id=recommendation.site_id,
+                point_name=recommendation.action.get("point"),
+            )
 
             emit_decision_event(
                 "safety.validated",

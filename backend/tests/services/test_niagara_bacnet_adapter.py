@@ -157,6 +157,28 @@ class TestAdapterLifecycle:
         result = await adapter._protocol_connect()
 
         assert result is False
+        assert adapter._last_status_message == "BACnet timeout while reading device objectName"
+
+    @pytest.mark.asyncio
+    async def test_connect_records_missing_bacnet_device_id(self, mock_client):
+        device = Device(
+            id="no-bacnet-id",
+            name="Test",
+            device_type=DeviceType.HVAC,
+            protocol=ProtocolType.BACNET,
+            site_id="site-001",
+            device_location=DeviceLocation(building="Test", floor="L1", zone="A", room="MR1", description="Test"),
+            equipment=DeviceEquipment(manufacturer="Test", model="Test"),
+            metadata={},
+        )
+        with patch("app.services.niagara.bacnet_adapter.get_bacnet_client", return_value=mock_client):
+            adpt = NiagaraBACnetAdapter(device)
+
+        result = await adpt._protocol_connect()
+
+        assert result is False
+        assert adpt._last_status_message == "skipped: missing bacnet_device_id"
+        mock_client.start.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_connect_returns_true_on_other_bacnet_errors(self, adapter, mock_client):
@@ -166,6 +188,7 @@ class TestAdapterLifecycle:
         result = await adapter._protocol_connect()
 
         assert result is True
+        assert adapter._last_status_message == "Not supported"
 
     @pytest.mark.asyncio
     async def test_disconnect_cancels_subscriptions(self, adapter, mock_client):

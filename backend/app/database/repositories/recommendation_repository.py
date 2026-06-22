@@ -1,7 +1,9 @@
 """Repository for recommendation tracking operations."""
 
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Any
+from uuid import UUID
 
 from app.database.repositories.base import SupabaseRepository
 from app.models.recommendation import Recommendation, RecommendationStatus
@@ -18,7 +20,9 @@ class RecommendationRepository(SupabaseRepository):
         "action, reason, expected_impact, confidence, confidence_score, profile, "
         "multi_objective_score, status, requires_approval, approval_status, "
         "approved_by, approved_at, approval_reason, executed_at, execution_result, "
-        "rejection_reason, source, source_type, point_resolution"
+        "rejection_reason, source, source_type, metadata, outcome_validated, "
+        "outcome_notes, actual_value_set, power_at_creation_kw, tariff_rate_at_creation, "
+        "baseline_energy_kwh, actual_energy_kwh, actual_saving_kwh, actual_saving_zar"
     )
     _WRITE_COLUMNS = {
         "id",
@@ -46,21 +50,145 @@ class RecommendationRepository(SupabaseRepository):
         "shadow_mode",
         "source",
         "source_type",
-        "point_resolution",
+        "metadata",
+        "outcome_validated",
+        "outcome_notes",
+        "actual_value_set",
+        "power_at_creation_kw",
+        "tariff_rate_at_creation",
+        "baseline_energy_kwh",
+        "actual_energy_kwh",
+        "actual_saving_kwh",
+        "actual_saving_zar",
     }
 
     def _filter_supabase_payload(self, rec_dict: dict[str, Any]) -> dict[str, Any]:
         """Drop model-only keys that do not exist in the live recommendations table."""
         return {key: value for key, value in rec_dict.items() if key in self._WRITE_COLUMNS}
 
+    def _normalise_source_fields(self, rec_dict: dict[str, Any]) -> dict[str, Any]:
+        """Ensure AI optimization recommendations remain visible to phase gates."""
+        action_type = str(rec_dict.get("action_type") or "")
+        if action_type not in {"ai_optimization", "coordinated_optimization"}:
+            return rec_dict
+
+        normalised = dict(rec_dict)
+        if not normalised.get("source"):
+            normalised["source"] = "ai_optimizer"
+
+        if not normalised.get("source_type"):
+            metadata = normalised.get("metadata") or {}
+            source_metadata = metadata.get("source_metadata") if isinstance(metadata, dict) else {}
+            rule = ""
+            if isinstance(metadata, dict):
+                rule = str(metadata.get("rule") or "")
+            if not rule and isinstance(source_metadata, dict):
+                rule = str(source_metadata.get("rule") or "")
+
+            if rule == "closed_empty_building_hvac_running":
+                normalised["source_type"] = "operating_state_gate"
+            else:
+                normalised["source_type"] = "ml_model"
+
+        return normalised
+
     async def create(self, rec: Recommendation) -> Recommendation:
         """Create new recommendation in the canonical DB store."""
-        rec_dict = rec.to_dict()
+        rec_dict = self._normalise_source_fields(rec.to_dict())
+        action_type = str(rec_dict.get("action_type") or "")
+        if action_type in {
+            "health_maintenance",
+            "maintenance",
+            "maintenance_gap",
+            "maintenance_schedule",
+            "inspect",
+            "repair",
+            "replace",
+            "schedule_maintenance",
+        }:
+            try:
+                client = await self.get_client()
+                existing = (
+                    client.table("recommendations")
+                    .select("*")
+                    .eq("site_id", rec_dict.get("site_id"))
+                    .eq("status", "pending")
+                    .eq("target_equipment", rec_dict.get("target_equipment"))
+                    .eq("action_type", action_type)
+                    .order("timestamp", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if existing.data:
+                    logger.info(
+                        "Deduped pending maintenance recommendation for %s/%s",
+                        rec_dict.get("site_id"),
+                        rec_dict.get("target_equipment"),
+                    )
+                    return Recommendation.from_dict(existing.data[0])
+            except Exception as exc:
+                logger.warning("Maintenance recommendation dedupe check failed: %s", exc)
+        try:
+            duplicate = await self._find_recent_duplicate_control_recommendation(rec_dict)
+            if duplicate:
+                logger.info(
+                    "Deduped recent control recommendation for %s/%s action=%s",
+                    rec_dict.get("site_id"),
+                    rec_dict.get("target_equipment"),
+                    rec_dict.get("action"),
+                )
+                return Recommendation.from_dict(duplicate)
+        except Exception as exc:
+            logger.warning("Control recommendation dedupe check failed: %s", exc)
         result = await self._supabase_insert(rec_dict)
         if result:
             return Recommendation.from_dict(result)
         logger.error("Error creating recommendation %s: canonical DB write failed", rec.id)
         raise RuntimeError("Failed to persist recommendation to canonical DB store")
+
+    async def _find_recent_duplicate_control_recommendation(self, rec_dict: dict[str, Any]) -> dict[str, Any] | None:
+        """Find an open duplicate control recommendation.
+
+        Executed recommendations are intentionally excluded. A newly generated
+        Telegram advisory must not reuse the ID of an already-actioned record,
+        otherwise a fresh inline button can point at a closed recommendation and
+        fail with a misleading stale/current message.
+        """
+        action = rec_dict.get("action") or {}
+        if not isinstance(action, dict):
+            return None
+        site_id = rec_dict.get("site_id")
+        equipment = rec_dict.get("target_equipment")
+        point = action.get("point")
+        value = action.get("value")
+        action_type = str(rec_dict.get("action_type") or "")
+        if action_type not in {"ai_optimization", "coordinated_optimization"}:
+            return None
+        if not site_id or not equipment or not point or value is None:
+            return None
+
+        client = await self.get_client()
+        if not client:
+            return None
+        since = (datetime.now(UTC) - timedelta(hours=2)).isoformat()
+        result = await (
+            client.table("recommendations")
+            .select(self._COLUMNS)
+            .eq("site_id", site_id)
+            .eq("target_equipment", equipment)
+            .in_("status", ["pending", "approved"])
+            .gte("timestamp", since)
+            .order("timestamp", desc=True)
+            .limit(50)
+            .execute()
+        )
+        for row in result.data or []:
+            row_action = row.get("action") or {}
+            if not isinstance(row_action, dict):
+                continue
+            if row_action.get("point") == point and str(row_action.get("value")) == str(value):
+                return row
+        return None
 
     async def get(self, rec_id: str) -> Recommendation | None:
         """Get recommendation by ID."""
@@ -74,7 +202,7 @@ class RecommendationRepository(SupabaseRepository):
     async def get_by_status(
         self,
         site_id: str,
-        status: RecommendationStatus,
+        status: RecommendationStatus | str,
         limit: int = 10,
     ) -> list[Recommendation]:
         """Get recommendations with status, newest first."""
@@ -113,9 +241,13 @@ class RecommendationRepository(SupabaseRepository):
         if not token:
             return ""
 
-        exact = await self.get(token)
-        if exact:
-            return token
+        try:
+            UUID(token)
+            exact = await self.get(token)
+            if exact:
+                return token
+        except ValueError:
+            pass
 
         client = await self.get_client()
         if not client:
@@ -170,7 +302,7 @@ class RecommendationRepository(SupabaseRepository):
     async def _supabase_get_by_status(
         self,
         site_id: str,
-        status: RecommendationStatus,
+        status: RecommendationStatus | str,
         limit: int,
     ) -> list[dict[str, Any]]:
         """Query recommendations from Supabase by status."""
@@ -178,18 +310,28 @@ class RecommendationRepository(SupabaseRepository):
         if not client:
             return []
         try:
-            result = await (
+            status_value = status.value if isinstance(status, RecommendationStatus) else str(status)
+            query = (
                 client.table("recommendations")
                 .select("*")
                 .eq("site_id", site_id)
-                .eq("status", status.value)
                 .eq("action_type", "ai_optimization")
                 .eq("shadow_mode", False)
                 .order("risk_level", desc=True)
                 .order("timestamp", desc=True)
                 .limit(limit)
-                .execute()
             )
+            if status_value == RecommendationStatus.PENDING.value:
+                query = query.in_(
+                    "status",
+                    [
+                        RecommendationStatus.PENDING.value,
+                        RecommendationStatus.ADVISORY_INFO.value,
+                    ],
+                )
+            else:
+                query = query.eq("status", status_value)
+            result = await query.execute()
             return result.data or []
         except Exception as e:
             logger.error("Supabase query failed: %s", e)

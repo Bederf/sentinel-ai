@@ -18,7 +18,9 @@ class WorkOrderRepository:
         "id, code, title, description, priority, status, "
         "assigned_to, assigned_team, equipment_id, site_id, "
         "scheduled_date, completed_at, created_at, created_by, "
-        "estimated_duration_hours, milestone_status, sla_hours, sla_deadline_at"
+        "estimated_duration_hours, milestone_status, sla_hours, sla_deadline_at, "
+        "action_point, action_value, recommendation_id, "
+        "notified_technician_telegram_id"
     )
 
     _DETAIL_COLUMNS = (
@@ -30,6 +32,8 @@ class WorkOrderRepository:
         "notes, updated_at, "
         "milestone_status, assigned_at, in_progress_at, resolved_at, verified_at, "
         "sla_hours, sla_deadline_at, "
+        "action_point, action_value, recommendation_id, "
+        "notified_technician_telegram_id, "
         "closed_at, closed_by"
     )
 
@@ -96,14 +100,18 @@ class WorkOrderRepository:
                 payload["site_id"] = site_id
 
             # New fields for recommendation-based WOs (dedup support)
-            if work_order.get("action_point"):
-                payload["action_point"] = work_order["action_point"]
-            if work_order.get("action_value") is not None:
-                payload["action_value"] = str(work_order["action_value"])
-            if work_order.get("recommendation_id"):
-                payload["recommendation_id"] = work_order["recommendation_id"]
-            if work_order.get("notified_technician_telegram_id") is not None:
-                payload["notified_technician_telegram_id"] = work_order["notified_technician_telegram_id"]
+            optional_fields = (
+                "action_point",
+                "action_value",
+                "recommendation_id",
+                "notified_technician_telegram_id",
+                "category",
+                "service_type",
+                "notes",
+            )
+            for field in optional_fields:
+                if work_order.get(field) is not None:
+                    payload[field] = str(work_order[field]) if field == "action_value" else work_order[field]
 
             # Insert with retry on duplicate code collision (DB trigger generates code)
             max_retries = 3
@@ -249,7 +257,7 @@ class WorkOrderRepository:
         status_map = {
             "assigned": "scheduled",
             "in_progress": "in_progress",
-            "resolved": "in_progress",
+            "resolved": "completed",
             "verified": "completed",
         }
         if new_milestone in status_map:
@@ -260,6 +268,9 @@ class WorkOrderRepository:
             updates["in_progress_at"] = now.isoformat()
         elif new_milestone == "resolved":
             updates["resolved_at"] = now.isoformat()
+            updates["completed_at"] = now.isoformat()
+            updates["closed_at"] = now.isoformat()
+            updates["closed_by"] = by_user or wo.get("assigned_to") or "technician"
         elif new_milestone == "verified":
             updates["verified_at"] = now.isoformat()
 
@@ -292,11 +303,11 @@ class WorkOrderRepository:
         except Exception:
             pass
 
-        if new_milestone != "verified":
+        if new_milestone in {"resolved", "verified"}:
+            updates["sla_deadline_at"] = None
+        else:
             deadline = milestone_start + timedelta(hours=milestone_hours)
             updates["sla_deadline_at"] = deadline.isoformat()
-        else:
-            updates["sla_deadline_at"] = None
 
         logger.info(
             f"Advancing WO {wo.get('code')} milestone to {new_milestone} "

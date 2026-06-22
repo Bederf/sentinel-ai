@@ -291,7 +291,7 @@ class SensorAutoencoder:
         tf, keras = _get_tf()
 
         instance = cls.__new__(cls)
-        instance.model = keras.models.load_model(path)
+        instance.model = keras.models.load_model(path, compile=False)
 
         # Load threshold
         threshold_path = path.replace(".h5", "_threshold.npy")
@@ -312,7 +312,7 @@ class SensorAutoencoder:
         # Rebuild encoder from loaded model
         latent_layer = instance.model.get_layer("latent")
         instance.encoder = keras.Model(instance.model.input, latent_layer.output)
-        instance.latent_dim = latent_layer.output_shape[-1]
+        instance.latent_dim = int(latent_layer.output.shape[-1])
 
         logger.info(f"Loaded autoencoder from {path}")
         return instance

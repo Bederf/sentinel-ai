@@ -198,7 +198,7 @@ class TestIngestBookingEmail:
             organiser_name="Shaun Grose",
             overlap_window_start=datetime(2026, 3, 2, 9, 0),
             overlap_window_end=datetime(2026, 3, 2, 17, 0),
-            rooms=["S002-L1-MR1", "S002-L2-MR1", "S002-L3-MR1"],
+            rooms=["S002-L0-MR1", "S002-L1-MR1", "S002-L2-MR1"],
             room_count=3,
             booking_ids=["booking-001", "booking-002", "booking-003"],
         )

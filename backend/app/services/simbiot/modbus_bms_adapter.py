@@ -11,6 +11,7 @@ import asyncio
 import csv
 import json
 import logging
+import struct
 from collections.abc import Sequence
 from io import StringIO
 from typing import Any
@@ -230,32 +231,43 @@ class ModbusBmsAdapter(BmsAdapter):
 
         try:
             # Read current value (audit trail)
+            data_type = point_def.get("data_type", "uint16")
             current_raw = await self._read_register(
                 address=point_def["address"],
                 register_type=point_def.get("type", "holding"),
-                data_type=point_def.get("data_type", "uint16"),
+                data_type=data_type,
             )
             logger.info(f"Modbus write: {device_id}.{point_id} current={current_raw}, new={request.value}")
 
             # Descale for raw register write
+            # For 32-bit float, we write the float value directly (packing handles conversion)
+            # For integer types, we descale to get the raw register value
             scale = point_def.get("scale", 1.0)
-            raw_value = int(request.value / scale)
+            if data_type == "float32":
+                raw_value = request.value
+            else:
+                raw_value = int(request.value / scale)
 
             # Write register
             await self._write_register(
                 address=point_def["address"],
                 value=raw_value,
                 register_type=point_def.get("type", "holding"),
+                data_type=data_type,
             )
 
             # Read back to verify
             verified_raw = await self._read_register(
                 address=point_def["address"],
                 register_type=point_def.get("type", "holding"),
-                data_type=point_def.get("data_type", "uint16"),
+                data_type=data_type,
             )
 
-            if verified_raw != raw_value:
+            # For float32, compare with small tolerance
+            if data_type == "float32":
+                if abs(verified_raw - raw_value) > 0.001:
+                    logger.warning(f"Modbus write verification failed: wrote {raw_value}, read {verified_raw}")
+            elif verified_raw != raw_value:
                 logger.warning(f"Modbus write verification failed: wrote {raw_value}, read {verified_raw}")
 
             return True
@@ -271,28 +283,39 @@ class ModbusBmsAdapter(BmsAdapter):
         if not self._connected or not self._client:
             raise ConnectionError("Modbus adapter is not connected")
 
+    def _get_word_order(self) -> str:
+        """Get word order from config metadata, default 'big' (high word first)."""
+        if self._config and self._config.metadata:
+            return self._config.metadata.get("word_order", "big")
+        return "big"
+
     async def _read_register(
         self,
         address: int,
         register_type: str,
         data_type: str = "uint16",
-    ) -> int | bool:
+    ) -> int | float | bool:
         assert self._client is not None
 
         # Normalize: Modbus UI uses 40001+ for holding, API uses 0-based
         addr = address - 1 if address >= 40001 else address
         slave_id = self._config.metadata.get("slave_id", 1) if self._config else 1
+        word_order = self._get_word_order()
+
+        # 32-bit types need 2 registers
+        is_32bit = data_type in ("uint32", "int32", "float32")
+        count = 2 if is_32bit else 1
 
         if register_type == "holding":
             response = await self._client.read_holding_registers(
                 address=addr,
-                count=1,
+                count=count,
                 slave=slave_id,
             )
         elif register_type == "input":
             response = await self._client.read_input_registers(
                 address=addr,
-                count=1,
+                count=count,
                 slave=slave_id,
             )
         elif register_type == "coil":
@@ -315,25 +338,78 @@ class ModbusBmsAdapter(BmsAdapter):
 
         if register_type in ("coil", "discrete"):
             return response.bits[0]
+
+        if is_32bit:
+            # Decode 2 registers based on data_type and word_order
+            regs = response.registers
+            if len(regs) < 2:
+                raise ModbusException(f"Expected 2 registers for {data_type}, got {len(regs)}")
+
+            # Combine registers according to word order
+            if word_order == "big":
+                # High word first (standard Modbus)
+                combined = (regs[0] << 16) | regs[1]
+            else:
+                # Low word first
+                combined = (regs[1] << 16) | regs[0]
+
+            if data_type == "float32":
+                return struct.unpack(">f", struct.pack(">I", combined))[0]
+            elif data_type == "uint32":
+                return combined
+            elif data_type == "int32":
+                # Sign-extend if needed
+                if combined & 0x80000000:
+                    return combined - 0x100000000
+                return combined
+
         return response.registers[0]
 
     async def _write_register(
         self,
         address: int,
-        value: int,
+        value: int | float,
         register_type: str,
+        data_type: str = "uint16",
     ) -> None:
         assert self._client is not None
 
         addr = address - 1 if address >= 40001 else address
         slave_id = self._config.metadata.get("slave_id", 1) if self._config else 1
+        word_order = self._get_word_order()
+
+        is_32bit = data_type in ("uint32", "int32", "float32")
 
         if register_type == "holding":
-            response = await self._client.write_register(
-                address=addr,
-                value=value,
-                slave=slave_id,
-            )
+            if is_32bit:
+                # Pack value into 2 registers
+                if data_type == "float32":
+                    packed = struct.pack(">f", float(value))
+                    combined = struct.unpack(">I", packed)[0]
+                elif data_type in ("uint32", "int32"):
+                    combined = int(value) & 0xFFFFFFFF
+
+                # Split into two 16-bit registers according to word order
+                if word_order == "big":
+                    reg_high = (combined >> 16) & 0xFFFF
+                    reg_low = combined & 0xFFFF
+                    registers = [reg_high, reg_low]
+                else:
+                    reg_low = combined & 0xFFFF
+                    reg_high = (combined >> 16) & 0xFFFF
+                    registers = [reg_low, reg_high]
+
+                response = await self._client.write_registers(
+                    address=addr,
+                    values=registers,
+                    slave=slave_id,
+                )
+            else:
+                response = await self._client.write_register(
+                    address=addr,
+                    value=int(value),
+                    slave=slave_id,
+                )
         elif register_type == "coil":
             response = await self._client.write_coil(
                 address=addr,

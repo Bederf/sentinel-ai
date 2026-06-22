@@ -28,8 +28,6 @@ def get_supabase_client():
     global _supabase_client
 
     if _supabase_client is None:
-        # In TESTING mode, try a real connection if credentials are available.
-        # Fall back to _DummySupabaseClient if no Supabase is configured.
         if os.getenv("TESTING", "").lower() == "true":
             if not settings.supabase_url or not settings.supabase_service_role_key:
                 _supabase_client = _DummySupabaseClient()
@@ -37,21 +35,6 @@ def get_supabase_client():
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            warnings.filterwarnings(
-                "ignore",
-                message="The 'timeout' parameter is deprecated. Please configure it in the http client instead.",
-                category=DeprecationWarning,
-            )
-            warnings.filterwarnings(
-                "ignore",
-                message="'.*' deprecated - use '.*'",
-                category=DeprecationWarning,
-            )
-            warnings.filterwarnings(
-                "ignore",
-                message="'.*' argument is deprecated, use '.*'",
-                category=DeprecationWarning,
-            )
             from supabase import create_client
 
         if not settings.supabase_url or not settings.supabase_service_role_key:
@@ -61,30 +44,48 @@ def get_supabase_client():
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            warnings.filterwarnings(
-                "ignore",
-                message="The 'timeout' parameter is deprecated. Please configure it in the http client instead.",
-                category=DeprecationWarning,
-            )
-            warnings.filterwarnings(
-                "ignore",
-                message="'.*' deprecated - use '.*'",
-                category=DeprecationWarning,
-            )
-            warnings.filterwarnings(
-                "ignore",
-                message="'.*' argument is deprecated, use '.*'",
-                category=DeprecationWarning,
-            )
             _supabase_client = create_client(settings.supabase_url, settings.supabase_service_role_key)
 
     return _supabase_client
 
 
+_async_supabase_client: object | None = None
+
+
+async def get_async_supabase_client():
+    """Get or create the async Supabase client singleton.
+
+    Returns:
+        Async Supabase client instance
+
+    Raises:
+        ValueError: If Supabase credentials are not configured
+    """
+    global _async_supabase_client
+
+    if _async_supabase_client is None:
+        if os.getenv("TESTING", "").lower() == "true":
+            if not settings.supabase_url or not settings.supabase_service_role_key:
+                _async_supabase_client = _DummySupabaseClient()
+                return _async_supabase_client
+
+        if not settings.supabase_url or not settings.supabase_service_role_key:
+            raise ValueError(
+                "Supabase credentials not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env"
+            )
+
+        from supabase._async.client import create_client as create_async_client
+
+        _async_supabase_client = await create_async_client(settings.supabase_url, settings.supabase_service_role_key)
+
+    return _async_supabase_client
+
+
 def reset_supabase_client():
     """Reset the Supabase client (useful for testing)."""
-    global _supabase_client
+    global _supabase_client, _async_supabase_client
     _supabase_client = None
+    _async_supabase_client = None
 
 
 class Supabase:
@@ -92,9 +93,4 @@ class Supabase:
 
     @staticmethod
     def instance():
-        """Get or create the Supabase client singleton.
-
-        Returns:
-            Supabase client instance
-        """
         return get_supabase_client()

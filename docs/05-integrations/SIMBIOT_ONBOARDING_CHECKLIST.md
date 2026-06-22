@@ -4,7 +4,7 @@ type: "spec"
 status: "draft"
 version: "2.0.0"
 created: "2026-03-31"
-updated: "2026-05-28"
+updated: "2026-06-19"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -35,7 +35,29 @@ Each new site is onboarded via the **SIMBIOT Connection Wizard**. The wizard ste
 2. **Discover** — discover BACnet points, classify equipment groups
 3. **Review** — review AI-classified mappings
 4. **Approve** — enable processing, save adapter config
-5. **Configure** — set site contacts, generate building twin (optional)
+5. **Access** — record the tenant MCP/GPT boundary before any client sharing
+6. **Configure** — set site contacts, generate building twin (optional)
+
+### Tenant MCP/GPT access gate
+
+Tenant access is an explicit onboarding gate. A newly created site must not automatically appear in a shared GPT or global MCP schema.
+
+For each tenant-facing connector:
+
+- Create or deploy a tenant-specific MCP API key outside the browser wizard
+- Bind that key to exactly one allowed site, e.g. `site-005`
+- Import a site-scoped GPT Action schema, e.g. `/api/mcp/openai/openapi.json?site_id=S005`
+- Keep write/control tools disabled unless a separate control approval process enables them
+- Negative-test isolation before sharing: the tenant key for `site-005` must fail against `site-002`
+- Keep shadow/onboarding sites in read-only or disabled access mode until promoted
+
+The wizard records tenant/client name, initial access mode, allowed site, and schema URL, but final key creation is an admin/deployment action.
+
+### Site code generation
+
+Site codes are generated per Supabase instance. A new client deployment starts from an empty `sites` table, so its first onboarded client site becomes `site-001`.
+
+Within a single database, auto-generation uses `max(existing numeric suffix) + 1`, not gap filling. For example, if `site-001`, `site-002`, and `site-005` exist in that tenant database, the next generated code is `site-006`.
 
 ### Connection types supported
 
@@ -53,6 +75,8 @@ The SIMBIOT Bridge vendor uses HTTP REST through the WireGuard tunnel. This avoi
 
 - Connects via `base_url` (e.g. `http://10.99.0.1:8080`) and API `token`
 - Discovers 1 logical bridge device per site with all points classified
+- Uses the bridge `/api/sites/{site_id}/objects` catalog as the source of truth for exact point IDs and `writable=true` writeability
+- Imports bridge `writable=true` objects for known equipment as verified writable mappings, provided the bridge write guard is kept synced to the same catalog
 - Saves per-site adapter config to `site_adapter_config` table
 - Is **disabled by default** for new sites — toggle on in Settings when ready
 
@@ -70,10 +94,17 @@ The wizard captures and persists to Supabase:
 | Building contacts | `sites` table (contact_email, contact_phone) + `metadata` JSONB |
 | BMS connection config | `site_adapter_config` table |
 | Base modules (15) | `site_modules` table (auto-seeded) |
+| Tenant MCP access intent | Wizard review artifact + deployment config (`MCP_TENANT_API_KEYS`) |
+
+### Required profile confirmation
+
+Phase 191 requires a confirmed `site_profiles` row before a site can move through the shadow/promotion path. The wizard creates the building profile after the site record is available; manual/API onboarding must call `POST /api/site-profiles/{site_id}` before attempting phase promotion.
+
+For hospital sites, compliance-relevant defaults must be corrected before or alongside site-profile confirmation. Example: Legionella/cooling-tower applicability must be manually reviewed for hospital cooling-tower sites before commissioning math or promotion gates rely on `site_profiles`.
 
 ### Building twin generation
 
-After onboarding, a **"Generate Building Twin"** button in Step 5 triggers:
+After onboarding, a **"Generate Building Twin"** button in Step 6 triggers:
 
 1. Web scrape for a building photo
 2. Claude Vision extracts geometry (floor count, shape, setbacks, facade)
@@ -97,6 +128,22 @@ Data ingestion rate is automatically controlled by the site's onboarding phase:
 | `automatic` | **100%** | Full |
 
 The polling service (`ShadowModePollingService`) reads the site's `onboarding_phase` from Supabase before each poll cycle and skips polls proportionally.
+
+Current SIMBIOT site creation defaults new sites to `shadow_live`. If a site must start conservatively in `commissioning`, pass or patch the initial phase explicitly before enabling polling.
+
+### Bridge discovery after onboarding
+
+Supabase is the source of truth for site inventory after onboarding. Live bridge polling may discover equipment or points that are not yet in the active `equipment` table, but polling must not create zones and must not automatically create active equipment.
+
+When the bridge reports an unknown equipment code:
+
+- The item is written to `bridge_discovered_equipment` with `status = pending`.
+- The item appears in **System Health -> Health -> Equipment Onboarding**.
+- Operators can dismiss the item or onboard it into the active equipment inventory.
+- Terminal equipment such as FCUs, VAVs, DALI controllers, and lighting endpoints can only be onboarded if the derived zone already exists in Supabase `zones` or `hvac_zones`.
+- If the derived zone does not exist, the item remains pending and is marked as not onboardable. The zone must be created through the site onboarding process first.
+
+This prevents bridge-only or stale point-list data from creating invalid zones such as a third-floor zone on a two-floor site.
 
 ### Promotion gates (commissioning → shadow_live)
 
@@ -168,6 +215,38 @@ Guided inspection generation is intentionally scoped to major plant first. This 
 
 - `S002-CHILLER-`, `S002-CHWP-`, `S002-CWP-`, `S002-CT-`, `S002-BOILER-`
 - `S002-AHU-`, `S002-GEN-`, `S002-UPS-`, `S002-ATS-`, `S002-MSB-`, `S002-INCOMER-`
+
+### Site ID policy
+
+- Database and API `site_id` values must use canonical `site-###` format, for
+  example `site-002` or `site-005`.
+- Equipment codes may keep the physical prefix, for example `S002-AHU-B01`.
+- Bridge discovery may report equipment codes with `S###-...`; onboarding must
+  bind those records to the canonical site row before persistence.
+- Zones are created only during site onboarding. Runtime bridge polling records
+  unknown equipment in `bridge_discovered_equipment`; it must not auto-create
+  zones or active equipment.
+
+### S002 DALI/Encom lighting telemetry
+
+S002 lighting is a separate DALI/Encom subsystem exposed through the bridge. The
+bridge object catalog provides zone-level DALI points such as `brightness`,
+`power_watts`, `energy_kwh`, and `occupancy`.
+
+Shadow polling writes measured DALI zone telemetry into `lighting_energy` using:
+
+- canonical `site_id`, for example `site-002`
+- canonical Supabase zone IDs from the active equipment row, for example
+  `Zone-101`, `Zone-202`, or `Zone-B`
+- measured `total_watts` and `avg_dim_level`
+
+The bridge does not currently expose a reliable active-luminaire count for these
+zone-level points, so `active_luminaires` remains nullable. Do not fabricate
+luminaire counts from zone power.
+
+Unzoned DALI/Encom controller hardware must remain visible as onboarding/mapping
+gaps until a real `zone_key` is assigned. It must not be fake-mapped just to make
+lighting reflex rules fire.
 
 ### Onboarding acceptance criteria for this policy
 

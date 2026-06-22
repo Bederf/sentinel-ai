@@ -422,3 +422,88 @@ class TestRecommendationExecution:
 
             assert rec.status == RecommendationStatus.FAILED
             assert "Device offline" in rec.execution_result["error"]
+
+    async def test_coordinated_optimization_does_not_use_generic_execution_path(self, service):
+        """Coordinated bundle drafts require their own approval/execution path."""
+        rec = Recommendation(
+            site_id="site-002",
+            action_type="coordinated_optimization",
+            target_equipment="S002-AHU-B01",
+            action={"execution_blocked": True, "blocker": "pending_human_approval"},
+            status=RecommendationStatus.PENDING,
+            requires_approval=True,
+            approval_status="pending",
+            metadata={"lifecycle": "draft_pending_approval"},
+        )
+
+        with patch("app.services.recommendation_service.device_manager") as mock_dm:
+            mock_dm.apply_action = AsyncMock(return_value={"success": True})
+
+            with pytest.raises(ValueError, match="dedicated coordinated approval/execution path"):
+                await service.execute_recommendation(rec.id, rec)
+
+            mock_dm.apply_action.assert_not_called()
+
+    async def test_approve_maintenance_recommendation_creates_work_order(self, service):
+        """Maintenance approvals create an AI maintenance WO, not a BMS action."""
+        rec = Recommendation(
+            id="rec-maint-001",
+            site_id="site-002",
+            action_type="maintenance",
+            risk_level=ActionRiskLevel.HIGH,
+            target_equipment="S002-CHILLER-B01",
+            action={
+                "type": "schedule_maintenance",
+                "priority": "high",
+                "evidence": ["Health at 60%", "2 alerts in 30 days"],
+                "immediate_actions": ["Check condenser approach temps", "Review recent alarms"],
+            },
+            reason="Maintenance Required: chiller health degradation",
+            status=RecommendationStatus.PENDING,
+            requires_approval=True,
+        )
+
+        mock_rec_repo = AsyncMock()
+        mock_rec_repo.get = AsyncMock(return_value=rec)
+        mock_rec_repo.update = AsyncMock(return_value=rec)
+
+        mock_wo_repo = AsyncMock()
+        mock_wo_repo.create_work_order = AsyncMock(
+            return_value={
+                "id": "wo-001",
+                "code": "WO-2026-001",
+                "equipment_id": "eq-001",
+            }
+        )
+
+        with (
+            patch("app.database.repositories.get_recommendation_repository", return_value=mock_rec_repo),
+            patch("app.services.module_registry_service.module_registry.is_module_active", return_value=True),
+            patch(
+                "app.database.repositories.work_order_repository.get_work_order_repository", return_value=mock_wo_repo
+            ),
+            patch("app.database.repositories.technician_repository.TechnicianRepository") as mock_tech_repo_cls,
+            patch("app.services.sentry_integration.work_order_notifier.WorkOrderNotifier") as mock_notifier_cls,
+            patch("app.services.recommendation_service.device_manager") as mock_device_manager,
+        ):
+            mock_tech_repo = mock_tech_repo_cls.return_value
+            mock_tech_repo.get_technician_for_equipment_code = AsyncMock(
+                return_value={
+                    "name": "HVAC Tech",
+                    "telegram_id": "12345",
+                    "email": "tech@example.com",
+                    "specialty": "hvac",
+                }
+            )
+            mock_notifier = mock_notifier_cls.return_value
+            mock_notifier.notify_technician = AsyncMock(return_value=True)
+
+            approved = await service.approve_recommendation("rec-maint-001", "operator-1")
+
+        assert approved.status == RecommendationStatus.APPROVED
+        assert approved.execution_result["status"] == "work_order_created"
+        assert approved.execution_result["work_order_id"] == "wo-001"
+        assert approved.execution_result["diagnostic_context"]["source"] == "ai_maintenance_recommendation"
+        mock_wo_repo.create_work_order.assert_awaited_once()
+        mock_notifier.notify_technician.assert_awaited_once()
+        mock_device_manager.apply_action.assert_not_called()

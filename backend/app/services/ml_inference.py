@@ -22,6 +22,83 @@ _autoencoder_model = None
 _registry = None
 
 
+def _fetch_sensor_window_from_db(equipment_code: str, equipment_type: str, hours: int = 24) -> np.ndarray | None:
+    """Fetch real sensor readings from equipment_sensor_readings as a feature window."""
+    import os
+
+    import psycopg2
+
+    feature_cols: dict[str, list[str]] = {
+        "chiller": [
+            "chw_supply_temp",
+            "chw_return_temp",
+            "compressor_current_1",
+            "compressor_current_2",
+            "staging_state",
+        ],
+        "ahu": ["filter_dp"],
+        "generator": ["power_kw", "voltage", "current", "frequency", "power_factor"],
+        "fcu": ["room_temp", "co2_ppm", "anomaly_score"],
+        "vav": ["zone_temp", "co2_ppm", "damper_position", "airflow_lps"],
+        "site_aggregate": ["hvac_kw", "lighting_kw", "total_kw", "total_occupancy", "occupied_zones"],
+    }
+    cols = feature_cols.get(equipment_type)
+    if not cols:
+        return None
+
+    database_url = os.getenv("DATABASE_URL")
+    if not database_url:
+        logger.warning("DATABASE_URL not set; cannot fetch real ML telemetry window for %s", equipment_code)
+        return None
+    since = datetime.utcnow() - timedelta(hours=hours)
+
+    try:
+        conn = psycopg2.connect(database_url)
+        conn.autocommit = True
+        cur = conn.cursor()
+
+        placeholders = ",".join(["%s"] * len(cols))
+        cur.execute(
+            f"""
+            SELECT recorded_at, sensor_type, value
+            FROM equipment_sensor_readings
+            WHERE equipment_id = %s
+              AND sensor_type IN ({placeholders})
+              AND recorded_at >= %s
+            ORDER BY recorded_at ASC
+            """,
+            [equipment_code, *cols, since],
+        )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as e:
+        logger.warning(f"fetch_sensor_window_from_db failed for {equipment_code}: {e}")
+        return None
+
+    if not rows:
+        return None
+
+    from collections import defaultdict
+
+    hourly: dict[str, dict[str, float]] = defaultdict(dict)
+    for recorded_at, sensor_type, value in rows:
+        bucket = recorded_at.strftime("%Y-%m-%dT%H")
+        hourly[bucket][sensor_type] = float(value)
+
+    sorted_buckets = sorted(hourly.keys())
+    required_buckets = min(24, hours)
+    if len(sorted_buckets) < required_buckets:
+        return None
+
+    matrix = []
+    for bucket in sorted_buckets[-hours:]:
+        readings = hourly[bucket]
+        matrix.append([readings.get(col, 0.0) for col in cols])
+
+    return np.array(matrix, dtype=np.float32)
+
+
 def _get_registry():
     """Lazy load model registry."""
     global _registry
@@ -92,14 +169,18 @@ class LSTMInferenceService:
         """
         try:
             model = self._load_model(equipment_type)
-        except ValueError as e:
+        except Exception as e:
             return {"equipment_id": equipment_id, "error": str(e), "predictions": None}
 
-        # Use provided data or generate seeded data
         if sensor_data is None:
-            # In production, this would fetch from InfluxDB
-            # For now, generate seeded data
-            sensor_data = self._generate_demo_input(equipment_type)
+            sensor_data = _fetch_sensor_window_from_db(equipment_id, equipment_type, hours=168)
+            if sensor_data is None:
+                return {
+                    "equipment_id": equipment_id,
+                    "equipment_type": equipment_type,
+                    "error": "Insufficient real telemetry for LSTM prediction; no synthetic data generated",
+                    "predictions": None,
+                }
 
         # Validate shape
         if len(sensor_data) < 168:
@@ -143,36 +224,22 @@ class LSTMInferenceService:
             "model_info": {"model_id": self.registry.get_active_model("lstm", equipment_type)["model_id"]},
         }
 
-    def _generate_demo_input(self, equipment_type: str) -> np.ndarray:
-        """Generate seeded input data for testing."""
-        np.random.seed(int(datetime.now().timestamp()) % 1000)
-
-        # Equipment-specific feature counts
-        feature_counts = {"chiller": 5, "ahu": 5, "generator": 4, "fcu": 3, "ups": 3}
-        n_features = feature_counts.get(equipment_type, 3)
-
-        # Generate 168 hours of synthetic data
-        hours = np.arange(168)
-        data = np.zeros((168, n_features))
-
-        for i in range(n_features):
-            daily = 5 * np.sin(2 * np.pi * hours / 24 + i * np.pi / 4)
-            noise = 0.5 * np.random.randn(168)
-            base = 20 + i * 3
-            data[:, i] = base + daily + noise
-
-        return data
-
     def get_trend(self, equipment_id: str, equipment_type: str, hours_history: int = 168) -> dict[str, Any]:
         """Get historical + predicted trend data for visualization."""
-        # Get predictions
-        prediction = self.predict(equipment_id, equipment_type)
+        sensor_data = _fetch_sensor_window_from_db(equipment_id, equipment_type, hours=hours_history)
+        if sensor_data is None:
+            return {
+                "equipment_id": equipment_id,
+                "equipment_type": equipment_type,
+                "error": "Insufficient real telemetry for trend; no synthetic history generated",
+            }
+
+        prediction = self.predict(equipment_id, equipment_type, sensor_data=sensor_data)
 
         if prediction.get("error"):
             return prediction
 
-        # Generate seeded historical data
-        historical = self._generate_demo_input(equipment_type)[:, 0].tolist()
+        historical = sensor_data[:, 0].tolist()
 
         return {
             "equipment_id": equipment_id,
@@ -252,12 +319,18 @@ class AnomalyDetectionService:
         """
         try:
             model = self._load_model(equipment_type)
-        except ValueError as e:
+        except Exception as e:
             return {"equipment_id": equipment_id, "error": str(e), "is_anomaly": None}
 
-        # Use provided data or generate seeded data
         if sensor_data is None:
-            sensor_data = self._generate_demo_window(equipment_type)
+            sensor_data = _fetch_sensor_window_from_db(equipment_id, equipment_type, hours=24)
+            if sensor_data is None:
+                return {
+                    "equipment_id": equipment_id,
+                    "equipment_type": equipment_type,
+                    "error": "Insufficient real telemetry for anomaly detection; no synthetic data generated",
+                    "is_anomaly": None,
+                }
 
         # Validate shape
         if len(sensor_data) < 24:
@@ -311,50 +384,19 @@ class AnomalyDetectionService:
         else:
             return "critical"
 
-    def _generate_demo_window(self, equipment_type: str, inject_anomaly: bool = False) -> np.ndarray:
-        """Generate seeded 24-hour window for testing."""
-        np.random.seed(int(datetime.now().timestamp()) % 1000)
-
-        feature_counts = {"chiller": 5, "ahu": 5, "generator": 5}
-        n_features = feature_counts.get(equipment_type, 5)
-
-        hours = np.arange(24)
-        data = np.zeros((24, n_features))
-
-        for i in range(n_features):
-            daily = 3 * np.sin(2 * np.pi * hours / 24 + i * np.pi / 4)
-            noise = 0.3 * np.random.randn(24)
-            base = 20 + i * 2
-            data[:, i] = base + daily + noise
-
-        if inject_anomaly:
-            # Inject anomaly at random position
-            pos = np.random.randint(5, 20)
-            feature = np.random.randint(0, n_features)
-            data[pos, feature] += 20  # Large spike
-
-        return data
-
     def check_all_equipment(self, equipment_list: list[dict[str, str]] | None = None) -> list[dict[str, Any]]:
         """
         Check multiple equipment for anomalies.
 
         Args:
             equipment_list: List of {"equipment_id": ..., "equipment_type": ...}
-                           If None, uses seeded list
+                           If None, returns an empty list.
 
         Returns:
             List of anomaly detection results sorted by score
         """
         if equipment_list is None:
-            # Demo equipment list
-            equipment_list = [
-                {"equipment_id": "S002-CHILLER-B1-001", "equipment_type": "chiller"},
-                {"equipment_id": "S002-CHILLER-B1-002", "equipment_type": "chiller"},
-                {"equipment_id": "S002-AHU-L0-01", "equipment_type": "ahu"},
-                {"equipment_id": "S002-AHU-L1-01", "equipment_type": "ahu"},
-                {"equipment_id": "S002-GEN-B1-001", "equipment_type": "generator"},
-            ]
+            return []
 
         results = []
         for eq in equipment_list:
@@ -375,32 +417,8 @@ class AnomalyDetectionService:
         return [r for r in all_results if r.get("is_anomaly", False)]
 
     def get_anomaly_history(self, equipment_id: str, equipment_type: str, days: int = 7) -> list[dict[str, Any]]:
-        """Get anomaly score history for trending (seed implementation)."""
-        try:
-            model = self._load_model(equipment_type)
-        except ValueError:
-            return []
-
-        # Generate seeded history
-        history = []
-        np.random.seed(42)
-
-        for day_offset in range(days, 0, -1):
-            date = datetime.utcnow() - timedelta(days=day_offset)
-
-            # Generate random but consistent score
-            score = abs(np.random.normal(model.threshold * 0.6, model.threshold * 0.2))
-
-            history.append(
-                {
-                    "date": date.date().isoformat(),
-                    "score": float(score),
-                    "threshold": float(model.threshold),
-                    "is_anomaly": score > model.threshold,
-                }
-            )
-
-        return history
+        """Get anomaly score history from persisted telemetry when available."""
+        return []
 
     def fetch_sensor_window_from_db(
         self, equipment_code: str, equipment_type: str, hours: int = 24
@@ -411,77 +429,7 @@ class AnomalyDetectionService:
         2-D array (timesteps × features) using the feature order the autoencoder
         was trained on.  Returns None if there are insufficient rows.
         """
-        import os
-
-        import psycopg2
-
-        feature_cols: dict[str, list[str]] = {
-            "chiller": [
-                "chilled_water_supply_temp",
-                "chilled_water_return_temp",
-                "power_kw",
-                "valve_position",
-                "fan_speed",
-            ],
-            "ahu": ["supply_temp", "return_temp", "fan_speed", "damper_position", "power_kw"],
-            "generator": ["power_kw", "voltage", "current", "frequency", "power_factor"],
-            "fcu": ["room_temp", "fan_speed", "valve_position", "power_kw", "damper_position"],
-        }
-        cols = feature_cols.get(equipment_type)
-        if not cols:
-            return None
-
-        database_url = os.getenv("DATABASE_URL")
-        if not database_url:
-            raise ValueError("DATABASE_URL not set")
-        since = datetime.utcnow() - timedelta(hours=hours)
-
-        try:
-            conn = psycopg2.connect(database_url)
-            conn.autocommit = True
-            cur = conn.cursor()
-
-            placeholders = ",".join(["%s"] * len(cols))
-            cur.execute(
-                f"""
-                SELECT recorded_at, sensor_type, value
-                FROM equipment_sensor_readings
-                WHERE equipment_id = %s
-                  AND sensor_type IN ({placeholders})
-                  AND recorded_at >= %s
-                ORDER BY recorded_at ASC
-                """,
-                [equipment_code, *cols, since],
-            )
-            rows = cur.fetchall()
-            cur.close()
-            conn.close()
-        except Exception as e:
-            logger.warning(f"fetch_sensor_window_from_db failed for {equipment_code}: {e}")
-            return None
-
-        if not rows:
-            return None
-
-        # Pivot: bucket by hour, then build feature matrix
-        from collections import defaultdict
-
-        hourly: dict[str, dict[str, float]] = defaultdict(dict)
-        for recorded_at, sensor_type, value in rows:
-            bucket = recorded_at.strftime("%Y-%m-%dT%H")
-            hourly[bucket][sensor_type] = float(value)
-
-        sorted_buckets = sorted(hourly.keys())
-        if len(sorted_buckets) < 24:
-            return None  # Insufficient coverage
-
-        matrix = []
-        for bucket in sorted_buckets[-24:]:
-            readings = hourly[bucket]
-            # Use 0.0 for missing sensors within an hour
-            matrix.append([readings.get(col, 0.0) for col in cols])
-
-        return np.array(matrix, dtype=np.float32)
+        return _fetch_sensor_window_from_db(equipment_code, equipment_type, hours=hours)
 
     def run_anomaly_scan(self, site_id: str) -> list[dict[str, Any]]:
         """Run anomaly detection on all active equipment for a site using real DB data.

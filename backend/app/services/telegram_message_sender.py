@@ -57,14 +57,15 @@ class TelegramMessageSender:
         chat_id: str,
         text: str,
         keyboard: InlineKeyboard | None = None,
-        parse_mode: str = "HTML",
+        parse_mode: str | None = "HTML",
     ) -> dict:
         """Send a text message, optionally with an inline keyboard."""
         payload: dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": parse_mode,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if keyboard:
             payload["reply_markup"] = keyboard.to_telegram()
 

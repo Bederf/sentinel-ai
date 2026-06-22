@@ -4,7 +4,7 @@ SENTINEL Workflow Trigger Engine
 Automated triggers that connect the workflow systems:
 - ML anomalies create inspection tasks
 - Baseline deviations generate recommendations
-- Critical deficiencies auto-create work orders
+- Critical deficiencies create approval-pending work orders only in supervised+
 - Repair completions trigger post-repair inspections
 - Effectiveness validation compares pre/post baselines
 
@@ -187,7 +187,7 @@ class WorkflowTriggerEngine:
     Handles:
     1. ML Anomaly → Inspection Task
     2. Baseline Deviation → Maintenance Recommendation
-    3. Critical Deficiency → Work Order
+    3. Critical Deficiency → Approval-pending Work Order in supervised+
     4. Repair Completion → Post-Repair Inspection
     5. Effectiveness Validation → ML Feedback Loop
     """
@@ -218,6 +218,55 @@ class WorkflowTriggerEngine:
         # Configuration
         self.baseline_deviation_threshold = 15.0  # Percentage
         self.critical_deviation_threshold = 20.0  # Percentage
+
+    @staticmethod
+    def _can_create_pending_work_order(site_phase: str | None) -> bool:
+        from app.models.onboarding_phase import phase_allows
+
+        return phase_allows(site_phase, "approve_reject")
+
+    async def _resolve_site_phase(
+        self,
+        *,
+        site_id: str | None = None,
+        equipment_id: str | None = None,
+        equipment_code: str | None = None,
+    ) -> str:
+        """Resolve the onboarding phase for work-order approval gating.
+
+        Fail closed to shadow if the site cannot be resolved. In shadow/advisory
+        phases, triggers may request manual review but must not create draft WOs.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+            from app.models.onboarding_phase import normalise_stage
+
+            client = get_supabase_client()
+
+            if site_id:
+                for field in ("code", "id"):
+                    result = client.table("sites").select("onboarding_phase").eq(field, site_id).limit(1).execute()
+                    if result.data:
+                        return normalise_stage(result.data[0].get("onboarding_phase") or "shadow")
+
+            resolved_site_id = None
+            if equipment_id:
+                result = client.table("equipment").select("site_id").eq("id", equipment_id).limit(1).execute()
+                if result.data:
+                    resolved_site_id = result.data[0].get("site_id")
+            elif equipment_code:
+                result = client.table("equipment").select("site_id").eq("code", equipment_code).limit(1).execute()
+                if result.data:
+                    resolved_site_id = result.data[0].get("site_id")
+
+            if resolved_site_id:
+                result = client.table("sites").select("onboarding_phase").eq("id", resolved_site_id).limit(1).execute()
+                if result.data:
+                    return normalise_stage(result.data[0].get("onboarding_phase") or "shadow")
+        except Exception as exc:
+            logger.debug("Could not resolve site phase for work-order gate: %s", exc)
+
+        return "shadow"
         self.effectiveness_success_threshold = 50.0  # Percentage improvement
         self.baseline_tolerance = 15.0  # Within % of original baseline
 
@@ -488,15 +537,21 @@ class WorkflowTriggerEngine:
             )
 
     # ========================================================================
-    # Trigger 3: Critical Deficiency → Work Order Creation
+    # Trigger 3: Critical Deficiency → Approval-pending Work Order in supervised+
     # ========================================================================
 
-    async def on_critical_deficiency(self, deficiency: InspectionDeficiency) -> TriggerResult:
+    async def on_critical_deficiency(
+        self,
+        deficiency: InspectionDeficiency,
+        *,
+        site_id: str | None = None,
+        site_phase: str | None = None,
+    ) -> TriggerResult:
         """
         Handle critical deficiency detection.
 
-        Auto-creates work order for critical/safety deficiencies.
-        Schedules pre-repair baseline capture.
+        Creates a draft work order only when the site is supervised or above.
+        Advisory and earlier phases request manual review without creating a WO.
         """
         equipment_id = deficiency.equipment_id
         logger.info(f"Critical deficiency trigger: {equipment_id} - {deficiency.severity}")
@@ -525,7 +580,7 @@ class WorkflowTriggerEngine:
                 self._trigger_history.append(result)
                 return result
 
-            # 1. Check severity (only auto-create for critical/safety)
+            # 1. Check severity (only critical/safety require immediate manual action)
             if deficiency.severity not in ["critical", "safety"]:
                 result = TriggerResult(
                     success=True,
@@ -545,53 +600,99 @@ class WorkflowTriggerEngine:
                 self._trigger_history.append(result)
                 return result
 
-            # 2. Generate work order
-            work_order = WorkOrderCreate(
-                equipment_id=equipment_id,
-                title=f"Critical Repair: {deficiency.deficiency_title}",
-                description=(
-                    f"Auto-generated from inspection {deficiency.inspection_id}\n\n"
+            resolved_phase = site_phase or await self._resolve_site_phase(site_id=site_id, equipment_id=equipment_id)
+            if not self._can_create_pending_work_order(resolved_phase):
+                # 2. Send notification. Work orders are not created before supervised mode.
+                await self._send_alert(
+                    f"Critical deficiency detected for {equipment_id}. Manual work-order review required."
+                )
+
+                # 3. Audit log
+                await self._audit_log(
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    action="manual_work_order_required",
+                    details={
+                        "deficiency_id": deficiency.id,
+                        "severity": deficiency.severity,
+                        "inspection_id": deficiency.inspection_id,
+                        "recommended_action": deficiency.recommended_action,
+                        "site_phase": resolved_phase,
+                    },
+                )
+
+                result = TriggerResult(
+                    success=True,
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    action_taken="manual_work_order_required",
+                    details={
+                        "deficiency_id": deficiency.id,
+                        "severity": deficiency.severity,
+                        "inspection_id": deficiency.inspection_id,
+                        "recommended_action": deficiency.recommended_action,
+                        "site_phase": resolved_phase,
+                    },
+                    follow_up_scheduled=False,
+                )
+                self._mark_trigger(
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    reference_id=deficiency.id,
+                )
+                await self._record_event(
+                    trigger_type=TriggerType.CRITICAL_DEFICIENCY,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details={"deficiency_id": deficiency.id, **result.details},
+                    inspection_id=deficiency.inspection_id,
+                    success=True,
+                )
+                self._trigger_history.append(result)
+                return result
+
+            work_order_data = {
+                "equipment_id": equipment_id,
+                "title": f"Approval Required: {deficiency.deficiency_title}",
+                "description": (
+                    f"Draft work order generated in supervised mode from inspection {deficiency.inspection_id}.\n\n"
                     f"Issue: {deficiency.deficiency_description}\n"
-                    f"Recommended Action: {deficiency.recommended_action}"
+                    f"Recommended Action: {deficiency.recommended_action}\n\n"
+                    "Approval is required before assignment, dispatch, or execution."
                 ),
-                priority="critical",
-                estimated_cost_min=deficiency.estimated_repair_cost_min,
-                estimated_cost_max=deficiency.estimated_repair_cost_max,
-                estimated_hours=deficiency.estimated_repair_hours,
-                deficiency_reference=deficiency.id,
-            )
+                "priority": "urgent" if deficiency.severity in ("critical", "safety") else "high",
+                "status": "draft",
+                "milestone_status": "pending_approval",
+                "created_by": "SENTINEL_SUPERVISED_PENDING_APPROVAL",
+                "estimated_duration_hours": deficiency.estimated_repair_hours,
+            }
+            created_wo = await self._work_order_repo.create_work_order(work_order_data)
 
-            # 3. Save work order
-            if equipment_id not in self._work_orders:
-                self._work_orders[equipment_id] = []
-            self._work_orders[equipment_id].append(work_order)
+            if not created_wo:
+                raise RuntimeError("Failed to create approval-pending work order")
 
-            # 4. Schedule pre-repair baseline capture
-            baseline_task = BaselineCaptureTask(
-                equipment_id=equipment_id,
-                baseline_type="pre_repair",
-                scheduled_date=datetime.now() + timedelta(hours=2),
-                reason=f"Pre-repair baseline for WO {work_order.id}",
-                work_order_reference=work_order.id,
-            )
-            if equipment_id not in self._baseline_tasks:
-                self._baseline_tasks[equipment_id] = []
-            self._baseline_tasks[equipment_id].append(baseline_task)
+            work_order_id = created_wo.get("id")
+            work_order_code = created_wo.get("code", "UNKNOWN")
 
-            # 5. Send notification
+            # 2. Send notification. Work order still requires approval.
             await self._send_alert(
-                f"Critical deficiency detected for {equipment_id}. Work order {work_order.id} created automatically."
+                f"Critical deficiency detected for {equipment_id}. "
+                f"Draft work order {work_order_code} is pending operator approval."
             )
 
-            # 6. Audit log
+            # 3. Audit log
             await self._audit_log(
                 trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                 equipment_id=equipment_id,
-                action="created_work_order",
+                action="created_pending_approval_work_order",
                 details={
                     "deficiency_id": deficiency.id,
-                    "work_order_id": work_order.id,
-                    "baseline_task_id": baseline_task.id,
+                    "work_order_id": work_order_id,
+                    "work_order_code": work_order_code,
+                    "severity": deficiency.severity,
+                    "inspection_id": deficiency.inspection_id,
+                    "recommended_action": deficiency.recommended_action,
+                    "site_phase": resolved_phase,
                 },
             )
 
@@ -599,11 +700,15 @@ class WorkflowTriggerEngine:
                 success=True,
                 trigger_type=TriggerType.CRITICAL_DEFICIENCY,
                 equipment_id=equipment_id,
-                action_taken="created_work_order",
+                action_taken="created_pending_approval_work_order",
                 details={
-                    "work_order_id": work_order.id,
-                    "baseline_task_id": baseline_task.id,
+                    "deficiency_id": deficiency.id,
+                    "work_order_id": work_order_id,
+                    "work_order_code": work_order_code,
                     "severity": deficiency.severity,
+                    "inspection_id": deficiency.inspection_id,
+                    "recommended_action": deficiency.recommended_action,
+                    "site_phase": resolved_phase,
                 },
                 follow_up_scheduled=True,
             )
@@ -616,7 +721,7 @@ class WorkflowTriggerEngine:
                 action_taken=result.action_taken,
                 details={"deficiency_id": deficiency.id, **result.details},
                 inspection_id=deficiency.inspection_id,
-                work_order_id=work_order.id,
+                work_order_id=work_order_id,
                 success=True,
             )
             self._trigger_history.append(result)
@@ -652,13 +757,14 @@ class WorkflowTriggerEngine:
         health_score: float,
         probability_percent: float,
         equipment_code: str | None = None,
+        site_id: str | None = None,
+        site_phase: str | None = None,
     ) -> TriggerResult:
         """
         Handle critical prediction detection.
 
-        Auto-creates a work order when a prediction with probability >= 65%
-        or health_score < 50 is generated. Persists to Supabase via WorkOrderRepository.
-        Deduplicates against existing open work orders for the same equipment.
+        Creates a draft work order only when the site is supervised or above.
+        Advisory and earlier phases request manual review without creating a WO.
         """
         logger.info(
             f"Prediction critical trigger: equipment={equipment_id} health={health_score} prob={probability_percent}%"
@@ -727,50 +833,99 @@ class WorkflowTriggerEngine:
             else:
                 priority = "medium"
 
-            # 3. Build description
             severity_label = "CRITICAL" if probability_percent >= 80 or health_score < 35 else "HIGH"
+            resolved_phase = site_phase or await self._resolve_site_phase(
+                site_id=site_id,
+                equipment_id=equipment_id,
+                equipment_code=equipment_code,
+            )
+
+            if not self._can_create_pending_work_order(resolved_phase):
+                # 3. Audit log
+                await self._audit_log(
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    action="manual_work_order_required_from_prediction",
+                    details={
+                        "prediction_id": prediction_id,
+                        "prediction_code": prediction_code,
+                        "health_score": health_score,
+                        "probability_percent": probability_percent,
+                        "priority": priority,
+                        "site_phase": resolved_phase,
+                    },
+                )
+
+                # 4. Send alert. Work orders are not created before supervised mode.
+                await self._send_alert(
+                    f"Critical prediction ({probability_percent:.0f}%) for {equipment_id}. "
+                    "Manual work-order review required."
+                )
+
+                result = TriggerResult(
+                    success=True,
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    action_taken="manual_work_order_required",
+                    details={
+                        "prediction_id": prediction_id,
+                        "prediction_code": prediction_code,
+                        "priority": priority,
+                        "severity": severity_label.lower(),
+                        "health_score": health_score,
+                        "probability_percent": probability_percent,
+                        "site_phase": resolved_phase,
+                    },
+                    follow_up_scheduled=False,
+                )
+                self._mark_trigger(
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    reference_id=prediction_code,
+                )
+                await self._record_event(
+                    trigger_type=TriggerType.PREDICTION_CRITICAL,
+                    equipment_id=equipment_id,
+                    action_taken=result.action_taken,
+                    details=result.details,
+                    success=True,
+                )
+                self._trigger_history.append(result)
+                return result
+
             description = (
-                f"Auto-generated from prediction {prediction_code}\n\n"
-                f"Trigger reason: "
-                f"failure probability {probability_percent:.0f}% "
+                f"Draft work order generated in supervised mode from prediction {prediction_code}.\n\n"
+                f"Trigger reason: failure probability {probability_percent:.0f}% "
                 f"{'>= 65% threshold' if probability_percent >= 65 else ''}"
                 f"{' / ' if probability_percent >= 65 and health_score < 50 else ''}"
                 f"{'health score ' + str(health_score) + '% (< 50%)' if health_score < 50 else ''}\n\n"
                 f"Equipment: {equipment_id}\n"
-                f"Prediction code: {prediction_code}\n"
-                f"Generated by: SENTINEL ML Prediction Engine"
+                f"Prediction code: {prediction_code}\n\n"
+                "Approval is required before assignment, dispatch, or execution."
             )
-
-            # 4. Persist work order to Supabase
             work_order_data = {
-                "title": f"[{severity_label}] Predictive Maintenance: {equipment_id}",
+                "title": f"[{severity_label}] Approval Required: Predictive Maintenance {equipment_id}",
                 "description": description,
                 "priority": priority,
-                "status": "scheduled",
+                "status": "draft",
                 "equipment_id": equipment_id,
-                "created_by": "SENTINEL_PREDICTION",
-                "milestone_status": "assigned",
+                "equipment_code": equipment_code,
+                "created_by": "SENTINEL_SUPERVISED_PENDING_APPROVAL",
+                "milestone_status": "pending_approval",
             }
             created_wo = await self._work_order_repo.create_work_order(work_order_data)
 
-            if created_wo is None:
-                logger.error(f"Failed to persist work order for prediction {prediction_code}")
-                return TriggerResult(
-                    success=False,
-                    trigger_type=TriggerType.PREDICTION_CRITICAL,
-                    equipment_id=equipment_id,
-                    action_taken="persistence_failed",
-                    details={"prediction_code": prediction_code},
-                )
+            if not created_wo:
+                raise RuntimeError("Failed to create approval-pending work order")
 
             work_order_id = created_wo.get("id")
             work_order_code = created_wo.get("code", "UNKNOWN")
 
-            # 5. Audit log
+            # 3. Audit log
             await self._audit_log(
                 trigger_type=TriggerType.PREDICTION_CRITICAL,
                 equipment_id=equipment_id,
-                action="created_work_order_from_prediction",
+                action="created_pending_approval_work_order_from_prediction",
                 details={
                     "prediction_id": prediction_id,
                     "prediction_code": prediction_code,
@@ -778,39 +933,32 @@ class WorkflowTriggerEngine:
                     "work_order_code": work_order_code,
                     "health_score": health_score,
                     "probability_percent": probability_percent,
+                    "priority": priority,
+                    "site_phase": resolved_phase,
                 },
             )
 
-            # 6. Send alert
+            # 4. Send alert. Work order still requires approval.
             await self._send_alert(
                 f"Critical prediction ({probability_percent:.0f}%) for {equipment_id}. "
-                f"Work order {work_order_code} created automatically."
-            )
-
-            # 7. Notify the assigned technician (if work order was created)
-            await self._notify_technician_for_work_order(
-                work_order_id=work_order_id,
-                work_order_code=work_order_code,
-                equipment_id=equipment_id,
-                equipment_code=equipment_code,
-                site_id=created_wo.get("site_id") or getattr(self, "_site_id", None),
-                priority=priority,
-                description=description,
+                f"Draft work order {work_order_code} is pending operator approval."
             )
 
             result = TriggerResult(
                 success=True,
                 trigger_type=TriggerType.PREDICTION_CRITICAL,
                 equipment_id=equipment_id,
-                action_taken="created_work_order",
+                action_taken="created_pending_approval_work_order",
                 details={
                     "prediction_id": prediction_id,
                     "prediction_code": prediction_code,
                     "work_order_id": work_order_id,
                     "work_order_code": work_order_code,
                     "priority": priority,
+                    "severity": severity_label.lower(),
                     "health_score": health_score,
                     "probability_percent": probability_percent,
+                    "site_phase": resolved_phase,
                 },
                 follow_up_scheduled=True,
             )

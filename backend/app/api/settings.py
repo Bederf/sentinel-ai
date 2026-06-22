@@ -12,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
@@ -449,7 +450,80 @@ async def update_site_ai_policy_settings(
 
 
 # Valid site deployment stages
-VALID_DEPLOYMENT_STAGES = {"shadow", "advisory", "supervised", "commissioning"}
+VALID_DEPLOYMENT_STAGES = {"commissioning", "shadow", "shadow_live", "advisory", "supervised", "automatic", "auto"}
+
+
+_PHASE_ORDER = ["commissioning", "shadow_live", "advisory", "supervised", "automatic"]
+
+
+def _phase_index(phase: str) -> int:
+    try:
+        return _PHASE_ORDER.index(phase)
+    except ValueError:
+        return -1
+
+
+def _sync_bridge_write_flags(client, site_id: str, phase: str) -> None:
+    """Keep bridge write execution disabled below supervised."""
+    write_enabled = phase in {"supervised", "automatic"}
+    rows = (
+        client.table("site_adapter_config")
+        .select("id,connection_config")
+        .eq("site_id", site_id)
+        .eq("protocol", "bridge")
+        .execute()
+    )
+    for row in rows.data or []:
+        config = row.get("connection_config") or {}
+        supports_writes = config.get("supports_writes") is True
+        client.table("site_adapter_config").update(
+            {
+                "connection_config": {
+                    **config,
+                    "write_enabled": write_enabled and supports_writes,
+                }
+            }
+        ).eq("id", row["id"]).execute()
+
+
+def _sync_bridge_policy_stage(client, site_id: str, phase: str) -> bool:
+    """Sync Trust Ladder stage to the bridge using the per-site adapter token."""
+    rows = (
+        client.table("site_adapter_config")
+        .select("connection_config")
+        .eq("site_id", site_id)
+        .eq("protocol", "bridge")
+        .eq("enabled", True)
+        .limit(1)
+        .execute()
+    )
+    if not rows.data:
+        return False
+    config = rows.data[0].get("connection_config") or {}
+    base_url = str(config.get("base_url") or "").rstrip("/")
+    token = str(config.get("token") or "")
+    if not base_url or not token:
+        return False
+
+    try:
+        response = httpx.put(
+            f"{base_url}/api/sites/{site_id}/ipmvp/policy-state",
+            json={"policy_stage": phase},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if response.is_success:
+            logger.info("Bridge policy stage synced to %s for %s", phase, site_id)
+            return True
+        logger.warning(
+            "Bridge policy stage sync failed for %s: HTTP %s %s",
+            site_id,
+            response.status_code,
+            response.text[:200],
+        )
+    except Exception as exc:
+        logger.warning("Bridge policy stage sync failed for %s: %s", site_id, exc)
+    return False
 
 
 class SiteAiPolicyUpdate(BaseModel):
@@ -517,20 +591,53 @@ async def set_site_mode(
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail=f"No mode policy found for {site_id}")
 
-    current_stage = state.get("current_stage", "commissioning")
+    current_stage = normalise_stage(state.get("current_stage", "commissioning"))
 
     # Evaluate promotion gates — don't allow write if gates fail
     eval_result = await svc.evaluate_site(site_id)
     decision = eval_result.get("decision", "hold")
     reasons = eval_result.get("reasons", [])
 
-    if decision == "hold" and canonical_stage != current_stage:
+    is_forward = _phase_index(canonical_stage) > _phase_index(current_stage)
+    if decision == "hold" and canonical_stage != current_stage and is_forward:
         gate_target = canonical_stage
         raise HTTPException(
             status_code=400,
             detail=f"Cannot promote to '{gate_target}'. "
             f"Current: {current_stage}. Promotion gates not met: {'; '.join(reasons)}",
         )
+
+    if is_forward and (
+        (current_stage == "advisory" and canonical_stage == "supervised")
+        or (current_stage == "supervised" and canonical_stage == "automatic")
+    ):
+        from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
+
+        readiness = await get_phase_promotion_evaluator().evaluate_site(site_id, current_stage)
+        if not readiness.eligible:
+            failed_gates = [
+                {
+                    "gate": gate.gate,
+                    "value": gate.value,
+                    "threshold": gate.threshold,
+                }
+                for gate in readiness.gates
+                if not gate.passed
+            ]
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "phase_readiness_not_met",
+                    "current": current_stage,
+                    "requested": canonical_stage,
+                    "message": (
+                        f"Cannot promote to {canonical_stage} until the previous phase readiness gates pass. "
+                        "Advisory must prove control modules, write endpoint readiness, and writable control coverage "
+                        "before supervised mode is enabled."
+                    ),
+                    "failed_gates": failed_gates,
+                },
+            )
 
     state["current_stage"] = canonical_stage
     state["candidate_stage"] = None
@@ -546,7 +653,7 @@ async def set_site_mode(
         supabase.table("phase_transition_log").insert(
             {
                 "site_id": site_id,
-                "from_phase": state.get("current_stage", "unknown"),
+                "from_phase": current_stage,
                 "to_phase": canonical_stage,
                 "changed_by": auth.user_id or "system",
                 "reason": f"Manual phase change via settings API: {canonical_stage}",
@@ -564,32 +671,17 @@ async def set_site_mode(
         from app.models.onboarding_phase import sync_site_phase_to_supabase
 
         await sync_site_phase_to_supabase(site_id, canonical_stage)
+        supabase = get_supabase_client()
+        supabase.table("sites").update({"control_enabled": canonical_stage in {"supervised", "automatic"}}).eq(
+            "code", site_id
+        ).execute()
+        _sync_bridge_write_flags(supabase, site_id, canonical_stage)
+        _sync_bridge_policy_stage(supabase, site_id, canonical_stage)
     except Exception as e:
         logger.error("Failed to sync site mode to Supabase for %s: %s", site_id, e)
 
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
     audit_config_change(f"settings.site-mode.{site_id}", user=auth.user_id, source_ip=source_ip)
-
-    # Sync bridge policy stage when phase is changed manually
-    try:
-        import os
-
-        import httpx
-
-        bridge_url = f"http://10.99.0.1:8080/api/sites/{site_id}/ipmvp/policy-state"
-        bridge_token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.put(
-                bridge_url,
-                json={"policy_stage": canonical_stage},
-                headers={"Authorization": f"Bearer {bridge_token}"},
-            )
-            if resp.is_success:
-                logger.info("Bridge policy stage synced to %s for %s", canonical_stage, site_id)
-            else:
-                logger.warning("Bridge policy sync returned %s: %s", resp.status_code, resp.text[:200])
-    except Exception as e:
-        logger.warning("Failed to sync bridge policy stage for %s: %s", site_id, e)
 
     return {"site_id": site_id, "current_stage": canonical_stage}
 

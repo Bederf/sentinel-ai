@@ -193,6 +193,10 @@ class DeviceStatusInitializer:
 
             for device in devices:
                 try:
+                    from app.config.health_config import get_scoreability
+
+                    if not get_scoreability(device["type"]).get("scoreable", False):
+                        continue
                     await self._update_device_status(
                         site_id,
                         device["code"],

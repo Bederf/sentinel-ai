@@ -217,8 +217,8 @@ async def trigger_critical_deficiency(request: TriggerCriticalDeficiencyRequest)
     """
     Handle critical deficiency trigger.
 
-    Auto-creates work order for critical/safety deficiencies.
-    Schedules pre-repair baseline capture.
+    Creates an approval-pending draft work order only when the site is supervised+.
+    Earlier phases only request manual work-order review.
     """
     trigger_engine = get_trigger_engine()
 

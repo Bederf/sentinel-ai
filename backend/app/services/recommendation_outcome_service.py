@@ -42,7 +42,7 @@ async def validate_outcome(rec_id: str) -> dict[str, Any] | None:
         logger.warning("Outcome validation: recommendation %s not found", rec_id)
         return None
 
-    if rec.outcome_validated is not None:
+    if _has_recorded_outcome(rec) and _has_recorded_energy_metrics(rec):
         logger.debug("Outcome validation: %s already validated", rec_id)
         return None
 
@@ -73,9 +73,18 @@ async def validate_outcome(rec_id: str) -> dict[str, Any] | None:
         current_reading=current_reading,
         equipment_id=equipment_id,
     )
+    energy_metrics = await _calculate_measured_energy_impact(rec)
+    success, notes = _merge_energy_outcome(success, notes, energy_metrics)
 
     # Write result to recommendation record
-    await _mark_outcome(repo, rec, validated=success, notes=notes)
+    await _mark_outcome(
+        repo,
+        rec,
+        validated=success,
+        notes=notes,
+        actual_value=current_reading,
+        energy_metrics=energy_metrics,
+    )
 
     # Feed back into Decision Memory Service
     await _record_to_decision_memory(rec, success, notes)
@@ -140,7 +149,7 @@ async def process_pending_verifications() -> list[dict[str, Any]]:
 
             for rec in recs:
                 # Skip already verified
-                if rec.outcome_validated is not None:
+                if _has_recorded_outcome(rec) and _has_recorded_energy_metrics(rec):
                     continue
 
                 # Check timing: must be past settling period but not too old
@@ -238,6 +247,33 @@ def _evaluate_outcome(
         )
 
 
+def _merge_energy_outcome(
+    success: bool,
+    notes: str,
+    energy_metrics: dict[str, float] | None,
+) -> tuple[bool, str]:
+    """Combine control-point verification with measured kWh/R outcome."""
+    if not energy_metrics:
+        return success, notes
+
+    if success and energy_metrics.get("actual_saving_kwh", 0) < 0:
+        success = False
+        notes = (
+            f"{notes}; Control point reached target, but measured energy increased "
+            f"by {abs(energy_metrics['actual_saving_kwh']):.3f} kWh "
+            f"(R{abs(energy_metrics['actual_saving_zar']):.2f})"
+        )
+
+    notes = (
+        f"{notes}; Energy impact measured from actual telemetry: "
+        f"baseline={energy_metrics['baseline_energy_kwh']:.3f} kWh, "
+        f"after={energy_metrics['actual_energy_kwh']:.3f} kWh, "
+        f"saving={energy_metrics['actual_saving_kwh']:.3f} kWh, "
+        f"R{energy_metrics['actual_saving_zar']:.2f}"
+    )
+    return success, notes
+
+
 async def _get_current_reading(equipment_id: str, point_name: str) -> float | None:
     """Query current telemetry value for an equipment point.
 
@@ -262,17 +298,18 @@ async def _get_current_reading(equipment_id: str, point_name: str) -> float | No
     except Exception as e:
         logger.debug("Device manager read failed for %s/%s: %s", equipment_id, point_name, e)
 
-    # Fallback: query Supabase telemetry
+    # Fallback: query Supabase live sensor readings written by the site bridge.
+    sensor_candidates = _sensor_candidates(point_name)
     try:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
         resp = (
-            client.table("telemetry")
-            .select("value")
+            client.table("equipment_sensor_readings")
+            .select("value,sensor_type,recorded_at")
             .eq("equipment_id", equipment_id)
-            .eq("point_name", point_name)
-            .order("timestamp", desc=True)
+            .in_("sensor_type", sensor_candidates)
+            .order("recorded_at", desc=True)
             .limit(1)
             .execute()
         )
@@ -286,18 +323,172 @@ async def _get_current_reading(equipment_id: str, point_name: str) -> float | No
     return None
 
 
+def _has_recorded_outcome(rec: Any) -> bool:
+    """Return True only when outcome verification has actually recorded a result.
+
+    The live recommendations table historically defaulted outcome_validated to
+    false. A bare false with no notes means "not checked yet"; a false with
+    notes means "checked and failed/inconclusive".
+    """
+    if rec.outcome_validated is True:
+        return True
+    if rec.outcome_validated is False and rec.outcome_notes:
+        return True
+    return False
+
+
+def _has_recorded_energy_metrics(rec: Any) -> bool:
+    """Return True when measured kWh and R impact are already recorded."""
+    return rec.actual_saving_kwh is not None and rec.actual_saving_zar is not None
+
+
+def _sensor_candidates(point_name: str) -> list[str]:
+    """Return possible bridge telemetry names for a control point."""
+    point = (point_name or "").strip()
+    aliases = {
+        "sat_setpoint": ["sat_setpoint", "supply_air_temp_setpoint", "supply_air_setpoint"],
+        "supply_air_temperature_setpoint": ["sat_setpoint", "supply_air_temp_setpoint", "supply_air_setpoint"],
+        "chilled_water_setpoint": ["chilled_water_setpoint", "chw_setpoint", "chilledwatersetpoint"],
+        "damper_position": ["damper_position", "economiser_damper_position", "economizer_damper_position"],
+        "fan_speed": ["fan_speed", "fan_speed_percent"],
+        "setpoint": ["setpoint", "temperature_setpoint", "zone_setpoint"],
+        "onoff": ["onoff", "on_off", "run_command"],
+    }
+    candidates = aliases.get(point.lower(), [point])
+    return [candidate for candidate in candidates if candidate]
+
+
+async def _calculate_measured_energy_impact(rec: Any) -> dict[str, float] | None:
+    """Calculate before/after kWh and Rand impact from real power readings.
+
+    The baseline window is the 30 minutes before execution. The outcome window
+    is the 30 minutes after execution. HVAC kW is preferred; total kW is used
+    only if HVAC kW is unavailable.
+    """
+    executed_at = rec.executed_at
+    if not executed_at:
+        return None
+    if executed_at.tzinfo is None:
+        executed_at = executed_at.replace(tzinfo=UTC)
+
+    before_start = executed_at - timedelta(minutes=SETTLING_MINUTES)
+    before_end = executed_at
+    after_start = executed_at
+    after_end = executed_at + timedelta(minutes=SETTLING_MINUTES)
+
+    for sensor_type in ("hvac_kw", "total_kw"):
+        before_values = await _get_power_values(rec.site_id, sensor_type, before_start, before_end)
+        after_values = await _get_power_values(rec.site_id, sensor_type, after_start, after_end)
+        if len(before_values) < 2 or len(after_values) < 2:
+            continue
+
+        baseline_kw = sum(before_values) / len(before_values)
+        actual_kw = sum(after_values) / len(after_values)
+        hours = SETTLING_MINUTES / 60.0
+        baseline_kwh = baseline_kw * hours
+        actual_kwh = actual_kw * hours
+        saving_kwh = baseline_kwh - actual_kwh
+        tariff_rate = _tariff_rate_for_recommendation(rec, executed_at)
+        return {
+            "baseline_energy_kwh": round(baseline_kwh, 4),
+            "actual_energy_kwh": round(actual_kwh, 4),
+            "actual_saving_kwh": round(saving_kwh, 4),
+            "actual_saving_zar": round(saving_kwh * tariff_rate, 2),
+            "tariff_rate_at_creation": round(tariff_rate, 4),
+        }
+
+    if rec.power_at_creation_kw is not None:
+        after_values = await _get_power_values(rec.site_id, "hvac_kw", after_start, after_end)
+        if len(after_values) < 2:
+            after_values = await _get_power_values(rec.site_id, "total_kw", after_start, after_end)
+        if len(after_values) >= 2:
+            hours = SETTLING_MINUTES / 60.0
+            baseline_kwh = float(rec.power_at_creation_kw) * hours
+            actual_kwh = (sum(after_values) / len(after_values)) * hours
+            saving_kwh = baseline_kwh - actual_kwh
+            tariff_rate = _tariff_rate_for_recommendation(rec, executed_at)
+            return {
+                "baseline_energy_kwh": round(baseline_kwh, 4),
+                "actual_energy_kwh": round(actual_kwh, 4),
+                "actual_saving_kwh": round(saving_kwh, 4),
+                "actual_saving_zar": round(saving_kwh * tariff_rate, 2),
+                "tariff_rate_at_creation": round(tariff_rate, 4),
+            }
+
+    return None
+
+
+async def _get_power_values(site_id: str, sensor_type: str, start: datetime, end: datetime) -> list[float]:
+    """Read measured power values for a site/time window."""
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        resp = (
+            client.table("equipment_sensor_readings")
+            .select("value")
+            .eq("site_id", site_id)
+            .eq("sensor_type", sensor_type)
+            .gte("recorded_at", start.isoformat())
+            .lt("recorded_at", end.isoformat())
+            .order("recorded_at")
+            .execute()
+        )
+        values = []
+        for row in resp.data or []:
+            value = row.get("value")
+            if isinstance(value, (int, float)):
+                values.append(float(value))
+        return values
+    except Exception as e:
+        logger.debug("Energy impact query failed for %s/%s: %s", site_id, sensor_type, e)
+        return []
+
+
+def _tariff_rate_for_recommendation(rec: Any, executed_at: datetime) -> float:
+    """Return the R/kWh tariff used for measured savings."""
+    try:
+        if rec.tariff_rate_at_creation:
+            return float(rec.tariff_rate_at_creation)
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        from app.services.solar_arbitrage_engine import SolarArbitrageEngine
+
+        band = SolarArbitrageEngine().get_current_tariff_band(executed_at)
+        return float(band.total_rate_per_kwh)
+    except Exception as e:
+        logger.debug("Tariff lookup failed for %s: %s", rec.site_id, e)
+        return 2.85
+
+
 async def _mark_outcome(
     repo: Any,
     rec: Any,
     validated: bool | None,
     notes: str,
+    actual_value: float | None = None,
+    energy_metrics: dict[str, float] | None = None,
 ) -> None:
     """Update the recommendation record with outcome validation results."""
-    rec.outcome_validated = validated
-    rec.outcome_notes = notes
-    rec.outcome_validated_at = datetime.now(UTC)
     try:
-        await repo.update(rec.id, rec)
+        client = await repo.get_client()
+        if not client:
+            raise RuntimeError("Supabase client unavailable")
+
+        payload: dict[str, Any] = {
+            "outcome_validated": validated,
+            "outcome_notes": notes,
+        }
+        if actual_value is not None:
+            payload["actual_value_set"] = f"{actual_value:g}"
+        if energy_metrics:
+            payload.update(energy_metrics)
+
+        result = await client.table("recommendations").update(payload).eq("id", rec.id).execute()
+        if not result.data:
+            raise RuntimeError("No recommendation row updated")
     except Exception as e:
         logger.error("Failed to save outcome for %s: %s", rec.id, e)
 

@@ -16,11 +16,13 @@ estimated_read_time: 15
 
 ## Overview
 
-The policy gate system controls phase progression through the SENTINEL Trust Ladder (shadow → advisory → supervised → automatic). Gates are **prerequisites, not automation** — the system tells operators when they're ready, but humans decide when to promote.
+The policy gate system controls phase progression through the SENTINEL Trust Ladder (shadow → advisory → supervised → automatic). Gates are **prerequisites, not automation** — the system tells operators when they're ready, but humans decide when to request promotion.
+
+For execution phases, gates are fail-closed. A site cannot enter supervised or automatic mode unless the previous phase has passed the required readiness gates. See [Supervised Control Readiness](./supervised-control-readiness.md).
 
 ## Core Principle
 
-> **Gates are evaluated, not enforced. The operator has final authority.**
+> **Gates are enforced for execution phases. The operator has final authority to request promotion, but SENTINEL blocks promotion when readiness evidence is incomplete.**
 
 ## Architecture
 

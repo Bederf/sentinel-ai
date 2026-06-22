@@ -8,6 +8,8 @@ Provides validation and business logic for:
 """
 
 import logging
+import math
+import re
 from decimal import Decimal
 from typing import Any
 
@@ -41,6 +43,204 @@ class ZoneIngestionService:
         if response.data:
             return response.data[0]["id"]
         return None
+
+    def generate_auto_plan(
+        self,
+        site_id: str,
+        building_type: str | None = None,
+        total_desks: int | None = None,
+        floors: list[str] | None = None,
+        sqm: int | None = None,
+    ) -> dict[str, Any]:
+        """Generate onboarding draft zones/desks from site settings.
+
+        This is a planning aid only; the wizard still shows the generated
+        structure for operator review before ingestion.
+        """
+        site_uuid = self.get_site_uuid(site_id)
+        if not site_uuid:
+            raise ValueError(f"Building not found: {site_id}")
+
+        site_result = self.client.table("sites").select("*").eq("id", site_uuid).limit(1).execute()
+        site = site_result.data[0] if site_result.data else {}
+
+        site_type = (building_type or site.get("type") or "commercial_office").lower()
+        desk_count = int(total_desks if total_desks is not None else site.get("total_desks") or 0)
+        floor_area = int(sqm if sqm is not None else site.get("sqm") or 0)
+        floor_count = int(site.get("floors") or 1)
+        floor_codes = floors or site.get("floor_labels") or self._floor_codes_from_count(floor_count)
+        if isinstance(floor_codes, str):
+            floor_codes = [f.strip() for f in floor_codes.split(",") if f.strip()]
+        floor_codes = list(floor_codes or ["G"])
+        if not floors and floor_count > len(floor_codes):
+            floor_codes = self._floor_codes_from_count(floor_count)
+
+        profile = self._zone_generation_profile(site_type)
+        zones: list[dict[str, Any]] = []
+        desks: list[dict[str, Any]] = []
+        desk_sequence = 1
+
+        if profile["basis"] == "area" and floor_area > 0:
+            floor_area_each = max(1, math.ceil(floor_area / len(floor_codes)))
+            zones_per_floor = max(1, math.ceil(floor_area_each / profile["sqm_per_zone"]))
+            for floor_index, floor in enumerate(floor_codes):
+                for zone_index in range(zones_per_floor):
+                    area = round(floor_area_each / zones_per_floor, 1)
+                    zones.append(
+                        self._make_zone(
+                            site_id,
+                            floor,
+                            zone_index,
+                            profile["zone_types"][zone_index % len(profile["zone_types"])],
+                            typical_occupancy=max(1, math.ceil(area / profile["sqm_per_person"])),
+                            area_sqm=area,
+                        )
+                    )
+        else:
+            desks_per_zone = profile["desks_per_zone"]
+            desks_by_floor = self._spread_count(desk_count, len(floor_codes))
+            for floor_index, floor in enumerate(floor_codes):
+                floor_desks = desks_by_floor[floor_index]
+                zone_count = (
+                    max(1, math.ceil(floor_desks / desks_per_zone)) if floor_desks else profile["min_zones_per_floor"]
+                )
+                desks_by_zone = self._spread_count(floor_desks, zone_count)
+                for zone_index in range(zone_count):
+                    zone_type = profile["zone_types"][zone_index % len(profile["zone_types"])]
+                    zone = self._make_zone(
+                        site_id,
+                        floor,
+                        zone_index,
+                        zone_type,
+                        typical_occupancy=max(0, math.ceil(desks_by_zone[zone_index] * profile["occupancy_factor"])),
+                        area_sqm=None,
+                    )
+                    zones.append(zone)
+                    for desk_in_zone in range(desks_by_zone[zone_index]):
+                        desks.append(
+                            self._make_desk(
+                                desk_sequence,
+                                zone["zone_id"],
+                                floor,
+                                floor_index,
+                                zone_index,
+                                desk_in_zone,
+                                desks_per_zone,
+                            )
+                        )
+                        desk_sequence += 1
+
+        return {
+            "site_id": site_id,
+            "building_type": site_type,
+            "strategy": profile["name"],
+            "zones": zones,
+            "desks": desks,
+            "metadata": {
+                "floors": floor_codes,
+                "total_desks": desk_count,
+                "sqm": floor_area,
+                "desks_per_zone": profile.get("desks_per_zone"),
+                "review_required": True,
+            },
+        }
+
+    @staticmethod
+    def _floor_codes_from_count(floor_count: int) -> list[str]:
+        if floor_count <= 1:
+            return ["G"]
+        return ["G", *[f"L{i}" for i in range(1, floor_count)]]
+
+    @staticmethod
+    def _zone_generation_profile(site_type: str) -> dict[str, Any]:
+        if site_type in {"retail", "shopping_centre", "shopping_center", "mall"}:
+            return {
+                "name": "retail_area_based",
+                "basis": "area",
+                "sqm_per_zone": 750,
+                "sqm_per_person": 15,
+                "min_zones_per_floor": 2,
+                "desks_per_zone": 0,
+                "occupancy_factor": 1.0,
+                "zone_types": ["retail", "food_court", "back_of_house", "public_area"],
+            }
+        if site_type in {"hospital", "private_hospital", "clinic"}:
+            return {
+                "name": "hospital_comfort_clinical",
+                "basis": "desks",
+                "desks_per_zone": 12,
+                "min_zones_per_floor": 2,
+                "occupancy_factor": 1.5,
+                "zone_types": ["ward", "consulting_room", "icu", "theatre", "public_area", "mechanical"],
+            }
+        return {
+            "name": "office_desk_based",
+            "basis": "desks",
+            "desks_per_zone": 20,
+            "min_zones_per_floor": 1,
+            "occupancy_factor": 1.0,
+            "zone_types": ["open_office"],
+        }
+
+    @staticmethod
+    def _spread_count(total: int, buckets: int) -> list[int]:
+        if buckets <= 0:
+            return []
+        base = total // buckets
+        remainder = total % buckets
+        return [base + (1 if index < remainder else 0) for index in range(buckets)]
+
+    @staticmethod
+    def _make_zone(
+        site_id: str,
+        floor: str,
+        zone_index: int,
+        zone_type: str,
+        typical_occupancy: int,
+        area_sqm: float | None,
+    ) -> dict[str, Any]:
+        zone_letter = chr(ord("A") + (zone_index % 26))
+        zone_id = f"Zone-{floor}-{zone_letter}"
+        return {
+            "zone_id": zone_id,
+            "zone_name": f"{floor} {zone_type.replace('_', ' ').title()} {zone_letter}",
+            "floor": floor,
+            "zone_letter": zone_letter,
+            "zone_type": zone_type,
+            "typical_occupancy": typical_occupancy,
+            "area_sqm": area_sqm,
+        }
+
+    @staticmethod
+    def _make_desk(
+        desk_sequence: int,
+        zone_id: str,
+        floor: str,
+        floor_index: int,
+        zone_index: int,
+        desk_in_zone: int,
+        desks_per_zone: int,
+    ) -> dict[str, Any]:
+        cols = min(5, max(1, math.ceil(math.sqrt(max(1, desks_per_zone)))))
+        row = desk_in_zone // cols
+        col = desk_in_zone % cols
+        zone_origin_x = (zone_index % 4) * 12
+        zone_origin_z = (zone_index // 4) * 12
+        return {
+            "desk_id": f"D{desk_sequence:04d}",
+            "zone_id": zone_id,
+            "floor": floor,
+            "context": "open_plan",
+            "coordinates": {
+                "x": min(49.0, zone_origin_x + col * 1.6 + 1.0),
+                "y": floor_index * 3.5,
+                "z": min(49.0, zone_origin_z + row * 1.8 + 1.0),
+            },
+        }
+
+    @staticmethod
+    def _is_valid_floor_code(floor: str | None) -> bool:
+        return bool(floor and re.fullmatch(r"(B[1-9]\d*|G|L\d+|R)", floor))
 
     async def ingest_zones(self, site_id: str, zones: list[dict[str, Any]]) -> dict[str, Any]:
         """Ingest zone configuration for a building.
@@ -81,9 +281,8 @@ class ZoneIngestionService:
             raise ValueError("Duplicate zone_ids detected within ingestion")
 
         # Validate floor codes
-        valid_floors = {"B1", "B2", "B3", "G", "L0", "L1", "L2", "L3", "L4", "L5", "R"}
         for zone in zones:
-            if zone.get("floor") not in valid_floors:
+            if not self._is_valid_floor_code(zone.get("floor")):
                 raise ValueError(f"Invalid floor code: {zone.get('floor')}")
 
         # Validate zone types
@@ -101,6 +300,14 @@ class ZoneIngestionService:
             "comms_room",
             "mechanical",
             "electrical",
+            "ward",
+            "theatre",
+            "icu",
+            "consulting_room",
+            "retail",
+            "food_court",
+            "back_of_house",
+            "public_area",
         }
         for zone in zones:
             if zone.get("zone_type") not in valid_types:

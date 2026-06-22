@@ -218,7 +218,7 @@ class SensorLSTM:
         tf, keras = _get_tf()
 
         instance = cls.__new__(cls)
-        instance.model = keras.models.load_model(path)
+        instance.model = keras.models.load_model(path, compile=False)
 
         # Infer parameters from loaded model
         input_shape = instance.model.input_shape

@@ -21,6 +21,7 @@ describe('RecommendationHistory', () => {
           id: 'rec-1',
           site_id: 'site-002',
           action_type: 'Adjust Setpoint',
+          action: { point: 'temperature_setpoint', value: 21.5, unit: '°C' },
           risk_level: 'low',
           target_equipment: 'CHILLER-001',
           reason: 'Temperature trending down',
@@ -35,6 +36,8 @@ describe('RecommendationHistory', () => {
           multi_objective_score: 0.85,
           status: 'executed',
           timestamp: new Date().toISOString(),
+          actual_saving_kwh: 1.2,
+          actual_saving_zar: 3.54,
           outcome: {
             predicted: { temperature_c: 21.5 },
             actual: { temperature_c: 21.3 },
@@ -47,10 +50,10 @@ describe('RecommendationHistory', () => {
     render(<RecommendationHistory siteId="site-002" />)
 
     await waitFor(() => {
-      expect(screen.getByText(/Adjust Setpoint/)).toBeInTheDocument()
+      expect(screen.getByText(/Temperature Setpoint to 21.5°C/)).toBeInTheDocument()
     })
 
-    expect(screen.getByText(/CHILLER-001/)).toBeInTheDocument()
+    expect(screen.getAllByText(/CHILLER-001/).length).toBeGreaterThan(0)
     expect(screen.getByText(/executed/)).toBeInTheDocument()
   })
 
@@ -131,13 +134,14 @@ describe('RecommendationHistory', () => {
     })
   })
 
-  it('displays accuracy metrics', async () => {
+  it('displays measured recommendation outcome metrics', async () => {
     vi.mocked(optimization.optimizationApi.getHistory).mockResolvedValue({
       recommendations: [
         {
           id: 'rec-1',
           site_id: 'site-002',
           action_type: 'Adjust Setpoint',
+          action: { point: 'temperature_setpoint', value: 21.5, unit: '°C' },
           risk_level: 'low',
           target_equipment: 'CHILLER-001',
           reason: 'Temperature trending down',
@@ -152,6 +156,10 @@ describe('RecommendationHistory', () => {
           multi_objective_score: 0.85,
           status: 'executed',
           timestamp: new Date().toISOString(),
+          baseline_energy_kwh: 5.43,
+          actual_energy_kwh: 4.91,
+          actual_saving_kwh: 0.52,
+          actual_saving_zar: 1.53,
           outcome: {
             predicted: { temperature_c: 21.5 },
             actual: { temperature_c: 21.3 },
@@ -164,11 +172,12 @@ describe('RecommendationHistory', () => {
     render(<RecommendationHistory siteId="site-002" />)
 
     await waitFor(() => {
-      expect(screen.getByText(/95/)).toBeInTheDocument()
+      expect(screen.getAllByText(/\+0,52 kWh/).length).toBeGreaterThan(0)
     })
 
-    expect(screen.getByText(/21.5/)).toBeInTheDocument()
-    expect(screen.getByText(/21.3/)).toBeInTheDocument()
+    expect(screen.getAllByText(/R\s*1,53/).length).toBeGreaterThan(0)
+    expect(screen.getByText(/5,43 kWh/)).toBeInTheDocument()
+    expect(screen.getAllByText(/21.5/).length).toBeGreaterThan(0)
   })
 
   it('shows no results message when empty', async () => {
@@ -180,7 +189,7 @@ describe('RecommendationHistory', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('No recommendations found for the selected filter')
+        screen.getByText('No recommendations found')
       ).toBeInTheDocument()
     })
   })
@@ -212,7 +221,7 @@ describe('RecommendationHistory', () => {
     render(<RecommendationHistory siteId="site-002" />)
 
     await waitFor(() => {
-      expect(screen.getByText('Pending...')).toBeInTheDocument()
+      expect(screen.getByText('Awaiting 30 min verification')).toBeInTheDocument()
     })
   })
 })

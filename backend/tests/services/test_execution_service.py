@@ -133,6 +133,52 @@ class TestExecuteCommandSuccess:
         assert call_kwargs.kwargs["metadata"]["verified"] is True
         assert call_kwargs.kwargs["metadata"]["source"] == "advisory"
 
+    @pytest.mark.asyncio
+    async def test_bridge_site_uses_site_adapter_before_device_manager(self):
+        mock_audit_repo = MagicMock()
+        mock_cov_service = AsyncMock()
+        mock_cov_service.verify_write = AsyncMock(return_value=MagicMock(verified=False, actual_value=None))
+        fallback_result = {
+            "success": True,
+            "adapter_id": "bridge",
+            "bridge_point_id": "S002-AHU-B01.ECON_DAMPER_CMD",
+            "write_response": {"accepted": True, "command_id": "cmd-123"},
+            "previous_value": 0.0,
+            "actual_value": 100.0,
+            "verified": True,
+            "error": None,
+        }
+
+        with (
+            patch("app.services.execution_service.device_manager") as mock_dm,
+            patch("app.services.execution_service._site_should_use_adapter_write", return_value=True),
+            patch(
+                "app.services.execution_service._execute_site_adapter_write",
+                new=AsyncMock(return_value=fallback_result),
+            ),
+            patch("app.services.execution_service.get_cov_monitor_service", return_value=mock_cov_service),
+            patch("app.services.execution_service.AuditRepository", return_value=mock_audit_repo),
+        ):
+            mock_dm.write_device_value = AsyncMock()
+            result = await execute_command(
+                site_id="site-002",
+                equipment_id="S002-AHU-B01",
+                control_point="damper_position",
+                target_value=100.0,
+                source="advisory",
+                correlation_id=CORRELATION_ID,
+            )
+
+        mock_dm.write_device_value.assert_not_awaited()
+        assert result["success"] is True
+        assert result["write_path"] == "site_adapter"
+        assert result["adapter_id"] == "bridge"
+        assert result["bridge_point_id"] == "S002-AHU-B01.ECON_DAMPER_CMD"
+        assert result["bridge_write_response"] == {"accepted": True, "command_id": "cmd-123"}
+        call_kwargs = mock_audit_repo.log_device_control.call_args
+        assert call_kwargs.kwargs["metadata"]["write_path"] == "site_adapter"
+        assert call_kwargs.kwargs["metadata"]["bridge_point_id"] == "S002-AHU-B01.ECON_DAMPER_CMD"
+
 
 class TestExecuteCommandMismatch:
     """Write ok, value != expected — verified=False, success=True."""

@@ -734,7 +734,7 @@ export interface Equipment {
   type: string;
   site_id: string;
   site_name: string;
-  status: "online" | "offline" | "maintenance" | "normal" | "warning" | "critical" | "unknown";
+  status: "online" | "offline" | "maintenance" | "needs_attention" | "normal" | "warning" | "critical" | "unknown";
   location?: string;
   last_reading?: {
     timestamp: string;
@@ -817,7 +817,7 @@ export interface Device {
   points: Record<string, DevicePoint>;
   metadata?: Record<string, unknown>;
   // Status properties
-  status?: "online" | "offline" | "maintenance";
+  status?: "online" | "offline" | "maintenance" | "needs_attention";
   safety_status?: "safe" | "warning" | "critical" | "unknown";
   last_communication?: string; // ISO timestamp
   current_value?: number;
@@ -2450,6 +2450,7 @@ export const api = {
         status: eq.status === "normal" || eq.status === "online" ? "online"
                 : eq.status === "fault" || eq.status === "offline" ? "offline"
                 : eq.status === "maintenance" ? "maintenance"
+                : eq.status === "needs_attention" ? "needs_attention"
                 : "offline",
         safety_status: "unknown",
         last_communication: undefined,
@@ -2530,6 +2531,7 @@ export const api = {
       status: response.status === "normal" || response.status === "online" ? "online"
               : response.status === "fault" || response.status === "offline" ? "offline"
               : response.status === "maintenance" ? "maintenance"
+              : response.status === "needs_attention" ? "needs_attention"
               : "offline",
       safety_status: "unknown",
       last_communication: undefined,
@@ -4676,6 +4678,23 @@ export interface CreateSiteRequest {
   type?: string;
   floors?: string[];
   sqm?: number;
+  year_built?: number;
+  latitude?: number;
+  longitude?: number;
+  contact_phone?: string;
+  contact_email?: string;
+  whatsapp_phone?: string;
+  occupancy_capacity?: number;
+  total_desks?: number;
+  parking_bays?: number;
+  nmd_limit_kva?: number;
+  demand_charge_per_kva?: number;
+  electricity_provider?: string;
+  equipment_count?: number;
+  operating_hours?: Record<string, unknown>;
+  optimization_settings?: Record<string, unknown>;
+  building_geometry?: Record<string, unknown>;
+  features?: Record<string, boolean>;
 }
 
 export interface CreateSiteResponse {
@@ -5443,6 +5462,112 @@ export interface RefillRecord {
 }
 
 // ---------------------------------------------------------------------------
+// Staff Roster Settings
+// ---------------------------------------------------------------------------
+
+export interface StaffRosterMember {
+  id: string;
+  staff_number: string;
+  name: string;
+  email: string;
+  phone: string;
+  desk: string;
+  site_id: string;
+  active: boolean;
+  source: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface StaffRosterCreate {
+  staff_number: string;
+  name: string;
+  email: string;
+  phone: string;
+  desk: string;
+  site_id: string;
+  active?: boolean;
+  source?: string;
+}
+
+export type StaffRosterUpdate = Partial<StaffRosterCreate>;
+
+export interface StaffRosterConnectorSettings {
+  enabled: boolean;
+  source_type: string;
+  endpoint_url?: string | null;
+  sync_cadence: string;
+  last_sync_at?: string | null;
+  notes?: string | null;
+}
+
+export interface StaffRosterImportResult {
+  imported: number;
+  skipped: number;
+  errors: string[];
+}
+
+export const staffRosterApi = {
+  async list(siteId?: string, includeInactive = false): Promise<{ members: StaffRosterMember[]; count: number }> {
+    const params = new URLSearchParams();
+    if (siteId) params.set('site_id', siteId);
+    if (includeInactive) params.set('include_inactive', 'true');
+    const qs = params.toString();
+    return fetchApi<{ members: StaffRosterMember[]; count: number }>(`/api/settings/staff-roster${qs ? `?${qs}` : ''}`);
+  },
+
+  async create(data: StaffRosterCreate): Promise<{ member: StaffRosterMember; success: boolean }> {
+    return fetchApi<{ member: StaffRosterMember; success: boolean }>('/api/settings/staff-roster', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  async update(id: string, data: StaffRosterUpdate): Promise<{ member: StaffRosterMember; success: boolean }> {
+    return fetchApi<{ member: StaffRosterMember; success: boolean }>(`/api/settings/staff-roster/${encodeURIComponent(id)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deactivate(id: string): Promise<{ success: boolean; message: string }> {
+    return fetchApi<{ success: boolean; message: string }>(`/api/settings/staff-roster/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+  },
+
+  async importCsv(file: File, siteId?: string): Promise<StaffRosterImportResult> {
+    const params = new URLSearchParams();
+    if (siteId) params.set('site_id', siteId);
+    const form = new FormData();
+    form.append('file', file);
+    const response = await authorizedFetch(`/api/settings/staff-roster/import${params.toString() ? `?${params}` : ''}`, {
+      method: 'POST',
+      body: form,
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({ detail: 'Staff roster import failed' }));
+      throw new Error(err.detail || `Staff roster import failed: ${response.status}`);
+    }
+    return response.json();
+  },
+
+  async getConnector(): Promise<StaffRosterConnectorSettings> {
+    return fetchApi<StaffRosterConnectorSettings>('/api/settings/staff-roster/connector/config');
+  },
+
+  async updateConnector(settings: StaffRosterConnectorSettings): Promise<StaffRosterConnectorSettings> {
+    return fetchApi<StaffRosterConnectorSettings>('/api/settings/staff-roster/connector/config', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Space Optimization Settings
 // ---------------------------------------------------------------------------
 
@@ -5711,9 +5836,19 @@ export interface BuildingConfigUpdatePayload {
   building_type?: string;
   floors?: string[];
   sqm?: number;
+  year_built?: number;
+  latitude?: number;
+  longitude?: number;
   occupancy_capacity?: number;
   total_desks?: number;
   parking_bays?: number;
+  nmd_limit_kva?: number;
+  demand_charge_per_kva?: number;
+  electricity_provider?: string;
+  equipment_count?: number;
+  operating_hours?: Record<string, unknown>;
+  optimization_settings?: Record<string, unknown>;
+  building_geometry?: Record<string, unknown>;
   optimization_profile?: string;
   sentinel_operating_mode?: "comfort" | "cost_saving" | "asset_preservation";
   control_tier?: string;

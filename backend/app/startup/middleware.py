@@ -67,6 +67,7 @@ _PUBLIC_PREFIXES = (
     "/api/simbiot/",  # SIMBIOT onboarding wizard — public during site setup (write endpoints carry own auth)
     "/api/municipal-billing/tariffs",  # Tariff schedules — read-only, scoped to site municipality
     "/api/webhooks/google/calendar",  # Google Calendar Pub/Sub push notifications (public — validated by channel ID)
+    "/api/webhooks/google/token",  # Retired Google token endpoint — explicit clean 410/retired response
     "/api/webhooks/graph/events",  # Microsoft Graph webhook notifications (public — validated by clientState)
     "/api/debug/",  # Debug endpoints for non-production inspection (guarded by environment=production check)
     # "/api/buildings",  # REMOVED: Building listing now requires auth to enforce per-user gating

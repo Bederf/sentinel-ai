@@ -4,7 +4,7 @@ type: "technical"
 status: "approved"
 version: "3.1.0"
 created: "2026-02-02"
-updated: "2026-05-25"
+updated: "2026-06-21"
 author: "Sentinel Development Team"
 tags: ["ai", "optimization", "recommendations", "claude", "zone-aware", "background-jobs"]
 related: ["./background-recommendation-generation.md", "../14-south-africa-context/load-shedding-optimization.md", "../06-safety-compliance/safety-interlocks-engine.md", "../08-ai-ml/hybrid-ai-routing.md", "../03-api-reference/recommendations-api.md"]
@@ -99,6 +99,8 @@ graph TB
 | **Safety Engine** | `backend/app/services/safety_interlocks.py` | Validation |
 | **M&V Verification** | `backend/app/services/mv_verification_service.py` | Post-action outcome tracking |
 | **Recommendation Scorer** | `backend/app/services/recommendation_scorer.py` | Multi-objective scoring |
+| **Reflex Reconciliation** | `backend/app/services/reflex_reconciliation_service.py` | Deterministic zone/system mismatch checks before or alongside AI optimization |
+| **Zone Identity Resolver** | `backend/app/services/zone_identity_resolver.py` | Shared resolver for canonical zone IDs and visible zone-mapping gaps |
 
 ### Frontend Components
 
@@ -137,6 +139,39 @@ flowchart TD
 | 5 | Advisory question + anticipatory check + JSON format | `_format_task()` |
 
 ### AI-OPT vs Health Engine Separation
+
+### Reflex Reconciliation
+
+Reflex reconciliation is the deterministic baseline layer for obvious
+cross-signal mismatches. It does not call the LLM and does not invoke
+`analyze_building()`. It runs as a current-state scan on its own scheduler so
+zone/system mismatches are not dependent on the AI optimization cadence.
+
+V1 rules are registered by `system_type`:
+
+- HVAC: empty or near-empty zone while local HVAC is still running.
+- HVAC: occupied zone outside the comfort band while local HVAC is idle.
+- Lighting: empty zone with lights on, but only when real lighting telemetry is
+  present.
+- Lighting: occupied zone with lights off, but only when real lighting telemetry
+  is present.
+
+Lighting findings must not be inferred from `equipment.status`; if
+`lighting_energy` telemetry is absent the service records no lighting finding
+for that zone.
+
+Zone matching goes through `ZoneIdentityResolver` before reconciliation. If a
+zone key is unresolved or ambiguous, the service records a data-quality gap in
+`reflex_zone_resolution_gaps` instead of silently dropping coverage or creating
+a finding against the wrong zone.
+
+Repeated reflex findings are tracked in
+`reflex_reconciliation_occurrences`. Recurrence is counted by site, canonical
+zone, system type, rule, day-of-week, two-hour local time bucket, and distinct
+local date. V1 promotes a repeated mismatch to `schedule_defect` after 3
+distinct local dates in the 35-day lookback. `schedule_defect` rows are
+advisory/manual-action-only until the BMS adapter contract exposes explicit
+schedule/timer writes.
 
 AI-OPT produces **operational advisory recommendations**. Maintenance recommendations are the exclusive domain of the rule-based health engine. This is a hard architectural separation:
 
@@ -529,11 +564,27 @@ routing tier decisions over time.
 
 ### Overview
 
-After recommendations are applied (auto or approved), the M&V service tracks whether predicted savings match actual energy consumption:
+After recommendations are applied (auto or approved), the M&V service tracks whether predicted savings match actual energy consumption. Energy savings are not accepted from the recommendation text or from a model estimate. They are calculated from actual measured telemetry before and after implementation.
 
 ```
 Recommendation Applied → Record Verification Task → Wait Measurement Window → Verify → Outcome
 ```
+
+### Measured kWh and Rand Feedback
+
+For energy-impacting recommendations, the feedback loop stores all of the values needed to audit the calculation:
+
+| Field | Meaning |
+|-------|---------|
+| `baseline_energy_kwh` | Actual measured kWh during the baseline window before implementation |
+| `actual_energy_kwh` | Actual measured kWh during the outcome window after implementation |
+| `actual_saving_kwh` | `baseline_energy_kwh - actual_energy_kwh` |
+| `tariff_rate_at_creation` | R/kWh tariff used for cost conversion |
+| `actual_saving_zar` | `actual_saving_kwh * tariff_rate_at_creation` |
+
+Negative `actual_saving_kwh` or `actual_saving_zar` is valid and must remain visible. It means the action increased measured consumption or cost during the verification window.
+
+The current implementation uses actual `hvac_kw` readings first and falls back to `total_kw` only when HVAC power is unavailable. The baseline window is the 30 minutes before execution and the outcome window is the 30 minutes after execution. This is intentionally auditable: operators can compare the before/after kWh values instead of trusting a single savings number.
 
 ### Measurement Windows
 
@@ -568,8 +619,28 @@ POST /api/optimization/mv/verify
 | File | Purpose |
 |------|---------|
 | `backend/app/services/mv_verification_service.py` | Core M&V service |
+| `backend/app/services/recommendation_outcome_service.py` | Recommendation outcome verification, measured kWh/R feedback |
 | `backend/app/models/outcome.py` | Outcome model (predicted vs actual) |
-| Supabase `recommendations` table | Verification task storage (outcome columns) |
+| Supabase `recommendations` table | Verification task storage (`baseline_energy_kwh`, `actual_energy_kwh`, `actual_saving_kwh`, `actual_saving_zar`) |
+| `/metrics` Prometheus endpoint | Exposes measured recommendation feedback gauges for Grafana |
+
+### Grafana Metrics
+
+Measured recommendation feedback is exported to Grafana through Prometheus:
+
+| Metric | Description |
+|--------|-------------|
+| `sentinel_recommendation_baseline_energy_kwh` | Before-implementation measured kWh |
+| `sentinel_recommendation_actual_energy_kwh` | After-implementation measured kWh |
+| `sentinel_recommendation_actual_saving_kwh` | Measured kWh delta |
+| `sentinel_recommendation_actual_saving_zar` | Measured Rand delta |
+
+Panels using these metrics are provisioned in:
+
+| Dashboard | Panels |
+|-----------|--------|
+| `sentinel-energy.json` | Measured Rec kWh Saved, Measured Rec R Saved, Recommendation Before vs After kWh |
+| `sentinel-ai-governance-live.json` | Verified Rec kWh Impact, Verified Rec R Impact, Verified Recommendation Energy Outcome |
 
 ---
 
@@ -1104,6 +1175,49 @@ START → fetch_pending
 | **Chat tool** | `process_recommendation` registered in `chat_tools.py` |
 | **WhatsApp approval** | `route_incoming_message()` in `whatsapp_webhooks.py` detects APPROVE/REJECT |
 | **Telegram approval** | `handle_telegram_recommendation_approval()` in `work_order_notifier.py` |
+
+### Operator Outcome View
+
+Operators can review carried-out AI recommendations from **System Health → AI Actions**.
+This view is backed by `POST /api/recommendations/history/{site_id}` and shows the
+same lifecycle record used by the optimization pages:
+
+| UI Column | Source | Meaning |
+|-----------|--------|---------|
+| Suggested | `recommendations.action`, `target_equipment`, `reason` | What Sentinel proposed and why |
+| Actioned | `status`, `approved_at`, `executed_at`, `action` | Whether the recommendation was applied and which control point/value was submitted |
+| Measured Result | `baseline_energy_kwh`, `actual_energy_kwh`, `actual_saving_kwh`, `actual_saving_zar` | Actual before/after energy and Rand outcome |
+| Outcome | `outcome_validated`, `outcome_notes` | Whether verification found a positive measured result |
+
+Negative `actual_saving_kwh` or `actual_saving_zar` values are intentionally shown.
+They mean the action was executed but the measured verification window consumed more
+energy than the baseline window. This is part of the AI feedback loop and must not
+be hidden from operators.
+
+### Phase Baseline Comparison
+
+Recommendation quality must be judged against the site baseline captured during
+onboarding and shadow operation. The baseline is not only energy. It must include:
+
+| Baseline Area | Source | Used For |
+|---------------|--------|----------|
+| Equipment baseline coverage | `equipment_baselines` | Promotion readiness and equipment-level audit completeness |
+| Equipment health by phase | `asset_health_snapshots` + `phase_transition_log` | Compare advisory/supervised/auto health against shadow health |
+| Energy by phase | `energy_consumption_history` + `phase_transition_log` | Compare daily kWh in advisory/supervised/auto against shadow daily kWh |
+| Recommendation result | `recommendations.baseline_energy_kwh`, `actual_energy_kwh` | Per-action before/after verification |
+
+The backend exports these phase comparison metrics to Prometheus:
+
+| Metric | Meaning |
+|--------|---------|
+| `sentinel_equipment_baseline_coverage_percent` | Percent of equipment with an active formal baseline |
+| `sentinel_equipment_phase_health_score_avg` | Average equipment health score per phase |
+| `sentinel_equipment_phase_health_delta_from_shadow` | Health score delta versus shadow baseline |
+| `sentinel_energy_phase_avg_daily_kwh` | Average daily kWh per phase |
+| `sentinel_energy_phase_delta_from_shadow_kwh` | Daily kWh delta versus shadow baseline |
+
+If a site has no formal equipment baseline records, the system must show that gap.
+It must not silently infer a complete baseline from later supervised or auto data.
 
 ### Tests
 

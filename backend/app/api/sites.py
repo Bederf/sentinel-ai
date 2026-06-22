@@ -237,7 +237,7 @@ def get_equipment_status_breakdown(site_uuid: str) -> dict:
             if status == "critical" or health_value < 57:
                 counts["critical"] += 1
             # Warning includes explicit warning plus non-operational or degraded-but-not-critical.
-            elif status in ("warning", "offline", "maintenance") or health_value < 80:
+            elif status in ("warning", "needs_attention") or health_value < 80 or status in ("offline", "maintenance"):
                 counts["warning"] += 1
             else:
                 counts["ok"] += 1
@@ -552,7 +552,7 @@ async def get_site_from_supabase(site_id: str) -> tuple[dict | None, bool]:
 
     try:
         repo = SiteRepository()
-        building = await repo.get_by_id(site_id)
+        building = repo.get_by_id(site_id)
 
         if not building:
             return None, True  # Success but not found
@@ -768,6 +768,23 @@ class CreateSiteRequest(BaseModel):
     type: str = Field("office", description="Building type (office, retail, hospital, industrial)")
     floors: list[str] = Field(default_factory=list, description="Floor list e.g. ['B1', 'G', 'L1', 'L2']")
     sqm: int = Field(0, description="Total floor area in square meters")
+    year_built: int | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    whatsapp_phone: str | None = None
+    occupancy_capacity: int | None = None
+    total_desks: int | None = None
+    parking_bays: int | None = None
+    nmd_limit_kva: float | None = None
+    demand_charge_per_kva: float | None = None
+    electricity_provider: str | None = None
+    equipment_count: int | None = None
+    operating_hours: dict[str, Any] | None = None
+    optimization_settings: dict[str, Any] | None = None
+    building_geometry: dict[str, Any] | None = None
+    features: dict[str, Any] | None = None
 
 
 class CreateSiteResponse(BaseModel):
@@ -782,6 +799,32 @@ class NextSiteIdResponse(BaseModel):
     """Response with next available site ID."""
 
     next_id: str
+
+
+class OnboardingFactsRequest(BaseModel):
+    """Request to enrich onboarding fields from public sources."""
+
+    site_name: str
+    address: str = ""
+    building_type: str = ""
+
+
+@router.post("/sites/onboarding-facts")
+async def scrape_onboarding_facts(
+    request: OnboardingFactsRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.AUTHENTICATED)),
+) -> dict[str, Any]:
+    """Prefill site onboarding facts from geocoding and Firecrawl, returning unresolved gaps."""
+    if not request.site_name.strip() and not request.address.strip():
+        raise HTTPException(status_code=400, detail="site_name or address is required")
+
+    from app.services.site_onboarding_scraper import scrape_site_onboarding_facts
+
+    return await scrape_site_onboarding_facts(
+        site_name=request.site_name.strip(),
+        address=request.address.strip(),
+        building_type=request.building_type.strip(),
+    )
 
 
 def _get_next_site_number() -> int:
@@ -853,7 +896,8 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
         "address": request.address,
         "timezone": "Africa/Johannesburg",
         "floors": request.floors or ["G"],
-        "features": {
+        "features": request.features
+        or {
             "hvac": True,
             "dali": False,
             "desk_diagnosis": False,
@@ -864,16 +908,33 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
             "system": "Unknown",
             "protocol": "BACnet/IP",
         },
-        "contacts": {},
+        "contacts": {
+            "email": request.contact_email or "",
+            "emergency": request.contact_phone or "",
+            "whatsapp": request.whatsapp_phone or "",
+        },
         "metadata": {
             "type": request.type,
             "total_floors": len(request.floors) if request.floors else 1,
             "sqm": request.sqm,
+            "year_built": request.year_built,
+            "occupancy_capacity": request.occupancy_capacity,
+            "total_desks": request.total_desks,
+            "parking_bays": request.parking_bays,
+            "nmd_limit_kva": request.nmd_limit_kva,
+            "demand_charge_per_kva": request.demand_charge_per_kva,
+            "electricity_provider": request.electricity_provider,
+            "equipment_count": request.equipment_count,
             "total_devices": 0,
             "on_bms_count": 0,
             "bms_coverage_pct": 0,
             "onboarding_phase": "commissioning",
         },
+        "year_built": request.year_built,
+        "latitude": request.latitude,
+        "longitude": request.longitude,
+        "operating_hours": request.operating_hours,
+        "building_geometry": request.building_geometry,
     }
 
     site_file = site_dir / "building.json"
@@ -969,20 +1030,36 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
 
             client = get_supabase_client()
             if client:
-                client.table("sites").insert(
-                    {
-                        "code": site_id,
-                        "name": request.name,
-                        "address": request.address,
-                        "type": request.type,
-                        "region": request.region,
-                        "sqm": request.sqm,
-                        "floors": len(request.floors) if request.floors else 1,
-                        "timezone": "Africa/Johannesburg",
-                        "onboarding_phase": "commissioning",
-                        "sentinel_processing_enabled": False,
-                    }
-                ).execute()
+                site_record: dict[str, Any] = {
+                    "code": site_id,
+                    "name": request.name,
+                    "address": request.address,
+                    "type": request.type,
+                    "region": request.region,
+                    "sqm": request.sqm,
+                    "floors": len(request.floors) if request.floors else 1,
+                    "floor_labels": request.floors or ["G"],
+                    "year_built": request.year_built,
+                    "latitude": request.latitude,
+                    "longitude": request.longitude,
+                    "contact_phone": request.contact_phone,
+                    "contact_email": request.contact_email,
+                    "whatsapp_phone": request.whatsapp_phone,
+                    "occupancy_capacity": request.occupancy_capacity,
+                    "total_desks": request.total_desks,
+                    "parking_bays": request.parking_bays,
+                    "nmd_limit_kva": request.nmd_limit_kva,
+                    "demand_charge_per_kva": request.demand_charge_per_kva,
+                    "electricity_provider": request.electricity_provider,
+                    "equipment_count": request.equipment_count or 0,
+                    "features": request.features,
+                    "operating_hours": request.operating_hours,
+                    "optimization_settings": request.optimization_settings,
+                    "building_geometry": request.building_geometry,
+                    "onboarding_phase": "commissioning",
+                    "sentinel_processing_enabled": False,
+                }
+                client.table("sites").insert(site_record).execute()
                 logger.info(f"Created building in Supabase: {site_id}")
 
                 # Auto-seed municipal tariff schedule + account based on region
@@ -1479,6 +1556,65 @@ class PhaseUpdateResponse(BaseModel):
     onboarding_phase: str
 
 
+def _sync_bridge_write_flags(client, site_id: str, phase: str) -> None:
+    """Enable bridge writes only in supervised/automatic phases."""
+    write_enabled = phase in {"supervised", "automatic"}
+    rows = (
+        client.table("site_adapter_config")
+        .select("id,connection_config")
+        .eq("site_id", site_id)
+        .eq("protocol", "bridge")
+        .execute()
+    )
+    for row in rows.data or []:
+        config = row.get("connection_config") or {}
+        supports_writes = config.get("supports_writes") is True
+        updated_config = {
+            **config,
+            "write_enabled": write_enabled and supports_writes,
+        }
+        client.table("site_adapter_config").update({"connection_config": updated_config}).eq("id", row["id"]).execute()
+
+
+def _sync_bridge_policy_stage(client, site_id: str, phase: str) -> None:
+    """Sync Trust Ladder stage to the bridge using the per-site adapter token."""
+    rows = (
+        client.table("site_adapter_config")
+        .select("connection_config")
+        .eq("site_id", site_id)
+        .eq("protocol", "bridge")
+        .eq("enabled", True)
+        .limit(1)
+        .execute()
+    )
+    if not rows.data:
+        return
+    config = rows.data[0].get("connection_config") or {}
+    base_url = str(config.get("base_url") or "").rstrip("/")
+    token = str(config.get("token") or "")
+    if not base_url or not token:
+        return
+
+    try:
+        response = httpx.put(
+            f"{base_url}/api/sites/{site_id}/ipmvp/policy-state",
+            json={"policy_stage": phase},
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=10,
+        )
+        if response.is_success:
+            logger.info("Bridge policy stage synced to %s for %s", phase, site_id)
+        else:
+            logger.warning(
+                "Bridge policy stage sync failed for %s: HTTP %s %s",
+                site_id,
+                response.status_code,
+                response.text[:200],
+            )
+    except Exception as exc:
+        logger.warning("Bridge policy stage sync failed for %s: %s", site_id, exc)
+
+
 _ONBOARDING_PHASE_FILE = DATA_DIR / "onboarding_phase_state.json"
 
 
@@ -1510,7 +1646,7 @@ async def update_site_phase(
     - Forward by one step: allowed
     - Same stage: no-op (succeeds)
     - Forward by more than one step: 400 error
-    - Backward: 400 error
+    - Backward/demotion: allowed and disables write transport below supervised
     """
     from app.models.onboarding_phase import normalise_stage, validate_transition
 
@@ -1573,6 +1709,39 @@ async def update_site_phase(
                 },
             )
 
+        # Trust Ladder gate: advisory is where control readiness is proven.
+        # A site may enter advisory with telemetry only, but it cannot enter
+        # supervised/automatic until mappings and a write-capable adapter are ready.
+        if (previous_phase == "advisory" and requested == "supervised") or (
+            previous_phase == "supervised" and requested == "automatic"
+        ):
+            from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
+
+            readiness = await get_phase_promotion_evaluator().evaluate_site(site_id, previous_phase)
+            if not readiness.eligible:
+                failed_gates = [
+                    {
+                        "gate": gate.gate,
+                        "value": gate.value,
+                        "threshold": gate.threshold,
+                    }
+                    for gate in readiness.gates
+                    if not gate.passed
+                ]
+                raise HTTPException(
+                    status_code=400,
+                    detail={
+                        "error": "supervised_readiness_not_met",
+                        "current": previous_phase,
+                        "requested": requested,
+                        "message": (
+                            f"Cannot promote to {requested} until readiness gates pass, including a verified "
+                            "write-capable adapter and writable control coverage."
+                        ),
+                        "failed_gates": failed_gates,
+                    },
+                )
+
         # Phase 191 gate: require confirmed building profile before shadow/advisory
         if requested in ("shadow_live", "advisory"):
             from app.services.site_profile_service import SiteProfileService
@@ -1607,6 +1776,14 @@ async def update_site_phase(
                 logger.info(f"control_enabled synced to {new_control_enabled} for {site_id} (phase={requested})")
             except Exception as ctrl_err:
                 logger.warning(f"Failed to sync control_enabled for {site_id}: {ctrl_err}")
+
+            try:
+                _sync_bridge_write_flags(client, site_id, requested)
+                logger.info("Bridge write flags synced for %s (write_enabled=%s)", site_id, new_control_enabled)
+            except Exception as bridge_err:
+                logger.warning("Failed to sync bridge write flags for %s: %s", site_id, bridge_err)
+
+            _sync_bridge_policy_stage(client, site_id, requested)
         except Exception as e:
             logger.error(f"Supabase phase update failed for {site_id}: {e}")
             raise HTTPException(status_code=500, detail=f"Supabase write failed: {e}") from e

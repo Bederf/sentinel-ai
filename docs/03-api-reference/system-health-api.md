@@ -451,6 +451,74 @@ curl "http://localhost:9095/api/system/health/history?range=7d" | jq '{
 
 ---
 
+### GET /api/system/sites/{site_id}/discovered-equipment
+
+Returns bridge-discovered equipment that is not yet onboarded into the Supabase site inventory.
+
+**Purpose:** Surface new or unexpected bridge equipment in System Health without allowing polling to create active equipment or zones automatically.
+
+**Method:** `GET`  
+**Path:** `/api/system/sites/{site_id}/discovered-equipment`  
+**Authentication:** Required  
+**Query Parameters:**
+- `limit` (optional): maximum rows to return, default `50`, max `200`
+
+#### Response
+
+```json
+{
+  "site_id": "site-002",
+  "pending_count": 1,
+  "items": [
+    {
+      "id": "2c148918-0d4e-40b4-87af-2af073b77134",
+      "site_id": "site-002",
+      "bridge_code": "S002-FCU-301",
+      "canonical_code": "S002-FCU-301",
+      "equipment_type": "fcu",
+      "derived_zone_id": "Zone-301",
+      "status": "pending",
+      "reason": "derived_zone_not_in_supabase_inventory",
+      "seen_count": 2,
+      "zone_onboardable": false,
+      "zone_message": "Zone-301 is not in the site zone inventory. Create/confirm the zone during site onboarding first."
+    }
+  ]
+}
+```
+
+### POST /api/system/sites/{site_id}/discovered-equipment/{id}/onboard
+
+Creates active equipment from a reviewed bridge discovery row.
+
+**Important:** This endpoint never creates zones. If the equipment is zone-scoped, the target zone must already exist in Supabase `zones` or `hvac_zones`.
+
+#### Request
+
+```json
+{
+  "equipment_name": "FCU Level 2 Zone 1",
+  "equipment_type": "fcu",
+  "zone_id": "Zone-L2-1"
+}
+```
+
+`equipment_name`, `equipment_type`, and `zone_id` are optional when the discovery row already contains enough information and any derived zone is valid.
+
+#### Invalid zone response
+
+```json
+{
+  "detail": "Zone-301 is not in the Supabase zone inventory. Zones must be created during site onboarding before equipment can be onboarded."
+}
+```
+
+### POST /api/system/sites/{site_id}/discovered-equipment/{id}/dismiss
+
+Marks a bridge discovery row as dismissed without creating active equipment.
+
+---
+
 ### GET /api/system/monitoring
 
 Retrieves unified monitoring snapshot for ingestion quality, control activity, commissioning readiness, and quality gate status.

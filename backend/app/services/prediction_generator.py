@@ -775,6 +775,7 @@ class PredictionGeneratorService:
                     supabase.table("equipment_fault_events")
                     .select("alarm_code")
                     .eq("equipment_code", eq_code)
+                    .eq("is_synthetic", False)
                     .gte("recorded_at", lookback)
                     .limit(100)
                     .execute()

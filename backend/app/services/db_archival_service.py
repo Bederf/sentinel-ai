@@ -1,7 +1,7 @@
 """Database Archival Service.
 
-Archives resolved alerts and predictions older than a configurable retention
-period. Copies records to *_archive tables before deleting from live tables.
+Purges resolved raw alerts after their short troubleshooting window and archives
+resolved predictions older than a configurable retention period.
 Runs as a daily background job via BackgroundScheduler.
 
 Phase 4 of Supabase Performance Optimization.
@@ -14,7 +14,10 @@ from app.config.settings import settings
 
 logger = logging.getLogger(__name__)
 
-# Default: archive resolved records older than 90 days
+# Raw alerts are source trace data, not long-term business records.
+ALERT_RETENTION_DAYS = 7
+
+# Default: archive resolved prediction records older than 90 days
 ARCHIVE_RETENTION_DAYS = int(getattr(settings, "archive_retention_days", 90))
 
 # Archive tables are created on first run via _ensure_archive_table()
@@ -93,22 +96,24 @@ def _archive_and_delete(client, table: str, record_ids: list, batch_size: int = 
 
 
 def archive_old_records(dry_run: bool = False) -> dict:
-    """Archive resolved alerts and predictions older than retention period.
+    """Purge resolved raw alerts and archive resolved predictions.
 
-    Copies records to {table}_archive before deleting from live tables.
-    Only archives records with status='resolved' that are older than
-    ARCHIVE_RETENTION_DAYS.
+    Alerts are not copied into alerts_archive because BACnet object IDs are
+    short-lived technical trace data. Predictions keep the existing archive path.
 
     Returns summary dict with counts.
     """
     from app.database.supabase_client import get_supabase_client
 
     client = get_supabase_client()
-    cutoff = datetime.now(UTC) - timedelta(days=ARCHIVE_RETENTION_DAYS)
-    cutoff_iso = cutoff.isoformat()
+    prediction_cutoff = datetime.now(UTC) - timedelta(days=ARCHIVE_RETENTION_DAYS)
+    prediction_cutoff_iso = prediction_cutoff.isoformat()
+    alert_cutoff = datetime.now(UTC) - timedelta(days=ALERT_RETENTION_DAYS)
+    alert_cutoff_iso = alert_cutoff.isoformat()
     summary = {
         "dry_run": dry_run,
-        "cutoff": cutoff_iso,
+        "cutoff": prediction_cutoff_iso,
+        "alert_cutoff": alert_cutoff_iso,
         "alerts_archived": 0,
         "alerts_deleted": 0,
         "predictions_archived": 0,
@@ -117,33 +122,37 @@ def archive_old_records(dry_run: bool = False) -> dict:
 
     # --- Alerts ---
     try:
-        resp = client.table("alerts").select("id").eq("status", "resolved").lt("created_at", cutoff_iso).execute()
+        resp = client.table("alerts").select("id").eq("status", "resolved").lt("updated_at", alert_cutoff_iso).execute()
         old_alerts = resp.data or []
 
         if old_alerts and not dry_run:
             ids = [a["id"] for a in old_alerts]
-            archived, deleted = _archive_and_delete(client, "alerts", ids)
-            summary["alerts_archived"] = archived
-            summary["alerts_deleted"] = deleted
+            client.table("alerts").delete().in_("id", ids).execute()
+            summary["alerts_deleted"] = len(ids)
             logger.info(
-                "DB archival: %d alerts archived, %d deleted (older than %s)",
-                archived,
-                deleted,
-                cutoff_iso,
+                "DB retention: %d resolved raw alerts deleted without archive (older than %s)",
+                len(ids),
+                alert_cutoff_iso,
             )
         elif old_alerts:
-            summary["alerts_archived"] = len(old_alerts)
+            summary["alerts_deleted"] = len(old_alerts)
             logger.info(
-                "DRY RUN: Would archive %d resolved alerts older than %s",
+                "DRY RUN: Would delete %d resolved raw alerts older than %s",
                 len(old_alerts),
-                cutoff_iso,
+                alert_cutoff_iso,
             )
     except Exception as exc:
         logger.warning("Alert archival failed: %s", exc)
 
     # --- Predictions ---
     try:
-        resp = client.table("predictions").select("id").eq("status", "resolved").lt("created_at", cutoff_iso).execute()
+        resp = (
+            client.table("predictions")
+            .select("id")
+            .eq("status", "resolved")
+            .lt("created_at", prediction_cutoff_iso)
+            .execute()
+        )
         old_preds = resp.data or []
 
         if old_preds and not dry_run:
@@ -155,14 +164,14 @@ def archive_old_records(dry_run: bool = False) -> dict:
                 "DB archival: %d predictions archived, %d deleted (older than %s)",
                 archived,
                 deleted,
-                cutoff_iso,
+                prediction_cutoff_iso,
             )
         elif old_preds:
             summary["predictions_archived"] = len(old_preds)
             logger.info(
                 "DRY RUN: Would archive %d resolved predictions older than %s",
                 len(old_preds),
-                cutoff_iso,
+                prediction_cutoff_iso,
             )
     except Exception as exc:
         logger.warning("Prediction archival failed: %s", exc)

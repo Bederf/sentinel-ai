@@ -97,11 +97,42 @@ export interface CreateSiteRequest {
   type?: string;
   floors?: string[];
   sqm?: number;
+  year_built?: number;
+  latitude?: number;
+  longitude?: number;
+  contact_phone?: string;
+  contact_email?: string;
+  whatsapp_phone?: string;
+  occupancy_capacity?: number;
+  total_desks?: number;
+  parking_bays?: number;
+  nmd_limit_kva?: number;
+  demand_charge_per_kva?: number;
+  electricity_provider?: string;
+  equipment_count?: number;
+  operating_hours?: Record<string, unknown>;
+  optimization_settings?: Record<string, unknown>;
+  building_geometry?: Record<string, unknown>;
+  features?: Record<string, boolean>;
 }
 
 export interface SiteListResponse {
   total: number;
   sites: Site[];
+}
+
+export interface OnboardingFactSource {
+  source: string;
+  confidence: number;
+  evidence: string;
+}
+
+export interface OnboardingFactsResponse {
+  status: string;
+  values: Partial<CreateSiteRequest> & { address?: string };
+  sources: Record<string, OnboardingFactSource>;
+  missing: string[];
+  scrape_available: boolean;
 }
 
 // ============= Sites API Methods =============
@@ -136,6 +167,12 @@ export const sitesApi = {
    */
   create: (data: CreateSiteRequest) =>
     fetchApi<Site>("/api/buildings", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  scrapeOnboardingFacts: (data: { site_name: string; address?: string; building_type?: string }) =>
+    fetchApi<OnboardingFactsResponse>("/api/sites/onboarding-facts", {
       method: "POST",
       body: JSON.stringify(data),
     }),
@@ -270,6 +307,7 @@ export interface OperatingSchedule {
   sunday_active: boolean;
   timezone: string;
   is_24_7: boolean;
+  [key: string]: unknown;
 }
 
 export interface OnSiteGeneration {
@@ -282,7 +320,7 @@ export interface SiteProfileRequest {
   building_type: string;
   primary_objective: string;
   objective_weights?: ObjectiveWeights;
-  operating_schedule?: OperatingSchedule;
+  operating_schedule?: OperatingSchedule | Record<string, unknown>;
   tariff_structure?: string;
   on_site_generation?: OnSiteGeneration;
   temp_band_min_c?: number;

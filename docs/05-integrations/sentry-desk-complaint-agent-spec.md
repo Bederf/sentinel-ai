@@ -4,7 +4,7 @@ type: "spec"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-06-16"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -15,7 +15,7 @@ estimated_read_time: 10
 
 # Sentry Desk Complaint Agent -- Full Specification
 
-> **Version:** 1.2 | **Last Updated:** 2026-03-07 | **Location:** `/home/bederf/.sentry/`
+> **Version:** 1.3 | **Last Updated:** 2026-06-16 | **Location:** `/home/bederf/.sentry/`
 >
 > **Phase 147 Note:** Telegram free-text complaint routing is now handled by the backend conversation system (`POST /api/sentry/telegram/message`) with inline keyboard flows. The gateway delegates to the backend instead of routing through `sentry_ai_bridge.py` for free-text messages. Slash commands and the desk diagnosis tool remain unchanged. See `docs/05-integrations/SENTRY_INTEGRATION.md` for the updated architecture.
 
@@ -37,9 +37,9 @@ estimated_read_time: 10
 
 | Field | Value |
 |-------|-------|
-| **Name** | Sentry (identity: Shad Masters) |
+| **Name** | Sentry Staff Bot |
 | **Location** | `/home/bederf/.sentry/` |
-| **Platform** | Telegram Bot (+ Discord-ready) |
+| **Platform** | Sentry channel adapters: Telegram current; WhatsApp/custom app planned |
 | **Runtime** | Python 3, standalone process |
 | **Framework** | Pattern-matching router (no LangGraph) |
 | **Entry Point** | `bot.py` -> `sentry_ai_bridge.detect_and_route()` |
@@ -49,11 +49,37 @@ estimated_read_time: 10
 
 ---
 
-## 3. Directory Structure
+## 3. Staff Identity & Self-Registration
+
+SENTINEL is the facilities/BMS platform. Sentry is the bot interface layer for the site manager, technicians, and staff. The current Staff bot deployment is scoped to site-002.
+
+The canonical staff identity should be the HR/staff number, not a Telegram ID. Channel-specific IDs are bindings captured at first use:
+
+- Telegram: current adapter stores the Telegram user ID for the Staff bot.
+- WhatsApp: future adapter should bind the staff number to the WhatsApp number.
+- Custom app: future adapter should bind the staff number to the app user ID/session identity.
+
+Bulk onboarding should be roster driven. Import or sync a roster from HR with at least `staff_number`, `name`, `email`, `phone`, `desk`, `site_id`, and `active`. The desk number gives the technician enough location context for first response.
+
+Recommended first-use flow:
+
+1. Admin imports/syncs the staff roster for site-002.
+2. Admin enables first-contact registration for the staff channel.
+3. Staff receive a link or QR code, for Telegram currently `https://t.me/sentinelstaffbot?start=staff`.
+4. Staff enter their staff number.
+5. Staff confirm the last 4 digits of their phone number from the roster.
+6. Sentry creates the channel binding, grants Staff bot access, and stores desk/location memory.
+7. Future complaints can skip manual identity capture and use the saved desk/location context.
+
+Security rule: unknown users must be gated before normal bot functions. Do not leave public first-contact registration enabled unless a roster/HR lookup is active. The current Telegram implementation uses `bot_users.telegram_id`; before adding WhatsApp or a custom app, introduce an explicit channel-binding model instead of overloading Telegram fields.
+
+---
+
+## 4. Directory Structure
 
 ```
 /home/bederf/.sentry/
-├── bot.py                                 # Main Telegram bot (Phase 41 WO handlers)
+├── bot.py                                 # Main Staff bot (Phase 41 WO handlers)
 ├── handlers/
 │   ├── wo_conversation_handler.py        # Work Order conversation state machine
 │   └── call_log_handler.py              # Call logging: fixed taxonomy, discovery, escalation
@@ -77,7 +103,7 @@ estimated_read_time: 10
 │   └── [daily logs]
 ├── config/
 │   └── ai_router_config.json            # AI tier configuration
-├── IDENTITY.md                          # Agent identity (Shad Masters)
+├── IDENTITY.md                          # Sentry Staff Bot identity
 ├── SOUL.md                              # Core behavioral principles
 ├── AGENTS.md                            # Memory & session management
 └── CLAUDE.md                            # Development guidelines
@@ -85,12 +111,12 @@ estimated_read_time: 10
 
 ---
 
-## 4. Workflows
+## 5. Workflows
 
 ### 4A: Desk Complaint Workflow
 
 ```
-1. User sends "Desk 120 is too hot" via Telegram
+1. User sends "Desk 120 is too hot" via the Staff channel
 2. bot.py -> detect_and_route() matches desk complaint regex
 3. Extract: desk_id=120, complaint_type="too_hot"
 4. diagnose_comfort_issue(120, "too_hot", "site-002")
@@ -101,7 +127,7 @@ estimated_read_time: 10
        - Read DALI sensors: occupancy, light levels
        - Check context: near_window, near_diffuser, near_printer
    4c. Return: diagnosis, probable_causes, suggested_actions, dispatch_required
-5. format_diagnosis_for_telegram(result) -> formatted message
+5. format_diagnosis_for_channel(result) -> formatted message
 6. Send response to user with:
    - Desk location (floor, zone, department)
    - Current readings (temp, setpoint, deviation)
@@ -111,14 +137,14 @@ estimated_read_time: 10
 7. IF dispatch_required:
    7a. Create work order -> Supabase
    7b. Assign technician by specialty
-   7c. Telegram notification to technician
+   7c. Sentry notification to the assigned technician
 ```
 
 ### 4B: Work Order Data Collection Workflow
 
 ```
 1. Technician receives WO notification (SR-2026-ABC123)
-2. Technician completes service, sends "done" via Telegram
+2. Technician completes service, sends "done" via the Tech bot
 3. WOConversationHandler.handle_initial_done()
    3a. POST "done" to /api/sentry/work-order/response
    3b. BMS returns first data prompt ("Take service sheet photo")
@@ -160,15 +186,15 @@ The `is_facilities_complaint()` function returns `True` if the message matches t
 
 Location handling for call log:
 
-1. First-time reporter: user must provide desk/location manually
-2. Repeat reporter: backend can prefill last location using `GET /api/sentry/call-log/location-memory` (phone or Telegram ID)
+1. First-time reporter: staff member registers with staff number, confirms roster phone digits, and uses the roster desk/location
+2. Repeat reporter: backend can prefill last location using `GET /api/sentry/call-log/location-memory` (phone or current channel binding; Telegram ID today)
 3. User confirmation is still mandatory before WO creation
 
 Current limitation: AD profile location and access-card telemetry are not used yet for auto-location.
 
 ---
 
-## 5. Tools & Functions
+## 6. Tools & Functions
 
 ### Primary Tool: bms_desk_diagnosis.py
 
@@ -301,7 +327,7 @@ desk_complaint_patterns = [
 
 **Context Flow:**
 ```
-Telegram message -> bot.py identifies user_id -> load _user_context[user_id]
+Staff channel message -> bot.py identifies user_id -> load _user_context[user_id]
 -> check active_sr_code (WO in progress?) -> process -> update context -> respond
 ```
 

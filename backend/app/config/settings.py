@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     deepseek_base_url: str = "https://api.deepseek.com/v1"
     minimax_api_key: str = ""
     minimax_model: str = "MiniMax-M2.7"
-    minimax_base_url: str = "https://api.minimax.io/anthropic"
+    minimax_base_url: str = "https://api.minimax.io/v1"
     openai_api_key: str = ""
     openai_model: str = "gpt-4.1-nano"  # Tier 1: fast/cheap for routine queries
     openai_model_heavy: str = "gpt-4.1-mini"  # Tier 2: complex reasoning & diagnostics
@@ -199,6 +199,9 @@ class Settings(BaseSettings):
 
     # OpenAI MCP endpoint API key (protects the read-only BMS intelligence endpoint)
     mcp_api_key: str = Field(default="", validation_alias="MCP_API_KEY")
+    # Optional tenant-scoped MCP keys. JSON object keyed by bearer token:
+    # {"token": {"tenant_id": "client-005", "allowed_sites": ["site-005"], "tools": ["ping", "get_site_status"]}}
+    mcp_tenant_api_keys: str = Field(default="", validation_alias="MCP_TENANT_API_KEYS")
     simbiot_api_url: str = Field(default="", validation_alias=AliasChoices("SIMBIOT_API_URL", "BRIDGE_BASE_URL"))
     simbiot_username: str = ""
     simbiot_password: str = ""
@@ -305,6 +308,10 @@ class Settings(BaseSettings):
     optimization_tier2_min: float = 0.60  # Below this -> tier1_advisory, above -> tier2_approval
     optimization_tier3_min: float = 0.85  # Above this -> tier3_auto_execute
     optimization_fcu_confidence_cap: float = 0.45  # FCU actions capped at this confidence
+    recommendation_advisory_info_retention_days: int = 7
+    after_hours_hvac_load_threshold_pct: float = 0.15
+    after_hours_hvac_load_threshold_kw: float = 15.0
+    after_hours_hvac_advisory_cooldown_hours: int = 2
 
     # MCP Authentication (Phase 81 - MCP SSE Security)
     mcp_auth_token: str = ""  # Shared MCP authentication token
@@ -341,6 +348,7 @@ class Settings(BaseSettings):
     token_budget_alert_threshold: float = Field(default=0.85, validation_alias="TOKEN_BUDGET_ALERT_THRESHOLD")
     token_budget_hard_limit: bool = Field(default=True, validation_alias="TOKEN_BUDGET_HARD_LIMIT")
     token_budget_exclude_interactive: bool = Field(default=True, validation_alias="TOKEN_BUDGET_EXCLUDE_INTERACTIVE")
+    ai_alert_email: str = Field(default="info@sentinel-ai.co.za", validation_alias="AI_ALERT_EMAIL")
 
     # Lifecycle simulation optimization mode
     # IMPORTANT: Simulation MUST NOT consume LLM tokens. It uses rule-based

@@ -59,6 +59,7 @@ export function ExpandableRiskList({
           // Aligns with SafetySummary logic in sites_aggregation.py
           const riskEquipment = response.equipment.filter((e) => {
             if (e.status === "warning" || e.status === "critical") return true;
+            if (e.status === "needs_attention") return true;
             if (e.status === "offline" || e.status === "maintenance") return true;
             // Health-based: normal status but degraded health
             // Backend returns health_score, not health

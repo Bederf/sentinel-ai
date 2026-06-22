@@ -23,6 +23,7 @@ from .connection_policy import (
     is_point_allowed_for_site,
     is_runtime_processing_enabled,
 )
+from .knx_bms_adapter import KnxBmsAdapter
 from .policy_enforced_bms_adapter import PolicyEnforcedBmsAdapter
 
 __all__ = [
@@ -36,6 +37,7 @@ __all__ = [
     "BmsPointValue",
     "BmsSubscription",
     "BmsWriteRequest",
+    "KnxBmsAdapter",
     "PolicyEnforcedBmsAdapter",
     "SiteConnectorPolicy",
     "create_bms_adapter",

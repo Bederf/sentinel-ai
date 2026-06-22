@@ -53,6 +53,22 @@ export interface ZoneValidationResult {
   error_count: number;
 }
 
+export interface AutoZonePlanRequest {
+  building_type?: string;
+  total_desks?: number;
+  floors?: string[];
+  sqm?: number;
+}
+
+export interface AutoZonePlanResponse {
+  site_id: string;
+  building_type: string;
+  strategy: string;
+  zones: ZoneConfig[];
+  desks: DeskConfig[];
+  metadata: Record<string, unknown>;
+}
+
 // ============= Zone Ingestion API Methods =============
 
 export const zoneIngestionApi = {
@@ -82,6 +98,15 @@ export const zoneIngestionApi = {
   ingestDesks: (siteId: string, request: DesksIngestionRequest) =>
     fetchApi<IngestionResponse>(
       `/api/buildings/${siteId}/zone-ingestion/desks`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+      }
+    ),
+
+  generateAutoPlan: (siteId: string, request: AutoZonePlanRequest = {}) =>
+    fetchApi<AutoZonePlanResponse>(
+      `/api/buildings/${siteId}/zone-ingestion/auto-plan`,
       {
         method: 'POST',
         body: JSON.stringify(request),

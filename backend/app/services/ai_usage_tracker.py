@@ -19,7 +19,10 @@ Persists to JSON with daily rollup. No external dependencies.
 import asyncio
 import json
 import logging
+import smtplib
+import uuid
 from datetime import date, datetime, timedelta
+from email.mime.text import MIMEText
 from pathlib import Path
 from threading import Lock
 from typing import Optional
@@ -121,6 +124,7 @@ class AiUsageTracker:
         self._redis_checked = False
         self._memory_daily_totals: dict[str, int] = {}  # site_id -> total tokens today
         self._memory_alert_sent: dict[str, bool] = {}  # site_id -> alert sent today
+        self._memory_email_alert_sent: dict[str, bool] = {}
         # Supabase primary store (Phase 193+)
         self._client = None
         self._pending_rows: list[dict] = []  # daily usage rows waiting to flush
@@ -245,6 +249,135 @@ class AiUsageTracker:
                 pass
         self._memory_alert_sent[key] = True
 
+    def _email_alert_key(self, alert_type: str, site_id: str, provider: str = "", model: str = "") -> str:
+        today = self._sast_date()
+        return f"ai_alert:{alert_type}:{site_id or 'unknown'}:{provider or 'any'}:{model or 'any'}:{today}"
+
+    def _email_alert_already_sent(self, alert_key: str) -> bool:
+        if self._memory_email_alert_sent.get(alert_key):
+            return True
+        try:
+            result = (
+                self._supabase.table("notification_delivery_log")
+                .select("id")
+                .eq("notification_type", "ai_provider_alert")
+                .eq("reference_type", alert_key)
+                .limit(1)
+                .execute()
+            )
+            sent = bool(result.data)
+            if sent:
+                self._memory_email_alert_sent[alert_key] = True
+            return sent
+        except Exception as exc:
+            logger.debug("AI alert dedup lookup failed for %s: %s", alert_key, exc)
+            return False
+
+    def _mark_email_alert_sent(self, alert_key: str, recipient: str, subject: str, body: str) -> None:
+        self._memory_email_alert_sent[alert_key] = True
+        try:
+            self._supabase.table("notification_delivery_log").insert(
+                {
+                    "id": str(uuid.uuid4()),
+                    "notification_type": "ai_provider_alert",
+                    "channel_type": "email",
+                    "recipient_identifier": recipient,
+                    "status": "sent",
+                    "provider": "smtp",
+                    "sent_at": datetime.now(ZoneInfo("Africa/Johannesburg")).isoformat(),
+                    "site_id": "system",
+                    "message_text": f"{subject}\n\n{body}"[:4000],
+                    "delivery_status": "sent",
+                    "reference_type": alert_key,
+                    "severity": "warning",
+                }
+            ).execute()
+        except Exception as exc:
+            logger.debug("AI alert delivery audit failed for %s: %s", alert_key, exc)
+
+    def _send_ai_alert_email(self, alert_key: str, subject: str, body: str) -> bool:
+        """Send a deduplicated AI operational alert email."""
+        from app.config.settings import settings
+
+        recipient = (settings.ai_alert_email or "info@sentinel-ai.co.za").strip()
+        if not recipient or "@" not in recipient:
+            logger.warning("AI alert email recipient is not configured")
+            return False
+        if self._email_alert_already_sent(alert_key):
+            logger.debug("AI alert email already sent for %s", alert_key)
+            return False
+
+        host = settings.notification_smtp_host
+        port = settings.notification_smtp_port
+        username = settings.notification_smtp_username
+        password = settings.notification_smtp_password
+        if not (host and username and password):
+            logger.warning("No SMTP configured — cannot send AI alert email")
+            return False
+
+        msg = MIMEText(body, "plain")
+        msg["Subject"] = subject
+        msg["From"] = username
+        msg["To"] = recipient
+
+        try:
+            server = smtplib.SMTP(host, port, timeout=15)
+            if settings.notification_smtp_use_tls:
+                server.starttls()
+            server.login(username, password)
+            server.sendmail(username, [recipient], msg.as_string())
+            server.quit()
+            self._mark_email_alert_sent(alert_key, recipient, subject, body)
+            logger.warning("AI alert email sent to %s: %s", recipient, subject)
+            return True
+        except Exception as exc:
+            logger.warning("Failed to send AI alert email: %s", exc)
+            return False
+
+    def send_token_budget_email_alert(self, site_id: str, current: int, budget: int) -> None:
+        pct = (current / budget * 100) if budget > 0 else 0
+        alert_key = self._email_alert_key("token_budget", site_id)
+        subject = f"SENTINEL AI Token Budget Alert — {site_id}"
+        body = "\n".join(
+            [
+                "SENTINEL AI token budget alert",
+                "",
+                f"Site: {site_id}",
+                f"Usage: {current:,} / {budget:,} tokens ({pct:.0f}%)",
+                f"Date: {self._sast_date()}",
+                "",
+                "Background LLM calls will be blocked at 100% if the hard limit is enabled.",
+            ]
+        )
+        self._send_ai_alert_email(alert_key, subject, body)
+
+    def send_provider_failure_email_alert(
+        self,
+        provider: str,
+        model: str,
+        site_id: str,
+        source: str,
+        error: Exception,
+        fallback_remaining: bool = False,
+    ) -> None:
+        alert_key = self._email_alert_key("provider_failure", site_id, provider, model)
+        subject = f"SENTINEL AI Provider Alert — {provider}"
+        body = "\n".join(
+            [
+                "SENTINEL AI provider call failed.",
+                "",
+                f"Provider: {provider}",
+                f"Model: {model}",
+                f"Site: {site_id or 'unknown'}",
+                f"Source: {source or 'unknown'}",
+                f"Fallback remaining: {'yes' if fallback_remaining else 'no'}",
+                f"Timestamp: {datetime.now(ZoneInfo('Africa/Johannesburg')).isoformat()}",
+                "",
+                f"Error: {type(error).__name__}: {str(error)[:1000]}",
+            ]
+        )
+        self._send_ai_alert_email(alert_key, subject, body)
+
     async def _send_budget_alert(self, site_id: str, current: int, budget: int) -> None:
         """Send Telegram budget alert via ThreadPoolExecutor (fire-and-forget)."""
         pct = (current / budget * 100) if budget > 0 else 0
@@ -256,15 +389,19 @@ class AiUsageTracker:
             tp = TelegramProvider()
             if not tp.is_enabled():
                 logger.warning("Telegram not configured, cannot send budget alert for %s", site_id)
-                return
+            else:
 
-            def _send():
-                try:
-                    tp.send_budget_alert(site_id, current, budget, pct)
-                except Exception as e:
-                    logger.warning("Budget alert failed for %s: %s", site_id, e)
+                def _send():
+                    try:
+                        tp.send_budget_alert(site_id, current, budget, pct)
+                    except Exception as e:
+                        logger.warning("Budget alert failed for %s: %s", site_id, e)
 
-            ThreadPoolExecutor(max_workers=1).submit(_send)
+                ThreadPoolExecutor(max_workers=1).submit(_send)
+
+            ThreadPoolExecutor(max_workers=1).submit(
+                lambda: self.send_token_budget_email_alert(site_id, current, budget)
+            )
         except Exception as e:
             logger.warning("Failed to send token budget alert: %s", e)
 

@@ -15,6 +15,8 @@
 | ELEVENLABS_API_KEY (inline cleanup) | 2026-06-12 | Removed inline `Environment="ELEVENLABS_API_KEY=..."` and `Environment="ELEVENLABS_TTS_ENABLED=true"` from `/etc/systemd/system/sentinel-backend.service`. `ELEVENLABS_TTS_ENABLED` moved to `/etc/sentinel/backend.env`. Service now reads both values from EnvironmentFiles. |
 | **Phase 226.1.4 — Secret rotation (on-server)** | 2026-06-12 | ADMIN_PIN_HASH, BRIDGE_API_TOKEN, HOME_BOT_WEBHOOK_SECRET, ELEVENLABS_API_KEY, and all Telegram bot tokens (SENTRY_BOT_API_KEY, SENTRY_CLIENT_BOT_TOKEN, SENTRY_TECH_BOT_TOKEN, SENTINEL_HOME_BOT_TOKEN, SENTRY_MANAGER_BOT_TOKEN) rotated. ElevenLabs key replaced with value provided by user via ElevenLabs dashboard. |
 | **Phase 226.3 — Restore drill** | 2026-06-12 | Full DR drill passed. Nightly encrypted backup restored into standby container (sentinel-postgres-backup-db, port 55432). Row counts match: sites=5, work_orders=7, audit_log=29863, recommendations=90845. Restore script fixed to use Docker container's pg_restore (v17) since host has only v15 clients. |
+| SMTP / IMAP password sync | 2026-06-16 | Updated `SMTP_PASSWORD`, `NOTIFICATION_SMTP_PASSWORD`, `ROOMS_IMAP_PASSWORD`, and `ROOMS_SMTP_PASSWORD` in `/etc/sentinel/secrets.env`; updated `/home/bederf/.sentry/.env` helper `SMTP_PASSWORD`; restarted `sentinel-backend`; main SMTP login probe returned `smtp ok`. |
+| TUNER_DB_PASSWORD | 2026-06-22 | Created for `sentinel_tuner` DB role (RSI threshold tuning, Phase 230-R). Generated via `openssl rand -hex 24`. Replaced placeholder `CHANGE_ME_IMMEDIATELY` that was live on the production DB for ~10 hours. Stored in `/etc/sentinel/secrets.env`. Role has zero table grants — can only call SECURITY DEFINER functions. See [RSI Threshold Tuning Schema](../07-database/rsi-threshold-tuning-schema.md). |
 
 ## Secret Inventory (current locations)
 
@@ -31,7 +33,11 @@
 | SENTRY_TECH_BOT_TOKEN | /etc/sentinel/secrets.env | 0600 | root:bederf |
 | SENTRY_MANAGER_BOT_TOKEN | /etc/sentinel/secrets.env | 0600 | root:bederf |
 | SMTP_PASSWORD | /etc/sentinel/secrets.env | 0600 | root:bederf |
+| NOTIFICATION_SMTP_PASSWORD | /etc/sentinel/secrets.env | 0600 | root:bederf |
+| ROOMS_IMAP_PASSWORD | /etc/sentinel/secrets.env | 0600 | root:bederf |
+| ROOMS_SMTP_PASSWORD | /etc/sentinel/secrets.env | 0600 | root:bederf |
 | ELEVENLABS_API_KEY | /etc/sentinel/secrets.env only (inline removed from systemd) | 0600 | root:bederf |
+| TUNER_DB_PASSWORD | /etc/sentinel/secrets.env | 0600 | root:bederf |
 
 ## Active Findings (Current Working Tree)
 No active findings. `gitleaks detect --source .` scanned 2802 commits and the current working tree in 1m6.2s and reported "no leaks found".
@@ -47,7 +53,7 @@ No historical findings. `gitleaks detect --source . --log-opts="--all"` scanned 
 |--------|----------|--------|-------------|
 | SUPABASE_SERVICE_ROLE_KEY | Supabase dashboard | Rotate → copy new value → `sudo sed -i 's/^SUPABASE_SERVICE_ROLE_KEY=.*$/SUPABASE_SERVICE_ROLE_KEY=<new>/' /etc/sentinel/secrets.env` → restart | `secrets.env` ready |
 | SUPABASE_KEY (anon) | Supabase dashboard (same project) | Same as above | `secrets.env` ready |
-| SMTP_PASSWORD | Email provider dashboard | Replace in `secrets.env` → restart | `secrets.env` ready |
+| SMTP / IMAP passwords | Email provider dashboard | Last synced on 2026-06-16. Recheck provider dashboard and rotate again if the mailbox password is changed externally. | Runtime secrets updated |
 
 **Post-rotation command**:
 ```bash

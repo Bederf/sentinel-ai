@@ -601,16 +601,58 @@ class NotificationService:
             current_value = impact.get("current_value")
             recommended_value = impact.get("recommended_value", action_value)
             current_line = f"Current value: {current_value}{unit}\n" if current_value is not None else ""
+            diagnostic_context = None
+            notify_service_type = "callout"
+            create_service_record = False
+            try:
+                from app.services.ai_maintenance_work_order_context import (
+                    build_ai_maintenance_context,
+                    build_ai_maintenance_description,
+                    is_ai_maintenance_recommendation,
+                )
 
-            description = (
-                f"Created from SENTINEL AI advisory recommendation {recommendation_id}.\n\n"
-                f"Equipment: {equipment_code or 'Unknown'}\n"
-                f"Action: Set {action_point or 'recommended adjustment'} to {recommended_value}{unit}\n"
-                f"{current_line}"
-                f"Goal: {(rec.profile or 'optimization').replace('_', ' ').title()}\n"
-                f"Confidence: {round((rec.confidence_score or rec.get_numeric_confidence()) * 100)}%\n\n"
-                f"Reason:\n{rec.reason}"
-            )
+                if is_ai_maintenance_recommendation(rec.action_type, action):
+                    diagnostic_context = build_ai_maintenance_context(
+                        recommendation_id=recommendation_id,
+                        site_id=rec.site_id,
+                        equipment_code=equipment_code,
+                        action_type=rec.action_type,
+                        action=action,
+                        reason=rec.reason or "",
+                        confidence_score=rec.confidence_score or rec.get_numeric_confidence(),
+                    )
+                    description = build_ai_maintenance_description(
+                        recommendation_id=recommendation_id,
+                        equipment_code=equipment_code,
+                        reason=rec.reason or "",
+                        diagnostic_context=diagnostic_context,
+                    )
+                    title = f"SENTINEL Maintenance Check: {equipment_code or 'Equipment'}"
+                    notify_service_type = "breakdown"
+                    create_service_record = True
+                else:
+                    title = f"SENTINEL Advisory Action: {equipment_code or 'Equipment'}"
+                    description = (
+                        f"Created from SENTINEL AI advisory recommendation {recommendation_id}.\n\n"
+                        f"Equipment: {equipment_code or 'Unknown'}\n"
+                        f"Action: Set {action_point or 'recommended adjustment'} to {recommended_value}{unit}\n"
+                        f"{current_line}"
+                        f"Goal: {(rec.profile or 'optimization').replace('_', ' ').title()}\n"
+                        f"Confidence: {round((rec.confidence_score or rec.get_numeric_confidence()) * 100)}%\n\n"
+                        f"Reason:\n{rec.reason}"
+                    )
+            except Exception as ctx_err:
+                logger.warning("[CERTIFIED] Failed to build AI WO context for %s: %s", recommendation_id, ctx_err)
+                title = f"SENTINEL Advisory Action: {equipment_code or 'Equipment'}"
+                description = (
+                    f"Created from SENTINEL AI advisory recommendation {recommendation_id}.\n\n"
+                    f"Equipment: {equipment_code or 'Unknown'}\n"
+                    f"Action: Set {action_point or 'recommended adjustment'} to {recommended_value}{unit}\n"
+                    f"{current_line}"
+                    f"Goal: {(rec.profile or 'optimization').replace('_', ' ').title()}\n"
+                    f"Confidence: {round((rec.confidence_score or rec.get_numeric_confidence()) * 100)}%\n\n"
+                    f"Reason:\n{rec.reason}"
+                )
 
             # Lookup technician by specialty BEFORE creating the WO (so assigned_to is persisted)
             tech_telegram_id = None
@@ -634,7 +676,7 @@ class NotificationService:
 
             created_wo = await work_order_repo.create_work_order(
                 {
-                    "title": f"SENTINEL Advisory Action: {equipment_code or 'Equipment'}",
+                    "title": title,
                     "description": description,
                     "priority": "medium",
                     "status": "scheduled",
@@ -648,6 +690,8 @@ class NotificationService:
                     "action_point": action_point,
                     "action_value": str(action_value) if action_value is not None else None,
                     "recommendation_id": recommendation_id,
+                    "service_type": notify_service_type,
+                    "notes": "AI-generated maintenance work order" if diagnostic_context else None,
                 }
             )
 
@@ -683,14 +727,20 @@ class NotificationService:
                     "code": wo_code,
                     "site_id": rec.site_id,
                     "equipment_code": equipment_code,
+                    "equipment_id": created_wo.get("equipment_id") or equipment_code,
                     "equipment_name": equipment_code,
                     "criticality": (priority or "medium").upper(),
-                    "service_type": "callout",
-                    "technician_id": tech_telegram_id,
+                    "service_type": notify_service_type,
+                    "technician_id": tech_telegram_id or tech_email or assigned_to or "pending",
                     "technician_name": tech_name or "Pending",
                     "description": description,
+                    "problem_description": description,
+                    "inspection_instructions": "\n".join(diagnostic_context.get("inspection_checklist", []))
+                    if diagnostic_context
+                    else "",
+                    "diagnostic_context": diagnostic_context,
                     "technician_email": tech_email,
-                    "create_service_record": False,
+                    "create_service_record": create_service_record,
                 }
                 asyncio.create_task(notifier.notify_technician(wo_notify_data))
 
@@ -798,11 +848,17 @@ class NotificationService:
                 health_score=equipment_health,
                 probability_percent=prediction.get("probability_percent", 0),
                 equipment_code=equipment_code,
+                site_id=site_id,
+                site_phase=site_phase,
             )
 
             if result.success:
                 created_wo = None
-                if result.action_taken in ("created_work_order", "open_work_order_exists"):
+                if result.action_taken in (
+                    "created_work_order",
+                    "created_pending_approval_work_order",
+                    "open_work_order_exists",
+                ):
                     # Extract work order info from result details
                     wo_id = result.details.get("work_order_id")
                     wo_code = result.details.get("work_order_code")

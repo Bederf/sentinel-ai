@@ -45,12 +45,20 @@ logger = logging.getLogger("sentinel.simbiot.bridge")
 class BridgeBmsAdapter(BmsAdapter):
     """SIMBIOT adapter for the Shadow Bridge REST proxy."""
 
-    def __init__(self, base_url: str = "", token: str = "", timeout_seconds: float = 10.0) -> None:
+    def __init__(
+        self,
+        base_url: str = "",
+        token: str = "",
+        timeout_seconds: float = 10.0,
+        write_enabled: bool = False,
+    ) -> None:
         self._base_url = base_url.rstrip("/") if base_url else ""
         self._token = token
         self._timeout = timeout_seconds
+        self._write_enabled = write_enabled
         self._site_id: str = ""
         self._connected: bool = False
+        self.last_write_response: dict[str, Any] | None = None
 
     @staticmethod
     def _resolve_base_url(config: BmsConnectionConfig) -> str:
@@ -68,7 +76,7 @@ class BridgeBmsAdapter(BmsAdapter):
             supports_device_discovery=True,
             supports_point_discovery=True,
             supports_reads=True,
-            supports_writes=False,
+            supports_writes=self._write_enabled,
             supports_subscriptions=False,
             supports_history=False,
         )
@@ -166,29 +174,46 @@ class BridgeBmsAdapter(BmsAdapter):
 
     async def discover_points(self, device_id: str) -> list[BmsPointDescriptor]:
         """Fetch BACnet object catalog from bridge and convert to point descriptors."""
+        data: dict[str, Any] = {}
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.get(
-                    f"{self._base_url}/api/sites/{self._site_id}/objects",
-                    headers=self._headers,
-                    params={"limit": 500},
-                )
-                resp.raise_for_status()
-                data = resp.json()
+                last_error: Exception | None = None
+                for endpoint in ("objects", "points"):
+                    try:
+                        resp = await client.get(
+                            f"{self._base_url}/api/sites/{self._site_id}/{endpoint}",
+                            headers=self._headers,
+                            params={"limit": 500},
+                        )
+                        resp.raise_for_status()
+                        data = resp.json()
+                        break
+                    except Exception as exc:
+                        last_error = exc
+                else:
+                    raise last_error or RuntimeError("Bridge point discovery failed")
         except Exception as exc:
             logger.warning("[BRIDGE] discover_points failed: %s", exc)
             return []
 
         points: list[BmsPointDescriptor] = []
-        for obj in data.get("objects", []):
+        raw_points = data.get("objects") or data.get("points") or []
+        for obj in raw_points:
+            point_id = obj.get("object_id") or obj.get("point_id") or obj.get("id") or ""
+            point_name = obj.get("object_name") or obj.get("point_name") or obj.get("name") or point_id
             points.append(
                 BmsPointDescriptor(
-                    point_id=obj.get("object_id", ""),
-                    point_name=obj.get("object_name", obj.get("object_id", "")),
+                    point_id=point_id,
+                    point_name=point_name,
                     point_type=obj.get("point_type", "unknown"),
                     unit=obj.get("unit"),
                     writable=obj.get("point_type", "") in {"setpoint", "analog_value", "command"},
-                    metadata={"equipment_id": obj.get("equipment_id", "")},
+                    metadata={
+                        "equipment_id": obj.get("equipment_id", ""),
+                        "bacnet_object_type": obj.get("object_type"),
+                        "bacnet_instance": obj.get("instance"),
+                        "source_endpoint": "objects" if data.get("objects") else "points",
+                    },
                 )
             )
         return points
@@ -225,13 +250,51 @@ class BridgeBmsAdapter(BmsAdapter):
         )
 
     async def write_point(self, request: BmsWriteRequest) -> bool:
-        """Bridge is read-only from SENTINEL's perspective."""
-        logger.warning(
-            "[BRIDGE] write_point called on read-only bridge adapter (site=%s, point=%s)",
-            self._site_id,
-            request.point_id,
+        """Write one point through the bridge when supervised/automatic mode enables writes."""
+        self.last_write_response = None
+        if not self._write_enabled:
+            logger.warning(
+                "[BRIDGE] write_point blocked because bridge writes are disabled (site=%s, point=%s)",
+                self._site_id,
+                request.point_id,
+            )
+            return False
+
+        metadata = request.metadata or {}
+        payload = {
+            "object_id": str(request.point_id),
+            "value": request.value,
+            "priority": request.priority,
+            "requested_by": request.user or "sentinel",
+            "approval_id": str(metadata.get("correlation_id") or ""),
+        }
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout) as client:
+                resp = await client.post(
+                    f"{self._base_url}/api/sites/{self._site_id}/write",
+                    headers=self._headers,
+                    json=payload,
+                )
+                if resp.status_code >= 400:
+                    logger.warning(
+                        "[BRIDGE] write_point rejected for %s.%s: HTTP %s %s",
+                        self._site_id,
+                        request.point_id,
+                        resp.status_code,
+                        resp.text[:300],
+                    )
+                resp.raise_for_status()
+                data = resp.json() if resp.content else {}
+                self.last_write_response = data
+        except Exception as exc:
+            logger.warning("[BRIDGE] write_point failed for %s.%s: %s", self._site_id, request.point_id, exc)
+            return False
+
+        return bool(
+            data.get("success", True) is not False
+            and data.get("ok", True) is not False
+            and data.get("accepted", True) is not False
         )
-        return False
 
 
 def bridge_adapter_from_connection_config(
@@ -254,4 +317,7 @@ def bridge_adapter_from_connection_config(
         base_url=base_url,
         token=token,
         timeout_seconds=connection_config.get("timeout_seconds", 10.0),
+        write_enabled=(
+            connection_config.get("supports_writes") is True and connection_config.get("write_enabled") is True
+        ),
     )

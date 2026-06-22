@@ -85,7 +85,6 @@ const ControlDashboard = lazy(() => import("./ControlDashboard").then(m => ({ de
 const OptimizationPage = lazy(() => import("../pages/OptimizationPage").then(m => ({ default: m.OptimizationPage })));
 // Lighting
 const LightingPage = lazy(() => import("./lighting/LightingPage").then(m => ({ default: m.LightingPage })));
-const OccupancyFullPanel = lazy(() => import("./OccupancyPanel").then(m => ({ default: m.OccupancyPanel })));
 const OccupancyAnalyticsPage = lazy(() => import("../pages/OccupancyAnalyticsPage").then(m => ({ default: m.OccupancyAnalyticsPage })));
 const OccupancyEnergyCorrelationPage = lazy(() => import("../pages/OccupancyEnergyCorrelationPage").then(m => ({ default: m.OccupancyEnergyCorrelationPage })));
 // Solar & BESS
@@ -680,8 +679,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   return (
     <div
       ref={containerRef}
-      className="overflow-y-auto p-4 md:p-6"
-      style={{ background: "var(--color-sentinel-bg-canvas)", height: 'calc(100vh - 3.5rem)' }}
+      className="overflow-y-auto p-3 sm:p-4 md:p-6"
+      style={{ background: "var(--color-sentinel-bg-canvas)", height: 'calc(100dvh - 3.5rem)' }}
     >
       {/* Back Button */}
       <button
@@ -708,14 +707,14 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       >
         <div className="p-4 md:p-6">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
                 <Building2
-                  className="h-8 w-8"
+                  className="h-7 w-7 shrink-0 sm:h-8 sm:w-8"
                   style={{ color: "var(--color-sentinel-blue)" }}
                 />
                 <h1
-                  className="text-2xl font-semibold flex-1"
+                  className="min-w-0 flex-[1_1_14rem] text-xl font-semibold leading-tight sm:text-2xl"
                   style={{ color: "var(--color-sentinel-text-primary)" }}
                 >
                   {site.name}
@@ -834,14 +833,14 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   })()}
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                <div className="flex items-center gap-1.5">
-                  <MapPin className="h-4 w-4" />
-                  <span className="text-sm">{site.address}</span>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                <div className="flex min-w-0 items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0" />
+                  <span className="min-w-0 text-sm break-words">{site.address}</span>
                 </div>
                 {site.operating_hours && (
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="h-4 w-4" />
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    <Clock className="h-4 w-4 shrink-0" />
                     <span className="text-sm">
                       {site.operating_hours.start || "N/A"} - {site.operating_hours.end || "N/A"}
                       {isDifferentTimezone(site.timezone) && site.timezone && (
@@ -932,7 +931,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             >
               <Building2 className="h-5 w-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Building Size
               </p>
@@ -960,7 +959,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             >
               <Calendar className="h-5 w-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Year Built
               </p>
@@ -988,7 +987,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
             >
               <Phone className="h-5 w-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                 Contact
               </p>
@@ -1017,11 +1016,11 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
               >
                 <Mail className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-wider mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>
                   Email
                 </p>
-                <p className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                <p className="text-sm font-semibold break-all" style={{ color: "var(--color-sentinel-text-primary)" }}>
                   {site.contact_email}
                 </p>
               </div>
@@ -1760,7 +1759,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
               />
               {lightingSub === "Lighting" && <LightingPage siteId={siteId} />}
               {lightingSub === "Occupancy" && (
-                <div className="p-4 md:p-6"><OccupancyFullPanel compact={false} /></div>
+                <div className="p-4 md:p-6"><OccupancyPanel compact={false} /></div>
               )}
               {lightingSub === "Analytics" && <OccupancyAnalyticsPage />}
               {lightingSub === "Correlation" && <OccupancyEnergyCorrelationPage />}

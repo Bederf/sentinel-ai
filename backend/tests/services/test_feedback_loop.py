@@ -150,6 +150,25 @@ class TestOutcomeTracker:
         # 5 kWh * 2.50 ZAR/kWh = 12.50 ZAR
         assert 12.0 <= cost <= 13.0
 
+    def test_negative_measured_energy_flips_successful_control_outcome_to_failed(self):
+        """A reached setpoint is not a successful recommendation if measured kWh worsens."""
+        from app.services.recommendation_outcome_service import _merge_energy_outcome
+
+        success, notes = _merge_energy_outcome(
+            True,
+            "Measured=100.00, target=100.00",
+            {
+                "baseline_energy_kwh": 5.999,
+                "actual_energy_kwh": 10.724,
+                "actual_saving_kwh": -4.726,
+                "actual_saving_zar": -39.37,
+            },
+        )
+
+        assert success is False
+        assert "measured energy increased by 4.726 kWh" in notes
+        assert "saving=-4.726 kWh" in notes
+
 
 class TestRejectionLearning:
     """Test rejection learning and constraint creation."""

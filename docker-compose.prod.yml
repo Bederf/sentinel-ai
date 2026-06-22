@@ -58,7 +58,8 @@ services:
       - PYTHONUNBUFFERED=1
       - ENVIRONMENT=production
     env_file:
-      - ./backend/.env
+      - /etc/sentinel/backend.env
+      - /etc/sentinel/secrets.env
     volumes:
       - ./backend/app:/app/app:ro
       - backend-logs:/app/logs

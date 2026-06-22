@@ -94,13 +94,12 @@ class TierRoutingEngine:
         2. Phase gate check (onboarding_phase caps autonomy)
         3. Master switch check (parasite_enabled)
         4. Actionability gate (no device action = Tier 1 advisory)
-        5. Optimizer gate (ai_optimization recs = Tier 1, optimizer handles notification)
-        6. Get thresholds from settings and DB, use stricter
-        7. Onboarding phase override (phase < supervised caps at Tier 2)
-        8. Risk level override (critical/high never auto-execute)
-        9. Tier 3 gate (disabled if not enabled)
-        10. Rate limit check (hourly auto-executions)
-        11. Route to tier and log decision
+        5. Get thresholds from settings and DB, use stricter
+        6. Onboarding phase override (phase < supervised caps at Tier 2)
+        7. Risk level override (critical/high never auto-execute)
+        8. Tier 3 gate (disabled if not enabled)
+        9. Rate limit check (hourly auto-executions)
+        10. Route to tier and log decision
 
         Args:
             recommendation: Dict with keys:
@@ -240,39 +239,10 @@ class TierRoutingEngine:
                 correlation_id=correlation_id,
             )
 
-        # 5. Optimizer gate: ai_optimization recs are already notified by the AI optimizer
-        #    with inline "Create work order" buttons — skip Tier 2/3 approval flow
-        action_type = recommendation.get("action_type", "")
-        if action_type == "ai_optimization":
-            logger.debug("ai_optimization rec — routing to Tier 1 advisory (optimizer handles notification)")
-            emit_decision_event(
-                "tier_routing.decided",
-                correlation_id=correlation_id,
-                equipment_code=_eq_code,
-                site_id=_site_id,
-                tier=TierLevel.TIER1.value,
-                status="advisory",
-                details={
-                    "reason": "AI optimization recommendation — notified via optimizer path",
-                    "confidence_score": confidence_score,
-                    "threshold_source": "optimizer_gate",
-                    "risk_level": risk_level,
-                },
-            )
-            return TierRoutingResult(
-                tier=TierLevel.TIER1.value,
-                action="advisory",
-                confidence_score=confidence_score,
-                threshold_source="optimizer_gate",
-                tier2_threshold=self.settings.parasite_confidence_tier2_min,
-                tier3_threshold=self.settings.parasite_confidence_tier3_min,
-                reason="AI optimization recommendation — notified via optimizer path",
-                equipment_type=equipment_type,
-                risk_level=risk_level,
-                correlation_id=correlation_id,
-            )
-
-        # 6. Get thresholds from TWO sources, use stricter (lazy-load model_registry)
+        # 5. Get thresholds from TWO sources, use stricter (lazy-load model_registry).
+        # ai_optimization rows with a verified control point are routed here as
+        # normal supervised/auto actions. Manual recommendations are already
+        # handled by the actionability gate above because they have no point.
         #    Only reached if PARASITE is enabled
         if self.model_registry is None:
             self.model_registry = await get_model_registry()

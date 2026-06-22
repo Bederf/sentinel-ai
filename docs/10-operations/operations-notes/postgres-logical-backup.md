@@ -15,7 +15,11 @@ estimated_read_time: 10
 
 # PostgreSQL Logical Backup
 
-SENTINEL now uses PostgreSQL logical backup as the only operational backup for the local Supabase database.
+> **Current status, 2026-06-16**: this note describes the local logical-backup and restore-target path. The full database DR model is documented in [../disaster-recovery.md](../disaster-recovery.md) and [../../disaster-recovery-db-backup-summary.md](../../disaster-recovery-db-backup-summary.md).
+
+SENTINEL uses PostgreSQL logical backup locally to maintain a same-host restore target at `127.0.0.1:55432`.
+
+The broader production DR model also includes a remote PostgreSQL 17 hot standby. Remote backup jobs run on that standby to avoid loading the production primary, and the remote host maintains physical basebackups plus a live WAL archive. The local logical restore target is a fast same-host recovery aid, not the only DR control.
 
 This replaces the old JSON export backup path. Legacy JSON backup files may still exist for verification and archival, but they are no longer an operational backup mechanism.
 

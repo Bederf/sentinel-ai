@@ -15,6 +15,7 @@ Site-scoped routing is enforced at query time via technician.site_id.
 from __future__ import annotations
 
 import hmac
+import html
 import logging
 
 from fastapi import APIRouter, HTTPException, Request
@@ -30,7 +31,12 @@ from app.services.telegram_conversation_manager import (
 )
 from app.services.telegram_flow_handlers import route_to_handler
 from app.services.telegram_intent_classifier import classify_intent
-from app.services.telegram_message_sender import TelegramMessageSender, get_telegram_sender
+from app.services.telegram_message_sender import (
+    InlineButton,
+    InlineKeyboard,
+    TelegramMessageSender,
+    get_telegram_sender,
+)
 
 logger = logging.getLogger("sentinel.telegram_webhook")
 router = APIRouter(prefix="/api/telegram", tags=["telegram"])
@@ -38,6 +44,43 @@ router = APIRouter(prefix="/api/telegram", tags=["telegram"])
 _tech_repo = TechnicianRepository()
 _notif_repo = NotificationRepository()
 _mgr = TelegramConversationManager()
+
+
+def _approval_action_label(point: str | None, value) -> str:
+    point_key = str(point or "").strip().lower()
+    labels = {
+        "damper_position": "Open economiser damper",
+        "sat_setpoint": "Set supply-air temperature setpoint",
+        "chilled_water_setpoint": "Set chilled-water setpoint",
+        "fan_speed": "Set fan speed",
+        "setpoint": "Set temperature setpoint",
+        "on_off": "Set on/off command",
+    }
+    label = labels.get(point_key, f"Set {str(point or 'control point').replace('_', ' ')}")
+    return f"{label} to {value}"
+
+
+def _approval_effect_text(point: str | None) -> str | None:
+    point_key = str(point or "").strip().lower()
+    if point_key == "damper_position":
+        return "This brings in more cool outside air so the AHU can cool the building with less chiller load."
+    if point_key == "sat_setpoint":
+        return "This adjusts supply-air temperature so zones stay comfortable without unnecessary overcooling."
+    if point_key == "chilled_water_setpoint":
+        return "This makes chilled water warmer so the chiller compressor works less while cooling remains available."
+    if point_key == "fan_speed":
+        return "This changes airflow and fan energy; zone temperatures will be monitored for comfort drift."
+    if point_key in {"setpoint", "temperature_setpoint", "zone_setpoint"}:
+        return "This changes the zone target temperature and should reduce heating or cooling demand if comfort remains stable."
+    return None
+
+
+def _approval_failed_message(equipment: str) -> str:
+    return (
+        "❌ <b>Approval could not be completed</b>\n"
+        f"<b>Recommendation:</b> {html.escape(str(equipment or 'Equipment'))}\n"
+        "The recommendation was not applied. Please try again in a moment or log an issue for support."
+    )
 
 
 # ==================== Step definitions ====================
@@ -249,13 +292,6 @@ async def telegram_webhook(request: Request):
             await _finalize_registration(chat_id, name, phone, site_id, sender)
             return {"ok": True}
 
-        # Non-registration callbacks handled by flow handlers
-        if session and session.flow in ("client_complaint", "technician_report", "wo_update", "ad_hoc_fault"):
-            await route_to_handler(
-                session.intent, chat_id, "", callback_data=data, message_id=cq.get("message", {}).get("message_id")
-            )
-            return {"ok": True}
-
         # Handle "Create Work Order" button on advisory notifications (no active session needed)
         if data.startswith("wo:rec_id:"):
             rec_uuid = data.split(":")[-1]
@@ -265,38 +301,181 @@ async def telegram_webhook(request: Request):
             await _handle_create_wo_from_rec(chat_id, rec_uuid, sender)
             return {"ok": True}
 
+        if data.startswith("devissue:approval:"):
+            rec_uuid = data.split(":")[-1]
+            from app.api.sentry_webhooks import _handle_telegram_developer_issue
+
+            sender = get_telegram_sender()
+            await _handle_telegram_developer_issue(
+                chat_id=chat_id,
+                user_id=chat_id,
+                rec_uuid=rec_uuid,
+                sender=sender,
+            )
+            return {"ok": True}
+
         # Handle "Approve" button on supervised mode advisory notifications
         if data.startswith("approve:rec_id:"):
             rec_uuid = data.split(":")[-1]
-            from app.database.repositories.recommendation_repository import RecommendationRepository
-            from app.services.approval_service import get_approval_service
+            from app.api.sentry_webhooks import _handle_supervised_recommendation_approval
             from app.services.telegram_message_sender import get_telegram_sender
 
             sender = get_telegram_sender()
-            repo = RecommendationRepository()
-            rec = await repo.get_by_id(rec_uuid)
-            if not rec:
-                await sender.send_text(chat_id, "Recommendation not found.")
+            await _handle_supervised_recommendation_approval(
+                chat_id=str(chat_id),
+                user_id=str(chat_id),
+                rec_uuid=rec_uuid,
+                sender=sender,
+            )
+            return {"ok": True}
+
+        if data.startswith("approvepkg:"):
+            from app.api.sentry_webhooks import _handle_supervised_package_approval
+            from app.services.telegram_message_sender import get_telegram_sender
+
+            sender = get_telegram_sender()
+            await _handle_supervised_package_approval(
+                chat_id=chat_id,
+                user_id=chat_id,
+                site_id=data.split(":", 1)[-1],
+                sender=sender,
+            )
+            return {"ok": True}
+
+        # Handle coordinated optimization decisions. Approval uses the dedicated
+        # coordinated path, then attempts supervised execution behind preflight gates.
+        if data.startswith("coord:approve:") or data.startswith("coord:reject:"):
+            parts = data.split(":")
+            decision = parts[1] if len(parts) > 2 else ""
+            rec_uuid = parts[-1]
+            from app.api.optimization import (
+                _coordinated_draft_decision_update,
+                _coordinated_bundle_from_record,
+                _coordinated_execution_blocked_result,
+                _coordinated_execution_blockers,
+                _execute_coordinated_child_actions,
+                _find_bundle_by_id,
+                _load_coordinated_bundle_inputs,
+                _validate_coordinated_draft_record,
+                _validate_coordinated_execution_record,
+            )
+            from app.database.supabase_client import get_supabase_client
+            from app.models.recommendation import RecommendationStatus
+
+            supabase = get_supabase_client()
+            result = supabase.table("recommendations").select("*").eq("id", rec_uuid).limit(1).execute()
+            if not result.data:
+                await sender.send_text(chat_id, "Coordinated optimization draft not found.")
                 return {"ok": True}
 
-            approval_svc = get_approval_service()
-            result = await approval_svc.execute_approval(
-                recommendation_id=rec_uuid,
-                approved_by=f"telegram:{chat_id}",
-                approval_notes="Approved via Telegram advisory notification",
-            )
-
-            equip = rec.target_equipment or "Equipment"
-            if result.success:
-                msg = (
-                    f"✅ *Approved — {equip}*\n"
-                    f"Adjustment applied automatically via BACnet.\n"
-                    f"Outcome will be verified in ~30 minutes."
+            record = result.data[0]
+            site_id = record.get("site_id") or ""
+            try:
+                _validate_coordinated_draft_record(record, site_id)
+                updates = _coordinated_draft_decision_update(
+                    record,
+                    decision="approved" if decision == "approve" else "rejected",
+                    user_id=f"telegram:{chat_id}",
+                    reason="Decision via Telegram coordinated optimization notification",
                 )
-            else:
-                msg = f"❌ *Approval failed — {equip}*\n{result.error_message or 'Unknown error'}"
+                update_result = supabase.table("recommendations").update(updates).eq("id", rec_uuid).execute()
+                if not update_result.data:
+                    await sender.send_text(chat_id, "Could not update coordinated optimization draft.")
+                    return {"ok": True}
 
-            await sender.send_text(chat_id, msg, parse_mode="Markdown")
+                updated = update_result.data[0]
+                status = updated.get("approval_status")
+                execution = updated.get("execution_result") or {}
+                if status == "approved":
+                    _validate_coordinated_execution_record(updated, site_id)
+                    inputs = _load_coordinated_bundle_inputs(site_id)
+                    bundle = _coordinated_bundle_from_record(updated)
+                    bundle_id = bundle.get("bundle_id")
+                    live_bundle = _find_bundle_by_id(inputs["bundles"], bundle_id) if bundle_id else None
+                    user_id = f"telegram:{chat_id}"
+                    blockers = _coordinated_execution_blockers(
+                        record=updated,
+                        live_bundle=live_bundle,
+                        site_phase=inputs["site_phase"],
+                    )
+                    if blockers:
+                        execution_updates = _coordinated_execution_blocked_result(
+                            record=updated,
+                            blockers=blockers,
+                            user_id=user_id,
+                            reason="Approved via Telegram coordinated optimization notification",
+                        )
+                        execution_update_result = (
+                            supabase.table("recommendations").update(execution_updates).eq("id", rec_uuid).execute()
+                        )
+                        updated = (
+                            execution_update_result.data[0]
+                            if execution_update_result.data
+                            else {**updated, **execution_updates}
+                        )
+                        execution = updated.get("execution_result") or execution_updates["execution_result"]
+                        msg = (
+                            "✅ <b>AI recommendation approved</b>\n"
+                            "Not applied to the BMS because execution is still blocked.\n"
+                            f"<b>Blockers:</b> {', '.join(str(item) for item in blockers[:5])}\n"
+                            f"<b>Device writes:</b> {execution.get('device_writes', 0)}"
+                        )
+                    else:
+                        execution = await _execute_coordinated_child_actions(
+                            bundle=bundle,
+                            user_id=user_id,
+                            recommendation_id=rec_uuid,
+                        )
+                        executed = bool(execution.get("executed"))
+                        execution_updates = {
+                            "status": RecommendationStatus.EXECUTED.value
+                            if executed
+                            else RecommendationStatus.FAILED.value,
+                            "execution_result": execution,
+                        }
+                        if executed:
+                            from datetime import datetime
+
+                            executed_at = datetime.utcnow().isoformat()
+                            execution_updates["executed_at"] = executed_at
+                            execution_updates["metadata"] = {
+                                **(updated.get("metadata") or {}),
+                                "lifecycle": "executed",
+                                "executed_by": user_id,
+                                "executed_at": executed_at,
+                            }
+                        supabase.table("recommendations").update(execution_updates).eq("id", rec_uuid).execute()
+                        msg = (
+                            "✅ <b>AI recommendation approved and applied</b>\n"
+                            if executed
+                            else "❌ <b>AI recommendation approved but execution failed</b>\n"
+                        )
+                        msg += f"<b>Device writes:</b> {execution.get('device_writes', 0)}"
+                else:
+                    msg = (
+                        "❌ <b>AI recommendation rejected</b>\n"
+                        "No control action was taken.\n"
+                        f"Device writes: {execution.get('device_writes', 0)}"
+                    )
+                await sender.send_text(chat_id, msg, parse_mode="HTML")
+                return {"ok": True}
+            except Exception:
+                logger.exception("Coordinated draft Telegram decision failed for %s", rec_uuid)
+                keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{rec_uuid}")]])
+                await sender.send_text(
+                    chat_id,
+                    _approval_failed_message("Coordinated AI recommendation"),
+                    keyboard=keyboard,
+                    parse_mode="HTML",
+                )
+                return {"ok": True}
+
+        # Non-registration callbacks handled by flow handlers. Global action
+        # buttons above must win even if the user has an active conversation.
+        if session and session.flow in ("client_complaint", "technician_report", "wo_update", "ad_hoc_fault"):
+            await route_to_handler(
+                session.intent, chat_id, "", callback_data=data, message_id=cq.get("message", {}).get("message_id")
+            )
             return {"ok": True}
 
         # Handle menu navigation buttons from inline keyboards

@@ -33,6 +33,21 @@ class CreateSiteRequest(BaseModel):
     building_type: str
     location: str
     gross_floor_area: float | None = None
+    year_built: int | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    contact_phone: str | None = None
+    contact_email: str | None = None
+    whatsapp_phone: str | None = None
+    occupancy_capacity: int | None = None
+    total_desks: int | None = None
+    parking_bays: int | None = None
+    nmd_limit_kva: float | None = None
+    demand_charge_per_kva: float | None = None
+    electricity_provider: str | None = None
+    operating_hours: dict[str, Any] | None = None
+    optimization_settings: dict[str, Any] | None = None
+    building_geometry: dict[str, Any] | None = None
     site_code: str | None = None  # None = auto-generate next sequential ID
 
 
@@ -76,15 +91,35 @@ async def create_site(
             building_type=request.building_type,
             location=request.location,
             gross_floor_area=request.gross_floor_area,
+            year_built=request.year_built,
+            latitude=request.latitude,
+            longitude=request.longitude,
+            contact_phone=request.contact_phone,
+            contact_email=request.contact_email,
+            whatsapp_phone=request.whatsapp_phone,
+            occupancy_capacity=request.occupancy_capacity,
+            total_desks=request.total_desks,
+            parking_bays=request.parking_bays,
+            nmd_limit_kva=request.nmd_limit_kva,
+            demand_charge_per_kva=request.demand_charge_per_kva,
+            electricity_provider=request.electricity_provider,
+            operating_hours=request.operating_hours,
+            optimization_settings=request.optimization_settings,
+            building_geometry=request.building_geometry,
             site_code=request.site_code,
         )
 
         # Seed only base modules. Add-ons remain inactive until explicitly activated.
+        seeded_modules: list[str] = []
+        module_seed_status = "not_attempted"
+        module_seed_error: str | None = None
         try:
             from app.services.module_registry_service import module_registry
 
             site_code = site["code"]
             seeded = module_registry.ensure_base_modules(site_code, request.site_name)
+            seeded_modules = list(seeded or [])
+            module_seed_status = "ok"
             if seeded:
                 logger.info(
                     "Seeded base modules for %s via SIMBIOT wizard: %s",
@@ -92,12 +127,23 @@ async def create_site(
                     seeded,
                 )
         except Exception as mod_err:
+            module_seed_status = "failed"
+            module_seed_error = str(mod_err)
             logger.warning("Failed to seed base modules for %s: %s", site.get("code"), mod_err)
 
         return {
             "site_code": site["code"],
             "site_id": site["id"],
             "site_name": site["name"],
+            "onboarding_phase": site.get("onboarding_phase"),
+            "module_seed_status": module_seed_status,
+            "seeded_modules": seeded_modules,
+            "module_seed_error": module_seed_error,
+            "next_steps": [
+                "Confirm building profile with POST /api/site-profiles/{site_id}",
+                "Save BMS adapter config with PUT /api/simbiot/sites/{site_id}/adapters/{protocol}/config",
+                "Record tenant MCP access boundary in the wizard before client GPT sharing",
+            ],
             "message": f"Site {site['code']} created successfully",
         }
     except Exception as exc:
@@ -150,7 +196,7 @@ async def save_adapter_config(
     Body (example for bridge):
         {
             "base_url": "http://10.99.0.1:8080",
-            "token": "ScUAjUet7...",
+            "token": "<site-bridge-token>",
             "poll_interval_seconds": 300
         }
 

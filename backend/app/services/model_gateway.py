@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import AsyncGenerator
+import asyncio
 
 from app.config import settings as _settings_module
 from app.config.routing_profiles import VALID_TASK_CLASSES, get_profile
@@ -47,6 +48,73 @@ class ModelGateway:
     def _get_active_profile(self) -> dict:
         profile_name = _settings_module.SENTINEL_ROUTING_PROFILE
         return get_profile(profile_name)
+
+    def _is_provider_credit_or_access_error(self, exc: Exception) -> bool:
+        response = getattr(exc, "response", None)
+        status_code = getattr(response, "status_code", None)
+        if status_code in {401, 402, 403, 429}:
+            return True
+        message = str(exc).lower()
+        return any(
+            marker in message
+            for marker in (
+                "insufficient",
+                "credit",
+                "quota",
+                "rate limit",
+                "rate_limit",
+                "billing",
+                "payment",
+                "exceeded",
+                "invalid api key",
+                "unauthorized",
+                "forbidden",
+                "too many requests",
+            )
+        )
+
+    def _schedule_provider_failure_alert(
+        self,
+        provider: str,
+        model: str,
+        site_id: str | None,
+        source: str,
+        exc: Exception,
+        fallback_remaining: bool,
+    ) -> None:
+        if not self._is_provider_credit_or_access_error(exc):
+            return
+        try:
+            from app.services.ai_usage_tracker import usage_tracker
+
+            asyncio.create_task(
+                asyncio.to_thread(
+                    usage_tracker.send_provider_failure_email_alert,
+                    provider,
+                    model,
+                    site_id or "unknown",
+                    source,
+                    exc,
+                    fallback_remaining,
+                )
+            )
+        except RuntimeError:
+            # No running loop in this context; send synchronously rather than losing the alert.
+            try:
+                from app.services.ai_usage_tracker import usage_tracker
+
+                usage_tracker.send_provider_failure_email_alert(
+                    provider,
+                    model,
+                    site_id or "unknown",
+                    source,
+                    exc,
+                    fallback_remaining,
+                )
+            except Exception:
+                logger.debug("Could not send AI provider failure alert", exc_info=True)
+        except Exception:
+            logger.debug("Could not schedule AI provider failure alert", exc_info=True)
 
     def _resolve(self, task_class: str) -> tuple[str, bool, list[tuple[str, str]]]:
         """
@@ -115,6 +183,7 @@ class ModelGateway:
                 stream=stream,
                 tools=tools,
                 source=source,
+                site_id=site_id,
             )
         elif mode == "cloud":
             return await self._try_routes(
@@ -127,6 +196,7 @@ class ModelGateway:
                 stream=stream,
                 tools=tools,
                 source=source,
+                site_id=site_id,
             )
         elif mode == "local":
             # local mode: no fallback to cloud, strict enforcement
@@ -138,6 +208,7 @@ class ModelGateway:
                 max_tokens=max_tokens,
                 stream=stream,
                 source=source,
+                site_id=site_id,
             )
         else:
             raise ValueError(f"Unknown execution mode '{mode}'")
@@ -153,6 +224,7 @@ class ModelGateway:
         stream: bool,
         tools: list | None,
         source: str,
+        site_id: str | None,
     ) -> str | AsyncGenerator:
         """
         Try a list of (provider, model) routes in priority order.
@@ -186,6 +258,7 @@ class ModelGateway:
                         stream=stream,
                         tools=tools,
                         source=source,
+                        site_id=site_id,
                     )
                 elif mode == "cloud":
                     return await self._call_cloud(
@@ -196,12 +269,22 @@ class ModelGateway:
                         max_tokens=max_tokens,
                         stream=stream,
                         source=source,
+                        site_id=site_id,
                     )
                 else:
                     raise ValueError(f"_try_routes: unsupported mode '{mode}'")
 
             except Exception as exc:
                 last_error = exc
+                fallback_remaining = fallback_enabled and attempt < len(routes)
+                self._schedule_provider_failure_alert(
+                    provider=provider,
+                    model=model,
+                    site_id=site_id,
+                    source=source,
+                    exc=exc,
+                    fallback_remaining=fallback_remaining,
+                )
                 logger.warning(
                     "model_gateway route failed attempt=%d provider=%s model=%s error=%s",
                     attempt,
@@ -239,6 +322,7 @@ class ModelGateway:
         stream: bool,
         tools: list | None,
         source: str,
+        site_id: str | None,
     ) -> str | AsyncGenerator:
         """
         api mode: direct provider API.
@@ -257,6 +341,7 @@ class ModelGateway:
                     system_prompt=system or "",
                     model_override=model,
                     source=source,
+                    site_id=site_id,
                 )
             else:
                 # Non-streaming: call Anthropic SDK directly (gateway is the only importer)
@@ -321,6 +406,7 @@ class ModelGateway:
                     messages=messages,
                     include_site_context=False,
                     source=source,
+                    site_id=site_id,
                 )
             else:
                 # Non-streaming OpenAI call via httpx (gateway is the provider boundary)
@@ -459,12 +545,14 @@ class ModelGateway:
                     messages=messages,
                     system_prompt=system,
                     source=source,
+                    site_id=site_id,
                 )
             else:
                 return await minimax_service.non_stream_response(
                     messages=messages,
                     system_prompt=system,
                     source=source,
+                    site_id=site_id,
                 )
 
         elif provider == "deepseek":
@@ -528,6 +616,7 @@ class ModelGateway:
         max_tokens: int,
         stream: bool,
         source: str,
+        site_id: str | None = None,
     ) -> str | AsyncGenerator:
         """
         cloud mode: externally hosted models through an abstraction layer.
@@ -571,6 +660,7 @@ class ModelGateway:
         max_tokens: int,
         stream: bool,
         source: str,
+        site_id: str | None = None,
     ) -> str | AsyncGenerator:
         """
         local mode: local-only inference. No external calls permitted.

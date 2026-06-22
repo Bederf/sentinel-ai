@@ -525,8 +525,14 @@ function App() {
       <Route path="/invite" element={<Suspense fallback={<RouteLoading />}><InviteAcceptPage /></Suspense>} />
       <Route path="*" element={
     <div
-      className="h-screen flex"
-      style={{ background: "var(--color-sentinel-bg-canvas)" }}
+      className="h-[100dvh] flex overflow-hidden"
+      style={{
+        background: "var(--color-sentinel-bg-canvas)",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingRight: "env(safe-area-inset-right)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+      }}
     >
       {/* Sidebar Navigation */}
       <Sidebar
@@ -541,7 +547,7 @@ function App() {
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header - SENTINEL style */}
         <header
-          className="flex-none h-14 px-4 flex items-center justify-between sticky top-0 z-40"
+          className="flex-none h-14 px-3 sm:px-4 flex items-center justify-between gap-2 sticky top-0 z-40"
           style={{
             background: "var(--glass-bg)",
             backdropFilter: "blur(var(--glass-blur)) saturate(180%)",
@@ -551,11 +557,11 @@ function App() {
           }}
         >
           {/* Left side - Page title and breadcrumb */}
-          <div className="flex items-center gap-4 ml-12 md:ml-0">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3 min-w-0 ml-12 md:ml-0">
+            <div className="flex items-center gap-2 min-w-0">
               {/* Sentinel Logo - Copied from Sidebar */}
               <div
-                className="w-9 h-9 rounded-lg flex items-center justify-center sentinel-shield sentinel-shield-active cursor-pointer"
+                className="w-9 h-9 shrink-0 rounded-lg flex items-center justify-center sentinel-shield sentinel-shield-active cursor-pointer"
                 onClick={handleSentinelLogoClick}
               >
                 <img
@@ -569,7 +575,7 @@ function App() {
                 />
               </div>
               <h1
-                className="text-base font-medium"
+                className="text-sm sm:text-base font-medium truncate"
                 style={{ color: "var(--color-sentinel-text-primary)" }}
               >
                 {VIEW_TITLES[currentView] || "AI Assistant"}
@@ -587,7 +593,7 @@ function App() {
           </div>
 
           {/* Right side - Status and time */}
-          <div className="flex items-center gap-4 relative">
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4 relative">
             {/* Alerts Button */}
             <button
               onClick={handleAlertsPanelOpen}
@@ -623,7 +629,7 @@ function App() {
               <div
                 ref={alertsPanelRef}
                 id="alerts-panel"
-                className="absolute top-full right-0 mt-2 w-96 max-h-[600px] overflow-hidden rounded-md shadow-lg z-50"
+                className="fixed inset-x-3 top-16 max-h-[calc(100dvh-5rem)] overflow-hidden rounded-md shadow-lg z-50 md:absolute md:inset-auto md:top-full md:right-0 md:mt-2 md:w-96 md:max-h-[600px]"
                 style={{
                   background: "var(--color-sentinel-bg-panel)",
                   border: "1px solid var(--color-sentinel-border)",
@@ -656,7 +662,7 @@ function App() {
                 </div>
 
                 {/* Alert Feed Content */}
-                <div className="overflow-y-auto max-h-[500px]">
+                <div className="overflow-y-auto max-h-[calc(100dvh-10rem)] md:max-h-[500px]">
                   <FreshnessAlertPanel />
                   <div style={{ borderTop: "1px solid var(--color-sentinel-border)" }} />
                   <AlertFeed

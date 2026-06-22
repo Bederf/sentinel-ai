@@ -8,6 +8,12 @@ from app.models.booking_record import BookingRecord
 from app.services.space_booking_simulator import SimulatedRoomEvent, SpaceBookingSimulator
 
 
+@pytest.fixture(autouse=True)
+def mock_room_site_resolution():
+    with patch("app.services.block_booking_detector.email_parser.resolve_site_id_for_room", return_value="site-002"):
+        yield
+
+
 @pytest.fixture
 def simulator(tmp_path: Path):
     site_dir = tmp_path / "site-002"
@@ -18,10 +24,10 @@ def simulator(tmp_path: Path):
           "zones": [
             {"zone_id": "Zone-L1-MR1", "zone_type": "meeting_room", "room_name": "S002-L1-MR1"},
             {"zone_id": "Zone-L2-MR1", "zone_type": "meeting_room", "room_name": "S002-L2-MR1"},
-            {"zone_id": "Zone-L3-MR1", "zone_type": "meeting_room", "room_name": "S002-L3-MR1"},
+            {"zone_id": "Zone-L0-MR1", "zone_type": "meeting_room", "room_name": "S002-L0-MR1"},
             {"zone_id": "Zone-L1-FR1", "zone_type": "focus_room", "room_name": "S002-L1-FR1"},
             {"zone_id": "Zone-L2-FR1", "zone_type": "focus_room", "room_name": "S002-L2-FR1"},
-            {"zone_id": "Zone-L3-FR1", "zone_type": "focus_room", "room_name": "S002-L3-FR1"}
+            {"zone_id": "Zone-L0-FR1", "zone_type": "focus_room", "room_name": "S002-L0-FR1"}
           ]
         }
         """.strip()
@@ -404,8 +410,8 @@ def test_space_booking_simulator_limits_ghosts_from_one_block_cluster(simulator:
                 "S002-L1-MR2",
                 "S002-L2-MR1",
                 "S002-L2-MR2",
-                "S002-L3-MR1",
-                "S002-L3-MR2",
+                "S002-L0-MR1",
+                "S002-L0-MR2",
             ],
             start=1,
         )

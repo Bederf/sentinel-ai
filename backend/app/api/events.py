@@ -6,13 +6,14 @@ This module now serves two SSE flows:
 2. Dashboard-wide event streaming via:
    - ``POST /api/events/ticket``
    - ``GET /api/events/stream?ticket=...``
+
+Tickets are stored in Redis so they're shared across all uvicorn workers.
 """
 
 import asyncio
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
@@ -24,46 +25,33 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api", tags=["events"])
 
-_SSE_TICKETS: dict[str, tuple[datetime, str]] = {}
 _TICKET_TTL_SECONDS = 30
-_MAX_TICKETS = 500
 
 
-def _cleanup_expired_tickets() -> None:
-    """Drop expired dashboard SSE tickets."""
-    now = datetime.utcnow()
-    expired = [ticket for ticket, (expires_at, _) in _SSE_TICKETS.items() if now > expires_at]
-    for ticket in expired:
-        _SSE_TICKETS.pop(ticket, None)
+def _redis() -> "redis.Redis":  # noqa: F821
+    import redis as _redis
+
+    return _redis.Redis.from_url("redis://localhost:6379/0")
 
 
 def _create_ticket(user_id: str) -> str:
-    """Create a short-lived, single-use SSE ticket."""
-    _cleanup_expired_tickets()
-
-    if len(_SSE_TICKETS) >= _MAX_TICKETS:
-        oldest = sorted(_SSE_TICKETS.items(), key=lambda item: item[1][0])
-        for ticket, _entry in oldest[: len(oldest) // 2]:
-            _SSE_TICKETS.pop(ticket, None)
-
+    """Create a short-lived, single-use SSE ticket in Redis."""
+    r = _redis()
     ticket = str(uuid.uuid4())
-    _SSE_TICKETS[ticket] = (datetime.utcnow() + timedelta(seconds=_TICKET_TTL_SECONDS), user_id)
+    key = f"sse:ticket:{ticket}"
+    r.setex(key, _TICKET_TTL_SECONDS, user_id)
     return ticket
 
 
 def _validate_ticket(ticket: str) -> str | None:
-    """Validate and consume a dashboard SSE ticket."""
-    _cleanup_expired_tickets()
-
-    entry = _SSE_TICKETS.pop(ticket, None)
-    if entry is None:
+    """Validate and consume a dashboard SSE ticket from Redis (single-use)."""
+    r = _redis()
+    key = f"sse:ticket:{ticket}"
+    user_id = r.get(key)
+    if user_id is None:
         return None
-
-    expires_at, user_id = entry
-    if datetime.utcnow() > expires_at:
-        return None
-
-    return user_id
+    r.delete(key)
+    return user_id.decode("utf-8") if isinstance(user_id, bytes) else user_id
 
 
 @router.post("/events/ticket")

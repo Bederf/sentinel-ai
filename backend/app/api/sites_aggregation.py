@@ -165,7 +165,7 @@ async def get_site_summary(request: Request, site_id: str) -> SiteSummary:
             # Determine equipment status category
             if status == "critical":
                 safety_counts["alarm"] += 1
-            elif status == "warning":
+            elif status in ("warning", "needs_attention"):
                 safety_counts["warning"] += 1
             elif status == "offline" or status == "maintenance":
                 safety_counts["blocked"] += 1

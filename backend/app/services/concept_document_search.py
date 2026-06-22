@@ -46,23 +46,49 @@ DEFAULT_INDEX_PATH = DATA_DIR / "concept_documents.json"
 DEFAULT_TSV_INDEX_PATH = PROJECT_ROOT / "site_id Building Document Sub Class Docu.tsv"
 
 MONTH_MAP: dict[str, int] = {
-    "jan": 1, "january": 1,
-    "feb": 2, "february": 2,
-    "mar": 3, "march": 3,
-    "apr": 4, "april": 4,
+    "jan": 1,
+    "january": 1,
+    "feb": 2,
+    "february": 2,
+    "mar": 3,
+    "march": 3,
+    "apr": 4,
+    "april": 4,
     "may": 5,
-    "jun": 6, "june": 6,
-    "jul": 7, "july": 7,
-    "aug": 8, "august": 8,
-    "sep": 9, "september": 9,
-    "oct": 10, "october": 10,
-    "nov": 11, "november": 11,
-    "dec": 12, "december": 12,
+    "jun": 6,
+    "june": 6,
+    "jul": 7,
+    "july": 7,
+    "aug": 8,
+    "august": 8,
+    "sep": 9,
+    "september": 9,
+    "oct": 10,
+    "october": 10,
+    "nov": 11,
+    "november": 11,
+    "dec": 12,
+    "december": 12,
 }
 
 STOP_WORDS: set[str] = {
-    "a", "an", "and", "at", "by", "for", "from", "in",
-    "is", "it", "of", "on", "or", "the", "to", "with", "all",
+    "a",
+    "an",
+    "and",
+    "at",
+    "by",
+    "for",
+    "from",
+    "in",
+    "is",
+    "it",
+    "of",
+    "on",
+    "or",
+    "the",
+    "to",
+    "with",
+    "all",
 }
 
 
@@ -109,10 +135,7 @@ class ConceptDocumentSearchService:
         documents = self._get_documents()
         normalised_site = _normalise_site_id(site_id)
 
-        site_docs = [
-            doc for doc in documents
-            if _normalise_site_id(doc.site_id) == normalised_site
-        ]
+        site_docs = [doc for doc in documents if _normalise_site_id(doc.site_id) == normalised_site]
 
         if not site_docs:
             return _empty_result(query, site_id)
@@ -148,9 +171,7 @@ class ConceptDocumentSearchService:
             if DEFAULT_TSV_INDEX_PATH.exists():
                 index_path = DEFAULT_TSV_INDEX_PATH
             else:
-                raise ConceptDocumentSearchUnavailable(
-                    f"Site-002 legacy index not found at {self.index_path}"
-                )
+                raise ConceptDocumentSearchUnavailable(f"Site-002 legacy index not found at {self.index_path}")
 
         if index_path.suffix.lower() == ".tsv":
             return _load_from_tsv(index_path)
@@ -169,6 +190,7 @@ class ConceptDocumentSearchService:
 # Query parsing
 # ---------------------------------------------------------------------------
 
+
 def _parse_query(query: str) -> tuple[set[str], int | None, int | None]:
     """Extract keyword tokens, optional month, optional year from query."""
     lowered = query.lower()
@@ -185,10 +207,7 @@ def _parse_query(query: str) -> tuple[set[str], int | None, int | None]:
     for month_word in MONTH_MAP:
         cleaned = re.sub(rf"\b{month_word}\b", "", cleaned)
 
-    tokens = {
-        t for t in re.findall(r"[a-z0-9]+", cleaned)
-        if t not in STOP_WORDS and len(t) > 1
-    }
+    tokens = {t for t in re.findall(r"[a-z0-9]+", cleaned) if t not in STOP_WORDS and len(t) > 1}
     return tokens, query_month, query_year
 
 
@@ -196,19 +215,22 @@ def _parse_query(query: str) -> tuple[set[str], int | None, int | None]:
 # Matching
 # ---------------------------------------------------------------------------
 
+
 def _matches(
     doc: ConceptDocument,
     tokens: set[str],
     query_month: int | None,
     query_year: int | None,
 ) -> bool:
-    searchable = " ".join([
-        doc.title,
-        doc.document_ref,
-        doc.subject,
-        doc.discipline,
-        doc.filename,
-    ]).lower()
+    searchable = " ".join(
+        [
+            doc.title,
+            doc.document_ref,
+            doc.subject,
+            doc.discipline,
+            doc.filename,
+        ]
+    ).lower()
 
     # At least one keyword token must appear
     if tokens and not any(t in searchable for t in tokens):
@@ -234,6 +256,7 @@ def _matches(
 # Output
 # ---------------------------------------------------------------------------
 
+
 def _to_result(doc: ConceptDocument) -> dict[str, Any]:
     return {
         "title": doc.title.strip(),
@@ -253,6 +276,7 @@ def _empty_result(query: str, site_id: str) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Loading
 # ---------------------------------------------------------------------------
+
 
 def _load_from_tsv(path: Path) -> list[ConceptDocument]:
     with path.open(encoding="utf-8-sig", newline="") as f:
@@ -284,6 +308,7 @@ def _row_to_doc(row: dict[str, Any]) -> ConceptDocument:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _clean(value: Any) -> str:
     s = str(value or "").strip()

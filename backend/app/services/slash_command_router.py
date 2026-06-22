@@ -191,7 +191,7 @@ async def _build_wo_email_body(
             lines.append("=" * 50)
             lines.append("EQUIPMENT DETAILS")
             lines.append("=" * 50)
-            lines.append(f"Name: {info.get('name', equipment_code)}")
+            lines.append(f"Code: {info.get('equipment_code') or info.get('code') or equipment_code}")
             lines.append(f"Type: {info.get('type', 'N/A')}")
             lines.append(f"Status: {info.get('status', 'N/A')}")
             lines.append(f"Health: {info.get('health_score', 'N/A')}%")
@@ -303,7 +303,7 @@ async def _handle_info(code: str, _extra: str | None, _user: str | None) -> Comm
 
     data = resp.json()
     lines = [
-        f"## {data.get('name', code)}",
+        f"## {data.get('equipment_code', code)}",
         "",
         "| Field | Value |",
         "|-------|-------|",
@@ -524,7 +524,8 @@ async def _handle_status_wo(code: str, _extra: str | None, user: str | None) -> 
                 success=False,
             )
 
-        status = data.get("status", "unknown")
+        status = data.get("display_status") or data.get("status", "unknown")
+        staff_summary = data.get("staff_summary", "")
         priority = data.get("priority", "")
         category = data.get("category", "")
         title = data.get("title", "")
@@ -533,30 +534,36 @@ async def _handle_status_wo(code: str, _extra: str | None, user: str | None) -> 
         created_at = data.get("created_at", "")
         updated_at = data.get("updated_at", "")
         completed_at = data.get("completed_at", "")
+        resolved_at = data.get("resolved_at", "")
+        closed_at = data.get("closed_at", "")
 
         lines = [
-            f"## \ud83d\udccb Work Order {code}",
+            f"📋 Work Order {code}",
             "",
-            "| Field | Value |",
-            "|-------|-------|",
-            f"| **Status** | {status} |",
+            f"Status: {status}",
         ]
+        if staff_summary:
+            lines.append(staff_summary)
         if priority:
-            lines.append(f"| **Priority** | {priority} |")
+            lines.append(f"Priority: {priority}")
         if category:
-            lines.append(f"| **Category** | {category} |")
+            lines.append(f"Category: {category}")
         if title:
-            lines.append(f"| **Title** | {title} |")
+            lines.append(f"Issue: {title}")
         if assigned_to:
-            lines.append(f"| **Assigned To** | {assigned_to} |")
+            lines.append(f"Assigned to: {assigned_to}")
         if created_at:
-            lines.append(f"| **Created** | {created_at[:16] if len(created_at) > 16 else created_at} |")
+            lines.append(f"Created: {created_at[:16] if len(created_at) > 16 else created_at}")
         if updated_at:
-            lines.append(f"| **Updated** | {updated_at[:16] if len(updated_at) > 16 else updated_at} |")
+            lines.append(f"Updated: {updated_at[:16] if len(updated_at) > 16 else updated_at}")
+        if resolved_at:
+            lines.append(f"Resolved: {resolved_at[:16] if len(resolved_at) > 16 else resolved_at}")
         if completed_at:
-            lines.append(f"| **Completed** | {completed_at[:16] if len(completed_at) > 16 else completed_at} |")
+            lines.append(f"Completed: {completed_at[:16] if len(completed_at) > 16 else completed_at}")
+        if closed_at:
+            lines.append(f"Closed: {closed_at[:16] if len(closed_at) > 16 else closed_at}")
         if notes:
-            lines.append(f"| **Notes** | {notes} |")
+            lines.append(f"Technician notes: {notes}")
 
         return CommandResult(message="\n".join(lines))
 
