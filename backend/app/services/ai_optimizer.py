@@ -2070,6 +2070,76 @@ If no action needed, return empty recommendations array.
             hour_text, minute_text = fallback.split(":", 1)
             return int(hour_text), int(minute_text)
 
+    def _effective_operating_hours_for_time(
+        self,
+        site_id: str,
+        current_time: datetime,
+    ) -> dict[str, Any]:
+        """Resolve flat, legacy, or day-keyed operating hours for a local time."""
+        site = self.find_site(site_id) or {}
+        operating_hours = site.get("operating_hours") or {}
+        weekday_key = current_time.strftime("%A").lower()
+        weekend = current_time.weekday() >= 5
+
+        if isinstance(operating_hours, str):
+            if "-" in operating_hours:
+                start_text, end_text = operating_hours.split("-", 1)
+                return {
+                    "start": start_text.strip(),
+                    "end": end_text.strip(),
+                    "operational": True,
+                    "explicit_day_schedule": False,
+                }
+            return {"start": "08:00", "end": "18:00", "operational": not weekend, "explicit_day_schedule": False}
+
+        if not isinstance(operating_hours, dict):
+            return {"start": "08:00", "end": "18:00", "operational": not weekend, "explicit_day_schedule": False}
+
+        day_value = operating_hours.get(weekday_key)
+        if isinstance(day_value, dict):
+            operational = bool(day_value.get("operational", True))
+            return {
+                "start": str(day_value.get("start", "00:00" if operational else "08:00")),
+                "end": str(day_value.get("end", "23:59" if operational else "18:00")),
+                "operational": operational,
+                "explicit_day_schedule": True,
+                "precool_minutes": day_value.get("precool_minutes", 0),
+            }
+        if isinstance(day_value, str):
+            if day_value.strip().lower() in {"closed", "false", "off"}:
+                return {"start": "08:00", "end": "18:00", "operational": False, "explicit_day_schedule": True}
+            if "-" in day_value:
+                start_text, end_text = day_value.split("-", 1)
+                return {
+                    "start": start_text.strip(),
+                    "end": end_text.strip(),
+                    "operational": True,
+                    "explicit_day_schedule": True,
+                }
+
+        if "start" in operating_hours or "end" in operating_hours:
+            return {
+                "start": str(operating_hours.get("start", "08:00")),
+                "end": str(operating_hours.get("end", "18:00")),
+                "operational": bool(operating_hours.get("operational", not weekend)),
+                "explicit_day_schedule": False,
+            }
+
+        legacy_key = "weekend" if weekend else "weekday"
+        legacy_hours = str(operating_hours.get(legacy_key) or "").strip()
+        if legacy_hours.lower() in {"closed", "false", "off"}:
+            return {"start": "08:00", "end": "18:00", "operational": False, "explicit_day_schedule": False}
+        if "-" in legacy_hours:
+            start_text, end_text = legacy_hours.split("-", 1)
+            return {
+                "start": start_text.strip(),
+                "end": end_text.strip(),
+                "operational": True,
+                "explicit_day_schedule": False,
+            }
+
+        return {"start": "08:00", "end": "18:00", "operational": not weekend, "explicit_day_schedule": False}
+
     def _current_conditions_time(self, current_conditions: dict[str, Any]) -> datetime:
         """Prefer telemetry timestamps when tests or persisted readings provide them."""
         candidates = [
@@ -2102,28 +2172,20 @@ If no action needed, return empty recommendations array.
         """Return True when local time is outside configured operating hours."""
         now = current_time or datetime.now()
         schedule = self._get_site_schedule_context(site_id, now)
-        if schedule.get("is_weekend") or schedule.get("is_public_holiday"):
+        operating_hours = self._effective_operating_hours_for_time(site_id, now)
+        if operating_hours.get("operational") is False:
             return True
 
-        site = self.find_site(site_id) or {}
-        operating_hours = site.get("operating_hours") or {}
-        if isinstance(operating_hours, str):
-            if "-" in operating_hours:
-                start_text, end_text = operating_hours.split("-", 1)
-                operating_hours = {"start": start_text.strip(), "end": end_text.strip()}
-            else:
-                operating_hours = {}
-        if "start" not in operating_hours and "weekday" in operating_hours:
-            weekday_hours = str(operating_hours.get("weekday") or "")
-            if "-" in weekday_hours:
-                start_text, end_text = weekday_hours.split("-", 1)
-                operating_hours = {"start": start_text.strip(), "end": end_text.strip()}
+        if schedule.get("is_public_holiday") and not operating_hours.get("explicit_day_schedule"):
+            return True
 
         start_hour, start_minute = self._parse_site_time(str(operating_hours.get("start", "08:00")), "08:00")
         end_hour, end_minute = self._parse_site_time(str(operating_hours.get("end", "18:00")), "18:00")
         start_minutes = start_hour * 60 + start_minute
         end_minutes = end_hour * 60 + end_minute
         now_minutes = now.hour * 60 + now.minute
+        if end_minutes < start_minutes:
+            return not (now_minutes >= start_minutes or now_minutes <= end_minutes)
         return not (start_minutes <= now_minutes <= end_minutes)
 
     def _is_within_pre_occupancy_window(
@@ -2133,23 +2195,9 @@ If no action needed, return empty recommendations array.
     ) -> bool:
         """Return True in the configured pre-conditioning window before opening."""
         now = current_time or datetime.now()
-        schedule = self._get_site_schedule_context(site_id, now)
-        if schedule.get("is_weekend") or schedule.get("is_public_holiday"):
+        operating_hours = self._effective_operating_hours_for_time(site_id, now)
+        if operating_hours.get("operational") is False:
             return False
-
-        site = self.find_site(site_id) or {}
-        operating_hours = site.get("operating_hours") or {}
-        if isinstance(operating_hours, str):
-            if "-" in operating_hours:
-                start_text, _end_text = operating_hours.split("-", 1)
-                operating_hours = {"start": start_text.strip()}
-            else:
-                operating_hours = {}
-        if "start" not in operating_hours and "weekday" in operating_hours:
-            weekday_hours = str(operating_hours.get("weekday") or "")
-            if "-" in weekday_hours:
-                start_text, _end_text = weekday_hours.split("-", 1)
-                operating_hours = {"start": start_text.strip()}
 
         start_hour, start_minute = self._parse_site_time(str(operating_hours.get("start", "08:00")), "08:00")
         start_minutes = start_hour * 60 + start_minute
@@ -2482,12 +2530,12 @@ If a pattern suggests a zone will empty soon, recommend action now.
                 direction = "above" if carbon["carbon_vs_baseline_kgco2"] > 0 else "below"
                 variance_line = f"vs baseline: {abs(carbon['carbon_vs_baseline_kgco2'])} kgCO2/h {direction}\n"
             blocks.append(f"""CARBON & ESG:
-Grid intensity: {carbon["grid_intensity_kgco2_kwh"]} kgCO2/kWh (Eskom 2024)
-Building footprint: {carbon["building_kgco2_hour"]} kgCO2/hour
-{variance_line}Renewable fraction: {carbon["renewable_fraction_pct"]}% (solar)
-Solar carbon offset: {carbon["solar_offset_kgco2_hour"]} kgCO2/hour
-Grid import: {carbon["grid_import_kw"]} kW
-Source: {carbon["source"]}
+Grid intensity: {carbon.get("grid_intensity_kgco2_kwh", "unknown")} kgCO2/kWh
+Building footprint: {carbon.get("building_kgco2_hour", "unknown")} kgCO2/hour
+{variance_line}Renewable fraction: {carbon.get("renewable_fraction_pct", "unknown")}% (solar)
+Solar carbon offset: {carbon.get("solar_offset_kgco2_hour", "unknown")} kgCO2/hour
+Grid import: {carbon.get("grid_import_kw", carbon.get("estimated_load_kw", "unknown"))} kW
+Source: {carbon.get("source", "unknown")}
 """)
 
         elec = conditions.get("electrical")

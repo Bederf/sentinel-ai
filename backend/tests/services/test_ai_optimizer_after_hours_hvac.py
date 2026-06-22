@@ -1,5 +1,7 @@
 """Regression tests for deterministic after-hours HVAC advisories."""
 
+from datetime import datetime
+
 import pytest
 
 from app.models.device import (
@@ -25,6 +27,27 @@ def _optimizer() -> AIOptimizerService:
             "operating_hours": {"start": "08:00", "end": "18:00"},
         }
     ]
+    return optimizer
+
+
+def _optimizer_with_site_005() -> AIOptimizerService:
+    optimizer = _optimizer()
+    optimizer._sites.append(
+        {
+            "id": "site-005",
+            "name": "Busamed Gateway Private Hospital",
+            "type": "hospital",
+            "operating_hours": {
+                "monday": {"start": "00:00", "end": "23:59", "operational": True},
+                "tuesday": {"start": "00:00", "end": "23:59", "operational": True},
+                "wednesday": {"start": "00:00", "end": "23:59", "operational": True},
+                "thursday": {"start": "00:00", "end": "23:59", "operational": True},
+                "friday": {"start": "00:00", "end": "23:59", "operational": True},
+                "saturday": {"start": "00:00", "end": "23:59", "operational": True},
+                "sunday": {"start": "00:00", "end": "23:59", "operational": True},
+            },
+        }
+    )
     return optimizer
 
 
@@ -100,6 +123,43 @@ def _conditions(timestamp: str, occupancy: float = 0, hvac_kw: float = 24.0) -> 
         },
         "active_urgent_work_orders": [],
     }
+
+
+def test_day_keyed_247_hospital_schedule_is_inside_operating_hours_on_weekday():
+    optimizer = _optimizer_with_site_005()
+
+    assert optimizer._is_outside_site_operating_hours("site-005", datetime(2026, 6, 22, 6, 38)) is False
+
+
+def test_day_keyed_247_hospital_schedule_is_inside_operating_hours_on_weekend():
+    optimizer = _optimizer_with_site_005()
+
+    assert optimizer._is_outside_site_operating_hours("site-005", datetime(2026, 6, 21, 6, 38)) is False
+
+
+def test_day_keyed_closed_day_is_outside_operating_hours():
+    optimizer = _optimizer_with_site_005()
+    site_005 = next(site for site in optimizer._sites if site["id"] == "site-005")
+    site_005["operating_hours"]["sunday"] = {"start": "00:00", "end": "23:59", "operational": False}
+
+    assert optimizer._is_outside_site_operating_hours("site-005", datetime(2026, 6, 21, 6, 38)) is True
+
+
+def test_partial_carbon_context_does_not_crash_full_context_formatter():
+    optimizer = _optimizer()
+
+    text = optimizer._format_full_context(
+        {
+            "carbon": {
+                "site_id": "site-005",
+                "estimated_load_kw": 174.5,
+                "source": "electrical_telemetry",
+            }
+        }
+    )
+
+    assert "CARBON & ESG" in text
+    assert "Grid import: 174.5 kW" in text
 
 
 def _after_hours_recs(result):
