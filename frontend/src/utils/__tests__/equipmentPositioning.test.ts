@@ -21,10 +21,12 @@ function makeEquipment(code: string): Equipment {
 
 describe('equipmentPositioning', () => {
   it('maps S002 equipment codes to five floor zones using the trailing zone digit', () => {
-    expect(extractZoneNumber('S002-FCU-101')).toBe(1);
-    expect(extractZoneNumber('S002-VAV-204')).toBe(4);
-    expect(extractZoneNumber('S002-DALI-105')).toBe(5);
-    expect(extractZoneNumber('S002-FCU-200')).toBe(5);
+    expect(extractZoneNumber('S002-FCU-100')).toBe(1);
+    expect(extractZoneNumber('S002-FCU-101')).toBe(2);
+    expect(extractZoneNumber('S002-VAV-204')).toBe(5);
+    expect(extractZoneNumber('S002-DALI-104')).toBe(5);
+    expect(extractZoneNumber('S002-FCU-200')).toBe(1);
+    expect(extractZoneNumber('S005-FCU-510')).toBe(11);
   });
 
   it('uses a shared plant zone for basement and roof equipment', () => {
@@ -32,16 +34,19 @@ describe('equipmentPositioning', () => {
     expect(buildZoneKey('S002-INV-R-002')).toBe('Zone-R-plant');
   });
 
+  it('uses canonical zone keys for SENTINEL equipment codes', () => {
+    expect(buildZoneKey(makeEquipment('S005-AHU-003'))).toBe('Zone-003');
+    expect(buildZoneKey(makeEquipment('S005-FCU-205'))).toBe('Zone-205');
+    expect(buildZoneKey(makeEquipment('S005-VAV-510'))).toBe('Zone-510');
+  });
+
   it('generates five full-depth zone strips across a standard floor plate', () => {
     const bounds = generateSyntheticZoneBounds('L1');
 
-    expect(Object.keys(bounds)).toEqual([
-      'Zone-L1-1',
-      'Zone-L1-2',
-      'Zone-L1-3',
-      'Zone-L1-4',
-      'Zone-L1-5',
-    ]);
+    expect(bounds).toHaveProperty('Zone-L1-1');
+    expect(bounds).toHaveProperty('Zone-L1-5');
+    expect(bounds).toHaveProperty('Zone-100');
+    expect(bounds).toHaveProperty('Zone-104');
 
     expect(bounds['Zone-L1-1']).toMatchObject({
       minX: -14,
@@ -58,6 +63,7 @@ describe('equipmentPositioning', () => {
     expect(bounds['Zone-L1-5'].maxZ).toBe(9);
     expect(bounds['Zone-L1-5'].width).toBeCloseTo(5.6, 6);
     expect(bounds['Zone-L1-5'].depth).toBe(18);
+    expect(bounds['Zone-104']).toBe(bounds['Zone-L1-5']);
   });
 
   it('uses the full floor area for plant-floor equipment placement', () => {

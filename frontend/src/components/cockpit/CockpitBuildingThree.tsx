@@ -59,11 +59,6 @@ function siteDepth(siteId: string, buildingType?: string, geometry?: import('./t
   return siteSlabScale(siteId, buildingType, geometry).d
 }
 
-function geometryFloorCount(geometry?: import('./types').BuildingGeometryData | null): number | null {
-  if (geometry?.floor_count && geometry.floor_count > 0) return geometry.floor_count
-  return null
-}
-
 /** Tracer orbit speed per active system (units: cycles per second roughly) */
 const TRACER_SPEEDS: Record<string, number> = {
   hvac: 0.42,
@@ -105,32 +100,9 @@ const SITE_MAP_TEXTURES: Record<string, string> = {
   'site-005': '/images/busamed-map.png',
 }
 
-function GroundPlane({ siteId, lat, lng }: { siteId?: string; lat?: number | null; lng?: number | null }) {
+function GroundPlane({ siteId }: { siteId?: string; lat?: number | null; lng?: number | null }) {
   const texPath = (siteId && SITE_MAP_TEXTURES[siteId]) || '/images/sandton-map.png'
   const mapTexture = useTexture(texPath)
-
-  // For sites without a pre-downloaded map, overlay a GPS pin on a canvas
-  const overlayTexture = useMemo(() => {
-    if (siteId && SITE_MAP_TEXTURES[siteId]) return undefined
-    if (!lat || !lng) return undefined
-    const canvas = document.createElement('canvas')
-    canvas.width = 512
-    canvas.height = 512
-    const ctx = canvas.getContext('2d')!
-    ctx.fillStyle = '#0f172a'
-    ctx.fillRect(0, 0, 512, 512)
-    ctx.strokeStyle = '#1e293b'
-    ctx.lineWidth = 1
-    for (let x = 0; x <= 512; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, 512); ctx.stroke() }
-    for (let y = 0; y <= 512; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(512, y); ctx.stroke() }
-    ctx.beginPath(); ctx.arc(256, 256, 12, 0, Math.PI * 2)
-    ctx.fillStyle = '#22c55e'; ctx.fill()
-    ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3; ctx.stroke()
-    ctx.fillStyle = '#94a3b8'; ctx.font = '14px sans-serif'; ctx.textAlign = 'center'
-    ctx.fillText(siteId || '', 256, 440)
-    ctx.fillText(`${lat?.toFixed(4)}, ${lng?.toFixed(4)}`, 256, 480)
-    return new THREE.CanvasTexture(canvas)
-  }, [lat, lng, siteId])
 
   return (
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
@@ -301,7 +273,6 @@ function BuildingStack({
   const geometry = state.site.buildingGeometry
   const slabW = siteWidth(siteId, undefined, geometry)
   const slabD = siteDepth(siteId, undefined, geometry)
-  const geomFloorCount = geometryFloorCount(geometry)
   const floors = state.visualTwin.floors
   const waiting = state.site.renderState === 'waiting'
   const calm = !waiting && state.primaryMetric.value === 'Stable'
@@ -392,7 +363,7 @@ function BuildingStack({
         }))
     // Never render more than MAX_FLOORS slabs
     return source.slice(0, MAX_FLOORS)
-  }, [floors, floorEquipmentHealth])
+  }, [floors])
 
   // Derive slabs with equipment health attached
   const slabsWithEquipment: SlabInfo[] = useMemo(() => {

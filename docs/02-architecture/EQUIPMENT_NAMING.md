@@ -1,10 +1,10 @@
 ---
 title: "Equipment Naming Conventions (Two-Tier System)"
 type: "architecture"
-status: "draft"
-version: "1.0.0"
+status: "approved"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-06-22"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -15,20 +15,21 @@ estimated_read_time: 10
 
 # Equipment Naming Conventions (Two-Tier System)
 
-**Complete Alignment:** Zones, Desks, and Equipment all reference the same numeric zone identifiers for office areas. Plant equipment uses location codes.
+**Complete Alignment:** Zones, desks, and equipment all reference the same canonical zone identifiers. Occupied-zone equipment uses the numeric zone code. Plant equipment in basement/roof areas uses location plus sequence.
 
 **See CLAUDE.md for quick reference. This document covers full naming system details.**
 
 ## Zone Numbering System (Self-Documenting)
 
 ```
-L0 (Ground):  Zone-001 to Zone-005  (5 zones)
-L1 (Level 1): Zone-100 to Zone-104  (5 zones)
-L2 (Level 2): Zone-200 to Zone-204  (5 zones)
+L0 (Ground):  Zone-001 to Zone-099
+L1 (Level 1): Zone-100 to Zone-199
+L2 (Level 2): Zone-200 to Zone-299
+L5 (Level 5): Zone-500 to Zone-599
 B1 (Basement): Zone-B1-001 (plant room)
 R (Roof):     Zone-R-001 (plant room)
 
-Zone number encodes floor: 0XX = L0, 1XX = L1, 2XX = L2
+Zone number encodes floor: 0XX = L0/Ground, 1XX = L1, 2XX = L2, 5XX = L5
 ```
 
 ## Desk Numbering System (Encodes Floor)
@@ -44,16 +45,17 @@ Desk distribution: 20 desks per zone (e.g., Desk-001-020 in Zone-001)
 
 ## Equipment Code System — TWO-TIER
 
-### Tier 1: Zone Equipment (Offices)
+### Tier 1: Occupied-Zone Equipment
 
 ```
 Pattern: {site}-{type}-{zone_id}
 Examples:
-  S002-VAV-101    ← Level 1, Zone B (Zone-101)
-  S002-FCU-200    ← Level 2, Zone A (Zone-200)
-  S002-DALI-104   ← Level 1, Zone E (Zone-104)
+  S005-AHU-003    ← Site 005, AHU, Ground/L0 Zone 003 (Zone-003)
+  S002-VAV-100    ← Site 002, VAV, Level 1 Zone 001 (Zone-100)
+  S002-FCU-204    ← Site 002, FCU, Level 2 Zone 005 (Zone-204)
+  S005-DALI-510   ← Site 005, DALI, Level 5 Zone 011 (Zone-510)
 
-Applies to: VAV, FCU, DALI units serving specific office zones
+Applies to: AHU, FCU, VAV, DALI, LUM, sensors, and other equipment assigned to a canonical occupied zone.
 ```
 
 ### Tier 2: Plant Equipment (Infrastructure)
@@ -63,22 +65,23 @@ Pattern: {site}-{type}-{location}-{sequence}
 Examples:
   S002-CHILLER-B1-001  ← Basement 1, Chiller #1
   S002-AHU-R-001       ← Roof, AHU #1
-  S002-GEN-G-001       ← Ground, Generator #1
   S002-PUMP-B1-CHW1    ← Basement 1, Chilled Water Pump
   S002-MTR-B1-MAIN     ← Basement 1, Main Meter
 
-Locations: B1 (Basement), R (Roof), G (Ground Plant)
+Locations: B1/B2 (Basement), R (Roof)
 Applies to: CHILLER, AHU, GEN, UPS, PUMP, MTR, CT (building-wide infrastructure)
 ```
+
+Ground-floor equipment that serves a normal occupied zone uses the occupied-zone pattern, e.g. `S005-AHU-003`. Use the plant pattern only where the asset is physically in a plant area or has no single occupied-zone assignment.
 
 ## Zone Mapping Reference
 
 ```
-Zone-001 = L0, Zone A   |  Zone-100 = L1, Zone A   |  Zone-200 = L2, Zone A
-Zone-002 = L0, Zone B   |  Zone-101 = L1, Zone B   |  Zone-201 = L2, Zone B
-Zone-003 = L0, Zone C   |  Zone-102 = L1, Zone C   |  Zone-202 = L2, Zone C
-Zone-004 = L0, Zone D   |  Zone-103 = L1, Zone D   |  Zone-203 = L2, Zone D
-Zone-005 = L0, Zone E   |  Zone-104 = L1, Zone E   |  Zone-204 = L2, Zone E
+Zone-001 = L0, Zone 001 |  Zone-100 = L1, Zone 001 |  Zone-200 = L2, Zone 001
+Zone-002 = L0, Zone 002 |  Zone-101 = L1, Zone 002 |  Zone-201 = L2, Zone 002
+Zone-003 = L0, Zone 003 |  Zone-102 = L1, Zone 003 |  Zone-202 = L2, Zone 003
+Zone-004 = L0, Zone 004 |  Zone-103 = L1, Zone 004 |  Zone-203 = L2, Zone 004
+Zone-005 = L0, Zone 005 |  Zone-104 = L1, Zone 005 |  Zone-204 = L2, Zone 005
 ```
 
 ## Type → Technician Specialty Mapping
@@ -94,35 +97,40 @@ Zone-005 = L0, Zone E   |  Zone-104 = L1, Zone E   |  Zone-204 = L2, Zone E
 - **Point naming:** `{system}_{parameter}_{qualifier}` (e.g., `chw_supply_temp`)
 - Use `equipment_id`/`equipment_name` in domain models, `device_id` only at device control layer
 
-## Site-005 Hospital Naming System (Floor-Based with Point Monitoring)
+## Raw Source Naming and Site-005 Hospital Labels
 
-**Context:** Example Hospital Private Hospital (Umhlanga) - 25,000 sqm, 9 levels, 90 equipment items
+External BMS/vendor naming is not the SENTINEL canonical code. During onboarding, preserve the raw source identifier and map it to the canonical equipment code and canonical zone.
 
-**Pattern:** `site-005-UMH-{TYPE}-{FLOOR}-{ID}.{POINT}` (site-005 preserves hospital naming for multi-campus systems)
+### Required Fields
 
-### Structure
+- `raw_code` / source object ID: original BMS/vendor identifier.
+- `code`: SENTINEL canonical equipment code.
+- `type`: normalized equipment type.
+- `zone_key`: normalized raw/source zone key when available.
+- `canonical_zone_id`: canonical `Zone-###` or plant zone.
+- `location`: human-readable location label.
 
-- `site-005-UMH-` - Hospital building identifier (UMH = Umhlanga Hospital)
-- `{TYPE}` - Equipment type (AHU, GEN, LIFT, JACE, CT, FIRE, PUMP, COLD, MSB, UPS, BOILER, DB, KEF, SPLIT, MEDGAS)
-- `{FLOOR}` - Floor location: B1 (Basement), L1-L9 (Levels), R (Roof)
-- `{ID}` - Equipment ID (room identifier for zones: ICU, THeatre, etc.; or sequence for infrastructure)
-- `.{POINT}` - Optional point suffix for monitoring (e.g., `.fan`, `.load`, `.fuel`, `.hepa`, `.door`, `.o2`)
+### Site-005 Examples
 
-### Examples
+Raw hospital labels such as ICU, theatres, wards, and plant rooms are retained as aliases or display labels, not as the canonical equipment code.
 
 ```
-# Critical Medical Equipment (ICU, Operating Theatres)
-site-005-UMH-AHU-L3-ICU.fan      ← ICU air handler fan
-site-005-UMH-AHU-L3-ICU.hepa     ← ICU HEPA filter
-site-005-UMH-AHU-L3-TH1.air      ← Theatre 1 air supply
-site-005-UMH-DB-L3-001.total     ← Level 3 electrical panel
+raw_code:           site-005-UMH-AHU-L3-ICU.fan
+code:               S005-AHU-300
+zone_key:           Zone-L3-ICU
+canonical_zone_id:  Zone-300
+location:           Level 3 ICU
 
-# Infrastructure Equipment (Plant, Basement, Roof)
-site-005-UMH-GEN-B1-001.fuel     ← Basement generator #1 fuel level
-site-005-UMH-PUMP-B1-001         ← Basement pump #1
-site-005-UMH-CT-R-001            ← Roof cooling tower #1
-site-005-UMH-LIFT-L4-001.door    ← Level 4 elevator door status
-site-005-UMH-COLD-L2-001         ← Level 2 cold storage (pharma/blood)
+raw_code:           site-005-UMH-AHU-L3-TH1.air
+code:               S005-AHU-301
+zone_key:           Zone-L3-TH1
+canonical_zone_id:  Zone-301
+location:           Level 3 Theatre 1
+
+raw_code:           site-005-UMH-CT-R-001
+code:               S005-CT-R-001
+canonical_zone_id:  Zone-R-001
+location:           Roof plant
 ```
 
 ### Medical Equipment Specialties
@@ -143,18 +151,17 @@ site-005-UMH-COLD-L2-001         ← Level 2 cold storage (pharma/blood)
 
 ## Difference from Site-002
 
-- **Site-002 (Office):** Zone-based (Zone-001-004), compact format (S002-TYPE-ZONE_ID)
-- **Site-005 (Hospital):** Floor-based (B1, L1-L9, R), verbose format (site-005-UMH-TYPE-FLOOR-ID), point-level monitoring
-- **Site-002:** ~30 equipment across 3 floors
-- **Site-005:** ~90 equipment across 11 floor levels
+- **Site-002 (Office):** Raw source IDs and canonical IDs are often already close to `S002-TYPE-ZONE`.
+- **Site-005 (Hospital):** Raw source IDs may be verbose and clinical (`site-005-UMH-AHU-L3-ICU`), but the canonical code still uses `S005-TYPE-ZONE`.
+- **Both sites:** Downstream services use canonical `equipment.code` and canonical zones. Raw source names remain available for integration, audit, and operator context.
 
 ## Naming System Benefits
 
 - ✅ Zone number self-documents floor (001-099=L0, 100-199=L1, 200-299=L2)
 - ✅ Desk number self-documents floor (001-100=L0, 102-201=L1, 202-301=L2)
 - ✅ Equipment code directly references zone — no translation needed
-- ✅ Perfect alignment: Zone-101 = Desk-122-141 = S002-XXX-101
+- ✅ Perfect alignment: Zone-100 = Level 1 Zone 001 = S002-XXX-100
 - ✅ Eliminates L0 vs L10 ambiguity (now it's 001 vs 101, crystal clear)
-- ✅ Queries simple: WHERE code LIKE '%-101' = all Zone-101 equipment
-- ✅ Hospital-specific naming preserved (UMH identifier, floor labels, point monitoring)
+- ✅ Queries simple: WHERE code LIKE '%-100' = all Zone-100 equipment
+- ✅ Hospital-specific raw naming preserved as source metadata, aliases, and display labels
 - ✅ Multi-campus support enabled (different sites can have different building codes: UMH, BTU, etc.)

@@ -43,25 +43,32 @@ This document defines the standard naming conventions used throughout the SENTIN
 
 ## Device ID Format
 
-**Pattern:** `{site_code}-{building_code}-{device_type}-{sequence}`
+SENTINEL canonical equipment codes use the same convention as `equipment.code`.
+
+**Occupied-zone pattern:** `{site}-{type}-{zone_id}`
+
+**Basement/roof plant pattern:** `{site}-{type}-{location}-{sequence}`
 
 ### Components
 
 | Component | Format | Example |
 |-----------|--------|---------|
-| Site Code | 3 digits | `001`, `002` |
-| Building Code | 2-4 lowercase letters | `gwc`, `rbt`, `cm` |
-| Device Type | lowercase with hyphens | `chiller`, `ahu`, `zone-ctrl` |
+| Site | `S###` | `S001`, `S005` |
+| Type | UPPERCASE equipment type | `AHU`, `FCU`, `CHILLER` |
+| Zone ID | 3-digit canonical zone | `003`, `205`, `510` |
+| Plant location | Basement/roof token | `B1`, `R` |
 | Sequence | 3 digits | `001`, `002` |
 
 ### Examples
 
 ```
 S001-CHILLER-B1-001     # Gateway Centre, Chiller 1
-S001-AHU-L0-02         # Gateway Centre, AHU 2
-S004-FCU-L0-A           # Rosebank Towers, FCU Level 0 Zone A
-S003-BMS-B1-001         # Menlyn Maine, Zone Controller 1
+S005-AHU-003            # Site 005, AHU, Ground/L0 Zone 003
+S004-FCU-105            # Site 004, FCU, Level 1 Zone 005
+S003-BMS-B1-001         # Site 003, BMS Controller 1 in Basement 1
 ```
+
+`001`-`099` = Ground/L0, `100`-`199` = L1, `200`-`299` = L2, etc. Raw BMS/vendor identifiers are preserved separately and mapped during onboarding.
 
 ### Device Types
 

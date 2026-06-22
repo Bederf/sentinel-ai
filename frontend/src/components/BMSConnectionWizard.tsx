@@ -792,7 +792,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [buildConnectionMessage, ensureSiteCreated, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
+  }, [buildConnectionMessage, ensureSiteCreated, isNiagara, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
@@ -870,7 +870,7 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
-  }, [state.bmsVendor, state.host, state.selectedDeviceId, state.siteId]);
+  }, [state.bmsVendor, state.capabilitySummary, state.host, state.password, state.port, state.selectedDeviceId, state.siteId, state.username]);
 
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
@@ -913,7 +913,7 @@ export function BMSConnectionWizard({
         error: err instanceof Error ? err.message : "Failed to load mappings",
       });
     }
-  }, [state.discoveryId, state.bmsVendor]);
+  }, [state.discoveryId, state.bmsVendor, state.capabilitySummary, state.siteId]);
 
   // ---------- Step 4: Approve ----------
   const handleApprove = useCallback(async () => {
@@ -962,7 +962,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Approval failed",
       });
     }
-  }, [state.approvedBy, state.discoveryId, state.siteId]);
+  }, [state.approvedBy, state.bmsVendor, state.discoveryId, state.siteId]);
 
   // ---------- Step navigation ----------
   const goNext = useCallback(async () => {

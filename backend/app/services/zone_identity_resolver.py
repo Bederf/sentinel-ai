@@ -58,7 +58,39 @@ class ZoneIdentityResolver:
         canonical_zone_ids = identifiers_by_source.get("zones", set()) | identifiers_by_source.get("hvac_zones", set())
         all_ids = {zone for zones in identifiers_by_source.values() for zone in zones}
         site_map: dict[str, ZoneResolution] = {}
+        for row in rows:
+            if str(row.get("source") or "") != "zone_aliases":
+                continue
+            alias = _clean_zone_id(row.get("zone_id"))
+            canonical = _clean_zone_id(row.get("canonical_zone_id"))
+            if not alias or not canonical:
+                continue
+            if canonical not in canonical_zone_ids:
+                site_map[alias] = ZoneResolution(
+                    source_zone_id=alias,
+                    canonical_zone_id=None,
+                    status="unresolved",
+                    reason="zone_alias_canonical_not_in_site_inventory",
+                    provenance={"source": "zone_aliases", "canonical_zone_id": canonical},
+                )
+                continue
+            site_map[alias] = ZoneResolution(
+                source_zone_id=alias,
+                canonical_zone_id=canonical,
+                status="resolved",
+                reason="approved_zone_alias",
+                aliases=(alias, canonical),
+                provenance={
+                    "source": "zone_aliases",
+                    "alias_type": row.get("alias_type"),
+                    "confidence": row.get("confidence"),
+                    "review_status": row.get("review_status"),
+                },
+            )
+
         for zone_id in sorted(all_ids):
+            if zone_id in site_map:
+                continue
             resolution = self._resolve_from_inventory(
                 zone_id,
                 canonical_zone_ids,
@@ -176,6 +208,28 @@ class ZoneIdentityRepository:
             ):
                 result = await client.table(table).select(column).eq("site_id", site_uuid).execute()
                 rows.extend({"source": source, "zone_id": row.get(column)} for row in result.data or [])
+            try:
+                result = (
+                    await client.table("zone_aliases")
+                    .select("alias_key,canonical_zone_id,alias_type,source,confidence,review_status")
+                    .eq("site_id", site_uuid)
+                    .eq("review_status", "approved")
+                    .execute()
+                )
+                rows.extend(
+                    {
+                        "source": "zone_aliases",
+                        "zone_id": row.get("alias_key"),
+                        "canonical_zone_id": row.get("canonical_zone_id"),
+                        "alias_type": row.get("alias_type"),
+                        "alias_source": row.get("source"),
+                        "confidence": row.get("confidence"),
+                        "review_status": row.get("review_status"),
+                    }
+                    for row in result.data or []
+                )
+            except Exception as exc:
+                logger.debug("zone_aliases unavailable for %s: %s", site_id, exc)
 
         for table, column, source in (
             ("fcu_zone_state", "zone_id", "fcu_zone_state"),
@@ -235,8 +289,9 @@ def _numeric_zone_to_level_zone(zone_id: str) -> str | None:
     if not match:
         return None
     raw = match.group(1)
-    level = int(raw[0])
-    zone_number = int(raw[1:])
+    raw_number = int(raw)
+    level = raw_number // 100
+    zone_number = raw_number if level == 0 else (raw_number % 100) + 1
     if zone_number <= 0:
         return None
     return f"Zone-L{level}-{zone_number}"
@@ -250,7 +305,9 @@ def _level_zone_to_numeric_zone(zone_id: str) -> str | None:
     zone_number = int(match.group(2))
     if zone_number <= 0:
         return None
-    return f"Zone-{level}{zone_number:02d}"
+    if level == 0:
+        return f"Zone-{zone_number:03d}"
+    return f"Zone-{level}{zone_number - 1:02d}"
 
 
 def _alias_to_canonical_zone(zone_id: str) -> str | None:

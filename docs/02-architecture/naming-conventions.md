@@ -2,9 +2,9 @@
 title: "Equipment & Device Naming Conventions"
 type: "reference"
 status: "approved"
-version: "3.0.0"
+version: "3.1.0"
 created: "2026-01-30"
-updated: "2026-05-08"
+updated: "2026-06-22"
 author: "Sentinel Development Team"
 tags: ["naming-conventions", "bms", "device-identification", "equipment-id"]
 related: ["system-overview.md", "../07-integrations/cafm-schema.md"]
@@ -16,7 +16,7 @@ estimated_read_time: 15
 
 # SENTINEL Equipment & Device Naming Conventions
 
-**Purpose:** Standardize SENTINEL's internal equipment/device identification so that any ID immediately tells you **which site**, **what device type**, **which floor**, and **which zone or unit**.
+**Purpose:** Standardize SENTINEL's internal equipment/device identification so that any ID immediately tells you **which site**, **what device type**, and **which canonical zone or plant unit**.
 
 **Scope:** This standard applies to SENTINEL's **internal** model — the single canonical ID used in Supabase (`equipment.code`), device control (`mock_devices.json`), audit logs, and all frontend/backend references. External BMS/CAFM systems use their own conventions mapped via the integration layer.
 
@@ -26,7 +26,32 @@ estimated_read_time: 15
 
 ## 1. Equipment ID Format
 
-**Pattern:** `{site}-{type}-{floor}-{zone_or_seq}`
+SENTINEL uses a two-tier canonical code. External BMS/vendor IDs are preserved separately as source metadata.
+
+### Tier 1: Occupied-Zone Equipment
+
+**Pattern:** `{site}-{type}-{zone_id}`
+
+Examples:
+
+```
+S005-AHU-003      Site 005, AHU, Ground/L0 Zone 003
+S002-VAV-100      Site 002, VAV, Level 1 Zone 001
+S002-FCU-204      Site 002, FCU, Level 2 Zone 005
+S005-DALI-510     Site 005, DALI, Level 5 Zone 011
+```
+
+### Tier 2: Basement/Roof Plant Equipment
+
+**Pattern:** `{site}-{type}-{location}-{sequence}`
+
+Examples:
+
+```
+S002-CHILLER-B1-001     Chiller #1, Basement 1 plant room
+S005-CT-R-002           Cooling Tower #2, Roof
+S005-GEN-B1-001         Generator #1, Basement 1
+```
 
 **Components:**
 
@@ -34,21 +59,23 @@ estimated_read_time: 15
 |-----------|--------|-------------|
 | `site` | `S###` (3-digit, zero-padded) | Site identifier from site registry |
 | `type` | UPPERCASE abbreviation | Device/equipment type from approved list |
-| `floor` | `B#` / `G` / `L#` / `R` | Basement, Ground, Level, or Roof |
-| `zone_or_seq` | Letter (`A`-`Z`) or 3-digit (`001`) | Zone letter for zoned equipment, numeric sequence for plant room equipment |
+| `zone_id` | 3-digit (`001`-`999`) | Canonical occupied-zone code. Hundreds digit encodes floor. |
+| `location` | `B#` / `R` | Plant location for basement/roof infrastructure |
+| `sequence` | 3-digit (`001`-`999`) | Plant asset sequence where multiple units can exist |
 
 **Floor Codes:**
 
 | Code | Meaning | Examples |
 |------|---------|---------|
 | `B1`, `B2` | Basement levels (B1 = first basement) | `B1`, `B2` |
-| `G` | Ground floor | `G` |
-| `L0`, `L1`...`L99` | Above-ground levels | `L0`, `L1`, `L2` |
+| `G` / `L0` | Ground floor | encoded as `0XX` |
+| `L1`...`L9` | Above-ground levels supported by three-digit zone codes | `1XX`, `2XX`, `5XX` |
 | `R` | Roof level | `R` |
 
 **Zone vs Sequence:**
-- **Zone letter** (`A`-`Z`): Used when a device serves a specific zone on a floor (FCUs, VAVs, DALI controllers, luminaires, sensors). One device per zone per floor.
-- **Numeric sequence** (`001`-`999`): Used for plant room equipment where multiple units exist without zone assignment (chillers, generators, UPS, transformers). Also used when a floor has multiple units of the same type serving the same zone.
+- **Canonical zone code** (`001`-`999`): Used when equipment belongs to or serves a specific occupied zone.
+- **Plant sequence** (`B1-001`, `R-002`): Used for basement/roof plant equipment where multiple units can exist without a single occupied-zone assignment.
+- For unusual duplicate equipment in the same occupied zone, add a sequence only after review. The normal case remains `S###-TYPE-ZZZ`.
 
 ---
 
@@ -120,22 +147,22 @@ The site code is the sole location identifier. There is no separate "building co
 S002-CHILLER-B1-001     Chiller #1, Basement 1 plant room
 S002-CHILLER-B1-002     Chiller #2, Basement 1 plant room
 S002-CHILLER-B1-003     Standby Chiller #3, Basement 1
-S002-AHU-L0-01          AHU serving Level 0
-S002-AHU-L1-01          AHU serving Level 1
-S002-AHU-L2-01          AHU serving Level 2
-S002-FCU-L0-A           FCU, Level 0, Zone A
-S002-FCU-L1-C           FCU, Level 1, Zone C
-S002-VAV-L1-A           VAV, Level 1, Zone A
-S002-VAV-L2-E           VAV, Level 2, Zone E
+S002-AHU-001            AHU serving Ground/L0 Zone 001
+S002-AHU-100            AHU serving Level 1 Zone 001
+S002-AHU-200            AHU serving Level 2 Zone 001
+S002-FCU-001            FCU, Ground/L0 Zone 001
+S002-FCU-102            FCU, Level 1 Zone 003
+S002-VAV-100            VAV, Level 1 Zone 001
+S002-VAV-204            VAV, Level 2 Zone 005
 S002-CT-R-001           Cooling Tower #1, Roof
 ```
 
 ### Lighting
 ```
-S002-DALI-L0-A          DALI Controller, Level 0, Zone A
-S002-DALI-L2-E          DALI Controller, Level 2, Zone E
-S002-LUM-L1-B           Luminaire Group, Level 1, Zone B
-S002-LUM-L2-E           Luminaire Group, Level 2, Zone E
+S002-DALI-001           DALI Controller, Ground/L0 Zone 001
+S002-DALI-204           DALI Controller, Level 2 Zone 005
+S002-LUM-102            Luminaire Group, Level 1 Zone 002
+S002-LUM-205            Luminaire Group, Level 2 Zone 005
 ```
 
 ### Energy Centre
@@ -161,10 +188,10 @@ S002-FDR-B1-HVAC        HVAC Plant Room Feeder
 
 ### Sensors
 ```
-S002-TS-L1-A            Temperature Sensor, Level 1, Zone A
-S002-CO2-L1-E           CO2 Sensor, Level 1, Zone E
-S002-OCC-L0-C           Occupancy Sensor, Level 0, Zone C
-S002-DLS-L2-A           Daylight Sensor, Level 2, Zone A
+S002-TS-100             Temperature Sensor, Level 1 Zone 001
+S002-CO2-104            CO2 Sensor, Level 1 Zone 005
+S002-OCC-003            Occupancy Sensor, Ground/L0 Zone 003
+S002-DLS-201            Daylight Sensor, Level 2 Zone 001
 ```
 
 ### Controllers
@@ -243,8 +270,8 @@ runtime_hours            Cumulative runtime
 **Fully qualified point reference:** `{equipment_id}.{point_name}`
 ```
 S002-CHILLER-B1-001.chw_supply_temp
-S002-VAV-L1-A.sa_damper_position
-S002-DALI-L2-E.brightness
+S002-VAV-100.sa_damper_position
+S002-DALI-204.brightness
 ```
 
 ---
@@ -391,8 +418,8 @@ The `point_asset_mappings` table stores these mappings with confidence scores.
 1. **Equipment IDs must be globally unique** across all sites
 2. **Site code must exist** in the site registry
 3. **Device type must be from approved list** (Section 3)
-4. **Floor code must follow format:** `B#`, `G`, `L#`, or `R`
-5. **Zone/sequence must be:** single uppercase letter (`A`-`Z`) or 3-digit number (`001`-`999`) or short named key (`MAIN`, `HVAC`, `CHP`)
+4. **Occupied-zone code must be:** 3 digits (`001`-`999`)
+5. **Plant location/sequence must be:** `B#-###`, `R-###`, or approved short named key (`MAIN`, `HVAC`, `CHP`) for plant-only assets
 6. **Point names must follow** `{system}_{parameter}_{qualifier}` pattern
 7. **Location metadata is required** for all devices
 
@@ -406,22 +433,22 @@ The `point_asset_mappings` table stores these mappings with confidence scores.
 |---------------|------------|------|
 | `001-gwc-chiller-001` | `S001-CHILLER-B1-001` | Drop building code, use site prefix |
 | `CHILLER-001` | `S002-CHILLER-B1-001` | Add site + floor |
-| `VAV-L1-05` | `S002-VAV-L1-E` | Add site, map zone number to letter |
+| `VAV-L1-05` | `S002-VAV-104` | Add site, encode floor/zone as canonical zone |
 | `SAN-GEN-001` | `S002-GEN-B1-001` | Replace building abbrev with site code |
-| `011-stc-ahu-001` | `S002-AHU-L0-01` | Remap site code, add floor |
-| `FCU-L12-03` | `S002-FCU-L1-C` | Add site, correct floor |
-| `002-stc-vav-l12-01` | `S002-VAV-L1-A` | Simplify to standard format |
-| `S001-FCU-L1-A` | `S001-FCU-L1-A` | Already correct |
+| `011-stc-ahu-001` | `S002-AHU-001` | Remap site code, map to ground canonical zone |
+| `FCU-L12-03` | `S002-FCU-102` | Add site, correct floor, encode zone |
+| `002-stc-vav-l12-01` | `S002-VAV-100` | Simplify to standard canonical format |
+| `S001-FCU-101` | `S001-FCU-101` | Already correct |
 
-### Zone Number to Letter Mapping (Sandton City)
+### Legacy Zone Number/Alias Mapping
 
-| Zone Number | Zone Letter | Zone Name |
-|-------------|-------------|-----------|
-| 01 | A | North |
-| 02 | B | East |
-| 03 | C | Central |
-| 04 | D | West |
-| 05 | E | South |
+Site onboarding may use site-specific aliases to resolve raw source labels to canonical zone numbers.
+
+| Source Label | Canonical Zone | Zone Name |
+|--------------|----------------|-----------|
+| `L1-01`, `L1-A` | `Zone-100` | Level 1 Zone 001 |
+| `L2-05`, `L2-E` | `Zone-204` | Level 2 Zone 005 |
+| `L3-ICU` | `Zone-300` | Level 3 ICU |
 
 ---
 
@@ -435,11 +462,11 @@ Equipment display names shown in the UI (e.g., dashboard, equipment lists) follo
 |----------------------|---------------|--------------|------|
 | `S002-AHU-B1-001` | `B1-001` | "AHU Basement" | Basement floor, no zone number |
 | `S002-AHU-105` | `105` | "AHU Level 1 Zone 5" | `1` = Level 1, `05` = Zone 5 |
-| `S002-CHILLER-R01` | `R01` | "CHILLER Roof Zone 01" | Roof with numeric sequence |
-| `S002-VAV-L2-E` | `L2-E` | "VAV L2-E" | Level + zone letter, fallback raw |
-| `S002-LTG-G-021` | `G-021` | "LTG G-021" | Ground zone, fallback raw |
+| `S002-CHILLER-R-001` | `R-001` | "CHILLER Roof Unit 1" | Roof plant with numeric sequence |
+| `S002-VAV-205` | `205` | "VAV Level 2 Zone 5" | Canonical zone code |
+| `S002-LTG-021` | `021` | "LTG Ground Zone 21" | Ground/L0 canonical zone |
 | `S002-UNKNOWN-R-001` | `R-001` | "Outdoor Air Sensor Roof" | UNKNOWN type + roof → special case |
-| `S002-UNKNOWN-L2-001` | `L2-001` | "Sensor L2 001" | UNKNOWN type, level pattern |
+| `S002-UNKNOWN-201` | `201` | "Sensor Level 2 Zone 1" | UNKNOWN type, canonical zone pattern |
 
 ### Normalisation Layers
 

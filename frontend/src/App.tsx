@@ -3,7 +3,7 @@ import { Routes, Route, useParams, useNavigate } from "react-router-dom";
 import { Clock, Wifi, WifiOff, Bell, X, LogOut } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import { formatTime } from "./lib/timeFormat";
-import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, getAccessToken, setAccessToken, clearAccessToken, clearAuthStorage, type Alert, type AuthUser } from "./lib/api";
+import api, { AUTH_EXPIRED_EVENT, isExpectedApiError, getAccessToken, clearAuthStorage, type Alert, type AuthUser } from "./lib/api";
 import { useRecommendationToasts, RecommendationCard } from "./components/RecommendationToast";
 import { useBuildingsList } from "./hooks/useBuildingsList";
 import { SITE_SELECTION_CHANGED_EVENT, getStoredSelectedSite } from "./lib/siteSelection";
@@ -275,11 +275,12 @@ function App() {
   const healthCheckRef = useRef<{ abort: boolean }>({ abort: false });
 
   useEffect(() => {
+    const ref = healthCheckRef.current;
     const checkHealth = async () => {
-      if (healthCheckRef.current.abort) return;
+      if (ref.abort) return;
       try {
         const response = await api.health();
-        if (healthCheckRef.current.abort) return;
+        if (ref.abort) return;
         setHealth(response);
         setError(null);
       } catch (err) {
@@ -296,7 +297,7 @@ function App() {
     checkHealth();
     const healthInterval = setInterval(checkHealth, 30000);
     return () => {
-      healthCheckRef.current.abort = true;
+      ref.abort = true;
       clearInterval(healthInterval);
     };
   }, []);
@@ -306,18 +307,19 @@ function App() {
 
   useEffect(() => {
     let failureCount = 0;
+    const ref = unreadCountRef.current;
 
     const fetchUnreadCount = async () => {
-      if (unreadCountRef.current.stop) return;
+      if (ref.stop) return;
       const token = getAccessToken();
       if (!token) return;
       if (document.hidden) {
-        unreadCountRef.current.timeoutId = window.setTimeout(fetchUnreadCount, 60000);
+        ref.timeoutId = window.setTimeout(fetchUnreadCount, 60000);
         return;
       }
       try {
         const { alerts, pending_recommendations } = await api.getAlerts();
-        if (unreadCountRef.current.stop) return;
+        if (ref.stop) return;
         // Count unread alerts (not acknowledged or created after last viewed time)
         const unread = alerts.filter((alert) => {
           if (!alert.acknowledged) return true;
@@ -348,7 +350,7 @@ function App() {
           // Silently ignore freshness fetch errors
         }
 
-        if (!unreadCountRef.current.stop) {
+        if (!ref.stop) {
           setUnreadAlertCount(unread.length + (pending_recommendations ?? 0) + freshnessBreaches);
         }
         failureCount = 0;
@@ -359,18 +361,18 @@ function App() {
         }
       }
 
-      if (!unreadCountRef.current.stop) {
+      if (!ref.stop) {
         const baseIntervalMs = 60000;
         const backoffIntervalMs = Math.min(300000, baseIntervalMs * (2 ** failureCount));
-        unreadCountRef.current.timeoutId = window.setTimeout(fetchUnreadCount, backoffIntervalMs);
+        ref.timeoutId = window.setTimeout(fetchUnreadCount, backoffIntervalMs);
       }
     };
 
     fetchUnreadCount();
     return () => {
-      unreadCountRef.current.stop = true;
-      if (unreadCountRef.current.timeoutId !== null) {
-        window.clearTimeout(unreadCountRef.current.timeoutId);
+      ref.stop = true;
+      if (ref.timeoutId !== null) {
+        window.clearTimeout(ref.timeoutId);
       }
     };
   }, [lastViewedAlertTime]);

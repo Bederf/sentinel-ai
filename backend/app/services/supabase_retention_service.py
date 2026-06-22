@@ -39,6 +39,8 @@ from urllib.parse import quote
 
 import httpx
 
+from app.config.settings import settings
+
 logger = logging.getLogger(__name__)
 RAW_ALERT_RETENTION_DAYS = 7
 
@@ -51,17 +53,22 @@ def _iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat()
 
 
-# Local Supabase REST endpoint (same as used in stats.py)
-_SUPABASE_REST_URL = "http://127.0.0.1:55321/rest/v1"
-# Service role JWT — generated with correct JWT_SECRET (super-secret-jwt-token-with-at-least-32-characters-long)
-# Sign with: JWT_SECRET + role=service_role + exp far future
-_SUPABASE_SERVICE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJvbGUiOiJzZXJ2aWNlX3JvbGUiLCJleHAiOjIwOTQ4MTcxMjMsImlhdCI6MTc3OTQ1NzEyM30.HoJcHZoRr7uq9PHsmcTsnvY98oNOFyFrtpQvX9OkJDc"
+def _get_supabase_rest_url() -> str:
+    """Supabase REST endpoint derived from settings."""
+    base = settings.supabase_url.rstrip("/")
+    return f"{base}/rest/v1"
+
+
+def _get_supabase_service_key() -> str:
+    """Service role key from settings (not hardcoded)."""
+    return settings.supabase_service_role_key
 
 
 def _rest_headers() -> dict[str, str]:
+    key = _get_supabase_service_key()
     return {
-        "Authorization": f"Bearer {_SUPABASE_SERVICE_KEY}",
-        "apikey": _SUPABASE_SERVICE_KEY,
+        "Authorization": f"Bearer {key}",
+        "apikey": key,
         "Content-Type": "application/json",
         "Prefer": "return=representation",
     }
@@ -203,8 +210,8 @@ class SupabaseRetentionService:
     """
 
     def __init__(self, rest_url: str | None = None, service_key: str | None = None):
-        self._rest_url = rest_url or _SUPABASE_REST_URL
-        self._service_key = service_key or _SUPABASE_SERVICE_KEY
+        self._rest_url = rest_url or _get_supabase_rest_url()
+        self._service_key = service_key or _get_supabase_service_key()
         self._timeout = 60.0
 
     def _headers(self) -> dict[str, str]:

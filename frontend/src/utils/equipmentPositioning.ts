@@ -7,7 +7,7 @@
  */
 
 import type { Equipment } from '@/lib/api/sites';
-import { extractFloorFromCode } from '@/utils/floorExtraction';
+import { extractFloorFromCode, extractFloorFromZoneKey } from '@/utils/floorExtraction';
 
 export interface ZoneBounds {
   minX: number;
@@ -38,6 +38,42 @@ function normalizeFloorCode(floor: string): string {
   return floor === 'G' ? 'L0' : floor;
 }
 
+function canonicalZoneKeyForFloorIndex(floor: string, zoneIndex: number): string | null {
+  const normalized = normalizeFloorCode(floor).toUpperCase();
+  const zone = Math.max(1, Math.min(zoneIndex, MAX_ZONES_PER_FLOOR));
+  if (normalized === 'L0') return `Zone-${String(zone).padStart(3, '0')}`;
+  const levelMatch = normalized.match(/^L(\d+)$/);
+  if (!levelMatch) return null;
+  const level = parseInt(levelMatch[1], 10);
+  if (Number.isNaN(level) || level < 0 || level > 9) return null;
+  return `Zone-${level}${String(zone - 1).padStart(2, '0')}`;
+}
+
+function canonicalZoneKeyFromCode(code: string): string | null {
+  if (!code) return null;
+
+  const directZone = code.match(/^Zone-(\d{3})$/i);
+  if (directZone?.[1]) return `Zone-${directZone[1]}`;
+
+  const canonicalPlant = code.match(/^S\d+-[A-Z]+-(B\d+|R)-\d+/i);
+  if (canonicalPlant?.[1]) return `Zone-${canonicalPlant[1].toUpperCase()}-${PLANT_ZONE_SUFFIX}`;
+
+  const canonicalZone = code.match(/^S\d+-[A-Z]+-(\d{3})(?:-|$)/i);
+  if (canonicalZone?.[1]) return `Zone-${canonicalZone[1]}`;
+
+  return null;
+}
+
+function zoneIndexFromCanonicalZoneKey(zoneKey: string): number {
+  const match = zoneKey.match(/^Zone-(\d{3})$/i);
+  if (!match) return 0;
+  const raw = parseInt(match[1], 10);
+  if (Number.isNaN(raw)) return 0;
+  const floorRelative = raw % 100;
+  const floor = Math.floor(raw / 100);
+  return floor === 0 ? floorRelative || raw : floorRelative + 1;
+}
+
 export function isPlantFloor(floor: string): boolean {
   const normalized = normalizeFloorCode(floor).toUpperCase();
   return normalized === 'R' || /^B\d+$/.test(normalized);
@@ -64,8 +100,9 @@ export function resolveMaxZonePerFloor(equipment: Equipment[]): Record<string, n
   const maxZones: Record<string, number> = {};
   for (const eq of equipment) {
     const code = ((eq as { code?: string }).code || eq.id || '').toString();
-    const floor = normalizeFloorCode(extractFloor(code));
-    const zoneNum = extractZoneNumberFromCode(code);
+    const zoneKey = buildZoneKey(eq);
+    const floor = normalizeFloorCode(extractFloorFromZoneKey(zoneKey) || extractFloor(code));
+    const zoneNum = zoneIndexFromCanonicalZoneKey(zoneKey) || extractZoneNumberFromCode(code);
     if (floor && zoneNum > 0) {
       const current = maxZones[floor] ?? 0;
       if (zoneNum > current) maxZones[floor] = zoneNum;
@@ -83,6 +120,10 @@ export function resolveMaxZonePerFloor(equipment: Equipment[]): Record<string, n
  */
 export function extractZoneNumberFromCode(code: string): number {
   if (!code) return 0;
+
+  const canonicalKey = canonicalZoneKeyFromCode(code);
+  const canonicalIndex = canonicalKey ? zoneIndexFromCanonicalZoneKey(canonicalKey) : 0;
+  if (canonicalIndex > 0) return canonicalIndex;
 
   // Hospital format: S{hospital}-TYPE-{floor}-{zone} e.g. S005-AHU-L1-042
   // Matches the last numeric segment after a floor identifier
@@ -128,7 +169,7 @@ function zoneIndexFromLetter(letter: string): number | null {
  * Extract floor code from equipment code.
  */
 export function extractFloor(code: string): string {
-  return extractFloorFromCode(code) || 'L0';
+  return extractFloorFromZoneKey(code) || extractFloorFromCode(code) || 'L0';
 }
 
 /**
@@ -142,19 +183,33 @@ export function extractZoneNumber(code: string): number {
  * Build a zone key for grouping equipment.
  * Returns "Zone-{floor}-{zoneNum}" for zone-grid placement.
  */
-export function buildZoneKey(equipment: Equipment): string {
+export function buildZoneKey(equipment: Equipment | string): string {
+  if (typeof equipment === 'string') {
+    const canonical = canonicalZoneKeyFromCode(equipment);
+    if (canonical) return canonical;
+    const floor = normalizeFloorCode(extractFloor(equipment));
+    if (isPlantFloor(floor)) {
+      return `Zone-${floor}-${PLANT_ZONE_SUFFIX}`;
+    }
+    const zoneNum = extractZoneNumberFromCode(equipment);
+    return canonicalZoneKeyForFloorIndex(floor, zoneNum) || `Zone-${floor}-${zoneNum}`;
+  }
+
   if ((equipment as any).zone_key) {
     return (equipment as any).zone_key;
   }
 
   const code = ((equipment as { code?: string }).code || equipment.id || '').toString();
+  const canonical = canonicalZoneKeyFromCode(code);
+  if (canonical) return canonical;
+
   const floor = normalizeFloorCode(extractFloor(code));
   if (isPlantFloor(floor)) {
     return `Zone-${floor}-${PLANT_ZONE_SUFFIX}`;
   }
 
   const zoneNum = extractZoneNumberFromCode(code);
-  return `Zone-${floor}-${zoneNum}`;
+  return canonicalZoneKeyForFloorIndex(floor, zoneNum) || `Zone-${floor}-${zoneNum}`;
 }
 
 /**
@@ -298,7 +353,12 @@ export function generateSyntheticZoneBounds(
 
   const effectiveMax = Math.max(1, Math.min(maxZonesPerFloor, MAX_ZONES_PER_FLOOR));
   for (let zoneIndex = 1; zoneIndex <= effectiveMax; zoneIndex++) {
-    bounds[`Zone-${normalizedFloor}-${zoneIndex}`] = makeZoneBounds(zoneIndex, effectiveMax);
+    const zoneBounds = makeZoneBounds(zoneIndex, effectiveMax);
+    bounds[`Zone-${normalizedFloor}-${zoneIndex}`] = zoneBounds;
+    const canonicalZoneKey = canonicalZoneKeyForFloorIndex(normalizedFloor, zoneIndex);
+    if (canonicalZoneKey) {
+      bounds[canonicalZoneKey] = zoneBounds;
+    }
   }
 
   return bounds;

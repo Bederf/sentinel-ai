@@ -132,6 +132,7 @@ export default function SystemHealthPage() {
     loadUptimeData();
     loadGateData();
     loadDiscoveredEquipment();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSiteId]);
 
   useEffect(() => {
@@ -148,7 +149,8 @@ export default function SystemHealthPage() {
       clearInterval(gateInterval);
       clearInterval(discoveryInterval);
     };
-  }, [loadAllData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedSiteId]);
 
   const loadHealthData = async () => {
     try {

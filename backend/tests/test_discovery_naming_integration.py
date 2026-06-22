@@ -157,8 +157,8 @@ class TestDiscoveryNamingConversion:
 
         # Verify v2.0 format IDs
         assert "S002-CHILLER-B1-001" in mappings
-        assert "S002-VAV-L1-A" in mappings
-        assert "S002-FCU-L2-B" in mappings
+        assert "S002-VAV-100" in mappings
+        assert "S002-FCU-201" in mappings
 
         # Verify no BMS IDs in output
         assert "CH-1" not in mappings
@@ -174,8 +174,8 @@ class TestDiscoveryNamingConversion:
 
         # Check metadata for BMS IDs
         assert mappings["S002-CHILLER-B1-001"].metadata.get("bms_original_id") == "CH-1"
-        assert mappings["S002-VAV-L1-A"].metadata.get("bms_original_id") == "VAV-L1-A"
-        assert mappings["S002-FCU-L2-B"].metadata.get("bms_original_id") == "FCU-L2-B"
+        assert mappings["S002-VAV-100"].metadata.get("bms_original_id") == "VAV-L1-A"
+        assert mappings["S002-FCU-201"].metadata.get("bms_original_id") == "FCU-L2-B"
 
     def test_zone_inference_from_equipment_id(self, mapping_service, sample_classified_points):
         """Test that zones are inferred from v2.0 equipment IDs."""
@@ -185,17 +185,19 @@ class TestDiscoveryNamingConversion:
         )
 
         # Check zone metadata
-        vav_mapping = mappings["S002-VAV-L1-A"]
+        vav_mapping = mappings["S002-VAV-100"]
         assert "zone" in vav_mapping.metadata
         zone_info = vav_mapping.metadata["zone"]
         assert zone_info["floor"] == "L1"
-        assert zone_info["zone_letter"] == "A"
+        assert zone_info["zone_id"] == "Zone-100"
+        assert zone_info["zone_number"] == "01"
 
-        fcu_mapping = mappings["S002-FCU-L2-B"]
+        fcu_mapping = mappings["S002-FCU-201"]
         assert "zone" in fcu_mapping.metadata
         zone_info = fcu_mapping.metadata["zone"]
         assert zone_info["floor"] == "L2"
-        assert zone_info["zone_letter"] == "B"
+        assert zone_info["zone_id"] == "Zone-201"
+        assert zone_info["zone_number"] == "02"
 
         # Chiller has no zone (plant room)
         chiller_mapping = mappings["S002-CHILLER-B1-001"]
@@ -244,8 +246,8 @@ class TestZoneGeneration:
         """Test structure of generated zones."""
         # Create mock equipment list
         equipment_list = [
-            {"equipment_id": "S002-VAV-L1-A"},
-            {"equipment_id": "S002-FCU-L2-B"},
+            {"equipment_id": "S002-VAV-100"},
+            {"equipment_id": "S002-FCU-201"},
         ]
 
         zones = zone_service.create_zones_from_equipment(equipment_list, "site-002")
@@ -355,11 +357,12 @@ class TestEndToEndWorkflow:
         )
 
         # Check metadata for key mapping
-        vav = mappings["S002-VAV-L1-A"]
+        vav = mappings["S002-VAV-100"]
         assert vav.metadata.get("bms_original_id") == "VAV-L1-A"
         assert vav.metadata.get("zone") is not None
         assert vav.metadata["zone"]["floor"] == "L1"
-        assert vav.metadata["zone"]["zone_letter"] == "A"
+        assert vav.metadata["zone"]["zone_id"] == "Zone-100"
+        assert vav.metadata["zone"]["zone_number"] == "01"
 
 
 class TestConverterIntegration:
@@ -386,7 +389,7 @@ class TestConverterIntegration:
         result1 = converter.convert_bms_to_v2(bms_id, equipment_type, site_id, zone_mapping)
         result2 = converter.convert_bms_to_v2(bms_id, equipment_type, site_id, zone_mapping)
 
-        assert result1 == result2 == "S002-VAV-L1-E"
+        assert result1 == result2 == "S002-VAV-104"
 
 
 if __name__ == "__main__":

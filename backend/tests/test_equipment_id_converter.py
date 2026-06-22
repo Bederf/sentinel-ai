@@ -20,12 +20,12 @@ class TestEquipmentIDConversion:
         assert result == "S002-CHILLER-B1-001"
 
     def test_vav_with_zone_number(self, converter):
-        """Test VAV with zone number: VAV-L1-05 → S002-VAV-L1-E"""
+        """Test VAV with zone number: VAV-L1-05 → S002-VAV-104"""
         zone_mapping = {"05": "E"}
         result = converter.convert_bms_to_v2(
             bms_id="VAV-L1-05", equipment_type="vav", site_id="site-002", zone_mapping=zone_mapping
         )
-        assert result == "S002-VAV-L1-E"
+        assert result == "S002-VAV-104"
 
     def test_legacy_sandton_format(self, converter):
         """Test legacy Sandton format: 011-stc-ahu-001 → S002-AHU-L0-01"""
@@ -34,15 +34,14 @@ class TestEquipmentIDConversion:
         assert "CHILLER" in result or "AHU" in result
 
     def test_fcu_with_letter_zone(self, converter):
-        """Test FCU with letter zone: FCU-L2-A → S002-FCU-L2-A"""
+        """Test FCU with letter zone: FCU-L2-A → S002-FCU-200"""
         result = converter.convert_bms_to_v2(bms_id="FCU-L2-A", equipment_type="fcu", site_id="site-002")
-        assert result == "S002-FCU-L2-A"
+        assert result == "S002-FCU-200"
 
     def test_ground_floor(self, converter):
-        """Test ground floor parsing: AHU-G-01 → S002-AHU-G-A (zone 01 maps to A)"""
+        """Test ground floor parsing: AHU-G-01 → S002-AHU-001"""
         result = converter.convert_bms_to_v2(bms_id="AHU-G-01", equipment_type="ahu", site_id="site-002")
-        # 01 is automatically converted to A using the zone mapping
-        assert result == "S002-AHU-G-A"
+        assert result == "S002-AHU-001"
 
     def test_generator_conversion(self, converter):
         """Test generator: GEN-B1-001 → S002-GEN-B1-001"""
@@ -216,6 +215,22 @@ class TestZoneNumberToLetter:
         """Handle single digit zone: 1 → A"""
         result = converter.map_zone_number_to_letter("1", "site-002")
         assert result == "A"
+
+
+class TestSentinelCanonicalCode:
+    """Test explicit SENTINEL canonical equipment code generation."""
+
+    def test_occupied_zone_code(self, converter):
+        result = converter.build_sentinel_code(site_id="site-005", equipment_type="ahu", zone_code="Zone-003")
+        assert result == "S005-AHU-003"
+
+    def test_roof_plant_code_with_sequence(self, converter):
+        result = converter.build_sentinel_code(site_id="site-005", equipment_type="ct", zone_code="R", sequence=2)
+        assert result == "S005-CT-R-002"
+
+    def test_basement_plant_code_with_sequence(self, converter):
+        result = converter.build_sentinel_code(site_id="site-005", equipment_type="chiller", zone_code="B1", sequence=1)
+        assert result == "S005-CHILLER-B1-001"
 
 
 class TestIntegration:

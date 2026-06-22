@@ -9,9 +9,26 @@ class FakeZoneIdentityRepository:
 
     async def list_zone_identifiers(self, site_id):
         return [
-            {"source": "zones", "zone_id": "Zone-101"},
+            {"source": "zones", "zone_id": "Zone-100"},
             {"source": "zones", "zone_id": "Zone-201"},
+            {"source": "zones", "zone_id": "Zone-300"},
             {"source": "hvac_zones", "zone_id": "Zone-B"},
+            {
+                "source": "zone_aliases",
+                "zone_id": "Zone-L3-ICU",
+                "canonical_zone_id": "Zone-300",
+                "alias_type": "source",
+                "confidence": 1,
+                "review_status": "approved",
+            },
+            {
+                "source": "zone_aliases",
+                "zone_id": "Zone-L3-UNKNOWN",
+                "canonical_zone_id": "Zone-399",
+                "alias_type": "source",
+                "confidence": 0.4,
+                "review_status": "approved",
+            },
             {"source": "equipment.zone_key", "zone_id": "Zone-L1-1"},
             {"source": "equipment.zone_key", "zone_id": "Zone-L2-1"},
             {"source": "equipment.zone_key", "zone_id": "B1"},
@@ -29,10 +46,10 @@ async def test_numeric_site_zone_stays_canonical():
     repo = FakeZoneIdentityRepository()
     resolver = ZoneIdentityResolver(repository=repo)
 
-    result = await resolver.resolve("site-002", "Zone-101")
+    result = await resolver.resolve("site-002", "Zone-100")
 
     assert result.resolved is True
-    assert result.canonical_zone_id == "Zone-101"
+    assert result.canonical_zone_id == "Zone-100"
     assert result.reason == "canonical_site_zone_inventory"
     assert repo.gaps == []
 
@@ -45,7 +62,7 @@ async def test_level_alias_resolves_to_site_zone_inventory():
     result = await resolver.resolve("site-002", "Zone-L1-1")
 
     assert result.resolved is True
-    assert result.canonical_zone_id == "Zone-101"
+    assert result.canonical_zone_id == "Zone-100"
     assert result.reason == "zone_alias_matches_site_inventory"
     assert repo.gaps == []
 
@@ -61,6 +78,31 @@ async def test_basement_alias_resolves_to_site_zone_inventory():
     assert result.canonical_zone_id == "Zone-B"
     assert result.reason == "zone_alias_matches_site_inventory"
     assert repo.gaps == []
+
+
+@pytest.mark.asyncio
+async def test_approved_zone_alias_resolves_to_canonical_inventory():
+    repo = FakeZoneIdentityRepository()
+    resolver = ZoneIdentityResolver(repository=repo)
+
+    result = await resolver.resolve("site-005", "Zone-L3-ICU")
+
+    assert result.resolved is True
+    assert result.canonical_zone_id == "Zone-300"
+    assert result.reason == "approved_zone_alias"
+    assert repo.gaps == []
+
+
+@pytest.mark.asyncio
+async def test_approved_zone_alias_with_missing_canonical_records_gap():
+    repo = FakeZoneIdentityRepository()
+    resolver = ZoneIdentityResolver(repository=repo)
+
+    result = await resolver.resolve("site-005", "Zone-L3-UNKNOWN", source_context="equipment.zone_key")
+
+    assert result.resolved is False
+    assert result.reason == "zone_alias_canonical_not_in_site_inventory"
+    assert repo.gaps[0]["source_zone_id"] == "Zone-L3-UNKNOWN"
 
 
 @pytest.mark.asyncio

@@ -28,7 +28,7 @@ related: ["SIMBIOT Universal Adapter Pattern", "Module Registry", "Naming Conven
 
 1. **Fixed schema, adaptive ingestion.** SENTINEL's BDP schema never changes per building. SIMBIOT adapts any BMS format (BACnet/IP, Modbus TCP, oBIX, Fox, CSV) to the canonical schema — no per-site schema variation.
 2. **Site isolation.** All tables include `site_id` or `building_id`. Multi-site queries are explicit; cross-site aggregation requires explicit fan-out.
-3. **Naming as architecture.** Equipment codes encode type and location. Zone = `{site}-{type}-{zone_id}`. Plant = `{site}-{type}-{loc}-{seq}`.
+3. **Naming as architecture.** Equipment codes encode site, type, and canonical zone or plant location. Occupied zone = `{site}-{type}-{zone_id}`. Basement/roof plant = `{site}-{type}-{loc}-{seq}`. Raw BMS/vendor names are preserved separately as provenance.
 4. **Immutable provenance.** Raw source records are frozen at ingestion. Canonical points carry full provenance chain from BMS device to BDP record.
 5. **Safety-classified points.** Every point carries a `safety_class` (CRITICAL / HIGH / MEDIUM / LOW) that gates write-back authority in supervised/auto modes.
 
@@ -48,15 +48,17 @@ related: ["SIMBIOT Universal Adapter Pattern", "Module Registry", "Naming Conven
 
 **Zones** (per-zone equipment — FCU, VAV, luminaires, sensors):
 ```
-{site}-{type}-{floor}{zone-letter}
+{site}-{type}-{zone_id}
 ```
-Examples: `S002-FCU-L0-A`, `S002-VAV-L1-C`, `S002-DALI-L2-E`
+Examples: `S005-AHU-003`, `S002-FCU-100`, `S002-VAV-204`, `S005-DALI-510`
 
-**Plants** (plant-room equipment — chillers, generators, UPS, transformers):
+**Plants** (basement/roof plant-room equipment — chillers, generators, UPS, transformers, cooling towers):
 ```
 {site}-{type}-{floor}-{seq}
 ```
 Examples: `S002-CHILLER-B1-001`, `S002-GEN-B1-001`, `S002-UPS-B1-001`
+
+Canonical zone codes are three digits: `001`-`099` = Ground/L0, `100`-`199` = L1, `200`-`299` = L2, `500`-`599` = L5. The first zone on L1 is `Zone-100`; the eleventh zone on L5 is `Zone-510`. Site-specific source labels such as `L3-ICU` or `L3-TH1` are stored as raw/source identifiers or zone aliases and mapped to canonical zones during onboarding.
 
 ### 2.3 Floor Codes
 
@@ -221,7 +223,7 @@ Zone-level HVAC state. One row per zone per site.
 ```sql
 CREATE TABLE sentinel.hvac_zones (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    zone_id             TEXT UNIQUE NOT NULL,       -- 'S002-VAV-L1-A'
+    zone_id             TEXT UNIQUE NOT NULL,       -- 'Zone-100'
     site_id             TEXT NOT NULL,
     zone_name           TEXT NOT NULL,             -- 'Level 1 North'
     floor               TEXT NOT NULL,             -- 'L1'
@@ -586,7 +588,7 @@ CREATE TABLE sentinel.energy_power_meter_validations (
 ```sql
 CREATE TABLE sentinel.lighting_dali_controllers (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    controller_id       TEXT UNIQUE NOT NULL,       -- 'S002-DALI-L12-01'
+    controller_id       TEXT UNIQUE NOT NULL,       -- 'S002-DALI-101'
     site_id             TEXT NOT NULL,
     name                TEXT NOT NULL,
     location            TEXT NOT NULL,
@@ -608,7 +610,7 @@ CREATE TABLE sentinel.lighting_dali_controllers (
 CREATE TABLE sentinel.lighting_dali_luminaires (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     controller_id       UUID NOT NULL REFERENCES sentinel.lighting_dali_controllers(id),
-    luminaire_id        TEXT UNIQUE NOT NULL,       -- 'S002-LUM-L12-025'
+    luminaire_id        TEXT UNIQUE NOT NULL,       -- 'S002-LUM-101'
     dali_address        INTEGER NOT NULL CHECK (dali_address BETWEEN 0 AND 63),
     channel             INTEGER NOT NULL CHECK (channel BETWEEN 1 AND 3),
     name                TEXT,

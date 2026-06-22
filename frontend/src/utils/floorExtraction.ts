@@ -13,6 +13,28 @@ export interface Floor {
   y: number; // 3D height for rendering
 }
 
+function floorFromThreeDigitZone(zoneCode: string): string | null {
+  if (!/^\d{3}$/.test(zoneCode)) return null;
+  const level = parseInt(zoneCode[0], 10);
+  if (Number.isNaN(level)) return null;
+  return level === 0 ? 'L0' : `L${level}`;
+}
+
+export function extractFloorFromZoneKey(zoneKey: string): string | null {
+  if (!zoneKey) return null;
+
+  const numericZone = zoneKey.match(/(?:^|-)Zone-(\d{3})(?:-|$)/i);
+  if (numericZone?.[1]) return floorFromThreeDigitZone(numericZone[1]);
+
+  const plantZone = zoneKey.match(/(?:^|-)Zone-(B\d+|R)(?:-|$)/i);
+  if (plantZone?.[1]) return plantZone[1].toUpperCase();
+
+  const levelZone = zoneKey.match(/(?:^|-)Zone-(L\d+|G)(?:-|$)/i);
+  if (levelZone?.[1]) return levelZone[1].toUpperCase();
+
+  return null;
+}
+
 /**
  * Extract floor code from equipment code pattern
  *
@@ -22,6 +44,16 @@ export interface Floor {
  */
 export function extractFloorFromCode(code: string): string | null {
   if (!code) return null;
+
+  const zoneKeyFloor = extractFloorFromZoneKey(code);
+  if (zoneKeyFloor) return zoneKeyFloor;
+
+  // SENTINEL canonical equipment format: S###-TYPE-ZZZ or S###-TYPE-B1-001/R-001
+  const canonicalPlantMatch = code.match(/^S\d+-[A-Z]+-(B\d+|R)-\d+/i);
+  if (canonicalPlantMatch?.[1]) return canonicalPlantMatch[1].toUpperCase();
+
+  const canonicalZoneMatch = code.match(/^S\d+-[A-Z]+-(\d{3})(?:-|$)/i);
+  if (canonicalZoneMatch?.[1]) return floorFromThreeDigitZone(canonicalZoneMatch[1]);
 
   // S012 format: S012-TYPE-FLOOR-ID or S012-TYPE-FLOOR-ID.POINT
   if (code.startsWith('S012-')) {
@@ -64,7 +96,7 @@ export function generateFloorsFromEquipment(
   const floors = new Set<string>();
 
   equipment.forEach((eq) => {
-    const floor = extractFloorFromCode((eq as any).code);
+    const floor = extractFloorFromZoneKey((eq as any).zone_key || '') || extractFloorFromCode((eq as any).code);
     if (floor) floors.add(floor);
   });
 

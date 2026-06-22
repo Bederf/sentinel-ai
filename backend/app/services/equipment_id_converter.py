@@ -167,33 +167,51 @@ class EquipmentIDConverter:
         # If parsing fails, provide defaults
         if not floor_zone:
             floor = "B1"
-            zone_or_seq = "001"
+            zone_or_seq = "B1-001"
             logger.warning(f"Could not parse floor/zone from '{bms_id}', using defaults: {floor}/{zone_or_seq}")
         else:
             floor = floor_zone.get("floor", "B1")
             zone_value = floor_zone.get("zone", "001")
 
-            # Build reverse zone mapping (letter → number)
-            zone_mapping_dict = zone_mapping or self._get_zone_mappings_for_site(site_id)
-            letter_to_zone = {v: k for k, v in zone_mapping_dict.items()}
-
-            # Resolve zone to 2-digit number
-            if zone_value.isdigit():
-                zone_num = f"{int(zone_value):02d}"
-            elif zone_value in letter_to_zone:
-                zone_num = letter_to_zone[zone_value]
-            else:
-                zone_num = "001"
-
-            # Combine level number + zone: zone 204 = level 2, zone 04
-            level_num = self._extract_level_number(floor)
-            zone_or_seq = f"{level_num}{zone_num}"
+            zone_index = self._resolve_zone_index(zone_value, site_id, zone_mapping)
+            zone_or_seq = self._format_zone_segment(floor, zone_index)
 
         # Build v2.0 format: {site}-{type}-{zone_id}
         v2_id = f"{site_prefix}-{normalized_type}-{zone_or_seq}"
         logger.info(f"Converted '{bms_id}' → '{v2_id}' (type: {normalized_type}, floor: {floor}, zone: {zone_or_seq})")
 
         return v2_id
+
+    def build_sentinel_code(
+        self,
+        *,
+        site_id: str,
+        equipment_type: str,
+        zone_code: str,
+        sequence: int | None = None,
+    ) -> str:
+        """Build a SENTINEL canonical equipment code.
+
+        Occupied-zone equipment uses ``S###-TYPE-ZZZ`` where ``ZZZ`` is the
+        canonical three-digit zone code. Plant areas keep their floor token and
+        sequence, e.g. ``S005-CHILLER-B1-001`` or ``S005-CT-R-001``.
+        """
+        site_prefix = self._extract_site_prefix(site_id)
+        normalized_type = self._normalize_equipment_type(equipment_type) or equipment_type.upper()
+        cleaned_zone = str(zone_code or "").strip().upper()
+
+        numeric_match = re.match(r"^(?:ZONE-)?(\d{3})$", cleaned_zone)
+        if numeric_match:
+            segment = numeric_match.group(1)
+        else:
+            plant_match = re.match(r"^(?:ZONE-)?(B\d+|R)(?:-(\d+))?$", cleaned_zone)
+            if not plant_match:
+                raise ValueError(f"Unsupported canonical zone code: {zone_code}")
+            floor = plant_match.group(1)
+            seq = sequence or int(plant_match.group(2) or "1")
+            segment = f"{floor}-{seq:03d}"
+
+        return f"{site_prefix}-{normalized_type}-{segment}"
 
     def parse_floor_zone(self, bms_id: str) -> dict[str, str] | None:
         """Extract floor and zone from BMS equipment ID.
@@ -348,6 +366,62 @@ class EquipmentIDConverter:
         if floor == "R":
             return "R"
         return "0"
+
+    def _format_zone_segment(self, floor: str, zone_index: int) -> str:
+        """Format floor/zone as SENTINEL's canonical equipment segment.
+
+        Normal occupied zones are encoded as a three-digit number:
+        001-099 = ground/L0, 100-199 = L1, 200-299 = L2, etc.
+
+        Basement and roof equipment keep the plant floor token plus a sequence,
+        because those levels commonly contain multiple plant assets rather than
+        ordinary occupied zones.
+        """
+        normalized_floor = self._normalize_floor(floor)
+        zone = max(1, min(int(zone_index or 1), 99))
+
+        if normalized_floor.startswith("B"):
+            return f"{normalized_floor}-{zone:03d}"
+        if normalized_floor == "R":
+            return f"R-{zone:03d}"
+
+        level = 0 if normalized_floor in ("G", "L0") else int(self._extract_level_number(normalized_floor) or "0")
+        if level < 0 or level > 9:
+            logger.warning("Floor '%s' is outside the three-digit zone encoding range; using L0", normalized_floor)
+            level = 0
+        if level == 0:
+            return f"{zone:03d}"
+        return f"{level}{zone - 1:02d}"
+
+    def _resolve_zone_index(
+        self,
+        zone_value: str,
+        site_id: str,
+        zone_mapping: dict[str, str] | None = None,
+    ) -> int:
+        """Resolve a source zone token to a 1-99 zone index.
+
+        ``zone_mapping`` may be supplied as number→alias (``{"05": "E"}``) or
+        alias→number (``{"ICU": "01"}``). Unknown named zones fall back to 1
+        and should be surfaced for manual review by the onboarding flow.
+        """
+        raw = str(zone_value or "").strip().upper()
+        if raw.isdigit():
+            return max(1, min(int(raw), 99))
+
+        mapping = {
+            str(k).upper(): str(v).upper()
+            for k, v in (zone_mapping or self._get_zone_mappings_for_site(site_id)).items()
+        }
+        if raw in mapping and mapping[raw].isdigit():
+            return max(1, min(int(mapping[raw]), 99))
+
+        alias_to_zone = {value: key for key, value in mapping.items()}
+        if raw in alias_to_zone and alias_to_zone[raw].isdigit():
+            return max(1, min(int(alias_to_zone[raw]), 99))
+
+        logger.warning("Could not resolve named zone '%s' for %s; defaulting to zone 001", raw, site_id)
+        return 1
 
     def _get_zone_mappings_for_site(self, site_id: str) -> dict[str, str]:
         """Get zone number→letter mappings for a specific site.

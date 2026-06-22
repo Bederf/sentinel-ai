@@ -193,14 +193,24 @@ class ZoneMappingService:
     def _parse_combined_zone(self, zone_id: str) -> tuple[str, str]:
         """Parse floor and zone from combined zone ID.
 
-        Zone format: {level}{zone_2digit}
-        204 → ("L2", "04"), 102 → ("L1", "02"), B01 → ("B1", "01")
+        Zone format: {level}{zone_2digit} for occupied floors, or plant-floor
+        segments such as B1-001/R-001.
+        204 → ("L2", "04"), 102 → ("L1", "02"), B1-001 → ("B1", "001")
         """
-        if zone_id[0] in ("B", "R"):
-            return (f"{zone_id[0]}1", zone_id[1:].zfill(2))
-        level = zone_id[0]
-        zone = zone_id[1:].zfill(2)
-        return (f"L{level}", zone)
+        if "-" in zone_id:
+            floor, sequence = zone_id.split("-", 1)
+            return (floor, sequence.zfill(3))
+        if zone_id[0] == "B":
+            return (f"{zone_id[0]}1", zone_id[1:].zfill(3))
+        if zone_id[0] == "R":
+            return ("R", zone_id[1:].zfill(3))
+        raw = int(zone_id)
+        level = raw // 100
+        if level == 0:
+            zone = raw
+        else:
+            zone = (raw % 100) + 1
+        return (f"L{level}", f"{zone:02d}")
 
     def infer_zone_from_equipment_id(
         self,
@@ -210,35 +220,35 @@ class ZoneMappingService:
         """Parse floor and zone from v2.0 equipment ID.
 
         Args:
-            equipment_id: v2.0 format equipment ID (e.g., "S002-FCU-L2-A")
+            equipment_id: canonical equipment ID (e.g., "S002-FCU-104")
             site_id: Site identifier
 
         Returns:
             Dict with zone metadata or None if parsing fails
 
         Example:
-            equipment_id="S002-FCU-L2-A", site="site-002"
+            equipment_id="S002-FCU-204", site="site-002"
             → {
-                "zone_id": "Zone-L2-A",
+                "zone_id": "Zone-204",
                 "floor": "L2",
-                "zone_letter": "A",
+                "zone_letter": "05",
                 "zone_type": "open_office",
                 "site_id": "site-002"
               }
         """
         import re
 
-        # Parse v2.0 format: S###-TYPE-ZONE_ID
-        # Zone ID is combined level+zone (e.g., 204 = level 2, zone 04)
-        match = re.match(r"S\d+-[A-Z]+-([A-Z0-9]{2,4})", equipment_id)
+        # Parse canonical format: S###-TYPE-ZZZ or plant S###-TYPE-B1-001/R-001.
+        match = re.match(r"^S\d+-[A-Z]+-(?P<zone>\d{3}|B\d+-\d{3}|R-\d{3})$", equipment_id)
         if not match:
-            logger.warning(f"Could not parse v2.0 equipment ID: {equipment_id}")
+            logger.warning(f"Could not parse canonical equipment ID: {equipment_id}")
             return None
 
-        zone_id = match.group(1).upper()
+        zone_segment = match.group("zone").upper()
 
         # Parse floor and zone from combined zone ID
-        floor, zone = self._parse_combined_zone(zone_id)
+        floor, zone = self._parse_combined_zone(zone_segment)
+        canonical_zone_id = f"Zone-{zone_segment}" if zone_segment[0].isdigit() else f"Zone-{zone_segment}"
 
         # Determine zone type based on equipment type and floor
         zone_type = "open_office"
@@ -250,9 +260,10 @@ class ZoneMappingService:
             zone_type = "executive"
 
         return {
-            "zone_id": f"Zone-{floor}-{zone}",
+            "zone_id": canonical_zone_id,
             "floor": floor,
             "zone_letter": zone,
+            "zone_number": zone,
             "zone_type": zone_type,
             "site_id": site_id,
         }
@@ -273,14 +284,14 @@ class ZoneMappingService:
 
         Example:
             Input: [
-              {"equipment_id": "S002-FCU-L2-A"},
-              {"equipment_id": "S002-FCU-L2-B"},
-              {"equipment_id": "S002-AHU-L2"}
+              {"equipment_id": "S002-FCU-201"},
+              {"equipment_id": "S002-FCU-201"},
+              {"equipment_id": "S002-AHU-200"}
             ]
             Output: {
-              "Zone-L2-A": ["S002-FCU-L2-A"],
-              "Zone-L2-B": ["S002-FCU-L2-B"],
-              "Zone-L2": ["S002-AHU-L2"]
+              "Zone-201": ["S002-FCU-201"],
+              "Zone-201": ["S002-FCU-201"],
+              "Zone-200": ["S002-AHU-200"]
             }
         """
         zone_assignments: dict[str, list[str]] = {}
@@ -429,10 +440,10 @@ class ZoneMappingService:
             zone_type = zone_info["zone_type"]
 
             # Group by floor-letter combination
-            key = f"{floor}-{zone_letter}"
+            key = zone_info["zone_id"]
             if key not in zones_by_floor_letter:
                 zones_by_floor_letter[key] = {
-                    "zone_id": f"Zone-{floor}-{zone_letter}",
+                    "zone_id": key,
                     "floor": floor,
                     "zone_letter": zone_letter,
                     "zone_type": zone_type,
