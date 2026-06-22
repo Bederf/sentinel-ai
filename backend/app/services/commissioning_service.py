@@ -219,6 +219,24 @@ class CommissioningService:
             blocking_gates=blocking,
         )
 
+    def _get_site_uuid(self, site_id: str) -> str:
+        """Resolve a site code (e.g. 'site-002') to its UUID.
+
+        log_sources.site_id is a UUID column, but run_scorecard receives
+        site codes. This resolver prevents 'invalid input syntax for type uuid'
+        errors in gates 7 and 8.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            resp = client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if resp.data:
+                return resp.data[0]["id"]
+        except Exception:
+            pass
+        return site_id  # fall back to code (may fail downstream, but won't crash)
+
     def _get_site_phase(self, site_id: str) -> str | None:
         """Read onboarding_phase from Supabase sites table."""
         try:
@@ -235,7 +253,8 @@ class CommissioningService:
     def _get_sync_frequency(self, site_id: str) -> int:
         """Get the sync frequency in minutes for the building's active sources."""
         try:
-            sources = self._repo.get_log_sources(site_id=site_id, is_active=True)
+            site_uuid = self._get_site_uuid(site_id)
+            sources = self._repo.get_log_sources(site_id=site_uuid, is_active=True)
             if sources:
                 return min(s.get("sync_frequency_minutes") or 15 for s in sources)
         except Exception:
@@ -245,7 +264,8 @@ class CommissioningService:
     def _check_source_provenance(self, site_id: str) -> tuple[int, str]:
         """Count active sources using file_drop or manual_upload connection types."""
         try:
-            sources = self._repo.get_log_sources(site_id=site_id, is_active=True)
+            site_uuid = self._get_site_uuid(site_id)
+            sources = self._repo.get_log_sources(site_id=site_uuid, is_active=True)
         except Exception:
             return 0, "No sources found"
 
@@ -264,7 +284,8 @@ class CommissioningService:
             cutoff = (datetime.utcnow() - timedelta(hours=48)).isoformat()
 
             # Get source IDs for this building
-            sources = self._repo.get_log_sources(site_id=site_id)
+            site_uuid = self._get_site_uuid(site_id)
+            sources = self._repo.get_log_sources(site_id=site_uuid)
             source_ids = [s["id"] for s in sources]
             if not source_ids:
                 return 0.0, "No sources — no data to validate"
@@ -298,8 +319,8 @@ class CommissioningService:
             pct = (invalid / total) * 100
             return pct, f"{invalid}/{total} invalid values ({pct:.2f}%)"
         except Exception as e:
-            # Table may not exist in local mode
-            return 0.0, f"Could not query trends: {e}"
+            # Query failure should NOT silently pass — return a failing value
+            return 100.0, f"Could not query trends: {e}"
 
     def _check_timestamp_integrity(self, site_id: str) -> tuple[float, str]:
         """Check ingested_trends for future timestamps (last 48h)."""
@@ -310,7 +331,8 @@ class CommissioningService:
             # 5-minute future tolerance
             future_cutoff = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
 
-            sources = self._repo.get_log_sources(site_id=site_id)
+            site_uuid = self._get_site_uuid(site_id)
+            sources = self._repo.get_log_sources(site_id=site_uuid)
             source_ids = [s["id"] for s in sources]
             if not source_ids:
                 return 100.0, "No sources — nothing to check"
@@ -340,7 +362,8 @@ class CommissioningService:
             valid_pct = ((total - future_count) / total) * 100
             return valid_pct, f"{future_count}/{total} future timestamps ({100 - valid_pct:.2f}% invalid)"
         except Exception as e:
-            return 100.0, f"Could not query trends: {e}"
+            # Query failure should NOT silently pass — return a failing value
+            return 0.0, f"Could not query trends: {e}"
 
     def submit_truth_check(self, site_id: str, entries: list[TruthCheckEntry]) -> TruthCheckResult:
         """Submit and evaluate a truth check (min 20 entries)."""
