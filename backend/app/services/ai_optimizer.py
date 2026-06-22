@@ -19,7 +19,7 @@ import contextlib
 import json
 import logging
 import os
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +48,11 @@ HEALTH_THRESHOLDS: dict[str, dict[str, int]] = {
 
 # Data directory for sites
 DATA_DIR = Path(__file__).parent.parent / "data"
+SAST = timezone(timedelta(hours=2))
+SERVED_ZONE_EMPTY_OCCUPANCY_PCT = 5.0
+SERVED_ZONE_STATE_FRESHNESS_MINUTES = 45
+SERVED_ZONE_PRE_OCCUPANCY_WINDOW_MINUTES = 60
+SERVED_ZONE_GATE_RULE = "closed_empty_served_zones_hvac_running"
 
 
 async def load_equipment_from_supabase() -> list[dict]:
@@ -100,6 +105,8 @@ async def load_equipment_from_supabase() -> list[dict]:
         status = (eq.get("status") or "unknown").lower()
         if status in ("normal", "online", "running"):
             mapped_status = "online"
+        elif status in ("needs_attention", "warning", "degraded"):
+            mapped_status = "warning"
         elif status in ("offline", "unknown"):
             mapped_status = "offline"
         else:
@@ -109,7 +116,7 @@ async def load_equipment_from_supabase() -> list[dict]:
             "id": eq.get("code", ""),
             "name": eq.get("name") or eq.get("code", ""),
             "device_type": device_type,
-            "protocol": "http",
+            "protocol": "supabase",
             "site_id": site_code,
             "status": mapped_status,
             "location": eq.get("location") or "",
@@ -117,11 +124,78 @@ async def load_equipment_from_supabase() -> list[dict]:
                 "source": "supabase",
                 "equipment_type": raw_type,
                 "health_score": eq.get("health_score"),
+                "device_info": eq.get("device_info") or {},
+                "network_info": eq.get("network_info") or {},
                 "operating_data": eq.get("operating_data", {}),
+                **(eq.get("device_info") or {}),
             },
         }
         devices.append(device)
 
+    return devices
+
+
+async def load_device_manager_devices_from_supabase() -> list[dict]:
+    """Load protocol devices for DeviceManager using Supabase inventory as source of truth.
+
+    Local site JSON is treated only as point metadata for equipment codes that
+    already exist in Supabase. It must not create additional device inventory.
+    """
+    from app.api.devices import load_equipment_from_buildings
+    from app.database.supabase_client import get_supabase_client
+
+    supabase_devices = await load_equipment_from_supabase()
+    site_devices = await load_equipment_from_buildings()
+    site_devices_by_id = {device["id"]: device for device in site_devices}
+    client = get_supabase_client()
+    bridge_config_resp = (
+        client.table("site_adapter_config").select("site_id").eq("protocol", "bridge").eq("enabled", True).execute()
+    )
+    bridge_site_ids = {row["site_id"] for row in (bridge_config_resp.data or [])}
+
+    devices: list[dict] = []
+    skipped_bridge_sites = 0
+    skipped_without_points = 0
+    skipped_unsupported = 0
+
+    for supabase_device in supabase_devices:
+        if supabase_device.get("site_id") in bridge_site_ids:
+            skipped_bridge_sites += 1
+            continue
+
+        local_device = site_devices_by_id.get(supabase_device["id"])
+        if not local_device:
+            skipped_without_points += 1
+            continue
+
+        protocol = local_device.get("protocol", "bacnet")
+        if protocol not in {"bacnet", "knx"}:
+            skipped_unsupported += 1
+            continue
+
+        metadata = {
+            **local_device.get("metadata", {}),
+            **supabase_device.get("metadata", {}),
+            "source": "supabase",
+            "point_source": "site_equipment",
+        }
+        devices.append(
+            {
+                **supabase_device,
+                "protocol": protocol,
+                "points": local_device.get("points", {}),
+                "metadata": metadata,
+            }
+        )
+
+    logger.info(
+        "Loaded %d DeviceManager devices from Supabase inventory with local point metadata "
+        "(skipped %d bridge-backed devices, %d without point metadata, %d unsupported protocol)",
+        len(devices),
+        skipped_bridge_sites,
+        skipped_without_points,
+        skipped_unsupported,
+    )
     return devices
 
 
@@ -130,26 +204,10 @@ async def ensure_device_manager_initialized() -> None:
     if not device_manager._initialized:
         logger.info("Device manager not initialized, loading devices from Supabase...")
         try:
-            devices_data = await load_equipment_from_supabase()
-
-            # Also load building equipment files as supplement (may add points data)
-            from app.api.devices import load_equipment_from_buildings
-
-            site_devices = await load_equipment_from_buildings()
-
-            existing_ids = {d["id"] for d in devices_data}
-            added_count = 0
-            for device in site_devices:
-                if device["id"] not in existing_ids:
-                    devices_data.append(device)
-                    existing_ids.add(device["id"])
-                    added_count += 1
+            devices_data = await load_device_manager_devices_from_supabase()
 
             await device_manager.initialize(devices_data)
-            logger.info(
-                f"Device manager initialized with {len(devices_data)} devices "
-                f"({len(devices_data) - added_count} from Supabase, {added_count} from files)"
-            )
+            logger.info("Device manager initialized with %d Supabase-backed protocol devices", len(devices_data))
         except Exception as e:
             logger.error(
                 f"[AI-OPT] Failed to initialize device manager from Supabase: {e}. "
@@ -267,10 +325,11 @@ class AIOptimizerService:
 
             weather_forecast = await get_weather_forecast(hours=4)
             if not weather_forecast:
-                # Fail if no weather data available
-                raise RuntimeError(
-                    f"No weather forecast available for site {site_id}. Weather API not configured or failed."
+                logger.warning(
+                    "[AI-OPT] Weather forecast unavailable for %s; continuing with unavailable forecast context",
+                    site_id,
                 )
+                weather_forecast = {"source": "unavailable", "forecast": []}
 
         # Generate mock energy prices if not provided
         if not energy_prices:
@@ -281,6 +340,18 @@ class AIOptimizerService:
 
         # Categorize equipment by type - this is site-specific
         equipment_inventory = self._categorize_equipment(all_devices)
+        current_conditions = dict(current_conditions)
+        served_zone_gate_context = await self._load_served_zone_gate_context(
+            site_id,
+            current_conditions,
+            equipment_inventory,
+        )
+        if served_zone_gate_context:
+            current_conditions["_served_zone_gate_context"] = served_zone_gate_context
+        optimization_equipment_inventory = self._filter_equipment_inventory_by_served_zone_gate(
+            equipment_inventory,
+            current_conditions,
+        )
 
         logger.info(f"Site {site_id} equipment inventory: {self._summarize_inventory(equipment_inventory)}")
 
@@ -302,8 +373,39 @@ class AIOptimizerService:
         except Exception as e:
             logger.warning(f"Failed to load profile for site {site_id}: {e}")
 
+        # Operating-state gate: if the site profile and live telemetry already
+        # indicate a deterministic operational mismatch, return that category
+        # before invoking equipment-level optimization or the LLM.
+        policy_recommendations = self._append_after_hours_zero_occupancy_advisory(
+            site_id,
+            current_conditions,
+            equipment_inventory,
+            [],
+        )
+        if policy_recommendations:
+            logger.warning(
+                "[AI-OPT] Operating-state gate fired for %s; skipping equipment-level optimization",
+                site_id,
+            )
+            gated_recommendation = OptimizationRecommendation(
+                site_id=site_id,
+                timestamp=datetime.now().isoformat(),
+                recommendations=policy_recommendations,
+                projected_savings={
+                    "cost_zar_per_hour": None,
+                    "source": "operating_state_gate",
+                },
+                confidence=0.72,
+                reasoning="Operating-state mismatch detected before equipment-level optimization.",
+                profile=profile.get("name") if profile else None,
+                profile_applied=bool(profile),
+            )
+            gated_recommendation = await self._apply_quality_gate(site_id, gated_recommendation)
+            gated_recommendation = await self._enrich_with_health_features(site_id, gated_recommendation)
+            return gated_recommendation
+
         # Gather ML model outputs for Claude context injection
-        ml_context = await self._gather_ml_context(site_id, equipment_inventory)
+        ml_context = await self._gather_ml_context(site_id, optimization_equipment_inventory)
 
         # Gather decision memory (learned patterns from past outcomes)
         decision_memory_text = await self._gather_decision_memory(site_id)
@@ -312,7 +414,7 @@ class AIOptimizerService:
         feedback_rates_text = self._gather_feedback_success_rates(site_id)
 
         # Phase 1b: Pre-compute waste opportunities before LLM analysis
-        ahu_devices = equipment_inventory.get("ahu", [])
+        ahu_devices = optimization_equipment_inventory.get("ahu", [])
         ahu_states = []
         for d in ahu_devices:
             op_data = getattr(d, "operating_data", {}) or {}
@@ -323,6 +425,10 @@ class AIOptimizerService:
 
         # Build enriched current_conditions for pre-compute (avoid mutating the original)
         enriched_conditions = dict(current_conditions)
+        schedule_context = self._get_site_schedule_context(site_id)
+        enriched_conditions["schedule_context"] = schedule_context
+        enriched_conditions["is_public_holiday"] = schedule_context["is_public_holiday"]
+        enriched_conditions["uses_weekend_schedule"] = schedule_context["uses_weekend_schedule"]
         enriched_conditions["ahu_states"] = ahu_states
         # building_occupancy_pct: numeric from zone_occupancy or occupancy string
         zone_occ = current_conditions.get("zone_occupancy", {})
@@ -364,7 +470,7 @@ class AIOptimizerService:
             current_conditions,
             weather_forecast,
             energy_prices,
-            equipment_inventory,
+            optimization_equipment_inventory,
             lighting_zones,
             profile=profile,
             ml_context=ml_context,
@@ -384,7 +490,13 @@ class AIOptimizerService:
         try:
             # Try LLM analysis via model_gateway
             recommendation = await self._analyze_with_claude(
-                site_id, task_class, prompt, current_conditions, equipment_inventory, lighting_zones, profile
+                site_id,
+                task_class,
+                prompt,
+                current_conditions,
+                optimization_equipment_inventory,
+                lighting_zones,
+                profile,
             )
 
             # Apply recommendation scoring and ranking with profile weights
@@ -395,6 +507,8 @@ class AIOptimizerService:
                 f"[ANALYZE] After scoring: rec_count={len(recommendation.recommendations)}, "
                 f"first_rec_keys={[list(r.keys()) if r else 'empty' for r in recommendation.recommendations[:2]]}"
             )
+
+            await self._expire_stale_served_zone_runtime_recommendations(site_id, recommendation.recommendations)
 
             # Phase 109: Apply quality gate evaluation to recommendations
             recommendation = await self._apply_quality_gate(site_id, recommendation)
@@ -419,6 +533,7 @@ class AIOptimizerService:
             # Apply scoring to fallback recommendations too
             if profile:
                 rec = self._score_and_rank_recommendations(rec, profile)
+            await self._expire_stale_served_zone_runtime_recommendations(site_id, rec.recommendations)
             # Phase 109: Apply quality gate to fallback recommendations too
             rec = await self._apply_quality_gate(site_id, rec)
             # Phase 109B-03: Enrich fallback recommendations with health features too
@@ -554,11 +669,11 @@ class AIOptimizerService:
 
             weather_data = await get_current_weather()
 
-            conditions = {
+            conditions: dict[str, Any] = {
                 "indoor_temp": 22.0,
                 "outdoor_temp": weather_data.get("outdoor_temp", 22.0) if weather_data else 22.0,
                 "humidity": weather_data.get("humidity", 50.0) if weather_data else 50.0,
-                "occupancy": "high",
+                "occupancy": "unknown",
                 "equipment_status": "normal",
                 "timestamp": datetime.now().isoformat(),
                 "zone_occupancy": {},  # Real occupancy from DALI
@@ -567,19 +682,17 @@ class AIOptimizerService:
                     "indoor_temp": "default",
                     "outdoor_temp": "weather_api" if weather_data else "default",
                     "humidity": "weather_api" if weather_data else "default",
-                    "occupancy": "default",
+                    "occupancy": "default_unknown",
                     "solar": "unavailable",
                     "bess": "unavailable",
                     "dali": "unavailable",
                 },
             }
 
-            # Fail if no weather data available
             if not weather_data:
-                raise RuntimeError(
-                    f"No weather data available for site {site_id}. "
-                    "OpenWeatherMap API not configured or failed. "
-                    "Set OPENWEATHER_API_KEY environment variable."
+                logger.warning(
+                    "[AI-OPT] Weather data unavailable for %s; continuing with defaults so live building telemetry is still evaluated",
+                    site_id,
                 )
 
             # Try to get actual readings from HVAC devices
@@ -712,6 +825,157 @@ class AIOptimizerService:
 
             except Exception as e:
                 logger.warning(f"Failed to get DALI occupancy data: {e}")
+
+            # Gather latest SIMBIOT/bridge aggregate telemetry from persisted sensor readings.
+            # This is the source that carries S002-SITE-AGG occupancy and plant runtime.
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb_telemetry = get_supabase_client()
+                sensor_types = [
+                    "total_occupancy",
+                    "occupied_zones",
+                    "zone_count",
+                    "peak_zone_density",
+                    "hvac_kw",
+                    "lighting_kw",
+                    "total_kw",
+                    "staging_state",
+                    "compressor_current_1",
+                    "compressor_current_2",
+                    "fan_speed_pct",
+                    "chw_supply_temp",
+                    "chw_return_temp",
+                    "room_temp",
+                    "zone_temp",
+                    "temperature",
+                    "co2_ppm",
+                    "humidity",
+                    "anomaly_score",
+                ]
+                reading_resp = (
+                    sb_telemetry.table("equipment_sensor_readings")
+                    .select("equipment_id,sensor_type,value,unit,recorded_at")
+                    .eq("site_id", site_id)
+                    .in_("sensor_type", sensor_types)
+                    .order("recorded_at", desc=True)
+                    .limit(250)
+                    .execute()
+                )
+
+                latest: dict[tuple[str, str], dict[str, Any]] = {}
+                for row in reading_resp.data or []:
+                    key = (row.get("equipment_id") or "", row.get("sensor_type") or "")
+                    if key[0] and key[1] and key not in latest:
+                        latest[key] = row
+
+                site_prefix = site_id.replace("site-", "S").upper()
+                site_agg_equipment = f"{site_prefix}-SITE-AGG"
+                chiller_agg_equipment = f"{site_prefix}-CHILLER-AGG"
+                chiller_equipment = f"{site_prefix}-CHILLER-B01"
+                cooling_tower_equipment = f"{site_prefix}-CT-R01"
+
+                site_agg: dict[str, Any] = {}
+                for sensor in ("total_occupancy", "occupied_zones", "zone_count", "peak_zone_density"):
+                    row = latest.get((site_agg_equipment, sensor))
+                    if row and row.get("value") is not None:
+                        site_agg[sensor] = float(row["value"])
+                        site_agg[f"{sensor}_recorded_at"] = row.get("recorded_at")
+
+                if site_agg:
+                    conditions["site_aggregate"] = site_agg
+                    conditions["_data_sources"]["occupancy"] = "equipment_sensor_readings"
+                    total_occupancy = site_agg.get("total_occupancy")
+                    occupied_zones = site_agg.get("occupied_zones")
+                    zone_count = site_agg.get("zone_count")
+                    if (
+                        isinstance(occupied_zones, (int, float))
+                        and isinstance(zone_count, (int, float))
+                        and zone_count > 0
+                    ):
+                        ratio = occupied_zones / zone_count
+                        if ratio > 0.7:
+                            conditions["occupancy"] = "high"
+                        elif ratio > 0.4:
+                            conditions["occupancy"] = "medium"
+                        elif ratio > 0.1:
+                            conditions["occupancy"] = "low"
+                        else:
+                            conditions["occupancy"] = "minimal"
+                    elif isinstance(total_occupancy, (int, float)):
+                        if total_occupancy >= 75:
+                            conditions["occupancy"] = "high"
+                        elif total_occupancy >= 25:
+                            conditions["occupancy"] = "medium"
+                        elif total_occupancy > 0:
+                            conditions["occupancy"] = "low"
+                        else:
+                            conditions["occupancy"] = "minimal"
+
+                power: dict[str, Any] = {}
+                for sensor in ("hvac_kw", "lighting_kw", "total_kw"):
+                    row = latest.get((chiller_agg_equipment, sensor))
+                    if row and row.get("value") is not None:
+                        power[sensor] = float(row["value"])
+                        power[f"{sensor}_recorded_at"] = row.get("recorded_at")
+                if power:
+                    conditions["electrical"] = {
+                        **conditions.get("electrical", {}),
+                        "total_kw": power.get("total_kw", conditions.get("electrical", {}).get("total_kw")),
+                        "hvac_kw": power.get("hvac_kw", conditions.get("electrical", {}).get("hvac_kw")),
+                        "lighting_kw": power.get("lighting_kw", conditions.get("electrical", {}).get("lighting_kw")),
+                        "source": "equipment_sensor_readings",
+                        "recorded_at": power.get("hvac_kw_recorded_at")
+                        or power.get("total_kw_recorded_at")
+                        or power.get("lighting_kw_recorded_at"),
+                    }
+                    conditions["_data_sources"]["electrical"] = "equipment_sensor_readings"
+
+                hvac_runtime: dict[str, Any] = {}
+                runtime_points = {
+                    (chiller_equipment, "staging_state"): "chiller_staging_state",
+                    (chiller_equipment, "compressor_current_1"): "compressor_current_1",
+                    (chiller_equipment, "compressor_current_2"): "compressor_current_2",
+                    (chiller_equipment, "chw_supply_temp"): "chw_supply_temp",
+                    (chiller_equipment, "chw_return_temp"): "chw_return_temp",
+                    (cooling_tower_equipment, "fan_speed_pct"): "cooling_tower_fan_speed_pct",
+                }
+                for key, output_name in runtime_points.items():
+                    row = latest.get(key)
+                    if row and row.get("value") is not None:
+                        hvac_runtime[output_name] = float(row["value"])
+                        hvac_runtime[f"{output_name}_recorded_at"] = row.get("recorded_at")
+                if hvac_runtime:
+                    conditions["hvac_runtime"] = hvac_runtime
+                    conditions["_data_sources"]["hvac_runtime"] = "equipment_sensor_readings"
+
+                zone_telemetry: dict[str, dict[str, Any]] = {}
+                zone_equipment_prefixes = (
+                    f"{site_prefix}-FCU-",
+                    f"{site_prefix}-VAV-",
+                )
+                zone_sensor_names = {
+                    "room_temp",
+                    "zone_temp",
+                    "temperature",
+                    "co2_ppm",
+                    "humidity",
+                    "anomaly_score",
+                }
+                for (equipment_id, sensor), row in latest.items():
+                    if not equipment_id.startswith(zone_equipment_prefixes) or sensor not in zone_sensor_names:
+                        continue
+                    if row.get("value") is None:
+                        continue
+                    zone = zone_telemetry.setdefault(equipment_id, {})
+                    zone[sensor] = float(row["value"])
+                    zone[f"{sensor}_recorded_at"] = row.get("recorded_at")
+                if zone_telemetry:
+                    conditions["zone_telemetry"] = zone_telemetry
+                    conditions["_data_sources"]["zone_telemetry"] = "equipment_sensor_readings"
+
+            except Exception as e:
+                logger.warning(f"[AI-OPT] Failed to load bridge aggregate telemetry from sensor readings: {e}")
 
             # Gather solar PV telemetry (inverters + meter)
             try:
@@ -936,11 +1200,9 @@ class AIOptimizerService:
             try:
                 import httpx
 
-                token = (
-                    os.environ.get("BRIDGE_API_TOKEN_SITE002")
-                    or os.environ.get("BRIDGE_API_TOKEN")
-                    or "ScUAjUet7i2vvcE0fuzn6dsF3C+YRMWbf8yMWwdoYbw"
-                )
+                token = os.environ.get("BRIDGE_API_TOKEN_SITE002") or os.environ.get("BRIDGE_API_TOKEN") or ""
+                if not token:
+                    raise RuntimeError("Bridge token is not configured")
                 # Use sync client — async is flaky with WireGuard bridge
                 with httpx.Client(timeout=10) as client:
                     url = f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry"
@@ -948,12 +1210,18 @@ class AIOptimizerService:
                     if resp.is_success:
                         telemetry = resp.json()
                         power = telemetry.get("power", {})
-                        conditions["electrical"] = {
-                            "total_kw": power.get("total_kw"),
-                            "hvac_kw": power.get("hvac_kw"),
-                            "lighting_kw": power.get("lighting_kw"),
-                            "solar_kw": power.get("solar_kw"),
-                        }
+                        existing_electrical = conditions.get("electrical", {})
+                        if existing_electrical.get("source") == "equipment_sensor_readings":
+                            existing_electrical["solar_kw"] = power.get("solar_kw", existing_electrical.get("solar_kw"))
+                            conditions["electrical"] = existing_electrical
+                        else:
+                            conditions["electrical"] = {
+                                "total_kw": power.get("total_kw"),
+                                "hvac_kw": power.get("hvac_kw"),
+                                "lighting_kw": power.get("lighting_kw"),
+                                "solar_kw": power.get("solar_kw"),
+                                "source": "bridge_http",
+                            }
                     else:
                         logger.warning(f"[AI-OPT] Bridge telemetry returned {resp.status_code}")
             except Exception as e:
@@ -1017,7 +1285,7 @@ class AIOptimizerService:
 
                 # Check whether any non-temperature sensor has real readings
                 has_real_iaq_sensors = any(
-                    comp.get("value") is not None and comp.get("component") not in ("temperature", "temp")
+                    comp.value is not None and comp.component not in ("temperature", "temp")
                     for zone in zones_raw
                     for comp in (zone.components or [])
                 )
@@ -1235,6 +1503,29 @@ class AIOptimizerService:
         except Exception as e:
             logger.debug("Feedback success rates unavailable: %s", e)
             return ""
+
+    async def _gather_carbon_context(self, site_id: str, conditions: dict[str, Any]) -> dict[str, Any]:
+        """Build lightweight carbon context from available electrical telemetry."""
+        electrical = conditions.get("electrical") or {}
+        total_kw = self._float_or_none(electrical.get("total_kw"))
+        if total_kw is None:
+            return {}
+        return {
+            "site_id": site_id,
+            "estimated_load_kw": total_kw,
+            "source": electrical.get("source", "electrical_telemetry"),
+        }
+
+    async def _call_claude(self, prompt: str, site_id: str) -> str:
+        """Compatibility wrapper for legacy sweep paths that still call Claude directly."""
+        return await model_gateway.call(
+            task_class="medium",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=settings.optimization_max_tokens,
+            stream=False,
+            source="ai_optimizer",
+            site_id=site_id,
+        )
 
     async def _gather_ml_context(self, site_id: str, equipment_inventory: dict[str, list[Device]]) -> dict[str, Any]:
         """Gather ML model outputs for injection into Claude's optimisation prompt.
@@ -1729,7 +2020,272 @@ If no action needed, return empty recommendations array.
 
     # ── Phase 2: 5-Layer Prompt Structure ─────────────────────────────────────
 
-    def _format_profile_intent(self, profile: str, energy_prices: dict[str, Any]) -> str:
+    def _get_site_schedule_context(
+        self,
+        site_id: str,
+        current_time: datetime | None = None,
+    ) -> dict[str, Any]:
+        """Return calendar context used by optimization decisions."""
+        now = current_time or datetime.now()
+        holiday_name = None
+
+        try:
+            from app.services.site_holiday_service import get_site_holiday_service
+
+            holiday_service = get_site_holiday_service()
+            target_date = now.date()
+            for holiday in holiday_service.list_holidays(site_id, target_date.year):
+                holiday_date = str(holiday.get("date", "")).strip()
+                if not holiday_date:
+                    continue
+                recurring_match = bool(holiday.get("recurring", False)) and holiday_date[-5:] == target_date.strftime(
+                    "%m-%d"
+                )
+                exact_match = holiday_date == target_date.isoformat()
+                if recurring_match or exact_match:
+                    holiday_name = str(holiday.get("name") or "Public holiday")
+                    break
+        except Exception as e:
+            logger.warning("Could not load holiday calendar for %s: %s", site_id, e)
+
+        is_weekend = now.weekday() >= 5
+        is_holiday = holiday_name is not None
+        return {
+            "date": now.date().isoformat(),
+            "weekday": now.strftime("%A"),
+            "is_weekend": is_weekend,
+            "is_public_holiday": is_holiday,
+            "holiday_name": holiday_name,
+            "uses_weekend_schedule": is_weekend,
+        }
+
+    @staticmethod
+    def _parse_site_time(value: str, fallback: str) -> tuple[int, int]:
+        """Parse HH:MM operating-hour values with a conservative fallback."""
+        raw = (value or fallback).strip()
+        try:
+            hour_text, minute_text = raw.split(":", 1)
+            return int(hour_text), int(minute_text[:2])
+        except (AttributeError, ValueError):
+            hour_text, minute_text = fallback.split(":", 1)
+            return int(hour_text), int(minute_text)
+
+    def _current_conditions_time(self, current_conditions: dict[str, Any]) -> datetime:
+        """Prefer telemetry timestamps when tests or persisted readings provide them."""
+        candidates = [
+            current_conditions.get("timestamp"),
+            (current_conditions.get("electrical") or {}).get("recorded_at"),
+            (current_conditions.get("site_aggregate") or {}).get("total_occupancy_recorded_at"),
+        ]
+        for candidate in candidates:
+            if not candidate:
+                continue
+            if isinstance(candidate, datetime):
+                if candidate.tzinfo is not None:
+                    return candidate.astimezone(SAST).replace(tzinfo=None)
+                return candidate.replace(tzinfo=None)
+            if isinstance(candidate, str):
+                try:
+                    parsed = datetime.fromisoformat(candidate.replace("Z", "+00:00"))
+                    if parsed.tzinfo is not None:
+                        return parsed.astimezone(SAST).replace(tzinfo=None)
+                    return parsed.replace(tzinfo=None)
+                except ValueError:
+                    continue
+        return datetime.now()
+
+    def _is_outside_site_operating_hours(
+        self,
+        site_id: str,
+        current_time: datetime | None = None,
+    ) -> bool:
+        """Return True when local time is outside configured operating hours."""
+        now = current_time or datetime.now()
+        schedule = self._get_site_schedule_context(site_id, now)
+        if schedule.get("is_weekend") or schedule.get("is_public_holiday"):
+            return True
+
+        site = self.find_site(site_id) or {}
+        operating_hours = site.get("operating_hours") or {}
+        if isinstance(operating_hours, str):
+            if "-" in operating_hours:
+                start_text, end_text = operating_hours.split("-", 1)
+                operating_hours = {"start": start_text.strip(), "end": end_text.strip()}
+            else:
+                operating_hours = {}
+        if "start" not in operating_hours and "weekday" in operating_hours:
+            weekday_hours = str(operating_hours.get("weekday") or "")
+            if "-" in weekday_hours:
+                start_text, end_text = weekday_hours.split("-", 1)
+                operating_hours = {"start": start_text.strip(), "end": end_text.strip()}
+
+        start_hour, start_minute = self._parse_site_time(str(operating_hours.get("start", "08:00")), "08:00")
+        end_hour, end_minute = self._parse_site_time(str(operating_hours.get("end", "18:00")), "18:00")
+        start_minutes = start_hour * 60 + start_minute
+        end_minutes = end_hour * 60 + end_minute
+        now_minutes = now.hour * 60 + now.minute
+        return not (start_minutes <= now_minutes <= end_minutes)
+
+    def _is_within_pre_occupancy_window(
+        self,
+        site_id: str,
+        current_time: datetime | None = None,
+    ) -> bool:
+        """Return True in the configured pre-conditioning window before opening."""
+        now = current_time or datetime.now()
+        schedule = self._get_site_schedule_context(site_id, now)
+        if schedule.get("is_weekend") or schedule.get("is_public_holiday"):
+            return False
+
+        site = self.find_site(site_id) or {}
+        operating_hours = site.get("operating_hours") or {}
+        if isinstance(operating_hours, str):
+            if "-" in operating_hours:
+                start_text, _end_text = operating_hours.split("-", 1)
+                operating_hours = {"start": start_text.strip()}
+            else:
+                operating_hours = {}
+        if "start" not in operating_hours and "weekday" in operating_hours:
+            weekday_hours = str(operating_hours.get("weekday") or "")
+            if "-" in weekday_hours:
+                start_text, _end_text = weekday_hours.split("-", 1)
+                operating_hours = {"start": start_text.strip()}
+
+        start_hour, start_minute = self._parse_site_time(str(operating_hours.get("start", "08:00")), "08:00")
+        start_minutes = start_hour * 60 + start_minute
+        now_minutes = now.hour * 60 + now.minute
+        minutes_until_open = start_minutes - now_minutes
+        return 0 < minutes_until_open <= SERVED_ZONE_PRE_OCCUPANCY_WINDOW_MINUTES
+
+    @staticmethod
+    def _device_code(device: Device) -> str:
+        code = getattr(device, "id", "") or getattr(device, "code", "")
+        if code:
+            return str(code)
+        metadata = getattr(device, "metadata", {}) or {}
+        if isinstance(metadata, dict):
+            return str(metadata.get("code") or metadata.get("equipment_code") or "")
+        return ""
+
+    @staticmethod
+    def _float_or_none(value: Any) -> float | None:
+        try:
+            if value is None or value == "":
+                return None
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime | None:
+        if isinstance(value, datetime):
+            if value.tzinfo is not None:
+                return value.astimezone(SAST).replace(tzinfo=None)
+            return value
+        if isinstance(value, str) and value.strip():
+            try:
+                parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+                if parsed.tzinfo is not None:
+                    return parsed.astimezone(SAST).replace(tzinfo=None)
+                return parsed
+            except ValueError:
+                return None
+        return None
+
+    @staticmethod
+    def _is_critical_served_zone(zone_meta: Any) -> bool:
+        if not isinstance(zone_meta, dict):
+            return False
+        tokens = " ".join(
+            str(zone_meta.get(key) or "").lower() for key in ("zone_id", "zone_name", "zone_type", "type", "floor")
+        )
+        return any(token in tokens for token in ("server", "clinical", "icu", "theatre", "lab", "plant"))
+
+    def _format_live_occupancy_context(self, current_conditions: dict[str, Any]) -> dict[str, Any]:
+        """Summarize live occupancy without letting calendar assumptions override telemetry."""
+        site_aggregate = current_conditions.get("site_aggregate") or {}
+        if isinstance(site_aggregate, dict):
+            total_occupancy = site_aggregate.get("total_occupancy")
+            occupied_zones = site_aggregate.get("occupied_zones")
+            zone_count = site_aggregate.get("zone_count")
+            if isinstance(total_occupancy, (int, float)) or isinstance(occupied_zones, (int, float)):
+                if isinstance(zone_count, (int, float)) and zone_count > 0 and isinstance(occupied_zones, (int, float)):
+                    ratio = occupied_zones / zone_count
+                    if ratio > 0.7:
+                        label = "active"
+                    elif ratio > 0.4:
+                        label = "reduced"
+                    elif ratio > 0.1:
+                        label = "low"
+                    else:
+                        label = "minimal"
+                    return {
+                        "label": label,
+                        "detail": (
+                            f"Live aggregate occupancy {total_occupancy if total_occupancy is not None else '?'} people, "
+                            f"{occupied_zones:.0f}/{zone_count:.0f} zones occupied"
+                        ),
+                        "is_live": True,
+                    }
+                if isinstance(total_occupancy, (int, float)):
+                    if total_occupancy >= 75:
+                        label = "active"
+                    elif total_occupancy >= 25:
+                        label = "reduced"
+                    elif total_occupancy > 0:
+                        label = "low"
+                    else:
+                        label = "minimal"
+                    return {
+                        "label": label,
+                        "detail": f"Live aggregate occupancy {total_occupancy:.0f} people",
+                        "is_live": True,
+                    }
+
+        zone_occupancy = current_conditions.get("zone_occupancy") or {}
+        if isinstance(zone_occupancy, dict):
+            values = []
+            for v in zone_occupancy.values():
+                if isinstance(v, (int, float)):
+                    values.append(float(v))
+                elif isinstance(v, dict) and isinstance(v.get("occupancy_percent"), (int, float)):
+                    values.append(float(v["occupancy_percent"]))
+            if values:
+                average = sum(values) / len(values)
+                if average <= 10:
+                    label = "low"
+                elif average <= 35:
+                    label = "reduced"
+                else:
+                    label = "active"
+                return {
+                    "label": label,
+                    "detail": f"Live zone occupancy average {average:.1f}% across {len(values)} zones",
+                    "is_live": True,
+                }
+
+        occupancy = current_conditions.get("occupancy", "unknown")
+        if isinstance(occupancy, (int, float)):
+            if occupancy <= 10:
+                label = "low"
+            elif occupancy <= 35:
+                label = "reduced"
+            else:
+                label = "active"
+            return {"label": label, "detail": f"Live occupancy {float(occupancy):.1f}%", "is_live": True}
+
+        if isinstance(occupancy, str) and occupancy.lower() in {"low", "medium", "high", "unknown"}:
+            label = {"medium": "reduced", "high": "active"}.get(occupancy.lower(), occupancy.lower())
+            return {"label": label, "detail": f"Occupancy telemetry reports {occupancy.lower()}", "is_live": False}
+
+        return {"label": "unknown", "detail": "Occupancy telemetry unavailable", "is_live": False}
+
+    def _format_profile_intent(
+        self,
+        profile: str,
+        energy_prices: dict[str, Any],
+        schedule_context: dict[str, Any] | None = None,
+    ) -> str:
         """Layer 1 — Active goal: what we're optimising for right now."""
         current_rate = energy_prices.get("current_rate", energy_prices.get("eskom_rate", 0))
         band = energy_prices.get("band", "standard")
@@ -1876,12 +2432,20 @@ Multiple adjustments if needed — but unified by a single insight.
         # Enriched tariff/time context — uses per-site tariff config from energy_prices
         peak_hours = energy_prices.get("peak_hours", [])
         weekday_only = energy_prices.get("weekday_only", True)
-        is_weekend = datetime.now().weekday() >= 5 if weekday_only else False
+        uses_weekend_schedule = bool(schedule_context and schedule_context.get("uses_weekend_schedule"))
+        is_weekend_schedule = uses_weekend_schedule if weekday_only else False
+        holiday_name = schedule_context.get("holiday_name") if schedule_context else None
+        holiday_line = (
+            f"Public holiday: YES ({holiday_name}) - explain sudden occupancy drops with live telemetry\n"
+            if holiday_name
+            else "Public holiday: NO\n"
+        )
         peak_hours_str = ", ".join(str(h) for h in peak_hours) if peak_hours else "not configured"
         tariff_line = (
             f"\nCurrent TOU: R{current_rate}/kWh ({band.upper()}) — next change: {next_change}\n"
             f"Peak hours: {peak_hours_str}\n"
-            f"Weekend/holiday: {'YES — all hours off-peak' if is_weekend else 'NO — weekday schedule active'}\n"
+            f"Weekend schedule: {'YES' if is_weekend_schedule else 'NO - weekday schedule active'}\n"
+            f"{holiday_line}"
         )
 
         return f"{base_intent}\n{tariff_line}"
@@ -1933,6 +2497,43 @@ Total site load: {elec.get("total_kw", "?")} kW
 HVAC load: {elec.get("hvac_kw", "?")} kW
 Lighting load: {elec.get("lighting_kw", "?")} kW
 Solar generating: {elec.get("solar_kw", "?")} kW""")
+
+        site_agg = conditions.get("site_aggregate")
+        if site_agg:
+            blocks.append(f"""LIVE SITE OCCUPANCY:
+Total occupancy: {site_agg.get("total_occupancy", "?")}
+Occupied zones: {site_agg.get("occupied_zones", "?")} / {site_agg.get("zone_count", "?")}
+Peak zone density: {site_agg.get("peak_zone_density", "?")}
+Recorded at: {site_agg.get("total_occupancy_recorded_at") or site_agg.get("occupied_zones_recorded_at") or "?"}""")
+
+        hvac_runtime = conditions.get("hvac_runtime")
+        if hvac_runtime:
+            blocks.append(f"""HVAC RUNTIME:
+Chiller staging state: {hvac_runtime.get("chiller_staging_state", "?")}
+Compressor current 1: {hvac_runtime.get("compressor_current_1", "?")} A
+Compressor current 2: {hvac_runtime.get("compressor_current_2", "?")} A
+Cooling tower fan speed: {hvac_runtime.get("cooling_tower_fan_speed_pct", "?")} %
+CHW supply / return: {hvac_runtime.get("chw_supply_temp", "?")} / {hvac_runtime.get("chw_return_temp", "?")} °C""")
+
+        zone_telemetry = conditions.get("zone_telemetry")
+        if isinstance(zone_telemetry, dict) and zone_telemetry:
+            zone_lines = []
+            for equipment_id, readings in sorted(zone_telemetry.items())[:30]:
+                temp = readings.get("room_temp", readings.get("zone_temp", readings.get("temperature", "?")))
+                co2 = readings.get("co2_ppm", "?")
+                humidity = readings.get("humidity", "?")
+                anomaly = readings.get("anomaly_score", "?")
+                recorded_at = (
+                    readings.get("room_temp_recorded_at")
+                    or readings.get("zone_temp_recorded_at")
+                    or readings.get("temperature_recorded_at")
+                    or readings.get("co2_ppm_recorded_at")
+                    or "?"
+                )
+                zone_lines.append(
+                    f"- {equipment_id}: temp={temp}°C, CO2={co2}ppm, humidity={humidity}%, anomaly={anomaly}, recorded_at={recorded_at}"
+                )
+            blocks.append("LIVE ZONE TELEMETRY:\n" + "\n".join(zone_lines))
 
         # Demand management context — NMD and demand charge from site contract
         ep = energy_prices or {}
@@ -2019,17 +2620,34 @@ symptoms or interfere with the maintenance response. Flag the equipment as
         profile: str,
         current_time: datetime,
         energy_prices: dict[str, Any],
+        schedule_context: dict[str, Any] | None = None,
+        occupancy_context: dict[str, Any] | None = None,
+        is_scheduled_occupied: bool | None = None,
     ) -> str:
         """Layer 5 — The specific question the AI should answer."""
-        is_occupied = 7 <= current_time.hour < 18
+        is_occupied = is_scheduled_occupied if is_scheduled_occupied is not None else 7 <= current_time.hour < 18
         tariff = energy_prices.get("band", "standard")
         current_rate = energy_prices.get("current_rate", energy_prices.get("eskom_rate", 0))
+        holiday_name = schedule_context.get("holiday_name") if schedule_context else None
+        uses_weekend_schedule = bool(schedule_context and schedule_context.get("uses_weekend_schedule"))
+        occupancy_detail = occupancy_context.get("detail") if occupancy_context else "Occupancy telemetry unavailable"
+        calendar_line = (
+            f"Calendar: Public holiday ({holiday_name}) - explain occupancy deviations; do not override live occupancy"
+            if holiday_name
+            else (
+                "Calendar: Weekend - use weekend/unoccupied operating assumptions"
+                if uses_weekend_schedule
+                else "Calendar: Normal weekday operating schedule"
+            )
+        )
 
         task_instruction = f"""
 TASK — FIND AND RECOMMEND EFFICIENCY OPPORTUNITIES
 
 Current time: {current_time.strftime("%A %H:%M")} SAST
-Building status: {"Occupied" if is_occupied else "Unoccupied"}
+Scheduled status: {"Occupied hours" if is_occupied else "Outside occupied hours"}
+Live occupancy: {occupancy_detail}
+{calendar_line}
 Active profile: {profile.upper().replace("_", " ")}
 Current tariff: R{current_rate}/kWh ({tariff})
 
@@ -2050,10 +2668,10 @@ FORMAT each recommendation as:
       "adjustments": [
         {{
           "equipment_id": "S002-AHU-B01",
-          "point": "speed_percent",
-          "current_value": 100,
-          "recommended_value": 75,
-          "unit": "%"
+          "point": "<exact writable control point from the control point list>",
+          "current_value": 18.0,
+          "recommended_value": 19.0,
+          "unit": "°C"
         }}
       ],
       "reason": "Must reference actual telemetry values. Must reference which trigger condition was met.",
@@ -2081,6 +2699,16 @@ RULES FOR no_action_reasons:
 EQUIPMENT CODES — use ONLY codes from the valid equipment list provided.
 Do not modify, abbreviate, or invent equipment codes.
 If unsure of the exact code, use the closest match from the valid list.
+
+CONTROL ACTIONS — use ONLY exact point names listed under writable control points.
+All equipment telemetry may be used as evidence, but read-only sensors must never
+be returned as action points. If the best intervention has no verified writable
+point, you may still create a non-executable operational advisory with point=null
+and a human-readable recommended_value. It must clearly say the user must make
+the change manually in the BMS until a writable point is verified.
+
+Meters, sensors, calculated demand points, and read-only telemetry are context
+only. Never target a meter or sensor as the equipment to adjust.
 """
         return task_instruction
 
@@ -2140,24 +2768,34 @@ If unsure of the exact code, use the closest match from the valid list.
         op_start = op_hours.get("start", "08:00")
         op_end = op_hours.get("end", "18:00")
         now_sast = datetime.now()
+        schedule_context = self._get_site_schedule_context(site["id"], now_sast)
+        occupancy_context = self._format_live_occupancy_context(current_conditions)
         current_time_str = now_sast.strftime("%H:%M")
         current_weekday = now_sast.strftime("%A")
-        is_occupied_hours = now_sast.weekday() < 5 and int(op_start.replace(":", "")) <= int(
+        is_occupied_hours = not schedule_context["uses_weekend_schedule"] and int(op_start.replace(":", "")) <= int(
             current_time_str.replace(":", "")
         ) <= int(op_end.replace(":", ""))
+        holiday_name = schedule_context.get("holiday_name")
+        calendar_status = (
+            f"PUBLIC HOLIDAY - {holiday_name}; explain occupancy deviations using live telemetry"
+            if holiday_name
+            else ("WEEKEND - use weekend/unoccupied schedule" if schedule_context["is_weekend"] else "NORMAL WEEKDAY")
+        )
 
         # ── 5-LAYER PROMPT STRUCTURE ───────────────────────────────────────────
         prompt_parts = []
 
         # LAYER 1 — ACTIVE GOAL
-        occupied_label = "OCCUPIED" if is_occupied_hours else "UNOCCUPIED (setback)"
+        occupied_label = "SCHEDULED OCCUPIED" if is_occupied_hours else "SCHEDULED UNOCCUPIED (setback)"
         layer1 = f"""=================================================================
 LAYER 1 — ACTIVE GOAL
 =================================================================
 Time: {current_time_str} {current_weekday} — {occupied_label}
 Operating hours: {op_start}–{op_end} weekdays (holidays follow weekend schedule)
+Calendar: {calendar_status}
+Occupancy telemetry: {occupancy_context["detail"]}
 Profile: {active_profile.upper().replace("_", " ")}
-{self._format_profile_intent(profile_name, energy_prices)}"""
+{self._format_profile_intent(profile_name, energy_prices, schedule_context=schedule_context)}"""
 
         # LAYER 2 — WASTE OPPORTUNITIES
         waste_block = (
@@ -2190,7 +2828,16 @@ LAYER 4 — CONSTRAINTS & MODULE PERMISSIONS
         layer5 = f"""=================================================================
 LAYER 5 — TASK
 =================================================================
-{self._format_task(profile_name, now_sast, energy_prices)}"""
+{
+            self._format_task(
+                profile_name,
+                now_sast,
+                energy_prices,
+                schedule_context=schedule_context,
+                occupancy_context=occupancy_context,
+                is_scheduled_occupied=is_occupied_hours,
+            )
+        }"""
 
         prompt_parts.extend([layer1, layer2, layer2b, layer3, layer4, layer5])
 
@@ -2205,12 +2852,16 @@ LAYER 5 — TASK
 - Region: {site.get("region", "Gauteng")}
 
 **Current Time:** {current_time_str} SAST, {current_weekday}
-**Building Status:** {"OCCUPIED — within operating hours" if is_occupied_hours else "UNOCCUPIED — outside hours"} [LIVE SITE — HVAC comfort recommendations ALLOWED 24/7 per operational mandate]
+**Calendar Status:** {calendar_status}
+**Schedule Status:** {"OCCUPIED HOURS" if is_occupied_hours else "OUTSIDE OCCUPIED HOURS"} [LIVE SITE — use live occupancy and HVAC telemetry to decide whether comfort conditioning is justified]
+**Live Occupancy Status:** {occupancy_context["detail"]}
 
-**SCHEDULE RULES (LIVE SITE):**
-- HVAC comfort/setpoint/pre-conditioning: ALLOWED 24/7 on live sites
-- Building is operating {"in occupied mode" if is_occupied_hours else "in unoccupied mode"} — AI contextualizes recommendations accordingly
-- The AI optimizer on live sites generates HVAC recommendations regardless of time of day — use professional judgment on urgency
+**SCHEDULE AND OCCUPANCY REASONING (LIVE SITE):**
+- Building schedule is {"within occupied hours" if is_occupied_hours else "outside occupied hours"} — use it as context, not as a hard allow/deny rule
+- Live occupancy telemetry is authoritative when it conflicts with calendar assumptions
+- Evaluate HVAC runtime/load together with measured occupancy, IAQ, zone temperature, humidity, plant-protection, and critical-zone requirements
+- Recommendations are current-state decisions: match equipment operation to live building demand, and reassess when occupancy, IAQ, comfort, load, or tariff telemetry changes
+- Public holidays are explanatory calendar context for occupancy changes; live occupancy telemetry remains authoritative
 
 **Equipment Inventory at This Site:**
 {chr(10).join(inventory_summary) if inventory_summary else "No equipment registered"}""",
@@ -2234,10 +2885,13 @@ LAYER 5 — TASK
             # Equipment + Control Points
             f"""{self._format_all_equipment_sections(equipment_inventory)}
 
-**All Available Control Points (by system):**
-{self._format_all_control_points(controllable)}
+	**All Available Control Points (by system):**
+	{self._format_all_control_points(controllable)}
 
-{self._format_zone_context(hvac_devices)}""",
+	**Verified SIMBIOT Writable Control Points:**
+	{self._format_verified_simbiot_control_points(site["id"])}
+
+	{self._format_zone_context(hvac_devices)}""",
             # Zone rules + Equipment constraints
             f"""**Zone-Aware Optimization Rules (Southern Hemisphere - South Africa):**
 - Executive/Server zones (P1): Maintain tighter comfort bands, never sacrifice cooling
@@ -2488,6 +3142,26 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         for eq in all_eq_resolve
                         if eq.get("code")
                     }
+                    if site_resp_resolve.data:
+                        mapping_resp = (
+                            sb_resolve.table("point_asset_mappings")
+                            .select("extracted_asset_id,parameter_name,bms_point_id,is_verified")
+                            .eq("site_id", site_uuid_resolve)
+                            .eq("is_verified", True)
+                            .execute()
+                        )
+                        for mapping in mapping_resp.data or []:
+                            raw_asset_id = (mapping.get("extracted_asset_id") or "").strip()
+                            if not raw_asset_id:
+                                continue
+                            asset_id = self._normalize_code_format(raw_asset_id)
+                            point_names = points_index.setdefault(asset_id, set())
+                            parameter_name = (mapping.get("parameter_name") or "").strip().lower()
+                            if parameter_name:
+                                point_names.add(parameter_name)
+                            bms_point_id = (mapping.get("bms_point_id") or "").strip()
+                            if "." in bms_point_id:
+                                point_names.add(bms_point_id.rsplit(".", 1)[-1].strip().lower())
                 except Exception as e:
                     logger.warning(f"[RESOLVE] Failed to load points_index: {e}")
 
@@ -2544,6 +3218,18 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         logger.warning(f"[RESOLVE]   Rec {i + 1}: no target_equipment — passing through as-is")
                         resolved.append(r)
                 normalised_recommendations = resolved
+                normalised_recommendations = self._append_after_hours_zero_occupancy_advisory(
+                    site_id,
+                    current_conditions,
+                    equipment_inventory,
+                    normalised_recommendations,
+                )
+                normalised_recommendations = self._apply_served_zone_runtime_gate(
+                    site_id,
+                    current_conditions,
+                    equipment_inventory,
+                    normalised_recommendations,
+                )
                 logger.warning(
                     f"[ANALYZE] After RESOLVE: {len(normalised_recommendations)} recs — "
                     f"targets={[r.get('target_equipment') for r in normalised_recommendations]}"
@@ -2574,6 +3260,731 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         except Exception as e:
             logger.error(f"Claude analysis failed: {e}")
             raise
+
+    def _append_after_hours_zero_occupancy_advisory(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+        recommendations: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Apply the site-profile operating-state policy to HVAC recommendations.
+
+        This is intentionally driven by site schedule, live occupancy, HVAC load,
+        and safety constraints. It is not a Sunday/evening special case.
+        """
+        if any(self._is_closed_empty_hvac_policy_rec(rec) for rec in recommendations):
+            return recommendations
+
+        hvac_devices = equipment_inventory.get("hvac", []) if isinstance(equipment_inventory, dict) else []
+
+        context = self._closed_empty_hvac_context(site_id, current_conditions)
+        if not context:
+            return recommendations
+
+        recommendations = [rec for rec in recommendations if not self._is_hvac_runtime_tuning_recommendation(rec)]
+
+        urgent_equipment = {
+            wo.get("equipment_code")
+            for wo in current_conditions.get("active_urgent_work_orders", [])
+            if wo.get("equipment_code")
+        }
+        chillers = self._find_devices_by_type(hvac_devices, "chiller")
+        ahus = self._find_devices_by_type(hvac_devices, "ahu")
+        target = next((d for d in chillers if d.id not in urgent_equipment), None)
+        if target is None:
+            target = next((d for d in ahus if d.id not in urgent_equipment), None)
+        if target is None:
+            target = next((d for d in hvac_devices if d.id not in urgent_equipment), None)
+        target_id = getattr(target, "id", None)
+        target_name = getattr(target, "name", None)
+        if not target_id:
+            for rec in recommendations:
+                rec_target = str(rec.get("target_equipment") or rec.get("equipment_id") or "")
+                if (
+                    rec_target
+                    and rec_target not in urgent_equipment
+                    and any(token in rec_target.upper() for token in ("CHILLER", "AHU", "HVAC"))
+                ):
+                    target_id = rec_target
+                    target_name = rec.get("equipment_name") or rec_target
+                    break
+        if not target_id:
+            target_id = f"{site_id.upper()}-HVAC-SCHEDULE"
+            target_name = "HVAC schedule"
+
+        hvac_kw_float = context["hvac_kw"]
+        total_kw_float = context["total_kw"]
+        threshold_kw = context["threshold_kw"]
+        load_share = (hvac_kw_float / total_kw_float * 100.0) if total_kw_float > 0 else None
+        share_text = f", {load_share:.1f}% of site load" if load_share is not None else ""
+        recommendations.append(
+            {
+                "equipment_id": target_id,
+                "equipment_name": target_name,
+                "target_equipment": target_id,
+                "point_name": "",
+                "current_value": hvac_kw_float,
+                "recommended_value": ("Shut down or setback non-critical HVAC plant according to the site profile"),
+                "unit": "manual_action",
+                "system": "hvac",
+                "action_type": "ai_optimization",
+                "action": {
+                    "point": None,
+                    "value": "Shut down or setback non-critical HVAC plant according to the site profile",
+                    "execution_blocked": True,
+                    "blocker": "missing_verified_plant_enable_or_schedule_point",
+                },
+                "confidence": 0.72,
+                "savings_kwh": round(max(0.0, hvac_kw_float - threshold_kw), 1),
+                "reason": (
+                    "Site profile indicates the building is closed and live occupancy is zero, but HVAC is still running: "
+                    f"HVAC {hvac_kw_float:.1f} kW exceeds threshold {threshold_kw:.1f} kW"
+                    f"{share_text}. The correct operational response is shutdown or setback of non-critical HVAC, "
+                    "unless a safety, preservation, or tenant requirement says otherwise."
+                ),
+                "metadata": {
+                    "rule": "closed_empty_building_hvac_running",
+                    "legacy_rule": "after_hours_zero_occupancy_hvac_load",
+                    "advisory_type": "site_profile_hvac_state_correction",
+                    "outside_operating_hours": True,
+                    "total_occupancy": context["total_occupancy"],
+                    "occupied_zones": context["occupied_zones"],
+                    "hvac_kw": hvac_kw_float,
+                    "threshold_kw": round(threshold_kw, 2),
+                    "enforced_after_llm": True,
+                    "suppressed_runtime_tuning": True,
+                },
+            }
+        )
+        logger.warning(
+            "[AI-OPT] Site-profile closed/empty HVAC policy for %s: %.1f kW > %.1f kW",
+            site_id,
+            hvac_kw_float,
+            threshold_kw,
+        )
+        return recommendations
+
+    async def _load_served_zone_gate_context(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+    ) -> dict[str, Any]:
+        """Load served-zone state used to gate equipment-level HVAC tuning."""
+        supplied = current_conditions.get("_served_zone_gate_context") or current_conditions.get(
+            "served_zone_gate_context"
+        )
+        if isinstance(supplied, dict):
+            return supplied
+
+        mapping = current_conditions.get("served_zone_mapping") or current_conditions.get("equipment_served_zones")
+        states = current_conditions.get("served_zone_states") or current_conditions.get("fcu_zone_state")
+        zone_metadata = current_conditions.get("served_zone_metadata") or {}
+        if mapping or states:
+            return self._build_served_zone_gate_context(
+                site_id,
+                current_conditions,
+                equipment_inventory,
+                mapping if isinstance(mapping, dict) else {},
+                states,
+                zone_metadata if isinstance(zone_metadata, dict) else {},
+            )
+
+        try:
+            from app.database.supabase_client import get_async_supabase_client
+
+            client = await get_async_supabase_client()
+            zone_rows_data: list[dict[str, Any]] = []
+            try:
+                zone_rows = (
+                    await client.table("zones")
+                    .select("zone_id,fcu_id,vav_id,ahu_id,zone_type,floor,area_sqm")
+                    .limit(2000)
+                    .execute()
+                )
+                zone_rows_data = zone_rows.data or []
+            except Exception as exc:
+                logger.warning(
+                    "[AI-OPT] zones HVAC mapping columns unavailable for %s; falling back to live zone state: %s",
+                    site_id,
+                    exc,
+                )
+            fcu_rows = (
+                await client.table("fcu_zone_state")
+                .select("zone_id,occupancy_pct,room_temp_c,setpoint_c,fcu_inferred_running,occupancy_source,timestamp")
+                .eq("site_id", site_id)
+                .order("timestamp", desc=True)
+                .limit(500)
+                .execute()
+            )
+            equipment_rows: list[dict[str, Any]] = []
+            hvac_zone_rows: list[dict[str, Any]] = []
+            site_resp = await client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            site_uuid = str(site_resp.data[0].get("id")) if site_resp.data else ""
+            if site_uuid:
+                equipment_result = (
+                    await client.table("equipment")
+                    .select("code,type,zone_key,status")
+                    .eq("site_id", site_uuid)
+                    .execute()
+                )
+                equipment_rows = equipment_result.data or []
+                try:
+                    hvac_zone_result = (
+                        await client.table("hvac_zones")
+                        .select("zone_id,zone_name,zone_type,floor,area_sqm,priority")
+                        .eq("site_id", site_uuid)
+                        .limit(2000)
+                        .execute()
+                    )
+                    hvac_zone_rows = hvac_zone_result.data or []
+                except Exception as exc:
+                    logger.warning("[AI-OPT] hvac_zones context unavailable for %s: %s", site_id, exc)
+
+            mapping_by_equipment: dict[str, list[str]] = {}
+            zone_meta: dict[str, dict[str, Any]] = {}
+            for row in [*zone_rows_data, *hvac_zone_rows]:
+                zone_id = str(row.get("zone_id") or "").strip()
+                if not zone_id:
+                    continue
+                zone_meta[zone_id] = row
+                for key in ("fcu_id", "vav_id", "ahu_id"):
+                    code = str(row.get(key) or "").strip()
+                    if code:
+                        mapping_by_equipment.setdefault(code, []).append(zone_id)
+
+            for row in equipment_rows:
+                code = str(row.get("code") or "").strip()
+                zone_key = str(row.get("zone_key") or "").strip()
+                if code and zone_key and zone_key in zone_meta:
+                    mapping_by_equipment.setdefault(code, []).append(zone_key)
+
+            live_zone_ids = sorted(
+                {
+                    str(row.get("zone_id") or "").strip()
+                    for row in fcu_rows.data or []
+                    if str(row.get("zone_id") or "").strip()
+                }
+            )
+            for row in equipment_rows:
+                code = str(row.get("code") or "").strip()
+                equipment_type = str(row.get("type") or "").strip().lower()
+                if (
+                    code
+                    and equipment_type in {"ahu", "chiller"}
+                    and not mapping_by_equipment.get(code)
+                    and live_zone_ids
+                ):
+                    mapping_by_equipment[code] = live_zone_ids
+
+            return self._build_served_zone_gate_context(
+                site_id,
+                current_conditions,
+                equipment_inventory,
+                mapping_by_equipment,
+                fcu_rows.data or [],
+                zone_meta,
+            )
+        except Exception as exc:
+            logger.warning("[AI-OPT] Failed to load served-zone gate context for %s: %s", site_id, exc)
+            return {}
+
+    def _build_served_zone_gate_context(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+        mapping: dict[str, Any],
+        states: Any,
+        zone_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        state_by_zone: dict[str, dict[str, Any]] = {}
+        if isinstance(states, dict):
+            state_iter = [
+                {"zone_id": zone_id, **state} if isinstance(state, dict) else {"zone_id": zone_id}
+                for zone_id, state in states.items()
+            ]
+        elif isinstance(states, list):
+            state_iter = states
+        else:
+            state_iter = []
+        for row in state_iter:
+            if not isinstance(row, dict):
+                continue
+            zone_id = str(row.get("zone_id") or row.get("canonical_zone_id") or "").strip()
+            if zone_id and zone_id not in state_by_zone:
+                state_by_zone[zone_id] = row
+
+        normalized_mapping: dict[str, list[str]] = {}
+        for equipment_code, zone_ids in mapping.items():
+            code = str(equipment_code or "").strip()
+            if not code:
+                continue
+            if isinstance(zone_ids, str):
+                zones = [zone_ids]
+            elif isinstance(zone_ids, list | tuple | set):
+                zones = list(zone_ids)
+            else:
+                zones = []
+            normalized_mapping[code.upper()] = sorted({str(zone).strip() for zone in zones if str(zone).strip()})
+
+        current_time = self._current_conditions_time(current_conditions)
+        outside_hours = self._is_outside_site_operating_hours(site_id, current_time)
+        pre_occupancy = self._is_within_pre_occupancy_window(site_id, current_time)
+        active_safety_constraints = current_conditions.get("active_safety_constraints") or current_conditions.get(
+            "safety_constraints"
+        )
+        urgent_equipment = {
+            str(wo.get("equipment_code") or "").upper()
+            for wo in current_conditions.get("active_urgent_work_orders", [])
+            if wo.get("equipment_code")
+        }
+        decisions: dict[str, dict[str, Any]] = {}
+        for device in equipment_inventory.get("hvac", []):
+            code = self._device_code(device)
+            if not code:
+                continue
+            decisions[code.upper()] = self._evaluate_served_zone_runtime_gate(
+                site_id=site_id,
+                equipment_code=code,
+                current_time=current_time,
+                outside_hours=outside_hours,
+                pre_occupancy=pre_occupancy,
+                safety_active=bool(active_safety_constraints),
+                urgent=code.upper() in urgent_equipment,
+                served_zone_ids=normalized_mapping.get(code.upper(), []),
+                state_by_zone=state_by_zone,
+                zone_metadata=zone_metadata,
+            )
+
+        return {
+            "rule": SERVED_ZONE_GATE_RULE,
+            "decisions": decisions,
+            "outside_operating_hours": outside_hours,
+            "pre_occupancy_window": pre_occupancy,
+            "occupancy_threshold_pct": SERVED_ZONE_EMPTY_OCCUPANCY_PCT,
+            "state_freshness_minutes": SERVED_ZONE_STATE_FRESHNESS_MINUTES,
+            "any_occupied_zone_blocks_suppression": True,
+            "all_served_zones_empty_required": True,
+        }
+
+    def _evaluate_served_zone_runtime_gate(
+        self,
+        *,
+        site_id: str,
+        equipment_code: str,
+        current_time: datetime,
+        outside_hours: bool,
+        pre_occupancy: bool,
+        safety_active: bool,
+        urgent: bool,
+        served_zone_ids: list[str],
+        state_by_zone: dict[str, dict[str, Any]],
+        zone_metadata: dict[str, Any],
+    ) -> dict[str, Any]:
+        decision: dict[str, Any] = {
+            "equipment_code": equipment_code,
+            "suppress": False,
+            "reason_code": "allowed",
+            "served_zones": served_zone_ids,
+            "occupied_zones": [],
+            "empty_zones": [],
+            "missing_state_zones": [],
+            "stale_state_zones": [],
+            "coverage_gap": None,
+        }
+        if not served_zone_ids:
+            decision.update(reason_code="coverage_gap_no_served_zone_mapping", coverage_gap="no_served_zone_mapping")
+            return decision
+        if safety_active:
+            decision["reason_code"] = "safety_constraints_active"
+            return decision
+        if urgent:
+            decision["reason_code"] = "urgent_work_order_active"
+            return decision
+        if not outside_hours:
+            decision["reason_code"] = "inside_operating_hours"
+            return decision
+        if pre_occupancy:
+            decision["reason_code"] = "pre_occupancy_window"
+            return decision
+
+        for zone_id in served_zone_ids:
+            meta = zone_metadata.get(zone_id) if isinstance(zone_metadata, dict) else {}
+            if self._is_critical_served_zone(meta):
+                decision["reason_code"] = "critical_served_zone"
+                return decision
+            state = state_by_zone.get(zone_id)
+            if not state:
+                decision["missing_state_zones"].append(zone_id)
+                continue
+            observed_at = self._parse_datetime(state.get("timestamp") or state.get("observed_at") or state.get("time"))
+            if not observed_at:
+                decision["stale_state_zones"].append(zone_id)
+                continue
+            if current_time - observed_at > timedelta(minutes=SERVED_ZONE_STATE_FRESHNESS_MINUTES):
+                decision["stale_state_zones"].append(zone_id)
+                continue
+            occupancy_raw = state.get("occupancy_pct")
+            if occupancy_raw is None:
+                occupancy_raw = state.get("occupancy_percent")
+            occupancy = self._float_or_none(occupancy_raw)
+            if occupancy is None:
+                decision["missing_state_zones"].append(zone_id)
+                continue
+            zone_summary = {
+                "zone_id": zone_id,
+                "occupancy_pct": occupancy,
+                "room_temp_c": self._float_or_none(state.get("room_temp_c")),
+                "setpoint_c": self._float_or_none(state.get("setpoint_c")),
+                "fcu_inferred_running": bool(state.get("fcu_inferred_running")),
+            }
+            if occupancy > SERVED_ZONE_EMPTY_OCCUPANCY_PCT:
+                decision["occupied_zones"].append(zone_summary)
+            else:
+                decision["empty_zones"].append(zone_summary)
+
+        if decision["missing_state_zones"] or decision["stale_state_zones"]:
+            decision.update(
+                reason_code="coverage_gap_missing_or_stale_zone_state",
+                coverage_gap="missing_or_stale_zone_state",
+            )
+            return decision
+        if decision["occupied_zones"]:
+            decision["reason_code"] = "served_zone_occupied"
+            return decision
+        if decision["empty_zones"] and len(decision["empty_zones"]) == len(served_zone_ids):
+            decision.update(suppress=True, reason_code="all_served_zones_empty_outside_hours")
+            return decision
+        decision.update(reason_code="coverage_gap_no_fresh_zone_state", coverage_gap="no_fresh_zone_state")
+        return decision
+
+    def _filter_equipment_inventory_by_served_zone_gate(
+        self,
+        equipment_inventory: dict[str, list[Device]],
+        current_conditions: dict[str, Any],
+    ) -> dict[str, list[Device]]:
+        context = current_conditions.get("_served_zone_gate_context") or {}
+        decisions = context.get("decisions") if isinstance(context, dict) else {}
+        if not isinstance(decisions, dict) or not decisions:
+            return equipment_inventory
+        filtered: dict[str, list[Device]] = {}
+        for device_type, devices in equipment_inventory.items():
+            if device_type != "hvac":
+                filtered[device_type] = devices
+                continue
+            allowed = []
+            for device in devices:
+                code = self._device_code(device).upper()
+                decision = decisions.get(code) or {}
+                if decision.get("suppress"):
+                    logger.warning(
+                        "[AI-OPT] Excluding %s from equipment optimization: %s",
+                        code,
+                        decision.get("reason_code"),
+                    )
+                    continue
+                allowed.append(device)
+            filtered[device_type] = allowed
+        return filtered
+
+    def _apply_served_zone_runtime_gate(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+        recommendations: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        context = current_conditions.get("_served_zone_gate_context") or {}
+        decisions = context.get("decisions") if isinstance(context, dict) else {}
+        if not isinstance(decisions, dict) or not decisions:
+            return recommendations
+
+        kept: list[dict[str, Any]] = []
+        suppressed_by_target: dict[str, dict[str, Any]] = {}
+        equipment_names = {
+            self._device_code(d).upper(): getattr(d, "name", self._device_code(d))
+            for d in equipment_inventory.get("hvac", [])
+        }
+
+        for rec in recommendations:
+            target = str(rec.get("target_equipment") or rec.get("equipment_id") or "").upper()
+            decision = decisions.get(target) or {}
+            if decision.get("suppress") and self._is_hvac_runtime_tuning_recommendation(rec):
+                bucket = suppressed_by_target.setdefault(target, {"decision": decision, "count": 0, "examples": []})
+                bucket["count"] += 1
+                bucket["examples"].append(
+                    {
+                        "point_name": rec.get("point_name") or (rec.get("action") or {}).get("point"),
+                        "recommended_value": rec.get("recommended_value") or (rec.get("action") or {}).get("value"),
+                        "reason": rec.get("reason"),
+                    }
+                )
+                continue
+            kept.append(rec)
+
+        for target, decision in decisions.items():
+            if not decision.get("suppress"):
+                continue
+            suppressed = suppressed_by_target.setdefault(target, {"decision": decision, "count": 0, "examples": []})
+            has_stop_or_setback = any(
+                str(rec.get("target_equipment") or rec.get("equipment_id") or "").upper() == target
+                and self._is_hvac_stop_or_setback_recommendation(rec)
+                for rec in kept
+            )
+            if has_stop_or_setback and suppressed["count"] == 0:
+                continue
+            if any(
+                (rec.get("metadata") or {}).get("rule") == SERVED_ZONE_GATE_RULE
+                and str(rec.get("target_equipment") or "").upper() == target
+                for rec in kept
+            ):
+                continue
+            kept.append(
+                self._served_zone_runtime_advisory(
+                    site_id,
+                    target,
+                    str(equipment_names.get(target, target)),
+                    suppressed["decision"],
+                    suppressed["count"],
+                    suppressed["examples"],
+                )
+            )
+
+        return kept
+
+    def _served_zone_runtime_advisory(
+        self,
+        site_id: str,
+        target: str,
+        equipment_name: str,
+        decision: dict[str, Any],
+        suppressed_count: int,
+        suppressed_examples: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        empty_zones = decision.get("empty_zones") or []
+        zone_ids = [str(item.get("zone_id")) for item in empty_zones if item.get("zone_id")]
+        return {
+            "equipment_id": target,
+            "equipment_name": equipment_name,
+            "target_equipment": target,
+            "point_name": "",
+            "current_value": None,
+            "recommended_value": "Verify whether this HVAC equipment should be running before tuning delivery",
+            "unit": "manual_action",
+            "system": "hvac",
+            "action_type": "ai_optimization",
+            "action": {
+                "point": None,
+                "value": "Verify served-zone operating state before applying runtime tuning",
+                "execution_blocked": True,
+                "blocker": "served_zones_empty_outside_operating_hours",
+            },
+            "confidence": 0.7,
+            "reason": (
+                f"{target} serves zones that are empty/near-empty outside operating hours "
+                f"({', '.join(zone_ids) if zone_ids else 'served zones'}). "
+                "The correct operational question is whether this equipment should be running before "
+                "economiser, damper, SAT, setpoint, or fan tuning is considered."
+            ),
+            "metadata": {
+                "rule": SERVED_ZONE_GATE_RULE,
+                "advisory_type": "served_zone_hvac_state_correction",
+                "outside_operating_hours": True,
+                "served_zones": decision.get("served_zones", []),
+                "empty_zones": empty_zones,
+                "occupied_zones": decision.get("occupied_zones", []),
+                "suppressed_runtime_tuning": True,
+                "suppressed_recommendation_count": suppressed_count,
+                "suppressed_examples": suppressed_examples[:5],
+                "occupancy_threshold_pct": SERVED_ZONE_EMPTY_OCCUPANCY_PCT,
+                "any_occupied_zone_blocks_suppression": True,
+                "all_served_zones_empty_required": True,
+                "stale_recommendations_should_expire": True,
+                "site_id": site_id,
+            },
+        }
+
+    async def _expire_stale_served_zone_runtime_recommendations(
+        self,
+        site_id: str,
+        recommendations: list[dict[str, Any]],
+    ) -> int:
+        targets = {
+            str(rec.get("target_equipment") or "").upper()
+            for rec in recommendations
+            if (rec.get("metadata") or {}).get("rule") == SERVED_ZONE_GATE_RULE
+        }
+        targets.discard("")
+        if not targets:
+            return 0
+
+        try:
+            from app.database.repositories.recommendation_repository import get_recommendation_repository
+            from app.models.recommendation import RecommendationStatus
+
+            repo = get_recommendation_repository()
+            active = await repo.get_by_status(site_id, RecommendationStatus.PENDING, limit=100)
+            expired = 0
+            for rec in active:
+                target = str(rec.target_equipment or "").upper()
+                if target not in targets:
+                    continue
+                rec_dict = {
+                    "target_equipment": rec.target_equipment,
+                    "equipment_id": rec.target_equipment,
+                    "action": rec.action or {},
+                    "reason": rec.reason,
+                    "metadata": rec.metadata or {},
+                }
+                if not self._is_hvac_runtime_tuning_recommendation(rec_dict):
+                    continue
+                rec.status = RecommendationStatus.EXPIRED
+                metadata = dict(rec.metadata or {})
+                metadata.update(
+                    {
+                        "superseded_by_rule": SERVED_ZONE_GATE_RULE,
+                        "superseded_reason": "served_zone_gate_now_blocks_runtime_tuning",
+                        "superseded_at": datetime.now(UTC).isoformat(),
+                    }
+                )
+                rec.metadata = metadata
+                await repo.update(rec.id, rec)
+                expired += 1
+            if expired:
+                logger.warning(
+                    "[AI-OPT] Expired %d stale active HVAC runtime tuning recommendations for %s after served-zone gate",
+                    expired,
+                    site_id,
+                )
+            return expired
+        except Exception as exc:
+            logger.warning("[AI-OPT] Failed to expire stale served-zone runtime recommendations: %s", exc)
+            return 0
+
+    def _closed_empty_hvac_context(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Return operating-state context when the site profile implies HVAC should be off/setback."""
+        electrical = current_conditions.get("electrical") or {}
+        site_aggregate = current_conditions.get("site_aggregate") or {}
+
+        def _as_float(value, default: float = 0.0) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        total_occupancy = site_aggregate.get("total_occupancy")
+        occupied_zones = site_aggregate.get("occupied_zones")
+        zone_count = site_aggregate.get("zone_count")
+        zero_occupancy = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
+            isinstance(occupied_zones, (int, float))
+            and float(occupied_zones) == 0
+            and isinstance(zone_count, (int, float))
+            and float(zone_count) > 0
+        )
+        if not zero_occupancy:
+            return None
+
+        current_time = self._current_conditions_time(current_conditions)
+        if not self._is_outside_site_operating_hours(site_id, current_time):
+            return None
+
+        active_safety_constraints = current_conditions.get("active_safety_constraints") or current_conditions.get(
+            "safety_constraints"
+        )
+        if active_safety_constraints:
+            return None
+
+        hvac_kw_float = _as_float(electrical.get("hvac_kw"))
+        total_kw_float = _as_float(electrical.get("total_kw"))
+        site_peak_kw = (
+            electrical.get("site_peak_kw")
+            or electrical.get("peak_kw")
+            or current_conditions.get("site_peak_kw")
+            or site_aggregate.get("site_peak_kw")
+        )
+        site_peak_kw_float = _as_float(site_peak_kw)
+        if site_peak_kw_float > 0:
+            threshold_kw = site_peak_kw_float * settings.after_hours_hvac_load_threshold_pct
+        else:
+            threshold_kw = settings.after_hours_hvac_load_threshold_kw
+        threshold_kw = max(settings.after_hours_hvac_load_threshold_kw, threshold_kw)
+        if hvac_kw_float <= threshold_kw:
+            return None
+
+        return {
+            "hvac_kw": hvac_kw_float,
+            "total_kw": total_kw_float,
+            "threshold_kw": threshold_kw,
+            "total_occupancy": total_occupancy,
+            "occupied_zones": occupied_zones,
+            "current_time": current_time.isoformat(),
+        }
+
+    @staticmethod
+    def _is_closed_empty_hvac_policy_rec(rec: dict[str, Any]) -> bool:
+        metadata = rec.get("metadata") or {}
+        return metadata.get("rule") in {
+            "closed_empty_building_hvac_running",
+            "after_hours_zero_occupancy_hvac_load",
+        }
+
+    @staticmethod
+    def _is_hvac_stop_or_setback_recommendation(rec: dict[str, Any]) -> bool:
+        action = rec.get("action") or {}
+        point = str(action.get("point") or rec.get("point_name") or "").strip().lower()
+        target = str(rec.get("target_equipment") or rec.get("equipment_id") or "").upper()
+        value = action.get("value", rec.get("recommended_value"))
+        value_text = str(value).strip().lower()
+        reason = str(rec.get("reason") or "").lower()
+        hvac_target = any(token in target for token in ("AHU", "CHILLER", "FCU", "VAV", "HVAC"))
+        if not hvac_target:
+            return False
+        if any(token in value_text for token in ("shut down", "shutdown", "turn off", " off", "setback")):
+            return True
+        if any(token in reason for token in ("shut down", "shutdown", "turn off", "setback")):
+            return True
+        if point == "fan_speed":
+            numeric_value = AIOptimizerService._float_or_none(value)
+            if numeric_value is not None and numeric_value <= 0:
+                return True
+            return value_text in {"0", "0speed", "off"}
+        return False
+
+    @staticmethod
+    def _is_hvac_runtime_tuning_recommendation(rec: dict[str, Any]) -> bool:
+        """Return True for setpoint/economiser tuning that assumes HVAC should keep running."""
+        if AIOptimizerService._is_hvac_stop_or_setback_recommendation(rec):
+            return False
+        action = rec.get("action") or {}
+        point = str(action.get("point") or rec.get("point_name") or "").strip().lower()
+        target = str(rec.get("target_equipment") or rec.get("equipment_id") or "").upper()
+        reason = str(rec.get("reason") or "").lower()
+        hvac_target = any(token in target for token in ("AHU", "CHILLER", "FCU", "VAV", "HVAC"))
+        hvac_point = point in {
+            "damper_position",
+            "economizer_mode",
+            "economiser_mode",
+            "fresh_air_damper",
+            "outdoor_air_damper",
+            "chilled_water_setpoint",
+            "chw_supply_temp_setpoint",
+            "supply_temp_setpoint",
+            "supply_air_temp_setpoint",
+            "sat_setpoint",
+            "fan_speed",
+            "setpoint",
+        }
+        tuning_reason = any(
+            token in reason
+            for token in ("free cooling", "economiser", "economizer", "chilled water", "supply air", "setpoint")
+        )
+        return hvac_target and (hvac_point or tuning_reason)
 
     def _extract_json(self, raw: str) -> str:
         """Extract JSON from LLM response with markdown fences stripped.
@@ -3065,6 +4476,45 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 lines.extend(type_lines)
 
         return "\n".join(lines) if lines else "No writable control points found"
+
+    def _format_verified_simbiot_control_points(self, site_id: str) -> str:
+        """Format verified SIMBIOT writable mappings for the optimizer prompt."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if not site_resp.data:
+                return "No verified SIMBIOT writable control points found"
+            site_uuid = site_resp.data[0]["id"]
+            resp = (
+                sb.table("point_asset_mappings")
+                .select("extracted_asset_id,parameter_name,bms_point_id,parameter_type")
+                .eq("site_id", site_uuid)
+                .eq("is_verified", True)
+                .execute()
+            )
+        except Exception as e:
+            logger.warning("[AI-OPT] Could not load verified SIMBIOT controls for prompt: %s", e)
+            return "No verified SIMBIOT writable control points found"
+
+        by_equipment: dict[str, list[str]] = {}
+        for mapping in resp.data or []:
+            if not self._mapping_type_is_writable(mapping.get("parameter_type")):
+                continue
+            equipment = self._normalize_code_format((mapping.get("extracted_asset_id") or "").strip())
+            point_name = (mapping.get("parameter_name") or "").strip()
+            if not point_name:
+                bms_point_id = (mapping.get("bms_point_id") or "").strip()
+                point_name = bms_point_id.rsplit(".", 1)[-1] if "." in bms_point_id else bms_point_id
+            if equipment and point_name:
+                by_equipment.setdefault(equipment, []).append(point_name)
+
+        lines = []
+        for equipment in sorted(by_equipment):
+            points = sorted(set(by_equipment[equipment]))
+            lines.append(f"- {equipment}: {', '.join(points)}")
+        return "\n".join(lines) if lines else "No verified SIMBIOT writable control points found"
 
     # Zone-Aware Optimization Helper Methods
 
@@ -4138,7 +5588,118 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 and getattr(d, "hvac_type", "") not in ("fcu", "chiller")
             ]
 
-        if outdoor_temp < 18.0:
+        # Rule 5: After-hours HVAC load with zero occupancy
+        # SENTINEL must flag sustained unoccupied HVAC load even when no writable BACnet
+        # point is currently resolved. The scheduler will persist this as advisory_info.
+        electrical = current_conditions.get("electrical") or {}
+        site_aggregate = current_conditions.get("site_aggregate") or {}
+        hvac_kw = electrical.get("hvac_kw")
+        total_kw = electrical.get("total_kw")
+        site_peak_kw = (
+            electrical.get("site_peak_kw")
+            or electrical.get("peak_kw")
+            or current_conditions.get("site_peak_kw")
+            or site_aggregate.get("site_peak_kw")
+        )
+
+        def _as_float(value, default: float = 0.0) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        hvac_kw_float = _as_float(hvac_kw)
+        total_kw_float = _as_float(total_kw)
+        site_peak_kw_float = _as_float(site_peak_kw)
+        if site_peak_kw_float > 0:
+            after_hours_threshold_kw = site_peak_kw_float * settings.after_hours_hvac_load_threshold_pct
+        else:
+            after_hours_threshold_kw = settings.after_hours_hvac_load_threshold_kw
+        after_hours_threshold_kw = max(settings.after_hours_hvac_load_threshold_kw, after_hours_threshold_kw)
+
+        total_occupancy = site_aggregate.get("total_occupancy")
+        occupied_zones = site_aggregate.get("occupied_zones")
+        zone_count = site_aggregate.get("zone_count")
+        zero_occupancy = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
+            isinstance(occupied_zones, (int, float))
+            and float(occupied_zones) == 0
+            and isinstance(zone_count, (int, float))
+            and float(zone_count) > 0
+        )
+        current_time = self._current_conditions_time(current_conditions)
+        outside_operating_hours = self._is_outside_site_operating_hours(site_id, current_time)
+        urgent_equipment = {
+            wo.get("equipment_code")
+            for wo in current_conditions.get("active_urgent_work_orders", [])
+            if wo.get("equipment_code")
+        }
+        active_safety_constraints = current_conditions.get("active_safety_constraints") or current_conditions.get(
+            "safety_constraints"
+        )
+        safety_active = bool(active_safety_constraints)
+        after_hours_target = next((d for d in chillers if d.id not in urgent_equipment), None)
+        if after_hours_target is None:
+            after_hours_target = next((d for d in ahus if d.id not in urgent_equipment), None)
+        if after_hours_target is None:
+            after_hours_target = next((d for d in hvac_devices if d.id not in urgent_equipment), None)
+
+        if (
+            after_hours_target
+            and outside_operating_hours
+            and zero_occupancy
+            and hvac_kw_float > after_hours_threshold_kw
+            and not safety_active
+        ):
+            closed_empty_hvac_running = True
+            load_share = (hvac_kw_float / total_kw_float * 100.0) if total_kw_float > 0 else None
+            share_text = f", {load_share:.1f}% of site load" if load_share is not None else ""
+            recommendations.append(
+                {
+                    "equipment_id": after_hours_target.id,
+                    "equipment_name": after_hours_target.name,
+                    "target_equipment": after_hours_target.id,
+                    "point_name": "",
+                    "current_value": hvac_kw_float,
+                    "recommended_value": ("Shut down or setback non-critical HVAC plant according to the site profile"),
+                    "unit": "manual_action",
+                    "system": "hvac",
+                    "action_type": "ai_optimization",
+                    "action": {
+                        "point": None,
+                        "value": "Shut down or setback non-critical HVAC plant according to the site profile",
+                        "execution_blocked": True,
+                        "blocker": "unresolved_bms_point",
+                    },
+                    "confidence": 0.72,
+                    "savings_kwh": round(max(0.0, hvac_kw_float - after_hours_threshold_kw), 1),
+                    "reason": (
+                        "Site profile indicates the building is closed and live occupancy is zero, but HVAC is still running: "
+                        f"HVAC {hvac_kw_float:.1f} kW exceeds threshold {after_hours_threshold_kw:.1f} kW"
+                        f"{share_text}. The correct operational response is shutdown or setback of non-critical HVAC, "
+                        "unless a safety, preservation, or tenant requirement says otherwise."
+                    ),
+                    "metadata": {
+                        "rule": "closed_empty_building_hvac_running",
+                        "legacy_rule": "after_hours_zero_occupancy_hvac_load",
+                        "outside_operating_hours": True,
+                        "total_occupancy": total_occupancy,
+                        "occupied_zones": occupied_zones,
+                        "hvac_kw": hvac_kw_float,
+                        "threshold_kw": round(after_hours_threshold_kw, 2),
+                        "suppressed_runtime_tuning": True,
+                    },
+                }
+            )
+        else:
+            closed_empty_hvac_running = False
+
+        # Rule 6: AHU Supply Air Temperature Reset
+        if closed_empty_hvac_running:
+            logger.info(
+                "[AI-OPT] Suppressing AHU/chiller runtime tuning for %s because site profile says closed, occupancy is zero, and HVAC is running",
+                site_id,
+            )
+        elif outdoor_temp < 18.0:
             # Mild outdoor temp: raise supply air temp to save reheat energy
             for ahu in ahus:
                 sat_point_names = ["supply_temp_setpoint", "supply_air_temp_setpoint"]
@@ -4175,7 +5736,9 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         )
 
         # Rule 6: AHU Economizer / Fresh Air Damper
-        if 15.0 <= outdoor_temp <= 22.0 and humidity < 65.0:
+        if closed_empty_hvac_running:
+            pass
+        elif 15.0 <= outdoor_temp <= 22.0 and humidity < 65.0:
             # Mild and dry: enable economizer for free cooling
             for ahu in ahus:
                 eco_point_names = ["economizer_mode", "fresh_air_damper", "outdoor_air_damper"]
@@ -4288,7 +5851,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         recommendations[-1]["confidence"] = 0.5
 
         # ============================================================
-        # DALI Lighting — Tridonic Handles Native Controls
+        # DALI Lighting — Tridonic Native Controls, SENTINEL Oversight
         # ============================================================
         # Tridonic net4more + DALI-2 natively handles (when properly installed):
         #   - Daylight harvesting (continuous proportional dimming to 500 lux setpoint)
@@ -4296,7 +5859,10 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         #   - Occupancy-based HVAC setback (via BACnet gateway to BMS)
         #   - Air quality driven ventilation (CO2/VOC sensors → BMS)
         #   - Emergency zone protection (maintains 70% minimum)
-        # AI does NOT duplicate these. SENTINEL adds value through:
+        # SENTINEL does not assume these are sufficient. The after-hours HVAC
+        # rule above independently flags aggregate unoccupied HVAC load when
+        # telemetry shows the native setback did not reduce plant demand.
+        # SENTINEL also adds value through:
         #   - Tariff-aware scheduling (shift loads to off-peak)
         #   - Predictive pre-conditioning (anticipate occupancy patterns)
         #   - Cross-zone energy balancing (redistribute across building)
@@ -4314,19 +5880,17 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
                 zone_name = zone.get("zone_name", zone_id)
 
-                # Tridonic handles occupancy-based dimming AND HVAC setback natively
-                # via net4more BACnet integration. SENTINEL adds predictive/tariff value.
+                # Tridonic may handle local occupancy actions via net4more BACnet.
+                # SENTINEL still monitors aggregate load for missed setbacks.
                 if not is_occupied:
                     cross_system_recommendations.append(
                         {
                             "zone_id": zone_id,
                             "zone_name": zone_name,
-                            "hvac_action": "Managed by Tridonic net4more (occupancy-based setback via BACnet)",
+                            "hvac_action": "Monitored by SENTINEL; native setback expected via Tridonic/BACnet",
                             "lighting_action": "Managed by Tridonic controller (occupancy-based dimming)",
                             "sentinel_action": "Monitor for predictive pre-conditioning and tariff optimization",
-                            "reason": (
-                                "Zone unoccupied - native Tridonic control active, SENTINEL monitoring for optimization"
-                            ),
+                            "reason": ("Zone unoccupied - SENTINEL monitors aggregate load for missed native setback"),
                             "combined_savings_kw": round(0.5, 2),
                         }
                     )
@@ -4566,6 +6130,13 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         for rec in bess_recommendations:
             recommendations.append(rec)
 
+        recommendations = self._apply_served_zone_runtime_gate(
+            site_id,
+            current_conditions,
+            equipment_inventory,
+            recommendations,
+        )
+
         # Sort recommendations by zone priority (critical zones first)
         recommendations = self._sort_recommendations_by_priority(recommendations, hvac_devices)
 
@@ -4774,6 +6345,97 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         # Returns default priority if device not found
         return 3
 
+    @staticmethod
+    def _point_is_writable(point: Any) -> bool:
+        if point is None:
+            return False
+        if isinstance(point, dict):
+            return bool(point.get("writable"))
+        return bool(getattr(point, "writable", False))
+
+    @staticmethod
+    def _mapping_type_is_writable(parameter_type: str | None) -> bool:
+        text = (parameter_type or "").lower()
+        if text in {"command", "setpoint", "writable"}:
+            return True
+        if text.startswith(("command:", "setpoint:", "writable:")):
+            return True
+        return any(token in text for token in ("analogoutput", "binaryoutput", "multistateoutput"))
+
+    async def _get_verified_writable_mapping(
+        self,
+        site_id: str,
+        equipment_id: str | None,
+        point_name: str | None,
+    ) -> dict[str, Any] | None:
+        """Return the verified SIMBIOT mapping for a writable control point, if one exists."""
+        equipment_code = (equipment_id or "").strip()
+        requested_point = (point_name or "").strip().lower()
+        if not equipment_code or not requested_point:
+            return None
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if not site_resp.data:
+                return None
+            site_uuid = site_resp.data[0]["id"]
+            canonical_equipment = self._normalize_code_format(equipment_code)
+            resp = (
+                sb.table("point_asset_mappings")
+                .select("bms_point_id,extracted_asset_id,parameter_name,parameter_type,is_verified,mapping_source")
+                .eq("site_id", site_uuid)
+                .eq("extracted_asset_id", canonical_equipment)
+                .eq("is_verified", True)
+                .execute()
+            )
+        except Exception as e:
+            logger.warning(
+                "[AI-OPT] Could not load verified SIMBIOT mappings for %s.%s: %s",
+                equipment_id,
+                point_name,
+                e,
+            )
+            return None
+
+        for mapping in resp.data or []:
+            if not self._mapping_type_is_writable(mapping.get("parameter_type")):
+                continue
+            parameter_name = (mapping.get("parameter_name") or "").strip().lower()
+            bms_point_id = (mapping.get("bms_point_id") or "").strip().lower()
+            bms_suffix = bms_point_id.rsplit(".", 1)[-1] if "." in bms_point_id else bms_point_id
+            if requested_point in {parameter_name, bms_suffix}:
+                return mapping
+        return None
+
+    async def _site_has_write_capable_adapter(self, site_id: str) -> bool:
+        """Return True only when the site has an enabled adapter that can execute writes."""
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            resp = (
+                sb.table("site_adapter_config")
+                .select("protocol,connection_config")
+                .eq("site_id", site_id)
+                .eq("enabled", True)
+                .execute()
+            )
+        except Exception as e:
+            logger.warning("[AI-OPT] Could not load adapter config for %s: %s", site_id, e)
+            return False
+
+        for row in resp.data or []:
+            protocol = str(row.get("protocol") or "").strip().lower()
+            config = row.get("connection_config") or {}
+            if protocol in {"bacnet", "knx", "modbus", "obix"}:
+                return True
+            if protocol == "bridge" and config.get("supports_writes") is True and config.get("write_enabled") is True:
+                return True
+        return False
+
     async def validate_recommendation(
         self,
         site_id: str,
@@ -4793,6 +6455,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             from app.database.repositories.equipment_repository import EquipmentRepository
 
             devices = await device_manager.list_devices_by_site(site_id)
+            site_write_ready = await self._site_has_write_capable_adapter(site_id)
             all_allowed = True
             validation_results = []
 
@@ -4802,10 +6465,26 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 # Handle both flat format (point_name) and grouped format (action.point)
                 point_name = rec.get("point_name") or rec.get("action", {}).get("point", "")
                 # Handle both flat format (recommended_value) and grouped format (action.value)
-                value = rec.get("recommended_value") or rec.get("action", {}).get("value")
+                value = rec.get("recommended_value")
+                if value is None:
+                    value = rec.get("action", {}).get("value")
+
+                if not point_name or value is None:
+                    validation_results.append(
+                        {
+                            "equipment_id": equipment_id,
+                            "point_name": point_name,
+                            "allowed": False,
+                            "reason": "Missing writable control point or target value",
+                            "validation_note": "missing_control_point_or_value",
+                        }
+                    )
+                    all_allowed = False
+                    continue
 
                 # Find device
                 device = next((d for d in devices if d.id == equipment_id), None)
+                verified_mapping = await self._get_verified_writable_mapping(site_id, equipment_id, point_name)
 
                 # FIX 2: HTTP bridge fallback — device_manager empty for oBIX sites
                 if not device:
@@ -4819,34 +6498,70 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                     except TimeoutError:
                         logger.error(
                             f"[AI-OPT] validate_recommendation DB timeout for {site_id} "
-                            f"— allowing recommendation through with reduced confidence"
+                            f"— blocking control recommendation until writable mapping can be verified"
                         )
-                        # Allow through but reduce confidence
                         validation_results.append(
                             {
                                 "equipment_id": equipment_id,
                                 "point_name": point_name,
-                                "allowed": True,
-                                "reason": "DB timeout — reduced confidence",
+                                "allowed": False,
+                                "reason": "DB timeout — writable mapping could not be verified",
                                 "validation_note": "supabase_timeout",
-                                "confidence_multiplier": 0.7,
                             }
                         )
+                        all_allowed = False
                         continue
 
                     # Normalise site_id for lookup: "site-002" → "S002" (for future use)
                     found = next((e for e in equip_list if e.get("code") == equipment_id), None)
-                    if found:
-                        logger.warning(f"[AI-OPT] {equipment_id} validated via Supabase fallback")
+                    if found and verified_mapping and site_write_ready:
+                        logger.warning(
+                            "[AI-OPT] %s.%s validated via verified SIMBIOT mapping",
+                            equipment_id,
+                            point_name,
+                        )
                         validation_results.append(
                             {
                                 "equipment_id": equipment_id,
                                 "point_name": point_name,
                                 "allowed": True,
-                                "reason": "Validated via Supabase fallback (device_manager empty for HTTP bridge site)",
-                                "source": "supabase_fallback",
+                                "reason": "Validated via verified SIMBIOT writable mapping",
+                                "source": "simbiot_verified_mapping",
+                                "mapping": {
+                                    "bms_point_id": verified_mapping.get("bms_point_id"),
+                                    "parameter_type": verified_mapping.get("parameter_type"),
+                                    "mapping_source": verified_mapping.get("mapping_source"),
+                                },
                             }
                         )
+                        continue
+                    elif found and verified_mapping:
+                        validation_results.append(
+                            {
+                                "equipment_id": equipment_id,
+                                "point_name": point_name,
+                                "allowed": False,
+                                "reason": (
+                                    "Equipment has a verified writable point mapping, but the site has no enabled "
+                                    "write-capable adapter. Route as manual BMS action/work order until control "
+                                    "transport is enabled."
+                                ),
+                                "validation_note": "missing_write_capable_adapter",
+                            }
+                        )
+                        all_allowed = False
+                        continue
+                    elif found:
+                        validation_results.append(
+                            {
+                                "equipment_id": equipment_id,
+                                "point_name": point_name,
+                                "allowed": False,
+                                "reason": "Equipment exists, but no verified writable SIMBIOT mapping exists for this point",
+                                "validation_note": "missing_verified_writable_mapping",
+                            }
+                        )
+                        all_allowed = False
                         continue
                     else:
                         validation_results.append(
@@ -4859,6 +6574,20 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         )
                         all_allowed = False
                         continue
+
+                device_point = (device.points or {}).get(point_name)
+                if not self._point_is_writable(device_point) and not verified_mapping:
+                    validation_results.append(
+                        {
+                            "equipment_id": equipment_id,
+                            "point_name": point_name,
+                            "allowed": False,
+                            "reason": "Point is not writable and has no verified SIMBIOT write mapping",
+                            "validation_note": "not_writable",
+                        }
+                    )
+                    all_allowed = False
+                    continue
 
                 # Validate against safety rules
                 if not safety_engine._initialized:
