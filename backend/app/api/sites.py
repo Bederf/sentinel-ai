@@ -487,11 +487,11 @@ async def get_sites_from_supabase(
 
         # Filter by user access if auth context provided
         if user_email and user_role:
-            buildings = await repo.get_all_for_user(
+            buildings = repo.get_all_for_user(
                 user_email=user_email, user_role=user_role, region=region, site_type=site_type
             )
         else:
-            buildings = await repo.get_all(region=region, site_type=site_type)
+            buildings = repo.get_all(region=region, site_type=site_type)
 
         if not buildings:
             return [], False
