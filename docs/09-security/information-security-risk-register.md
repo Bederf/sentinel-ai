@@ -1,10 +1,10 @@
 ---
 title: "Information Security Risk Register"
 type: "policy"
-status: "draft"
-version: "1.0.0"
+status: "approved"
+version: "1.1.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-06-23"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "security"

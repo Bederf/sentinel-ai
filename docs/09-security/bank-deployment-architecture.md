@@ -1,10 +1,10 @@
 ---
 title: "SENTINEL Bank Deployment Architecture"
 type: "reference"
-status: "draft"
-version: "1.0.0"
+status: "approved"
+version: "1.1.0"
 created: "2026-04-03"
-updated: "2026-04-03"
+updated: "2026-06-23"
 tags: ["sentinel", "bank", "deployment", "edge", "security"]
 domain: "security"
 audience: "bank-it", "bank-security", "platform-team"
@@ -15,8 +15,8 @@ estimated_read_time: 15
 # SENTINEL Bank Deployment Architecture
 
 **Document ID:** SENTINEL-BDA-001
-**Version:** 1.0
-**Effective Date:** 2026-04-03
+**Version:** 1.1
+**Effective Date:** 2026-06-23
 **Owner:** SENTINEL Platform Team
 **Classification:** Confidential
 
@@ -37,7 +37,7 @@ SENTINEL is designed as a **local-first, air-gap-compatible** BMS intelligence p
 | Component | Specification | Notes |
 |-----------|--------------|-------|
 | **GPU** | 1024 CUDA cores, 16 GB VRAM | Runs full local model set simultaneously |
-| **CPU** | 6-core ARM Cortex-A78AE | достаточно for BMS workloads |
+| **CPU** | 6-core ARM Cortex-A78AE | Sufficient for BMS workloads |
 | **RAM** | Integrated (shares VRAM) | Models use VRAM, not system RAM |
 | **Storage** | MicroSD or NVMe SSD (256 GB recommended) | For OS, models, telemetry DB |
 | **Power** | 7-15W | Low enough for PoE |
@@ -417,8 +417,35 @@ SUPABASE_SERVICE_KEY=
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-04-03 | SENTINEL Platform Team | Initial bank deployment architecture |
+| 1.1 | 2026-06-23 | SENTINEL Platform Team | FNB FSR prep — status to approved, endpoint count updates, feature availability matrix |
 
 ---
 
 *Document: SENTINEL-BDA-001*
 *Classification: Confidential*
+
+---
+
+## 9. Feature Availability by Deployment Mode
+
+The following matrix shows which Sentinel features are available in each deployment configuration. This is important for bank assessments where air-gapped or fully on-premises deployment is required.
+
+| Feature | Cloud VPS (Current) | On-Prem (SA Server) | Air-Gapped (local_full) |
+|---------|---------------------|---------------------|-------------------------|
+| BMS telemetry collection | ✅ | ✅ | ✅ |
+| Alarms & notifications | ✅ | ✅ | ✅ (Teams/Email only) |
+| Dashboard & web UI | ✅ | ✅ | ✅ |
+| RBAC & site isolation | ✅ | ✅ | ✅ |
+| Audit logging | ✅ | ✅ | ✅ |
+| AI diagnostics (local models) | ✅ | ✅ | ✅ |
+| AI chat (Ollama) | ✅ | ✅ | ✅ |
+| AI chat (Claude API) | ✅ | ✅ (optional) | ❌ (disabled) |
+| ML forecasting & anomaly detection | ✅ | ✅ | ✅ |
+| Recommendation engine | ✅ | ✅ | ✅ |
+| Sentry Bot (Telegram/WhatsApp) | ✅ | ✅ | ❌ (requires external connectivity) |
+| SIMBIOT bridge | ✅ | ✅ | ✅ (LAN-only) |
+| Remote operator access | ✅ | ✅ | ✅ (reverse tunnel) |
+| Supabase cloud sync | ✅ | ❌ (local PG) | ❌ (local PG) |
+| Third-party AI APIs | ✅ | ❌ (configurable) | ❌ (hard-blocked by EDGE_MODE) |
+
+**Key statement for bank assessors:** *"In fully air-gapped deployments, Sentry Bot is not available because it relies on external connectivity. Sentinel core monitoring, analytics, and local AI functions remain operational."*

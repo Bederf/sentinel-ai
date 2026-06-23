@@ -22,7 +22,7 @@ estimated_read_time: 10
 **Owner:** Platform/SRE Lead
 **Classification:** Internal
 **FSR Domain:** 4.15 -- Business Continuity
-**Status:** Draft (ready for execution and evidence capture)
+**Status:** Superseded — Q2 exercise completed at `docs/09-security/dr-exercise-report-2026Q2.md`
 
 ---
 
