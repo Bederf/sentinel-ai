@@ -646,10 +646,14 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   // Calculate summary stats — status field tracks BMS comms, health_score tracks mechanical equipment condition
   // Critical = health degradation (operational). Offline = comms loss (BMS not reporting, may be healthy).
   // Phase 226 — passive devices (DALI, meters, sensors) have health_score: null and are excluded.
+  // Phase 230 — thresholds aligned to DB/backend standard: OK >= 85, Warning 65-84, Critical < 65.
+  // Status field (offline/maintenance/needs_attention) is comms/lifecycle state, kept separate from
+  // health-score-derived buckets to avoid double-counting items that are both e.g. "needs_attention"
+  // AND have a healthy score (the old code's `||` caused exactly this overlap).
   const scorableEquipment = equipment.filter((e) => e.health_score != null);
-  const healthyEquipment = scorableEquipment.filter((e) => (e.status === "normal" || (e.status as string) === "online") && (e.health_score! >= 80)).length;
-  const warningEquipment = scorableEquipment.filter((e) => e.status === "warning" || (e.health_score! >= 60 && e.health_score! < 80)).length;
-  const criticalEquipment = scorableEquipment.filter((e) => e.health_score! < 60).length;
+  const healthyEquipment = scorableEquipment.filter((e) => e.health_score! >= 85).length;
+  const warningEquipment = scorableEquipment.filter((e) => e.health_score! >= 65 && e.health_score! < 85).length;
+  const criticalEquipment = scorableEquipment.filter((e) => e.health_score! < 65).length;
   const offlineEquipment = equipment.filter((e) => (e.status as string) === "offline" || (e.status as string) === "maintenance").length;
   const healthValues = scorableEquipment.map((e) => e.health_score!).filter((v): v is number => typeof v === "number" && v > 0);
   const avgHealth = healthValues.length > 0
@@ -1216,8 +1220,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </div>
                   <button
                     onClick={() => {
-                      // Filter to warning equipment and show first prediction if available
-                      const warningItems = equipment.filter((e) => e.status === "warning");
+                      // Filter to warning equipment (health 65-84) and show first prediction if available
+                      const warningItems = equipment.filter((e) => e.health_score != null && e.health_score >= 65 && e.health_score < 85);
                       if (warningItems.length > 0) {
                         const prediction = predictions.find(
                           (p) => warningItems.some((w) => p.equipment_id === w.id || p.equipment_name === w.name)
@@ -1243,8 +1247,8 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                   </button>
                   <button
                     onClick={() => {
-                      // Filter to critical equipment (health < 60) and show first prediction if available
-                      const criticalItems = equipment.filter((e) => (e.health_score ?? 100) < 60);
+                      // Filter to critical equipment (health < 65) and show first prediction if available
+                      const criticalItems = equipment.filter((e) => e.health_score != null && e.health_score < 65);
                       if (criticalItems.length > 0) {
                         const prediction = predictions.find(
                           (p) => criticalItems.some((c) => p.equipment_id === c.id || p.equipment_name === c.name)
