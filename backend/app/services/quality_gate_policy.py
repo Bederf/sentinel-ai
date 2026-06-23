@@ -275,6 +275,144 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "live_control"): MetricThreshold(
             pass_bound=0, warn_bound=None, direction="lower_is_better"
         ),
+        # ===================================================================
+        # COMMISSIONING mode — lenient (system is learning)
+        # ===================================================================
+        ("freshness_minutes", "commissioning"): MetricThreshold(
+            pass_bound=1440, warn_bound=4320, direction="lower_is_better"
+        ),
+        ("ingest_error_rate_pct_1h", "commissioning"): MetricThreshold(
+            pass_bound=15, warn_bound=25, direction="lower_is_better"
+        ),
+        ("match_coverage_pct", "commissioning"): MetricThreshold(
+            pass_bound=60, warn_bound=40, direction="higher_is_better"
+        ),
+        ("manual_source_pct", "commissioning"): MetricThreshold(na=True),
+        ("unmatched_points_pct", "commissioning"): MetricThreshold(
+            pass_bound=40, warn_bound=60, direction="lower_is_better"
+        ),
+        ("commissioning_all_gates_passed", "commissioning"): MetricThreshold(na=True),
+        ("truth_check_pass_rate_pct", "commissioning"): MetricThreshold(na=True),
+        ("consecutive_pass_days", "commissioning"): MetricThreshold(na=True),
+        ("mv_accuracy_7d_pct", "commissioning"): MetricThreshold(
+            pass_bound=50, warn_bound=40, direction="higher_is_better"
+        ),
+        ("comfort_violation_rate_7d_pct", "commissioning"): MetricThreshold(
+            pass_bound=20, warn_bound=35, direction="lower_is_better"
+        ),
+        ("rollback_rate_7d_pct", "commissioning"): MetricThreshold(na=True),
+        ("feedback_capture_rate_7d_pct", "commissioning"): MetricThreshold(
+            pass_bound=70, warn_bound=50, direction="higher_is_better"
+        ),
+        ("label_lag_p95_hours", "commissioning"): MetricThreshold(
+            pass_bound=72, warn_bound=120, direction="lower_is_better"
+        ),
+        ("drift_critical_alerts_24h", "commissioning"): MetricThreshold(
+            pass_bound=2, warn_bound=None, direction="lower_is_better"
+        ),
+        # ===================================================================
+        # ADVISORY mode — moderate (recommendations visible, no auto-control)
+        # ===================================================================
+        ("freshness_minutes", "advisory"): MetricThreshold(pass_bound=240, warn_bound=720, direction="lower_is_better"),
+        ("ingest_error_rate_pct_1h", "advisory"): MetricThreshold(
+            pass_bound=5, warn_bound=10, direction="lower_is_better"
+        ),
+        ("match_coverage_pct", "advisory"): MetricThreshold(pass_bound=80, warn_bound=65, direction="higher_is_better"),
+        ("manual_source_pct", "advisory"): MetricThreshold(pass_bound=5, warn_bound=10, direction="lower_is_better"),
+        ("unmatched_points_pct", "advisory"): MetricThreshold(
+            pass_bound=20, warn_bound=35, direction="lower_is_better"
+        ),
+        ("commissioning_all_gates_passed", "advisory"): MetricThreshold(
+            pass_bound=1, warn_bound=None, direction="higher_is_better"
+        ),
+        ("truth_check_pass_rate_pct", "advisory"): MetricThreshold(na=True),
+        ("consecutive_pass_days", "advisory"): MetricThreshold(na=True),
+        ("mv_accuracy_7d_pct", "advisory"): MetricThreshold(pass_bound=65, warn_bound=55, direction="higher_is_better"),
+        ("comfort_violation_rate_7d_pct", "advisory"): MetricThreshold(
+            pass_bound=12, warn_bound=20, direction="lower_is_better"
+        ),
+        ("rollback_rate_7d_pct", "advisory"): MetricThreshold(na=True),
+        ("feedback_capture_rate_7d_pct", "advisory"): MetricThreshold(
+            pass_bound=75, warn_bound=60, direction="higher_is_better"
+        ),
+        ("label_lag_p95_hours", "advisory"): MetricThreshold(pass_bound=48, warn_bound=72, direction="lower_is_better"),
+        ("drift_critical_alerts_24h", "advisory"): MetricThreshold(
+            pass_bound=1, warn_bound=3, direction="lower_is_better"
+        ),
+        # ===================================================================
+        # SUPERVISED mode — fairly strict (human-in-loop, active control)
+        # ===================================================================
+        ("freshness_minutes", "supervised"): MetricThreshold(pass_bound=30, warn_bound=90, direction="lower_is_better"),
+        ("ingest_error_rate_pct_1h", "supervised"): MetricThreshold(
+            pass_bound=2, warn_bound=4, direction="lower_is_better"
+        ),
+        ("match_coverage_pct", "supervised"): MetricThreshold(
+            pass_bound=95, warn_bound=90, direction="higher_is_better"
+        ),
+        ("manual_source_pct", "supervised"): MetricThreshold(
+            pass_bound=0, warn_bound=None, direction="lower_is_better"
+        ),
+        ("unmatched_points_pct", "supervised"): MetricThreshold(
+            pass_bound=5, warn_bound=10, direction="lower_is_better"
+        ),
+        ("commissioning_all_gates_passed", "supervised"): MetricThreshold(
+            pass_bound=1, warn_bound=None, direction="higher_is_better"
+        ),
+        ("truth_check_pass_rate_pct", "supervised"): MetricThreshold(
+            pass_bound=98, warn_bound=95, direction="higher_is_better"
+        ),
+        ("consecutive_pass_days", "supervised"): MetricThreshold(na=True),
+        ("mv_accuracy_7d_pct", "supervised"): MetricThreshold(
+            pass_bound=80, warn_bound=70, direction="higher_is_better"
+        ),
+        ("comfort_violation_rate_7d_pct", "supervised"): MetricThreshold(
+            pass_bound=5, warn_bound=8, direction="lower_is_better"
+        ),
+        ("rollback_rate_7d_pct", "supervised"): MetricThreshold(
+            pass_bound=3, warn_bound=5, direction="lower_is_better"
+        ),
+        ("feedback_capture_rate_7d_pct", "supervised"): MetricThreshold(
+            pass_bound=95, warn_bound=85, direction="higher_is_better"
+        ),
+        ("label_lag_p95_hours", "supervised"): MetricThreshold(
+            pass_bound=12, warn_bound=24, direction="lower_is_better"
+        ),
+        ("drift_critical_alerts_24h", "supervised"): MetricThreshold(
+            pass_bound=0, warn_bound=1, direction="lower_is_better"
+        ),
+        # ===================================================================
+        # AUTOMATIC mode — strictest (full autonomy)
+        # ===================================================================
+        ("freshness_minutes", "automatic"): MetricThreshold(pass_bound=15, warn_bound=60, direction="lower_is_better"),
+        ("ingest_error_rate_pct_1h", "automatic"): MetricThreshold(
+            pass_bound=1, warn_bound=2, direction="lower_is_better"
+        ),
+        ("match_coverage_pct", "automatic"): MetricThreshold(
+            pass_bound=98, warn_bound=95, direction="higher_is_better"
+        ),
+        ("manual_source_pct", "automatic"): MetricThreshold(pass_bound=0, warn_bound=None, direction="lower_is_better"),
+        ("unmatched_points_pct", "automatic"): MetricThreshold(pass_bound=2, warn_bound=5, direction="lower_is_better"),
+        ("commissioning_all_gates_passed", "automatic"): MetricThreshold(
+            pass_bound=1, warn_bound=None, direction="higher_is_better"
+        ),
+        ("truth_check_pass_rate_pct", "automatic"): MetricThreshold(
+            pass_bound=98, warn_bound=None, direction="higher_is_better"
+        ),
+        ("consecutive_pass_days", "automatic"): MetricThreshold(na=True),
+        ("mv_accuracy_7d_pct", "automatic"): MetricThreshold(
+            pass_bound=85, warn_bound=75, direction="higher_is_better"
+        ),
+        ("comfort_violation_rate_7d_pct", "automatic"): MetricThreshold(
+            pass_bound=3, warn_bound=5, direction="lower_is_better"
+        ),
+        ("rollback_rate_7d_pct", "automatic"): MetricThreshold(pass_bound=2, warn_bound=4, direction="lower_is_better"),
+        ("feedback_capture_rate_7d_pct", "automatic"): MetricThreshold(
+            pass_bound=97, warn_bound=93, direction="higher_is_better"
+        ),
+        ("label_lag_p95_hours", "automatic"): MetricThreshold(pass_bound=6, warn_bound=12, direction="lower_is_better"),
+        ("drift_critical_alerts_24h", "automatic"): MetricThreshold(
+            pass_bound=0, warn_bound=None, direction="lower_is_better"
+        ),
     }
 
     # All 14 metric names (ordered for consistent iteration)
@@ -295,7 +433,15 @@ class QualityGatePolicy:
         "drift_critical_alerts_24h",
     ]
 
-    MODES: list[str] = ["simulation", "shadow_live", "live_control"]
+    MODES: list[str] = [
+        "simulation",
+        "commissioning",
+        "shadow_live",
+        "advisory",
+        "supervised",
+        "automatic",
+        "live_control",
+    ]
 
     def get_thresholds(self, mode: str) -> dict[str, MetricThreshold]:
         """Get all 14 metric thresholds for a given mode.

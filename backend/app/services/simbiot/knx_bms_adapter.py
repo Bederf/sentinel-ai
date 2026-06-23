@@ -37,6 +37,30 @@ def _is_emergency_group(point_metadata: dict) -> bool:
     return any(p in desc for p in _EMERGENCY_PATTERNS)
 
 
+def _hierarchy_from_metadata(metadata: dict[str, Any], *, default_source: str) -> dict[str, Any] | None:
+    hierarchy = metadata.get("hierarchy")
+    if isinstance(hierarchy, dict):
+        return {
+            "available": bool(hierarchy.get("nodes") or hierarchy.get("relationships")),
+            "source": hierarchy.get("source") or default_source,
+            "nodes": hierarchy.get("nodes") or [],
+            "relationships": hierarchy.get("relationships") or [],
+            "raw": hierarchy,
+        }
+
+    nodes = metadata.get("hierarchy_nodes") or metadata.get("nodes")
+    relationships = metadata.get("hierarchy_relationships") or metadata.get("relationships")
+    if nodes or relationships:
+        return {
+            "available": True,
+            "source": metadata.get("hierarchy_source") or default_source,
+            "nodes": nodes or [],
+            "relationships": relationships or [],
+            "raw": {"nodes": nodes or [], "relationships": relationships or []},
+        }
+    return None
+
+
 class KnxBmsAdapter(BmsAdapter):
     """Concrete BMS adapter that wraps the shared KNXClient."""
 
@@ -55,6 +79,7 @@ class KnxBmsAdapter(BmsAdapter):
         return BmsAdapterCapabilities(
             supports_device_discovery=False,  # KNX topology comes from ETS export
             supports_point_discovery=True,
+            supports_hierarchy_discovery=True,
             supports_reads=True,
             supports_writes=True,
             supports_subscriptions=False,
@@ -178,6 +203,58 @@ class KnxBmsAdapter(BmsAdapter):
                 )
             )
         return points
+
+    async def discover_hierarchy(self) -> dict[str, Any]:
+        """Return KNX hierarchy from ETS/group-address metadata.
+
+        KNX group-address traffic does not describe building engineering
+        relationships by itself. ETS exports or configured group metadata may
+        include floor, zone, and equipment bindings; those are imported here.
+        """
+        metadata = self._config.metadata if self._config else {}
+        configured = _hierarchy_from_metadata(metadata, default_source="knx_ets_export")
+        if configured:
+            return configured
+
+        nodes: dict[str, dict[str, Any]] = {}
+        relationships: list[dict[str, Any]] = []
+        for point_name, ga_meta in self._group_addresses.items():
+            equipment_id = ga_meta.get("equipment_id") or ga_meta.get("canonical_code")
+            zone_id = ga_meta.get("zone_id") or ga_meta.get("zone_key")
+            if equipment_id:
+                nodes[str(equipment_id)] = {
+                    "id": str(equipment_id),
+                    "equipment_id": str(equipment_id),
+                    "type": "equipment",
+                    "name": str(equipment_id),
+                }
+            if zone_id:
+                nodes[str(zone_id)] = {
+                    "id": str(zone_id),
+                    "zone_id": str(zone_id),
+                    "type": "zone",
+                    "name": ga_meta.get("zone_name") or str(zone_id),
+                }
+            if equipment_id and zone_id:
+                relationships.append(
+                    {
+                        "parent": str(equipment_id),
+                        "child": str(zone_id),
+                        "relationship_type": ga_meta.get("relationship_type") or "controls",
+                        "evidence_basis": f"KNX group address {point_name}",
+                        "source": "knx_ets_export",
+                    }
+                )
+
+        return {
+            "available": bool(relationships),
+            "source": "knx_ets_export",
+            "nodes": list(nodes.values()),
+            "relationships": relationships,
+            "message": ""
+            if relationships
+            else "KNX hierarchy requires ETS metadata with equipment_id and zone_id bindings.",
+        }
 
     async def read_point(self, device_id: str, point_id: str) -> BmsPointValue:
         self._ensure_connected()

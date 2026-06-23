@@ -229,6 +229,12 @@ def load_sites() -> list[dict[str, Any]]:
             if buildings:
                 sites = []
                 for b in buildings:
+                    opt_settings = b.get("optimization_settings") or {}
+                    site_peak_kw = opt_settings.get("site_peak_kw")
+                    try:
+                        site_peak_kw = float(site_peak_kw) if site_peak_kw is not None else None
+                    except (TypeError, ValueError):
+                        site_peak_kw = None
                     site = {
                         "id": b.get("code") or b.get("id"),
                         "name": b.get("name"),
@@ -240,7 +246,11 @@ def load_sites() -> list[dict[str, Any]]:
                         "occupancy_pattern": b.get("occupancy_pattern", "office"),
                         "optimization_enabled": b.get("optimization_enabled", False),
                         "optimization_status": b.get("optimization_status", "unknown"),
-                        "optimization_settings": b.get("optimization_settings"),
+                        "optimization_settings": opt_settings,
+                        "site_peak_kw": site_peak_kw,
+                        "site_peak_kw_source": opt_settings.get("site_peak_kw_source"),
+                        "site_peak_kw_basis": opt_settings.get("site_peak_kw_basis"),
+                        "site_peak_kw_updated_at": opt_settings.get("site_peak_kw_updated_at"),
                         "last_recommendation": b.get("last_recommendation"),
                         "last_optimization": b.get("last_optimization"),
                         "optimization_history": b.get("optimization_history", []),
@@ -1069,9 +1079,13 @@ class AIOptimizerService:
 
                 # Inline site lookup — sb not yet defined at this point in the function
                 sb_sp = get_supabase_client()
-                site_resp_sp = sb_sp.table("sites").select("id").eq("code", site_id).execute()
+                site_resp_sp = sb_sp.table("sites").select("id,optimization_settings").eq("code", site_id).execute()
                 if site_resp_sp.data:
-                    site_uuid_sp = site_resp_sp.data[0]["id"]
+                    site_row_sp = site_resp_sp.data[0]
+                    site_uuid_sp = site_row_sp["id"]
+                    site_peak_kw = self._site_peak_kw_from_site_row(site_row_sp)
+                    if site_peak_kw and site_peak_kw > 0:
+                        conditions["site_peak_kw"] = site_peak_kw
                     eq_repo = EquipmentRepository()
                     all_equip = eq_repo.get_all(site_id=site_uuid_sp)
                     now_utc = datetime.now(tz=UTC)
@@ -3950,18 +3964,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         hvac_kw_float = _as_float(electrical.get("hvac_kw"))
         total_kw_float = _as_float(electrical.get("total_kw"))
-        site_peak_kw = (
-            electrical.get("site_peak_kw")
-            or electrical.get("peak_kw")
-            or current_conditions.get("site_peak_kw")
-            or site_aggregate.get("site_peak_kw")
-        )
-        site_peak_kw_float = _as_float(site_peak_kw)
-        if site_peak_kw_float > 0:
-            threshold_kw = site_peak_kw_float * settings.after_hours_hvac_load_threshold_pct
-        else:
-            threshold_kw = settings.after_hours_hvac_load_threshold_kw
-        threshold_kw = max(settings.after_hours_hvac_load_threshold_kw, threshold_kw)
+        threshold_kw = self._after_hours_hvac_threshold_kw(site_id, current_conditions)
         if hvac_kw_float <= threshold_kw:
             return None
 
@@ -3981,6 +3984,56 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             "closed_empty_building_hvac_running",
             "after_hours_zero_occupancy_hvac_load",
         }
+
+    @staticmethod
+    def _site_peak_kw_from_site_row(site_row: dict[str, Any] | None) -> float | None:
+        if not site_row:
+            return None
+        opt_settings = site_row.get("optimization_settings") or {}
+        candidates = (
+            opt_settings.get("site_peak_kw"),
+            opt_settings.get("peak_kw"),
+            site_row.get("site_peak_kw"),
+            site_row.get("peak_kw"),
+        )
+        for candidate in candidates:
+            if candidate is None:
+                continue
+            try:
+                peak_kw = float(candidate)
+            except (TypeError, ValueError):
+                continue
+            if peak_kw > 0:
+                return peak_kw
+        return None
+
+    def _after_hours_hvac_threshold_kw(self, site_id: str, current_conditions: dict[str, Any]) -> float:
+        electrical = current_conditions.get("electrical") or {}
+        site_aggregate = current_conditions.get("site_aggregate") or {}
+        site_peak_kw = (
+            electrical.get("site_peak_kw")
+            or electrical.get("peak_kw")
+            or current_conditions.get("site_peak_kw")
+            or site_aggregate.get("site_peak_kw")
+        )
+        if site_peak_kw is None:
+            site_peak_kw_float = 0.0
+        else:
+            try:
+                site_peak_kw_float = float(site_peak_kw)
+            except (TypeError, ValueError):
+                site_peak_kw_float = 0.0
+
+        if site_peak_kw_float > 0:
+            threshold_kw = site_peak_kw_float * settings.after_hours_hvac_load_threshold_pct
+            return max(settings.after_hours_hvac_load_threshold_kw, threshold_kw)
+
+        logger.warning(
+            "[AI-OPT] site_peak_kw missing for %s; using conservative fallback %.2f kW",
+            site_id,
+            settings.after_hours_hvac_load_threshold_kw,
+        )
+        return settings.after_hours_hvac_load_threshold_kw
 
     @staticmethod
     def _is_hvac_stop_or_setback_recommendation(rec: dict[str, Any]) -> bool:
@@ -5643,12 +5696,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         site_aggregate = current_conditions.get("site_aggregate") or {}
         hvac_kw = electrical.get("hvac_kw")
         total_kw = electrical.get("total_kw")
-        site_peak_kw = (
-            electrical.get("site_peak_kw")
-            or electrical.get("peak_kw")
-            or current_conditions.get("site_peak_kw")
-            or site_aggregate.get("site_peak_kw")
-        )
 
         def _as_float(value, default: float = 0.0) -> float:
             try:
@@ -5658,12 +5705,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         hvac_kw_float = _as_float(hvac_kw)
         total_kw_float = _as_float(total_kw)
-        site_peak_kw_float = _as_float(site_peak_kw)
-        if site_peak_kw_float > 0:
-            after_hours_threshold_kw = site_peak_kw_float * settings.after_hours_hvac_load_threshold_pct
-        else:
-            after_hours_threshold_kw = settings.after_hours_hvac_load_threshold_kw
-        after_hours_threshold_kw = max(settings.after_hours_hvac_load_threshold_kw, after_hours_threshold_kw)
+        after_hours_threshold_kw = self._after_hours_hvac_threshold_kw(site_id, current_conditions)
 
         total_occupancy = site_aggregate.get("total_occupancy")
         occupied_zones = site_aggregate.get("occupied_zones")

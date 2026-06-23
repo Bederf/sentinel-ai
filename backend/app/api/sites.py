@@ -493,6 +493,9 @@ async def get_sites_from_supabase(
         else:
             buildings = repo.get_all(region=region, site_type=site_type)
 
+        # Commercial SENTINEL surfaces must not include residential onboarding rows.
+        buildings = [b for b in buildings if str(b.get("code") or "").startswith("site-")]
+
         if not buildings:
             return [], False
 
@@ -556,6 +559,8 @@ async def get_site_from_supabase(site_id: str) -> tuple[dict | None, bool]:
 
         if not building:
             return None, True  # Success but not found
+        if not str(building.get("code") or "").startswith("site-"):
+            return None, True
 
         site_uuid = building.get("id")
 

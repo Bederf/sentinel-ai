@@ -132,6 +132,35 @@ class DiscoveredEquipmentActionResponse(BaseModel):
     equipment_code: str | None = None
 
 
+class UnmappedEquipmentRow(BaseModel):
+    id: str
+    code: str
+    name: str | None = None
+    equipment_type: str | None = None
+    raw_code: str | None = None
+    canonical_code: str | None = None
+    canonical_zone_id: str | None = None
+    reason: str | None = None
+    zone_key: str | None = None
+
+
+class UnmappedEquipmentResponse(BaseModel):
+    site_id: str
+    pending_count: int
+    items: list[UnmappedEquipmentRow]
+
+
+class MapUnmappedEquipmentRequest(BaseModel):
+    canonical_code: str = Field(..., min_length=3)
+    equipment_type: str | None = None
+    canonical_zone_id: str | None = None
+    relationship_type: str | None = Field(
+        None,
+        description="Optional equipment-zone relationship: serves, located_in, controls, monitors, or plant",
+    )
+    notes: str | None = None
+
+
 # ==================== Endpoints ====================
 
 
@@ -212,6 +241,23 @@ def _row_with_zone_status(row: dict[str, Any], inventory: dict[str, str]) -> Dis
     )
 
 
+def _normalize_zone_id(zone_id: str | None, inventory: dict[str, str]) -> str | None:
+    value = str(zone_id or "").strip()
+    if not value:
+        return None
+    return inventory.get(value)
+
+
+def _infer_relationship_type(equipment_type: str | None, canonical_zone_id: str | None) -> str | None:
+    if not canonical_zone_id:
+        return None
+    if canonical_zone_id.startswith("Zone-B") or canonical_zone_id.startswith("Zone-R-"):
+        return "plant"
+    if (equipment_type or "").lower() in {"ahu", "fcu", "vav", "split", "dali", "lum", "zone"}:
+        return "serves"
+    return "located_in"
+
+
 @router.get("/sites/{site_id}/discovered-equipment", response_model=DiscoveredEquipmentResponse)
 async def get_discovered_equipment(site_id: str, limit: int = Query(50, ge=1, le=200)):
     """List bridge-discovered equipment waiting for onboarding review."""
@@ -229,6 +275,136 @@ async def get_discovered_equipment(site_id: str, limit: int = Query(50, ge=1, le
     )
     items = [_row_with_zone_status(row, inventory) for row in response.data or []]
     return DiscoveredEquipmentResponse(site_id=site_id, pending_count=len(items), items=items)
+
+
+@router.get("/sites/{site_id}/unmapped-equipment", response_model=UnmappedEquipmentResponse)
+async def get_unmapped_equipment(site_id: str, limit: int = Query(100, ge=1, le=300)):
+    """List active equipment rows waiting for manual canonical mapping."""
+    client = _get_supabase_client()
+    site_uuid = _get_site_uuid(site_id)
+    response = (
+        client.table("equipment")
+        .select(
+            "id, code, name, type, raw_code, canonical_code, canonical_zone_id, zone_key, canonicalization_metadata"
+        )
+        .eq("site_id", site_uuid)
+        .eq("canonicalization_status", "needs_review")
+        .order("code")
+        .limit(limit)
+        .execute()
+    )
+    items = [
+        UnmappedEquipmentRow(
+            id=str(row.get("id")),
+            code=row.get("code"),
+            name=row.get("name"),
+            equipment_type=row.get("type"),
+            raw_code=row.get("raw_code"),
+            canonical_code=row.get("canonical_code"),
+            canonical_zone_id=row.get("canonical_zone_id"),
+            zone_key=row.get("zone_key"),
+            reason=(row.get("canonicalization_metadata") or {}).get("reason"),
+        )
+        for row in response.data or []
+    ]
+    return UnmappedEquipmentResponse(site_id=site_id, pending_count=len(items), items=items)
+
+
+@router.post("/sites/{site_id}/unmapped-equipment/{equipment_id}/map", response_model=DiscoveredEquipmentActionResponse)
+async def map_unmapped_equipment(site_id: str, equipment_id: str, body: MapUnmappedEquipmentRequest):
+    """Apply a manual canonical mapping to an active equipment row."""
+    client = _get_supabase_client()
+    site_uuid = _get_site_uuid(site_id)
+    inventory = _zone_inventory(site_uuid)
+
+    equipment_response = (
+        client.table("equipment")
+        .select("id, code, type, raw_code")
+        .eq("site_id", site_uuid)
+        .eq("id", equipment_id)
+        .limit(1)
+        .execute()
+    )
+    if not equipment_response.data:
+        raise HTTPException(status_code=404, detail="Equipment item not found")
+
+    row = equipment_response.data[0]
+    canonical_code = body.canonical_code.strip().upper()
+    equipment_type = (body.equipment_type or row.get("type") or "unknown").strip().lower()
+    canonical_zone_id = _normalize_zone_id(body.canonical_zone_id, inventory)
+    if body.canonical_zone_id and not canonical_zone_id:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{body.canonical_zone_id} is not in the site zone inventory. "
+                "Create or approve the zone before assigning equipment to it."
+            ),
+        )
+
+    relationship_type = body.relationship_type or _infer_relationship_type(equipment_type, canonical_zone_id)
+    if relationship_type and relationship_type not in {"serves", "located_in", "controls", "monitors", "plant"}:
+        raise HTTPException(status_code=422, detail="Invalid relationship_type")
+
+    now_iso = datetime.now(tz=UTC).isoformat()
+    metadata = {
+        "reason": "manual_mapping_applied",
+        "mapped_by": "system_health",
+        "mapped_at": now_iso,
+    }
+    if body.notes:
+        metadata["notes"] = body.notes
+
+    client.table("equipment").update(
+        {
+            "raw_code": row.get("raw_code") or row.get("code"),
+            "canonical_code": canonical_code,
+            "canonical_zone_id": canonical_zone_id,
+            "zone_key": canonical_zone_id,
+            "type": equipment_type,
+            "canonicalization_status": "canonical",
+            "canonicalization_source": "manual_mapping",
+            "canonicalization_metadata": metadata,
+            "updated_at": now_iso,
+        }
+    ).eq("id", equipment_id).execute()
+
+    alias_code = row.get("raw_code") or row.get("code")
+    if alias_code and alias_code != canonical_code:
+        client.table("equipment_aliases").upsert(
+            {
+                "site_id": site_uuid,
+                "equipment_id": equipment_id,
+                "alias_code": alias_code,
+                "canonical_code": canonical_code,
+                "alias_type": "source",
+                "source": "manual_mapping",
+                "confidence": 1.0,
+                "review_status": "approved",
+                "metadata": metadata,
+            },
+            on_conflict="site_id,alias_code",
+        ).execute()
+
+    if canonical_zone_id and relationship_type:
+        client.table("equipment_zone_relationships").upsert(
+            {
+                "site_id": site_uuid,
+                "equipment_id": equipment_id,
+                "zone_id": canonical_zone_id,
+                "relationship_type": relationship_type,
+                "source": "manual_mapping",
+                "confidence": 1.0,
+                "review_status": "approved",
+                "metadata": metadata,
+            },
+            on_conflict="equipment_id,zone_id,relationship_type",
+        ).execute()
+
+    return DiscoveredEquipmentActionResponse(
+        success=True,
+        message="Manual equipment mapping saved.",
+        equipment_code=canonical_code,
+    )
 
 
 @router.post(
@@ -422,7 +598,7 @@ async def get_current_health():
             name="bms_connectivity",
             status=bms_status,
             score=bms_avg,
-            message="Aggregate BMS protocol connectivity",
+            message="Global aggregate of supervisor, field network, oBIX, and lighting telemetry probes",
         )
 
         return SystemHealthSnapshot(

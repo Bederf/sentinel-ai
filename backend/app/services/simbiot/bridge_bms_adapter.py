@@ -75,6 +75,7 @@ class BridgeBmsAdapter(BmsAdapter):
         return BmsAdapterCapabilities(
             supports_device_discovery=True,
             supports_point_discovery=True,
+            supports_hierarchy_discovery=True,
             supports_reads=True,
             supports_writes=self._write_enabled,
             supports_subscriptions=False,
@@ -218,6 +219,69 @@ class BridgeBmsAdapter(BmsAdapter):
             )
         return points
 
+    async def discover_hierarchy(self) -> dict[str, Any]:
+        """Fetch native BMS hierarchy proxied by the bridge, when available.
+
+        Expected bridge endpoint:
+            GET /api/sites/{site_id}/hierarchy
+
+        The bridge may expose Desigo plant/location trees, Niagara station
+        trees, or BACnet Structured Views behind this normalized endpoint.
+        Older flat-point bridges do not have it; that is reported as
+        unavailable so onboarding can fall back to naming inference/manual
+        review without failing activation.
+        """
+        if not self._site_id:
+            return {
+                "available": False,
+                "source": "bridge",
+                "nodes": [],
+                "relationships": [],
+                "message": "Bridge adapter is not connected to a site",
+            }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                resp = await client.get(
+                    f"{self._base_url}/api/sites/{self._site_id}/hierarchy",
+                    headers=self._headers,
+                )
+                if resp.status_code == 404:
+                    return {
+                        "available": False,
+                        "source": "bridge",
+                        "nodes": [],
+                        "relationships": [],
+                        "message": "Bridge hierarchy endpoint is not available",
+                    }
+                resp.raise_for_status()
+                data = resp.json() if resp.content else {}
+        except Exception as exc:
+            logger.warning("[BRIDGE] discover_hierarchy failed for %s: %s", self._site_id, exc)
+            return {
+                "available": False,
+                "source": "bridge",
+                "nodes": [],
+                "relationships": [],
+                "message": str(exc),
+            }
+
+        nodes = data.get("nodes") or data.get("hierarchy", {}).get("nodes") or []
+        relationships = data.get("relationships") or data.get("hierarchy", {}).get("relationships") or []
+        if not nodes and not relationships:
+            flattened = _flatten_bridge_hierarchy(data)
+            nodes = flattened["nodes"]
+            relationships = flattened["relationships"]
+
+        return {
+            "available": bool(nodes or relationships),
+            "source": _bridge_hierarchy_source(data),
+            "adapter": "bridge",
+            "nodes": nodes,
+            "relationships": relationships,
+            "raw": data,
+        }
+
     async def read_point(self, device_id: str, point_id: str) -> BmsPointValue:
         """Read one point from the bridge (single-point health monitor path).
 
@@ -321,3 +385,173 @@ def bridge_adapter_from_connection_config(
             connection_config.get("supports_writes") is True and connection_config.get("write_enabled") is True
         ),
     )
+
+
+def _bridge_hierarchy_source(data: dict[str, Any]) -> str:
+    raw = str(data.get("source") or data.get("source_type") or data.get("hierarchy_source") or "").lower()
+    system = str(data.get("bms_system") or data.get("bms_vendor") or "").lower()
+    if "desigo" in raw or "desigo" in system:
+        return "desigo_plant_tree"
+    if "niagara" in raw or "jace" in raw or "niagara" in system or "jace" in system:
+        return "niagara_station_tree"
+    if "bacnet" in raw and "structured" in raw:
+        return "bacnet_structured_view"
+    return "bridge_hierarchy"
+
+
+def _flatten_bridge_hierarchy(data: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    nodes_by_id: dict[str, dict[str, Any]] = {}
+    relationships: dict[tuple[str, str, str], dict[str, Any]] = {}
+    roots = [
+        ("plant_tree", data.get("plant_tree")),
+        ("station_tree", data.get("station_tree")),
+        ("location_tree", data.get("location_tree")),
+    ]
+    for root_name, root in roots:
+        if isinstance(root, dict):
+            source = _source_for_tree(root_name, data)
+            _walk_bridge_node(
+                root,
+                tree_name=root_name,
+                source=source,
+                path=[],
+                nodes_by_id=nodes_by_id,
+                relationships=relationships,
+                nearest_equipment_id=None,
+            )
+    return {"nodes": list(nodes_by_id.values()), "relationships": list(relationships.values())}
+
+
+def _source_for_tree(tree_name: str, data: dict[str, Any]) -> str:
+    if tree_name == "station_tree":
+        return "niagara_station_tree"
+    if tree_name == "location_tree":
+        return "desigo_location_tree" if "desigo" in _bridge_hierarchy_source(data) else _bridge_hierarchy_source(data)
+    if tree_name == "plant_tree":
+        return "desigo_plant_tree" if "desigo" in _bridge_hierarchy_source(data) else _bridge_hierarchy_source(data)
+    return _bridge_hierarchy_source(data)
+
+
+def _walk_bridge_node(
+    node: dict[str, Any],
+    *,
+    tree_name: str,
+    source: str,
+    path: list[str],
+    nodes_by_id: dict[str, dict[str, Any]],
+    relationships: dict[tuple[str, str, str], dict[str, Any]],
+    nearest_equipment_id: str | None,
+) -> None:
+    name = str(node.get("name") or node.get("equipment_id") or node.get("zone_id") or node.get("id") or "node")
+    current_path = [*path, name]
+    node_id = _bridge_node_id(node, tree_name, current_path)
+    node_type = str(
+        node.get("node_type") or node.get("type") or ("equipment" if node.get("equipment_id") else "folder")
+    )
+    current_source = str(node.get("source") or source)
+    confidence = _coerce_confidence(node.get("confidence"))
+    review_status = _normalize_review_status(node.get("review_status"), confidence)
+    evidence_basis = node.get("evidence_basis") or " > ".join(current_path)
+
+    normalized_node = {
+        "id": node_id,
+        "node_id": node_id,
+        "name": name,
+        "type": node_type,
+        "node_type": node_type,
+        "path": " > ".join(current_path),
+        "source": current_source,
+        "confidence": confidence,
+        "review_status": review_status,
+        "evidence_basis": evidence_basis,
+    }
+    for key in ("equipment_id", "canonical_code", "zone_id", "zone_key", "equipment_type"):
+        if node.get(key):
+            normalized_node[key] = node[key]
+    nodes_by_id[node_id] = normalized_node
+
+    current_equipment_id = node.get("canonical_code") or node.get("equipment_id")
+    if nearest_equipment_id and current_equipment_id and nearest_equipment_id != current_equipment_id:
+        rel_type = str(node.get("relationship_type") or ("manages" if source == "niagara_station_tree" else "contains"))
+        _add_bridge_relationship(
+            relationships,
+            parent=str(nearest_equipment_id),
+            child=str(current_equipment_id),
+            relationship_type=rel_type,
+            source=current_source,
+            confidence=confidence,
+            review_status=review_status,
+            evidence_basis=evidence_basis,
+        )
+
+    zone_id = node.get("zone_id") or node.get("zone_key")
+    if nearest_equipment_id and zone_id:
+        _add_bridge_relationship(
+            relationships,
+            parent=str(nearest_equipment_id),
+            child=str(zone_id),
+            relationship_type=str(node.get("relationship_type") or "serves"),
+            source=current_source,
+            confidence=confidence,
+            review_status=review_status,
+            evidence_basis=evidence_basis,
+        )
+
+    next_nearest_equipment = str(current_equipment_id) if current_equipment_id else nearest_equipment_id
+    for child in node.get("children") or []:
+        if isinstance(child, dict):
+            _walk_bridge_node(
+                child,
+                tree_name=tree_name,
+                source=source,
+                path=current_path,
+                nodes_by_id=nodes_by_id,
+                relationships=relationships,
+                nearest_equipment_id=next_nearest_equipment,
+            )
+
+
+def _bridge_node_id(node: dict[str, Any], tree_name: str, path: list[str]) -> str:
+    for key in ("id", "node_id", "canonical_code", "equipment_id", "zone_id", "zone_key"):
+        if node.get(key):
+            return str(node[key])
+    return f"{tree_name}:{'/'.join(path)}"
+
+
+def _add_bridge_relationship(
+    relationships: dict[tuple[str, str, str], dict[str, Any]],
+    *,
+    parent: str,
+    child: str,
+    relationship_type: str,
+    source: str,
+    confidence: float,
+    review_status: str,
+    evidence_basis: Any,
+) -> None:
+    key = (parent, child, relationship_type)
+    relationships[key] = {
+        "parent": parent,
+        "child": child,
+        "relationship_type": relationship_type,
+        "source": source,
+        "confidence": confidence,
+        "review_status": review_status,
+        "evidence_basis": evidence_basis,
+    }
+
+
+def _coerce_confidence(value: Any) -> float:
+    try:
+        return max(0.0, min(1.0, float(value)))
+    except (TypeError, ValueError):
+        return 0.85
+
+
+def _normalize_review_status(value: Any, confidence: float) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in {"approved", "suggested", "rejected"}:
+        return raw
+    if confidence >= 0.90 and raw in {"auto_approved", "high_confidence_approved"}:
+        return "approved"
+    return "suggested"

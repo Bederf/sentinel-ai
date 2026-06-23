@@ -645,6 +645,7 @@ class BackgroundSchedulerService:
             "min_success_rate": 70.0,
             "cooldown_hours": 24,
         }
+        self._site_peak_refresh_lookback_days = 90
         logger.info("Background scheduler initialized")
 
     def set_main_loop(self, loop: asyncio.AbstractEventLoop):
@@ -887,10 +888,34 @@ class BackgroundSchedulerService:
     ) -> bool:
         """Trigger analysis for sustained after-hours HVAC load in an empty building."""
         from app.config.settings import settings
+        from app.database.supabase_client import get_supabase_client
 
         if is_occupied_hours or occupancy != 0:
             return False
-        if hvac_kw <= float(getattr(settings, "after_hours_hvac_load_threshold_kw", 15.0)):
+        site_peak_kw = None
+        try:
+            client = get_supabase_client()
+            site_row = client.table("sites").select("optimization_settings").eq("code", site_id).limit(1).execute()
+            if site_row.data:
+                opt_settings = site_row.data[0].get("optimization_settings") or {}
+                candidate = opt_settings.get("site_peak_kw") or opt_settings.get("peak_kw")
+                if candidate is not None:
+                    site_peak_kw = float(candidate)
+        except Exception as exc:
+            logger.warning("[AI-OPT] Could not resolve site_peak_kw for %s: %s", site_id, exc)
+
+        abs_floor = float(getattr(settings, "after_hours_hvac_load_threshold_kw", 2.5))
+        if site_peak_kw and site_peak_kw > 0:
+            threshold_kw = max(
+                abs_floor, site_peak_kw * float(getattr(settings, "after_hours_hvac_load_threshold_pct", 0.08))
+            )
+        else:
+            logger.warning(
+                "[AI-OPT] site_peak_kw missing for %s; using conservative fallback %.2f kW", site_id, abs_floor
+            )
+            threshold_kw = abs_floor
+
+        if hvac_kw <= threshold_kw:
             return False
 
         now = now or datetime.now()
@@ -2005,6 +2030,10 @@ class BackgroundSchedulerService:
                     InlineKeyboard,
                     TelegramMessageSender,
                 )
+                from app.services.recommendation_preflight_service import (
+                    build_recommendation_preflight_lines,
+                    collect_quality_gate_preflight,
+                )
                 from app.models.recommendation import RecommendationStatus
 
                 async def _send_advisories():
@@ -2312,6 +2341,9 @@ class BackgroundSchedulerService:
                         lines.append(f"*Site:* {_site_id}  |  *Mode:* {phase}")
                         lines.append(f"*Actions pending:* {len(active_recs)}")
                         lines.append("")
+                        preflight_quality = (
+                            await collect_quality_gate_preflight(_site_id) if phase == "supervised" else None
+                        )
                         for idx, r in enumerate(active_recs[:5], start=1):
                             equip = r.target_equipment or "Unknown"
                             action_data = r.action or {}
@@ -2344,6 +2376,15 @@ class BackgroundSchedulerService:
                                     lines.append(
                                         "Note: Supervised control readiness is incomplete; use manual BMS action or create a work order."
                                     )
+                                elif (
+                                    not action_data.get("execution_blocked")
+                                    and r.status != RecommendationStatus.ADVISORY_INFO
+                                ):
+                                    for preflight_line in await build_recommendation_preflight_lines(
+                                        r,
+                                        quality_gate=preflight_quality,
+                                    ):
+                                        lines.append(preflight_line)
                             elif action_data.get("execution_blocked") or r.status == RecommendationStatus.ADVISORY_INFO:
                                 action_text, why_text, effect_text, saving_text = _manual_action_line(r)
                                 lines.append(f"*{idx}. {equip}*")
@@ -4616,6 +4657,52 @@ class BackgroundSchedulerService:
                 logger.debug("Feedback scoring inputs refresh skipped: no module outcomes yet")
         except Exception as e:
             logger.error(f"Failed to refresh feedback scoring inputs: {e}", exc_info=True)
+
+    def add_site_peak_demand_refresh_job(self, interval_seconds: int = 21600, lookback_days: int = 90):
+        """Add periodic refresh of site peak demand snapshots."""
+        if self.scheduler.get_job("site_peak_demand_refresh"):
+            self.scheduler.remove_job("site_peak_demand_refresh")
+            logger.info("Removed existing site peak demand refresh job")
+
+        self._site_peak_refresh_lookback_days = int(lookback_days)
+        self.scheduler.add_job(
+            func=self._run_site_peak_demand_refresh,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="site_peak_demand_refresh",
+            name="Refresh Site Peak Demand Snapshots",
+            replace_existing=True,
+        )
+        logger.info(
+            "Added site peak demand refresh job with %ss interval (lookback=%sd)",
+            interval_seconds,
+            lookback_days,
+        )
+
+    @track_job_metrics("site_peak_demand_refresh")
+    def _run_site_peak_demand_refresh(self):
+        """Refresh site peak demand snapshots from historical telemetry."""
+        try:
+            from app.services.site_peak_demand_service import get_site_peak_demand_service
+
+            result = get_site_peak_demand_service().refresh_registered_sites(
+                lookback_days=self._site_peak_refresh_lookback_days
+            )
+            refreshed = result.get("refreshed_sites", [])
+            missing = result.get("missing_sites", [])
+            if refreshed:
+                logger.info(
+                    "Site peak demand refreshed for %s site(s): %s",
+                    len(refreshed),
+                    ", ".join(refreshed),
+                )
+            if missing:
+                logger.warning(
+                    "Site peak demand missing for %s site(s): %s",
+                    len(missing),
+                    ", ".join(missing),
+                )
+        except Exception as e:
+            logger.error(f"Failed to refresh site peak demand snapshots: {e}", exc_info=True)
 
     def add_feedback_retraining_job(
         self,

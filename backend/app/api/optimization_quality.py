@@ -83,6 +83,8 @@ async def get_quality_gate(site_id: str):
             rule_results=rule_details,
             overall_status=result.overall.value,
             enforcement_action=result.enforcement.value,
+            failed_rules=result.failed_rules,
+            warn_rules=result.warn_rules,
             reason_codes=[rc.value for rc in result.reason_codes],
         )
 

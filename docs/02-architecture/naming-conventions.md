@@ -77,6 +77,8 @@ S005-GEN-B1-001         Generator #1, Basement 1
 - **Plant sequence** (`B1-001`, `R-002`): Used for basement/roof plant equipment where multiple units can exist without a single occupied-zone assignment.
 - For unusual duplicate equipment in the same occupied zone, add a sequence only after review. The normal case remains `S###-TYPE-ZZZ`.
 
+**Zone-equipment pointers:** SENTINEL keeps the canonical relationship in `equipment_zone_relationships` and mirrors direct pointers onto zone records for runtime compatibility. When onboarding resolves equipment for a zone, the direct zone fields (`fcu_id`, `vav_id`, `ahu_id`, `lighting_id`) should match the canonical relationship state rather than being treated as an alternate source of truth.
+
 ---
 
 ## 2. Site Code Registry

@@ -546,6 +546,13 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Feedback scoring refresh job initialization failed: {e}")
 
+    # Site peak demand refresh — keeps per-site HVAC gating thresholds grounded
+    try:
+        scheduler_service.add_site_peak_demand_refresh_job(interval_seconds=21600, lookback_days=90)  # 6 hours
+        _logger.info("✅ Site peak demand refresh job initialized - updates site-specific HVAC thresholds")
+    except Exception as e:
+        _logger.warning(f"⚠️ Site peak demand refresh job initialization failed: {e}")
+
     # Feedback-driven retraining — also gated by ML_BACKGROUND_TRAINING_ENABLED
     if not settings.edge_mode and settings.ml_background_training_enabled:
         try:

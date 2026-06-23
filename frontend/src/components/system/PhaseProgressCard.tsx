@@ -3,13 +3,17 @@
  * onboarding lifecycle and what's needed to advance to the next phase.
  */
 
-import { Shield, ArrowRight, Clock, CheckCircle, XCircle, AlertTriangle, Loader2 } from 'lucide-react';
+import { Shield, ArrowRight, Clock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 export interface PhaseProgressProps {
   currentPhase: string | null;
   isLoading?: boolean;
   /** Gates with their status for the current phase */
   gates?: { name: string; passed: boolean; label: string }[];
+  /** Whether the current phase is actually eligible for promotion. */
+  canPromote?: boolean;
+  /** Overall recommendation quality gate status for autonomous authority. */
+  qualityGateStatus?: 'pass' | 'warn' | 'fail' | 'na' | null;
   /** Hours since site creation */
   hoursSinceCreated?: number;
   /** Successful bridge polls */
@@ -57,16 +61,34 @@ function phaseProgress(current: string, gates?: { passed: boolean }[]): number {
   return Math.round((passed / gates.length) * 100);
 }
 
-export function PhaseProgressCard({ currentPhase, isLoading, gates, hoursSinceCreated, bridgePolls, dataQualityScore }: PhaseProgressProps) {
+export function PhaseProgressCard({
+  currentPhase,
+  isLoading,
+  gates,
+  canPromote,
+  qualityGateStatus,
+  hoursSinceCreated,
+}: PhaseProgressProps) {
   const phase = currentPhase || 'commissioning';
   const info = PHASE_DETAILS[phase] || PHASE_DETAILS.commissioning;
   const progress = phaseProgress(phase, gates);
   const isLastPhase = phase === 'automatic';
   const passedCount = gates?.filter(g => g.passed).length ?? 0;
   const totalGates = gates?.length ?? 0;
+  const nextPhaseLabel = PHASE_DETAILS[info.next]?.label || info.next;
+  const promotionBlocked = progress >= 100 && !isLastPhase && canPromote === false;
+  const summaryText = progress < 100
+    ? `${passedCount}/${totalGates} gates passed — completing requirements to advance`
+    : isLastPhase
+    ? 'All phases complete — system at full capability'
+    : promotionBlocked && qualityGateStatus === 'fail'
+    ? `Data gates passed — Quality Gate still blocks ${nextPhaseLabel}`
+    : promotionBlocked
+    ? `Data gates passed — promotion readiness still pending for ${nextPhaseLabel}`
+    : `All promotion checks passed — ready to advance to ${nextPhaseLabel}`;
 
   // Determine status color
-  const statusColor = progress >= 100 ? '#22c55e' : progress >= 50 ? '#f59e0b' : '#ef4444';
+  const _statusColor = progress >= 100 ? '#22c55e' : progress >= 50 ? '#f59e0b' : '#ef4444';
 
   if (isLoading) {
     return (
@@ -163,12 +185,7 @@ export function PhaseProgressCard({ currentPhase, isLoading, gates, hoursSinceCr
         <div className="flex items-center gap-2">
           <Clock className="w-3.5 h-3.5" style={{ color: 'var(--color-sentinel-text-disabled)' }} />
           <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>
-            {progress < 100
-              ? `${passedCount}/${totalGates} gates passed — completing requirements to advance`
-              : isLastPhase
-              ? 'All phases complete — system at full capability'
-              : `All gates passed — ready to advance to ${PHASE_DETAILS[info.next]?.label || info.next}`
-            }
+            {summaryText}
           </span>
         </div>
         {progress < 100 && hoursSinceCreated !== undefined && (

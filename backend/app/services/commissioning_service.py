@@ -277,31 +277,24 @@ class CommissioningService:
         return count, f"{count} file/manual source(s): {names}"
 
     def _check_value_validity(self, site_id: str) -> tuple[float, str]:
-        """Check ingested_trends for null or out-of-range values (last 48h)."""
+        """Check equipment_sensor_readings for null or out-of-range values (last 48h)."""
         try:
             from datetime import timedelta
 
             cutoff = (datetime.utcnow() - timedelta(hours=48)).isoformat()
 
-            # Get source IDs for this building
-            site_uuid = self._get_site_uuid(site_id)
-            sources = self._repo.get_log_sources(site_id=site_uuid)
-            source_ids = [s["id"] for s in sources]
-            if not source_ids:
-                return 0.0, "No sources — no data to validate"
-
-            # Query trends for the building's sources
             response = (
-                self._repo.client.table("ingested_trends")
+                self._repo.client.table("equipment_sensor_readings")
                 .select("value")
-                .in_("log_source_id", source_ids)
+                .eq("site_id", site_id)
                 .gte("recorded_at", cutoff)
+                .limit(5000)
                 .execute()
             )
             rows = response.data or []
             total = len(rows)
             if total == 0:
-                return 0.0, "No trend data in last 48h"
+                return 0.0, "No sensor data in last 48h"
 
             invalid = 0
             for r in rows:
@@ -311,7 +304,10 @@ class CommissioningService:
                     continue
                 try:
                     fval = float(val)
-                    if fval < -1000 or fval > 10000:
+                    # Cumulative meters (kWh, m3) can legitimately exceed 10000
+                    # Only flag clearly broken values: NaN, extreme negatives,
+                    # or absurdly large (> 10M suggests a parsing error)
+                    if fval != fval or fval < -10000 or fval > 10000000:
                         invalid += 1
                 except (ValueError, TypeError):
                     invalid += 1
@@ -319,41 +315,31 @@ class CommissioningService:
             pct = (invalid / total) * 100
             return pct, f"{invalid}/{total} invalid values ({pct:.2f}%)"
         except Exception as e:
-            # Query failure should NOT silently pass — return a failing value
-            return 100.0, f"Could not query trends: {e}"
+            return 100.0, f"Could not query sensor readings: {e}"
 
     def _check_timestamp_integrity(self, site_id: str) -> tuple[float, str]:
-        """Check ingested_trends for future timestamps (last 48h)."""
+        """Check equipment_sensor_readings for future timestamps (last 48h)."""
         try:
             from datetime import timedelta
 
             cutoff = (datetime.utcnow() - timedelta(hours=48)).isoformat()
-            # 5-minute future tolerance
             future_cutoff = (datetime.utcnow() + timedelta(minutes=5)).isoformat()
 
-            site_uuid = self._get_site_uuid(site_id)
-            sources = self._repo.get_log_sources(site_id=site_uuid)
-            source_ids = [s["id"] for s in sources]
-            if not source_ids:
-                return 100.0, "No sources — nothing to check"
-
-            # Total count
             total_resp = (
-                self._repo.client.table("ingested_trends")
+                self._repo.client.table("equipment_sensor_readings")
                 .select("id", count="exact")
-                .in_("log_source_id", source_ids)
+                .eq("site_id", site_id)
                 .gte("recorded_at", cutoff)
                 .execute()
             )
             total = total_resp.count or 0
             if total == 0:
-                return 100.0, "No trend data in last 48h"
+                return 0.0, "No sensor data in last 48h"
 
-            # Future timestamps
             future_resp = (
-                self._repo.client.table("ingested_trends")
+                self._repo.client.table("equipment_sensor_readings")
                 .select("id", count="exact")
-                .in_("log_source_id", source_ids)
+                .eq("site_id", site_id)
                 .gt("recorded_at", future_cutoff)
                 .execute()
             )
@@ -362,8 +348,7 @@ class CommissioningService:
             valid_pct = ((total - future_count) / total) * 100
             return valid_pct, f"{future_count}/{total} future timestamps ({100 - valid_pct:.2f}% invalid)"
         except Exception as e:
-            # Query failure should NOT silently pass — return a failing value
-            return 0.0, f"Could not query trends: {e}"
+            return 0.0, f"Could not query sensor readings: {e}"
 
     def submit_truth_check(self, site_id: str, entries: list[TruthCheckEntry]) -> TruthCheckResult:
         """Submit and evaluate a truth check (min 20 entries)."""

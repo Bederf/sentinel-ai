@@ -41,4 +41,6 @@ class QualityGateStatusResponse(BaseModel):
     rule_results: list[QualityMetricDetail] = Field(default_factory=list, description="Per-metric evaluation results")
     overall_status: str = Field(description="Overall gate: pass/warn/fail")
     enforcement_action: str = Field(description="Enforcement action applied")
+    failed_rules: list[str] = Field(default_factory=list, description="Metrics currently failing")
+    warn_rules: list[str] = Field(default_factory=list, description="Metrics currently warning")
     reason_codes: list[str] = Field(default_factory=list, description="Machine-readable reason codes")

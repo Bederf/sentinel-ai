@@ -252,8 +252,26 @@ class RecommendationService:
             )
             return recs
         except Exception as e:
-            logger.error(f"Error fetching recommendation history for {site_id}: {e}")
+            logger.error("Failed to fetch recommendation history: %s", e)
             return []
+
+    async def get_history_aggregates(
+        self,
+        site_id: str,
+    ) -> dict[str, Any]:
+        """Get aggregate counts and savings across all non-pending recs.
+
+        Returns totals without limit — for the summary card so it stays
+        accurate even when the paginated list is truncated.
+        """
+        from app.database.repositories import get_recommendation_repository
+
+        try:
+            repo = get_recommendation_repository()
+            return await repo.get_history_aggregates(site_id)
+        except Exception as e:
+            logger.error("Failed to fetch recommendation aggregates: %s", e)
+            return {"total": 0, "actioned": 0, "verified": 0, "saving_kwh": 0.0, "saving_zar": 0.0}
 
     async def approve_recommendation(self, rec_id: str, user_id: str, reason: str | None = None) -> Recommendation:
         """Operator approves recommendation (Tier 2).

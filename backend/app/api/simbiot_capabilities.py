@@ -97,6 +97,7 @@ async def get_site_capabilities(
             "adapter_capabilities": {
                 "supports_device_discovery": adapter.capabilities.supports_device_discovery,
                 "supports_point_discovery": adapter.capabilities.supports_point_discovery,
+                "supports_hierarchy_discovery": adapter.capabilities.supports_hierarchy_discovery,
                 "supports_reads": adapter.capabilities.supports_reads,
                 "supports_writes": adapter.capabilities.supports_writes,
                 "supports_subscriptions": adapter.capabilities.supports_subscriptions,

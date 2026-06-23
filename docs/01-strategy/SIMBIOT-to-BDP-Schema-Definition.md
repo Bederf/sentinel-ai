@@ -60,6 +60,8 @@ Examples: `S002-CHILLER-B1-001`, `S002-GEN-B1-001`, `S002-UPS-B1-001`
 
 Canonical zone codes are three digits: `001`-`099` = Ground/L0, `100`-`199` = L1, `200`-`299` = L2, `500`-`599` = L5. The first zone on L1 is `Zone-100`; the eleventh zone on L5 is `Zone-510`. Site-specific source labels such as `L3-ICU` or `L3-TH1` are stored as raw/source identifiers or zone aliases and mapped to canonical zones during onboarding.
 
+Runtime compatibility note: the canonical relationship source is still `equipment_zone_relationships`, but zone records are also populated with direct equipment pointers for live read paths. In practice, both `zones` and `hvac_zones` may carry `fcu_id`, `vav_id`, `ahu_id`, and `lighting_id` as denormalized fields, and onboarding keeps them synchronized from the canonical mapping.
+
 ### 2.3 Floor Codes
 
 | Code | Meaning |
@@ -252,6 +254,21 @@ CREATE TABLE sentinel.hvac_zones (
     updated_at          TIMESTAMPTZ DEFAULT NOW()
 );
 ```
+
+### 3.5.1 Zone Pointer Compatibility
+
+Several live services still read zone equipment pointers directly from zone tables. To keep those paths stable, SENTINEL mirrors the canonical equipment relationship into the zone record itself:
+
+- `zones.fcu_id`
+- `zones.vav_id`
+- `zones.ahu_id`
+- `zones.lighting_id`
+- `hvac_zones.fcu_id`
+- `hvac_zones.vav_id`
+- `hvac_zones.ahu_id`
+- `hvac_zones.lighting_id`
+
+These fields are denormalized compatibility columns, not the source of truth. The source of truth remains `equipment_zone_relationships` plus the canonical equipment records written during onboarding.
 
 ---
 

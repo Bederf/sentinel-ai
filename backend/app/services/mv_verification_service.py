@@ -546,6 +546,8 @@ class MVVerificationService:
         # Recent outcomes (last 10)
         recent = sorted(site_outcomes, key=lambda o: o.verified_at, reverse=True)[:10]
 
+        tasks_with_cv = sum(1 for t in site_tasks if t.comfort_violations)
+
         return {
             "site_id": site_id,
             "total_verifications": len(site_tasks),
@@ -555,6 +557,7 @@ class MVVerificationService:
             "rollbacks_recommended": sum(1 for t in site_tasks if t.rollback_recommended),
             "average_accuracy": round(avg_accuracy, 3) if avg_accuracy else None,
             "recent_outcomes": [o.to_dict() for o in recent],
+            "tasks_with_comfort_violations": tasks_with_cv,
         }
 
     def get_pending_count(self) -> int:

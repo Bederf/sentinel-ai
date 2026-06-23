@@ -22,16 +22,14 @@ export const RecommendationHistory: React.FC<
     if (!siteId) return
     loadHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [siteId, filter])
+  }, [siteId])
 
   const loadHistory = async () => {
     if (!siteId) return
     try {
       setLoading(true)
       setError(null)
-      const data = await optimizationApi.getHistory(siteId, {
-        status: filter === 'all' ? undefined : filter,
-      })
+      const data = await optimizationApi.getHistory(siteId, {})
       setHistory(data.recommendations)
     } catch (error) {
       console.error('Failed to load history:', error)
@@ -55,16 +53,11 @@ export const RecommendationHistory: React.FC<
     )
   }
 
-  const filteredHistory = filter === 'all'
-    ? history
-    : filter === 'executed'
-      ? history.filter(r => r.status === 'executed' || r.status === 'auto_executed')
-      : history.filter(r => r.status === filter)
-
-  const actionedCount = history.filter(r => r.status === 'executed' || r.status === 'auto_executed').length
-  const verifiedCount = history.filter(r => r.outcome_validated === true || r.actual_saving_kwh != null).length
-  const measuredSavingKwh = history.reduce((sum, rec) => sum + toNumber(rec.actual_saving_kwh), 0)
-  const measuredSavingZar = history.reduce((sum, rec) => sum + toNumber(rec.actual_saving_zar), 0)
+  const filteredHistory = filterRecommendations(history, filter)
+  const visibleActionedCount = filteredHistory.filter(isActionedRecommendation).length
+  const visibleVerifiedCount = filteredHistory.filter(isVerifiedRecommendation).length
+  const visibleSavingKwh = filteredHistory.reduce((sum, rec) => sum + toNumber(rec.actual_saving_kwh), 0)
+  const visibleSavingZar = filteredHistory.reduce((sum, rec) => sum + toNumber(rec.actual_saving_zar), 0)
 
   return (
     <Panel
@@ -88,20 +81,20 @@ export const RecommendationHistory: React.FC<
       )}
 
       <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
-        <SummaryMetric label="Suggested" value={String(history.length)} />
-        <SummaryMetric label="Actioned" value={String(actionedCount)} />
-        <SummaryMetric label="Verified" value={String(verifiedCount)} />
+        <SummaryMetric label="Suggested" value={String(filteredHistory.length)} />
+        <SummaryMetric label="Actioned" value={String(visibleActionedCount)} />
+        <SummaryMetric label="Verified" value={String(visibleVerifiedCount)} />
         <SummaryMetric
           label="Measured Result"
-          value={`${formatSignedKwh(measuredSavingKwh)} / ${formatCurrencyZAR(measuredSavingZar, 2, 2)}`}
-          tone={measuredSavingKwh >= 0 ? 'positive' : 'negative'}
+          value={`${formatSignedKwh(visibleSavingKwh)} / ${formatCurrencyZAR(visibleSavingZar, 2, 2)}`}
+          tone={visibleSavingKwh >= 0 ? 'positive' : 'negative'}
         />
       </div>
 
       {/* Filter */}
       <div className="flex gap-2 px-4 pb-4">
         {[
-          { key: 'all', label: 'All' },
+          { key: 'all', label: 'Total' },
           { key: 'executed', label: 'Executed' },
           { key: 'rejected', label: 'Rejected' },
         ].map(f => (
@@ -254,6 +247,20 @@ function SummaryMetric({
       </p>
     </div>
   )
+}
+
+function filterRecommendations(history: Recommendation[], filter: string): Recommendation[] {
+  if (filter === 'executed') return history.filter(isActionedRecommendation)
+  if (filter === 'rejected') return history.filter(rec => rec.status === 'rejected')
+  return history
+}
+
+function isActionedRecommendation(rec: Recommendation): boolean {
+  return rec.status === 'executed' || rec.status === 'auto_executed'
+}
+
+function isVerifiedRecommendation(rec: Recommendation): boolean {
+  return rec.outcome_validated === true || rec.actual_saving_kwh != null || rec.actual_saving_zar != null
 }
 
 function MeasuredResult({ rec }: { rec: Recommendation }) {

@@ -109,7 +109,7 @@ async def get_recommendation_history(
     request: Request,
     site_id: str,
     filters: dict[str, Any] = Body(default={"status": None, "risk_level": None}),
-    limit: int = Query(50, ge=1, le=500),
+    limit: int = Query(200, ge=1, le=2000),
     auth: AuthContext = Depends(require_site_access("site_id")),
 ):
     """Get historical recommendations for a site with optional filters.
@@ -158,11 +158,14 @@ async def get_recommendation_history(
             limit=limit,
         )
 
+        aggregates = await service.get_history_aggregates(site_id)
+
         return attach_ai_provenance(
             {
                 "site_id": site_id,
                 "recommendations": [r.to_dict() for r in recs],
                 "count": len(recs),
+                "aggregates": aggregates,
                 "filters": {
                     "status": status_filter,
                     "risk_level": risk_level_filter,

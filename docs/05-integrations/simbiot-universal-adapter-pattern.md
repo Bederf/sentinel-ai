@@ -57,6 +57,37 @@ graph LR
 3. **One adapter per BMS type** - BACnet, Modbus, oBIX, simulation, custom CSV
 4. **Adapter contract is UNIFORM** - All adapters expose identical interface
 
+### Native Hierarchy During Onboarding
+
+SIMBIOT onboarding imports more than flat points when the upstream BMS exposes
+native hierarchy:
+
+- **Desigo CC**: plant tree and location tree
+- **Niagara/JACE**: station/component tree
+- **BACnet**: Structured View objects, when configured
+- **Flat BACnet/CSV**: point list only; hierarchy is unavailable
+
+The onboarding wizard runs hierarchy import after equipment canonicalization:
+
+```text
+discover points -> canonicalize equipment -> import BMS hierarchy -> infer gaps -> manual review
+```
+
+Hierarchy facts are stored with provenance and confidence:
+
+```text
+relationship_type: serves | controls | feeds | contains | located_in | monitors
+source: desigo_plant_tree | niagara_station_tree | bacnet_structured_view | naming_inference | manual_onboarding
+confidence: 0.0-1.0
+review_status: suggested | approved | rejected
+evidence_basis: source path/object id
+```
+
+This prevents flat point containment from being treated as confirmed
+engineering meaning. If `/api/sites/{site_id}/hierarchy` is not available on
+the bridge, SENTINEL records hierarchy as unavailable and keeps unresolved
+relationships in manual mapping.
+
 ---
 
 ## Real-World Deployment Examples

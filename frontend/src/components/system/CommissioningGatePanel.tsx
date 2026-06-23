@@ -10,7 +10,7 @@
  */
 
 import { CheckCircle, XCircle, Shield, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { CommissioningSnapshot, QualityGateStatus } from '@/lib/api/system';
 
 /* ------------------------------------------------------------------ */
@@ -52,6 +52,17 @@ const ENFORCEMENT_LABELS: Record<string, string> = {
   block_writes: 'Write Blocked — log-only mode active',
 };
 
+const LOWER_IS_BETTER_METRICS = new Set([
+  'freshness_minutes',
+  'ingest_error_rate_pct_1h',
+  'manual_source_pct',
+  'unmatched_points_pct',
+  'comfort_violation_rate_7d_pct',
+  'rollback_rate_7d_pct',
+  'label_lag_p95_hours',
+  'drift_critical_alerts_24h',
+]);
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -87,6 +98,12 @@ function enforcementColor(action: string): 'green' | 'orange' | 'red' | 'purple'
   }
 }
 
+function ruleThresholdText(rule: { metric: string; pass_bound: number | null }): string | null {
+  if (rule.pass_bound === null || rule.pass_bound === undefined) return null;
+  const operator = LOWER_IS_BETTER_METRICS.has(rule.metric) ? '<=' : '>=';
+  return `needs ${operator} ${formatValue(rule.metric, rule.pass_bound)}`;
+}
+
 /* ------------------------------------------------------------------ */
 /* Props                                                               */
 /* ------------------------------------------------------------------ */
@@ -103,6 +120,12 @@ interface CommissioningGatePanelProps {
 export function CommissioningGatePanel({ commissioning, qualityGate }: CommissioningGatePanelProps) {
   const [qgExpanded, setQgExpanded] = useState(false);
 
+  useEffect(() => {
+    if (qualityGate?.overall_status === 'fail') {
+      setQgExpanded(true);
+    }
+  }, [qualityGate?.overall_status]);
+
   // ----- Commissioning -----
 
   const allPassed = commissioning?.all_gates_passed ?? false;
@@ -117,12 +140,18 @@ export function CommissioningGatePanel({ commissioning, qualityGate }: Commissio
   const qgOverall = qualityGate?.overall_status ?? 'na';
   const qgEnforcement = qualityGate?.enforcement_action ?? 'unknown';
 
-  const failedCount = qualityGate?.failed_rules?.length ?? 0;
-  const warnCount = qualityGate?.warn_rules?.length ?? 0;
+  const failedRuleResults = (qualityGate?.rule_results ?? []).filter(r => r.state === 'fail');
+  const warnRuleResults = (qualityGate?.rule_results ?? []).filter(r => r.state === 'warn');
+  const failedCount = qualityGate?.failed_rules?.length
+    ? qualityGate.failed_rules.length
+    : failedRuleResults.length;
+  const warnCount = qualityGate?.warn_rules?.length
+    ? qualityGate.warn_rules.length
+    : warnRuleResults.length;
   const qgPassCount = (qualityGate?.rule_results ?? []).filter(r => r.state === 'pass').length;
   const qgTotal = (qualityGate?.rule_results ?? []).filter(r => r.state !== 'na').length;
 
-  const isQgFail = qgOverall === 'fail';
+  const _isQgFail = qgOverall === 'fail';
   const isQgWarn = qgOverall === 'warn';
   const isQgPass = qgOverall === 'pass';
 
@@ -305,6 +334,31 @@ export function CommissioningGatePanel({ commissioning, qualityGate }: Commissio
                   {ENFORCEMENT_LABELS[qgEnforcement] ?? qgEnforcement}
                 </span>
               </div>
+
+              {failedRuleResults.length > 0 && (
+                <div
+                  className="rounded px-3 py-2 mb-3 text-xs"
+                  style={{
+                    background: 'rgba(220, 38, 38, 0.08)',
+                    border: '1px solid rgba(220, 38, 38, 0.30)',
+                    color: 'var(--color-sentinel-text-secondary)',
+                  }}
+                >
+                  <span className="font-semibold" style={{ color: 'var(--color-sentinel-red)' }}>
+                    Blocking quality metrics:
+                  </span>{' '}
+                  {failedRuleResults.map((rule, index) => {
+                    const threshold = ruleThresholdText(rule);
+                    return (
+                      <span key={rule.metric}>
+                        {index > 0 && '; '}
+                        {QUALITY_GATE_LABELS[rule.metric] ?? rule.metric} {formatValue(rule.metric, rule.value)}
+                        {threshold ? ` (${threshold})` : ''}
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Metrics grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">

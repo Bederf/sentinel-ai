@@ -8,7 +8,7 @@
  * - Network-first with cached fallback for decision payloads.
  */
 
-const APP_VERSION = "v2";
+const APP_VERSION = "v4";
 const APP_SHELL_CACHE = `sentinel-shell-${APP_VERSION}`;
 const STATIC_CACHE = `sentinel-static-${APP_VERSION}`;
 const PAYLOAD_CACHE = `sentinel-payload-${APP_VERSION}`;
@@ -65,7 +65,7 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (url.origin === self.location.origin && isStaticAsset(url)) {
-    event.respondWith(staleWhileRevalidate(request));
+    event.respondWith(networkFirstStatic(request));
   }
 });
 
@@ -101,23 +101,18 @@ async function networkFirstAppShell(request) {
   }
 }
 
-async function staleWhileRevalidate(request) {
+async function networkFirstStatic(request) {
   const cache = await caches.open(STATIC_CACHE);
-  const cachedResponse = await cache.match(request);
-  const networkFetch = fetch(request)
-    .then((networkResponse) => {
-      if (networkResponse.ok) {
-        cache.put(request, networkResponse.clone());
-      }
-      return networkResponse;
-    })
-    .catch(() => undefined);
 
-  if (cachedResponse) {
-    return cachedResponse;
+  try {
+    const networkResponse = await fetch(request);
+    if (networkResponse.ok) {
+      cache.put(request, networkResponse.clone());
+    }
+    return networkResponse;
+  } catch (_networkError) {
+    return (await cache.match(request)) || Response.error();
   }
-
-  return (await networkFetch) || Response.error();
 }
 
 /**

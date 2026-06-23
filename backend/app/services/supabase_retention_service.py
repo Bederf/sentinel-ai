@@ -1,7 +1,10 @@
-"""POPIA-aligned Supabase table retention enforcement.
+"""POPIA-aligned Supabase table retention enforcement via direct psycopg2.
 
 POPIA Section 14(1): Records must not be retained longer than necessary for the
 purpose for which they were collected.
+
+Uses direct PostgreSQL connections (not Supabase REST API) — avoids dependency
+on SUPABASE_SERVICE_ROLE_KEY being set for admin-write operations.
 
 This service handles SQL table retention for:
 - TIER 2: ML training data (7-day rolling delete after processing window)
@@ -14,7 +17,8 @@ Retention schedules:
 - adapter_health_current: 7 days (transient state, POPIA S14(1))
 - adapter_health_alerts: 7 days (ML training data, POPIA S14(1))
 - space_occupancy_events: 7 days (ML training data, POPIA S14(1))
-- equipment_sensor_readings: 90 days (raw telemetry aggregation window)
+- equipment_sensor_readings: 10 days (raw telemetry operational window)
+- drift_detection_log: 10 days (ML drift monitoring — aggregated, not per-reading needed)
 - alerts: active until cleared, then 7 days (raw fault events — noise, not decisions, POPIA S14(1))
 - asset_health_snapshots: 30 days (operational snapshots, POPIA S14(1))
 - system_health_snapshots: 30 days (operational snapshots, POPIA S14(1))
@@ -34,10 +38,8 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+import os
 from typing import Any
-from urllib.parse import quote
-
-import httpx
 
 from app.config.settings import settings
 
@@ -51,27 +53,6 @@ def _utc_now() -> datetime:
 
 def _iso(value: datetime) -> str:
     return value.astimezone(UTC).isoformat()
-
-
-def _get_supabase_rest_url() -> str:
-    """Supabase REST endpoint derived from settings."""
-    base = settings.supabase_url.rstrip("/")
-    return f"{base}/rest/v1"
-
-
-def _get_supabase_service_key() -> str:
-    """Service role key from settings (not hardcoded)."""
-    return settings.supabase_service_role_key
-
-
-def _rest_headers() -> dict[str, str]:
-    key = _get_supabase_service_key()
-    return {
-        "Authorization": f"Bearer {key}",
-        "apikey": key,
-        "Content-Type": "application/json",
-        "Prefer": "return=representation",
-    }
 
 
 @dataclass(frozen=True)
@@ -123,10 +104,17 @@ ML_TRAINING_SCHEDULES: list[RetentionSchedule] = [
     ),
     RetentionSchedule(
         table_name="equipment_sensor_readings",
-        retention_days=90,
+        retention_days=10,
         tier="ML_TRAINING",
         date_column="recorded_at",
-        description="Raw sensor telemetry — delete after 90-day aggregation window (tiered retention)",
+        description="Raw sensor telemetry — delete after 10-day operational window (aggregated in telemetry_hourly)",
+    ),
+    RetentionSchedule(
+        table_name="drift_detection_log",
+        retention_days=10,
+        tier="ML_TRAINING",
+        date_column="recorded_at",
+        description="ML drift monitoring — delete after 10-day window (aggregated signals preserved elsewhere)",
     ),
 ]
 
@@ -203,94 +191,91 @@ class DeletionRun:
 
 
 class SupabaseRetentionService:
-    """POPIA-aligned SQL table retention enforcement via Supabase REST API.
+    """POPIA-aligned SQL table retention enforcement via direct psycopg2.
 
-    Uses direct REST API (httpx) — same pattern as stats.py:_rest_query.
-    Deletes via POST to /rest/v1/{table} with appropriate filters.
+    Uses direct PostgreSQL connections (psycopg2) — avoids dependency on
+    Supabase REST API auth for admin-write operations.
     """
 
-    def __init__(self, rest_url: str | None = None, service_key: str | None = None):
-        self._rest_url = rest_url or _get_supabase_rest_url()
-        self._service_key = service_key or _get_supabase_service_key()
-        self._timeout = 60.0
+    def __init__(self, database_url: str | None = None):
+        self._db_url = database_url or os.environ.get("DATABASE_URL_DIRECT") or settings.database_url
 
-    def _headers(self) -> dict[str, str]:
-        return _rest_headers()
+    def _db_connect(self):
+        """Create a psycopg2 connection from settings database_url."""
+        import psycopg2
 
-    def _count_url(self, table: str, date_column: str, created_at_before: str) -> str:
-        """Build URL to count rows older than cutoff. Uses date_column to avoid PK issues on tables without id."""
-        return f"{self._rest_url}/{table}?{date_column}=lt.{created_at_before}&select={date_column}"
-
-    def _delete_url(self, table: str, date_column: str, created_at_before: str) -> str:
-        """Build URL to delete rows older than cutoff."""
-        return f"{self._rest_url}/{table}?{date_column}=lt.{created_at_before}"
-
-    def _get_cutoff(self, retention_days: int) -> str:
-        """Get URL-encoded ISO cutoff datetime for retention window."""
-        cutoff = _utc_now() - timedelta(days=retention_days)
-        return quote(cutoff.isoformat())
+        return psycopg2.connect(self._db_url)
 
     def _count_overdue(self, schedule: RetentionSchedule) -> int:
-        """Count rows older than retention window."""
-        cutoff = self._get_cutoff(schedule.retention_days)
-        url = self._count_url(schedule.table_name, schedule.date_column, cutoff)
+        """Count rows older than retention window via direct SQL."""
+        cutoff = _utc_now() - timedelta(days=schedule.retention_days)
         try:
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.get(url, headers=self._headers())
-                resp.raise_for_status()
-                rows = resp.json()
-                return len(rows) if isinstance(rows, list) else 0
+            conn = self._db_connect()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"SELECT count(*) FROM {schedule.table_name} WHERE {schedule.date_column} < %s",
+                        (cutoff,),
+                    )
+                    row = cursor.fetchone()
+                    return int(row[0]) if row else 0
+            finally:
+                conn.close()
         except Exception as e:
             logger.warning("Count failed for %s: %s", schedule.table_name, e)
             return 0
 
     def _delete_overdue(self, schedule: RetentionSchedule) -> tuple[int, int | None]:
-        """Delete rows older than retention window. Returns (reviewed, deleted)."""
-        cutoff = self._get_cutoff(schedule.retention_days)
-
-        # First count how many we'll delete
-        reviewed = self._count_overdue(schedule)
-
-        # Execute deletion via POST with PostgREST delete syntax
-        url = self._delete_url(schedule.table_name, schedule.date_column, cutoff)
+        """Delete rows older than retention window via direct SQL. Returns (reviewed, deleted)."""
+        cutoff = _utc_now() - timedelta(days=schedule.retention_days)
         try:
-            with httpx.Client(timeout=self._timeout) as client:
-                resp = client.delete(url, headers=self._headers())
-                if resp.status_code in (200, 204):
-                    return reviewed, reviewed
-                # PostgREST returns 200 with deletion count or 204 No Content
-                logger.warning(
-                    "Delete %s returned status %s: %s",
-                    schedule.table_name,
-                    resp.status_code,
-                    resp.text[:200],
-                )
-                return reviewed, reviewed
+            conn = self._db_connect()
+            try:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        f"SELECT count(*) FROM {schedule.table_name} WHERE {schedule.date_column} < %s",
+                        (cutoff,),
+                    )
+                    reviewed = int(cursor.fetchone()[0] or 0)
+
+                    cursor.execute(
+                        f"DELETE FROM {schedule.table_name} WHERE {schedule.date_column} < %s",
+                        (cutoff,),
+                    )
+                    deleted = cursor.rowcount
+                    conn.commit()
+                return reviewed, deleted
+            finally:
+                conn.close()
         except Exception as e:
             logger.error("Delete failed for %s: %s", schedule.table_name, e)
-            return reviewed, None
+            return 0, None
 
     def _write_enforcement_log(self, run: DeletionRun) -> None:
         """Write per-table enforcement audit records to retention_enforcement_log."""
         for result in run.results:
-            payload = {
-                "executed_at": run.executed_at,
-                "dry_run": run.dry_run,
-                "tier": result.tier,
-                "table_name": result.table_name,
-                "date_column": "created_at",
-                "reviewed": result.reviewed,
-                "deleted": result.deleted if not run.dry_run else 0,
-                "errors": [{"error": result.error}] if result.error else None,
-            }
             try:
-                with httpx.Client(timeout=self._timeout) as client:
-                    resp = client.post(
-                        f"{self._rest_url}/retention_enforcement_log",
-                        headers=self._headers(),
-                        json=payload,
-                    )
-                    resp.raise_for_status()
+                conn = self._db_connect()
+                try:
+                    with conn.cursor() as cursor:
+                        cursor.execute(
+                            """INSERT INTO retention_enforcement_log
+                               (executed_at, dry_run, tier, table_name, date_column, reviewed, deleted, errors)
+                               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                            (
+                                run.executed_at,
+                                run.dry_run,
+                                result.tier,
+                                result.table_name,
+                                "created_at",
+                                result.reviewed,
+                                result.deleted if not run.dry_run else 0,
+                                [{"error": result.error}] if result.error else None,
+                            ),
+                        )
+                        conn.commit()
+                finally:
+                    conn.close()
             except Exception as exc:
                 logger.warning("Failed to write retention enforcement log for %s: %s", result.table_name, exc)
 
@@ -323,15 +308,7 @@ class SupabaseRetentionService:
               AND COALESCE(resolved_at, updated_at, created_at) < %s
         """
         try:
-            import psycopg2
-
-            conn = psycopg2.connect(
-                host="127.0.0.1",
-                port=55322,
-                dbname="postgres",
-                user="postgres",
-                password="postgres",
-            )
+            conn = self._db_connect()
             try:
                 with conn.cursor() as cursor:
                     cursor.execute(f"SELECT count(*) {query}", (cutoff,))
@@ -423,7 +400,7 @@ class SupabaseRetentionService:
         now = _utc_now()
         categories = []
 
-        raw_alert_cutoff = quote((_utc_now() - timedelta(days=RAW_ALERT_RETENTION_DAYS)).isoformat())
+        raw_alert_cutoff = (now - timedelta(days=RAW_ALERT_RETENTION_DAYS)).isoformat()
         categories.append(
             {
                 "table": "alerts",
@@ -436,7 +413,7 @@ class SupabaseRetentionService:
         )
 
         for schedule in ML_TRAINING_SCHEDULES + SNAPSHOT_SCHEDULES + AUDIT_TRAIL_SCHEDULES:
-            cutoff = self._get_cutoff(schedule.retention_days)
+            cutoff = (now - timedelta(days=schedule.retention_days)).isoformat()
             overdue = self._count_overdue(schedule)
             categories.append(
                 {

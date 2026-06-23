@@ -14,6 +14,8 @@ from typing import Any
 
 import numpy as np
 
+from app.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 # Lazy imports to avoid loading ML libraries on every import
@@ -46,7 +48,7 @@ def _fetch_sensor_window_from_db(equipment_code: str, equipment_type: str, hours
     if not cols:
         return None
 
-    database_url = os.getenv("DATABASE_URL")
+    database_url = settings.database_url or os.getenv("DATABASE_URL")
     if not database_url:
         logger.warning("DATABASE_URL not set; cannot fetch real ML telemetry window for %s", equipment_code)
         return None
@@ -442,7 +444,7 @@ class AnomalyDetectionService:
 
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL not set")
 

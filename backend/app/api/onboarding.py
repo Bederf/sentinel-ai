@@ -18,10 +18,22 @@ from pydantic import BaseModel
 from app.database.repositories.equipment_repository import EquipmentRepository
 from app.middleware.auth_middleware import AuthContext, require_auth
 from app.services.baseline_seed_service import BaselineSeedService
+from app.services.onboarding_canonicalization_service import OnboardingCanonicalizationService
+from app.services.onboarding_hierarchy_service import OnboardingHierarchyService
 
 
 class SeedBaselinesBody(BaseModel):
     equipment_ids: list[str] = []
+
+
+class EquipmentCanonicalizationBody(BaseModel):
+    commit: bool = False
+
+
+class HierarchyIngestionBody(BaseModel):
+    commit: bool = True
+    auto_fetch: bool = True
+    hierarchy: dict[str, Any] | None = None
 
 
 logger = logging.getLogger(__name__)
@@ -59,6 +71,60 @@ async def _get_major_mechanical_equipment(site_id: str) -> list[dict[str, Any]]:
     except Exception as e:
         logger.error(f"Error fetching equipment for site {site_id}: {e}")
         return []
+
+
+@router.post("/equipment-canonicalization/{site_id}")
+async def canonicalize_onboarding_equipment(
+    site_id: str,
+    body: EquipmentCanonicalizationBody = Body(default_factory=EquipmentCanonicalizationBody),
+    auth: AuthContext = Depends(require_auth()),
+) -> dict[str, Any]:
+    """Preview or apply onboarding equipment canonicalization for a site.
+
+    This normalizes vendor/BMS equipment identifiers into SENTINEL canonical
+    fields, creates approved aliases, and writes equipment-zone relationships.
+    ``commit=false`` returns the proposed counts without changing rows.
+    """
+    _check_site_access(auth, site_id)
+    try:
+        service = OnboardingCanonicalizationService()
+        return service.canonicalize_site(site_id, commit=body.commit)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Onboarding equipment canonicalization failed for %s: %s", site_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/hierarchy-ingestion/{site_id}")
+async def ingest_onboarding_hierarchy(
+    site_id: str,
+    body: HierarchyIngestionBody = Body(default_factory=HierarchyIngestionBody),
+    auth: AuthContext = Depends(require_auth()),
+) -> dict[str, Any]:
+    """Import native BMS hierarchy evidence for a site.
+
+    When ``hierarchy`` is provided, it is expected to be the normalized bridge
+    shape with ``nodes`` and ``relationships``. When omitted and ``auto_fetch``
+    is true, the service asks the enabled SIMBIOT adapter for native hierarchy
+    (for example bridge ``/api/sites/{site_id}/hierarchy``). If the upstream
+    only exposes flat points, the endpoint returns ``available=false`` and
+    onboarding falls back to naming inference/manual mapping.
+    """
+    _check_site_access(auth, site_id)
+    try:
+        service = OnboardingHierarchyService()
+        return await service.ingest_site_hierarchy(
+            site_id,
+            hierarchy=body.hierarchy,
+            commit=body.commit,
+            auto_fetch=body.auto_fetch,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("Onboarding hierarchy ingestion failed for %s: %s", site_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.get("/baseline-eligibility")

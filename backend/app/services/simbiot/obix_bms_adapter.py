@@ -58,6 +58,30 @@ def _normalize_unit(value: float, unit: str) -> tuple[float, str]:
     return value, unit  # pass-through for unknown/unsupported units
 
 
+def _hierarchy_from_metadata(metadata: dict[str, Any], *, default_source: str) -> dict[str, Any] | None:
+    hierarchy = metadata.get("hierarchy")
+    if isinstance(hierarchy, dict):
+        return {
+            "available": bool(hierarchy.get("nodes") or hierarchy.get("relationships")),
+            "source": hierarchy.get("source") or default_source,
+            "nodes": hierarchy.get("nodes") or [],
+            "relationships": hierarchy.get("relationships") or [],
+            "raw": hierarchy,
+        }
+
+    nodes = metadata.get("hierarchy_nodes") or metadata.get("nodes")
+    relationships = metadata.get("hierarchy_relationships") or metadata.get("relationships")
+    if nodes or relationships:
+        return {
+            "available": True,
+            "source": metadata.get("hierarchy_source") or default_source,
+            "nodes": nodes or [],
+            "relationships": relationships or [],
+            "raw": {"nodes": nodes or [], "relationships": relationships or []},
+        }
+    return None
+
+
 class ObixBmsAdapter(BmsAdapter):
     """Concrete BMS adapter wrapping OBIXClient."""
 
@@ -75,6 +99,7 @@ class ObixBmsAdapter(BmsAdapter):
         return BmsAdapterCapabilities(
             supports_device_discovery=False,  # oBIX has no device discovery
             supports_point_discovery=True,
+            supports_hierarchy_discovery=True,
             supports_reads=True,
             supports_writes=True,
             supports_subscriptions=False,
@@ -182,6 +207,26 @@ class ObixBmsAdapter(BmsAdapter):
         # oBIX requires manual point path configuration
         # Return empty — points must be discovered via configuration
         return []
+
+    async def discover_hierarchy(self) -> dict[str, Any]:
+        """Return oBIX hierarchy supplied by adapter configuration.
+
+        Niagara/oBIX is hierarchical, but this adapter currently reads explicit
+        point paths rather than browsing the whole station tree. During
+        onboarding, the bridge/config layer can pass normalized hierarchy in
+        ``metadata.hierarchy`` or ``metadata.relationships``.
+        """
+        metadata = self._config.metadata if self._config else {}
+        configured = _hierarchy_from_metadata(metadata, default_source="obix_config_hierarchy")
+        if configured:
+            return configured
+        return {
+            "available": False,
+            "source": "obix_config_hierarchy",
+            "nodes": [],
+            "relationships": [],
+            "message": "No oBIX hierarchy metadata configured; station-tree browsing is not implemented in the direct oBIX adapter yet.",
+        }
 
     async def read_point(self, device_id: str, point_id: str) -> BmsPointValue:
         self._ensure_connected()

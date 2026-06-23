@@ -56,6 +56,7 @@ class BmsAdapterCapabilities:
 
     supports_device_discovery: bool = True
     supports_point_discovery: bool = True
+    supports_hierarchy_discovery: bool = False
     supports_reads: bool = True
     supports_writes: bool = True
     supports_subscriptions: bool = False
@@ -159,6 +160,31 @@ class BmsAdapter(ABC):
     @abstractmethod
     async def discover_points(self, device_id: str) -> list[BmsPointDescriptor]:
         """Discover readable or writable points for one device."""
+
+    async def discover_hierarchy(self) -> dict[str, Any]:
+        """Return native BMS hierarchy when the source exposes it.
+
+        The normalized shape is intentionally simple so vendor adapters can map
+        Desigo plant/location trees, Niagara station trees, or BACnet Structured
+        Views without leaking vendor-specific APIs into onboarding:
+
+            {
+                "source": "desigo_plant_tree",
+                "nodes": [...],
+                "relationships": [...]
+            }
+
+        Adapters without native hierarchy support return an empty unavailable
+        result instead of raising; manual/naming inference remains the fallback.
+        """
+
+        return {
+            "available": False,
+            "source": self.adapter_id,
+            "nodes": [],
+            "relationships": [],
+            "message": f"{self.adapter_id} does not expose native hierarchy discovery",
+        }
 
     @abstractmethod
     async def read_point(self, device_id: str, point_id: str) -> BmsPointValue:

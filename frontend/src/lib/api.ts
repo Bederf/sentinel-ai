@@ -4455,7 +4455,7 @@ export async function createWorkOrder(params: CreateWorkOrderParams): Promise<Wo
   return response.json();
 }
 
-// ============= Niagara Connection Interfaces (Phase 65) =============
+// ============= BMS Connection Interfaces (legacy /api/niagara routes) =============
 
 export interface NiagaraOBIXConfig {
   host: string;
@@ -4490,7 +4490,7 @@ export interface BACnetDevice {
 }
 
 // BMS vendor type
-export type BMSVendor = 'niagara' | 'desigo' | 'metasys' | 'honeywell' | 'schneider' | 'trend' | 'generic';
+export type BMSVendor = 'niagara' | 'desigo' | 'metasys' | 'honeywell' | 'schneider' | 'trend' | 'generic' | 'bridge';
 
 // BACnet test connection request
 export interface BACnetTestConnectionRequest {
@@ -4550,6 +4550,51 @@ export interface NiagaraApproveResponse {
   success: boolean;
   equipment_created: number;
   message: string;
+  canonicalization_summary?: OnboardingCanonicalizationSummary;
+  hierarchy_summary?: OnboardingHierarchySummary;
+}
+
+export interface OnboardingCanonicalizationSummary {
+  site_id: string;
+  site_uuid: string;
+  commit: boolean;
+  equipment_total: number;
+  equipment_canonicalized: number;
+  needs_review: number | null;
+  status_counts: Record<string, number>;
+  zone_proposals_count: number;
+  zone_proposals: Array<{
+    alias_key: string;
+    canonical_zone_id: string;
+    floor: string;
+    zone_letter: string;
+    zone_name: string;
+    reason: string;
+  }>;
+  sample_review: Array<{
+    equipment_id: string;
+    raw_code: string;
+    reason: string;
+  }>;
+  error?: string;
+}
+
+export interface OnboardingHierarchySummary {
+  site_id: string;
+  site_uuid: string;
+  commit: boolean;
+  available: boolean;
+  source: string | null;
+  nodes_total: number;
+  nodes_resolved?: number;
+  equipment_stubs_created?: number;
+  relationships_total: number;
+  equipment_relationships_upserted: number;
+  zone_relationships_upserted: number;
+  relationships_skipped: number;
+  review_status_counts: Record<string, number>;
+  message?: string;
+  error?: string;
 }
 
 export interface NiagaraCorrectRequest {
@@ -4558,6 +4603,13 @@ export interface NiagaraCorrectRequest {
   point_type?: string;
   equipment_type?: string;
 }
+
+export type BMSOBIXConfig = NiagaraOBIXConfig;
+export type BMSConfigResponse = NiagaraConfigResponse;
+export type BMSConnectionStatus = NiagaraConnectionStatus;
+export type BMSMappingSummary = NiagaraMappingSummary;
+export type BMSApproveResponse = NiagaraApproveResponse;
+export type BMSCorrectRequest = NiagaraCorrectRequest;
 
 export interface SimbiotCapabilitiesSummary {
   devices: number;
@@ -4644,6 +4696,24 @@ export const niagaraApi = {
       { method: 'POST' },
     ),
 
+  canonicalizeOnboardingEquipment: (siteId: string, commit = false) =>
+    fetchApi<OnboardingCanonicalizationSummary>(
+      `/api/onboarding/equipment-canonicalization/${encodeURIComponent(siteId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ commit }),
+      },
+    ),
+
+  ingestOnboardingHierarchy: (siteId: string, commit = true, autoFetch = true) =>
+    fetchApi<OnboardingHierarchySummary>(
+      `/api/onboarding/hierarchy-ingestion/${encodeURIComponent(siteId)}`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ commit, auto_fetch: autoFetch }),
+      },
+    ),
+
   correctPoint: (discoveryId: string, correction: NiagaraCorrectRequest) =>
     fetchApi<{ success: boolean; corrections: string[]; message: string }>(
       `/api/niagara/mappings/${discoveryId}/correct`,
@@ -4666,7 +4736,10 @@ export const niagaraApi = {
     ),
 };
 
-/** Backward-compatible alias for niagaraApi */
+/** Brand-agnostic connection API. Routes are legacy-named for compatibility. */
+export const bmsConnectionApi = niagaraApi;
+
+/** Backward-compatible alias for older wizard code. */
 export const bmsApi = niagaraApi;
 
 // ============= Sites API Interfaces (Onboarding Wizard) =============

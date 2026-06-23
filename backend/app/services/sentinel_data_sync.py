@@ -19,6 +19,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from app.api.metrics import sentinel_data_freshness_violations_total
+from app.config.settings import settings
 from app.core.site_resolver import get_primary_site_code
 from app.services.audit_logger import audit_structured_logger
 from app.services.ml_config import (
@@ -241,18 +242,36 @@ class SentinelDataSync:
                     num = self.site_id[1:]
                     site_code_for_persist = f"site-{num}"
 
-                # Calculate actual ML hours from telemetry timestamps (restart-proof)
-                # Falls back to in-memory counter if DB query fails or returns 0
-                actual_hours = await self.ml_feeder.calculate_actual_ml_hours(self.site_id)
-                persisted_hours = actual_hours if actual_hours > 0 else float(self.ml_feeder.hours_ingested)
+                # Calculate actual ML hours from telemetry timestamps (restart-proof).
+                # If the calculate call raises (e.g. DB unreachable in subprocess
+                # context), skip BOTH the persist and the scoring — a wrong
+                # persisted value would silently reset the cumulative counter.
+                persisted_hours: float | None = None
+                try:
+                    actual_hours = await self.ml_feeder.calculate_actual_ml_hours(self.site_id)
+                except Exception as e:
+                    logger.warning(
+                        f"[ML FEEDER] calculate_actual_ml_hours failed for "
+                        f"{self.site_id}: {e} — skipping persist + scoring this poll"
+                    )
+                    actual_hours = None
+                if actual_hours is not None and actual_hours > 0:
+                    persisted_hours = actual_hours
                 try:
                     import psycopg2
 
+                    # Per CLAUDE.md: APScheduler subprocess contexts don't
+                    # inherit env vars. settings.database_url is loaded from
+                    # .env at import time and is the authoritative source.
                     database_url = (
-                        os.getenv("DATABASE_URL") or "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+                        settings.database_url
+                        or os.getenv("DATABASE_URL")
+                        or "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
                     )
                     if not database_url:
-                        raise ValueError("DATABASE_URL not set")
+                        raise ValueError("DATABASE_URL not set (settings.database_url empty, env var missing)")
+                    if persisted_hours is None:
+                        raise ValueError("persisted_hours unavailable — calculate_actual_ml_hours failed")
                     conn = psycopg2.connect(database_url)
                     conn.autocommit = True
                     cur = conn.cursor()
@@ -270,12 +289,18 @@ class SentinelDataSync:
                     )
                 except Exception as e:
                     logger.warning(f"[ML FEEDER] Could not persist ml_hours_ingested: {e}")
+                    persisted_hours = None  # ensure scoring is also skipped
 
                 # 1a. Compute IF anomaly scores and inject into equipment_states.
                 # Use persisted ml_hours_ingested from Supabase rather than the
                 # in-memory counter which resets to 0 on every restart.
-                ml_hours_for_scoring = int(persisted_hours) if persisted_hours > 0 else None
-                anomaly_scores = self.ml_feeder.score_anomaly(hours_ingested=ml_hours_for_scoring)
+                # persisted_hours may be None if the calculate/persist failed —
+                # skip scoring rather than score against an in-memory 0.
+                ml_hours_for_scoring = int(persisted_hours) if (persisted_hours and persisted_hours > 0) else None
+                if ml_hours_for_scoring is not None:
+                    anomaly_scores = self.ml_feeder.score_anomaly(hours_ingested=ml_hours_for_scoring)
+                else:
+                    anomaly_scores = {}
                 if anomaly_scores:
                     for code, score in anomaly_scores.items():
                         if code in equipment_states:
@@ -383,7 +408,7 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL not set")
 
@@ -620,7 +645,7 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             return 0
 
@@ -735,7 +760,7 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             return 0
 
@@ -808,7 +833,7 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL not set")
 
@@ -917,7 +942,7 @@ class SentinelDataSync:
         """
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL not set")
 

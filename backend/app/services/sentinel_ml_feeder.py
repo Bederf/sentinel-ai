@@ -13,6 +13,7 @@ Architecture:
 """
 
 import logging
+import os
 from collections import defaultdict
 from datetime import datetime
 from typing import Any
@@ -1028,54 +1029,74 @@ class SentinelMLFeeder:
             site_id: Site identifier (canonical format: 'site-002').
 
         Returns:
-            Cumulative hours of telemetry collection, or in-memory counter
-            as fallback if the DB query fails.
+            Cumulative hours of telemetry collection, or raises RuntimeError
+            if the DB read fails. We never fall back to the in-memory counter
+            on DB failure — for a fresh process that counter is 0, and a
+            silent reset to 0 would corrupt the persisted value on the
+            next persist call.
         """
         if not hasattr(self, "_ml_session_start"):
             self._ml_session_start = datetime.utcnow()
 
-        try:
-            import os
+        # Per CLAUDE.md: APScheduler subprocess contexts don't inherit env
+        # vars. Use the settings singleton (loaded from .env at import time)
+        # so the writer works in both the main process and any subprocess.
+        from app.config.settings import settings
 
+        database_url = settings.database_url or os.getenv("DATABASE_URL", "")
+        if not database_url:
+            raise RuntimeError(
+                f"[ML FEEDER] Cannot calculate actual ML hours for {site_id}: "
+                "DATABASE_URL is not configured (settings.database_url empty, "
+                "DATABASE_URL env var missing). Refusing to fall back to "
+                "in-memory counter — would silently reset the persisted value."
+            )
+
+        site_code = site_id
+        if site_id.startswith("S") and not site_id.startswith("site-"):
+            site_code = f"site-{site_id[1:]}"
+
+        try:
             import psycopg2
 
-            database_url = os.getenv("DATABASE_URL")
-            if not database_url:
-                logger.warning("[ML FEEDER] DATABASE_URL not set — cannot calculate actual hours")
-                return self._hours_ingested / 12.0  # 5-min polls ÷ 12 = hours
-
-            site_code = site_id
-            if site_id.startswith("S") and not site_id.startswith("site-"):
-                site_code = f"site-{site_id[1:]}"
-
             conn = psycopg2.connect(database_url)
-            try:
-                cur = conn.cursor()
-                cur.execute(
-                    "SELECT ml_hours_ingested FROM sites WHERE code = %s",
-                    (site_code,),
-                )
-                row = cur.fetchone()
-                cur.close()
-                if row and row[0] is not None:
-                    base_hours = float(row[0])
-                    session_delta = (datetime.utcnow() - self._ml_session_start).total_seconds() / 3600.0
-                    total = base_hours + session_delta
-                    logger.info(
-                        "[ML FEEDER] Cumulative ML hours for %s: %.1fh (base=%.1f + session=%.1f)",
-                        site_id,
-                        total,
-                        base_hours,
-                        session_delta,
-                    )
-                    return total
-                logger.info("[ML FEEDER] No persisted ml_hours_ingested for %s — using in-memory counter", site_id)
-            finally:
-                conn.close()
         except Exception as e:
-            logger.warning("[ML FEEDER] Could not calculate actual ML hours: %s", e)
+            raise RuntimeError(f"[ML FEEDER] Cannot connect to DB to read ml_hours_ingested for {site_id}: {e}") from e
 
-        return self._hours_ingested / 12.0
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT ml_hours_ingested FROM sites WHERE code = %s",
+                (site_code,),
+            )
+            row = cur.fetchone()
+            cur.close()
+            if row and row[0] is not None:
+                base_hours = float(row[0])
+                session_delta = (datetime.utcnow() - self._ml_session_start).total_seconds() / 3600.0
+                total = base_hours + session_delta
+                logger.info(
+                    "[ML FEEDER] Cumulative ML hours for %s: %.1fh (base=%.1f + session=%.1f)",
+                    site_id,
+                    total,
+                    base_hours,
+                    session_delta,
+                )
+                return total
+            # No persisted base yet (first-ever call for this site) — return
+            # the session delta from process start so the very first
+            # persist writes a sensible value. This is the ONLY place we
+            # trust the in-memory counter, and only when the DB has no row
+            # to contradict it.
+            session_delta = (datetime.utcnow() - self._ml_session_start).total_seconds() / 3600.0
+            logger.info(
+                "[ML FEEDER] No persisted ml_hours_ingested for %s — returning session_delta=%.2fh as initial value",
+                site_id,
+                session_delta,
+            )
+            return session_delta
+        finally:
+            conn.close()
 
     def reset(self):
         """Clear all accumulated data."""

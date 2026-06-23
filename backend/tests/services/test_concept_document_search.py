@@ -1,6 +1,6 @@
 import json
 
-from app.services.concept_document_search import ConceptDocumentSearchService, parse_query_intent
+from app.services.concept_document_search import ConceptDocumentSearchService
 
 
 def make_document(**overrides):
@@ -29,47 +29,6 @@ def make_document(**overrides):
     }
     base.update(overrides)
     return base
-
-
-def test_parse_generator_service_sheets():
-    intent = parse_query_intent("generator service sheets 2023")
-    assert intent["document_type"] == "service_sheet"
-    assert intent["equipment"] == "generator"
-    assert intent["year"] == 2023
-    assert intent["frequency"] is None
-
-
-def test_parse_generator_inspection_sheets():
-    intent = parse_query_intent("generator inspection sheets 2024")
-    assert intent["document_type"] == "inspection_sheet"
-    assert intent["equipment"] == "generator"
-    assert intent["year"] == 2024
-
-
-def test_parse_common_generator_typo():
-    intent = parse_query_intent("generagor sheets 2025")
-    assert intent["equipment"] == "generator"
-    assert intent["year"] == 2025
-
-
-def test_parse_pressure_vessel_certificate():
-    intent = parse_query_intent("pressure vessel certificate")
-    assert intent["document_type"] == "certificate"
-    assert intent["equipment"] == "pressure_vessel"
-
-
-def test_parse_meter_readings_2024():
-    intent = parse_query_intent("meter readings 2024")
-    assert intent["document_type"] == "reading"
-    assert intent["year"] == 2024
-
-
-def test_parse_monthly_inspection_plumbing():
-    intent = parse_query_intent("monthly inspection plumbing february 2025")
-    assert intent["discipline"] == "plumbing"
-    assert intent["document_type"] == "inspection_sheet"
-    assert intent["month"] == 2
-    assert intent["year"] == 2025
 
 
 def test_prefers_latest_generator_service_sheet(tmp_path):

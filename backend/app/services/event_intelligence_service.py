@@ -18,10 +18,13 @@ from __future__ import annotations
 import logging
 import math
 import time
+import json
+import os
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from app.models.operational_event import (
@@ -48,6 +51,7 @@ DEFAULT_STALE_READING_MINUTES = 15.0
 DEFAULT_ANOMALY_SCORE_THRESHOLD = 0.5
 DEFAULT_SETPOINT_DRIFT_THRESHOLD_C = 1.0
 TREND_BUFFER_SIZE = 5
+COMFORT_VIOLATIONS_FILE = Path(__file__).parent.parent / "data" / "comfort_violations.json"
 
 
 # ---------------------------------------------------------------------------
@@ -159,6 +163,7 @@ class EventIntelligenceService:
         self._event_history: deque[OperationalEvent] = deque(maxlen=10000)
         self._trend_buffers: dict[str, _TrendBuffer] = {}
         self._energy_history: dict[str, deque[float]] = {}
+        self._comfort_check_count: int = 0
 
         # Configurable thresholds
         self._temp_deviation_threshold = temp_deviation_threshold
@@ -229,6 +234,64 @@ class EventIntelligenceService:
             rule: The detection rule to add.
         """
         self._rules.append(rule)
+
+    # ------------------------------------------------------------------
+    # Comfort violation persistence (for quality gate collector)
+    # ------------------------------------------------------------------
+
+    def _persist_comfort_violations(self, site_id: str, violations: list[OperationalEvent], total_checked: int) -> None:
+        """Append comfort violations to persistent JSON file.
+
+        Each entry records the timestamp so the quality gate can count
+        violations within a 7-day window.
+        """
+        if not violations:
+            return
+        try:
+            os.makedirs(COMFORT_VIOLATIONS_FILE.parent, exist_ok=True)
+            existing: list[dict] = []
+            if COMFORT_VIOLATIONS_FILE.exists():
+                raw = COMFORT_VIOLATIONS_FILE.read_text()
+                if raw.strip():
+                    existing = json.loads(raw)
+            now = datetime.now(UTC)
+            for v in violations:
+                existing.append(
+                    {
+                        "site_id": site_id,
+                        "equipment_id": v.equipment_id,
+                        "timestamp": v.timestamp.isoformat() if hasattr(v.timestamp, "isoformat") else str(v.timestamp),
+                        "recorded_at": now.isoformat(),
+                    }
+                )
+            COMFORT_VIOLATIONS_FILE.write_text(json.dumps(existing, indent=2))
+        except Exception as e:
+            logger.warning("Failed to persist comfort violations: %s", e)
+
+    def get_comfort_violation_count_7d(self, site_id: str) -> tuple[int, int]:
+        """Count comfort violations and total checks in last 7 days.
+
+        Returns:
+            (violation_count, total_checks_7d)
+        """
+        cutoff = datetime.now(UTC) - timedelta(days=7)
+        if not COMFORT_VIOLATIONS_FILE.exists():
+            return 0, self._comfort_check_count
+        try:
+            raw = COMFORT_VIOLATIONS_FILE.read_text()
+            if not raw.strip():
+                return 0, self._comfort_check_count
+            entries: list[dict] = json.loads(raw)
+            recent_violations = sum(
+                1
+                for e in entries
+                if e.get("site_id") == site_id and datetime.fromisoformat(e.get("recorded_at", "")) > cutoff
+            )
+            # Also count total checks in same period from a companion counter
+            return recent_violations, max(self._comfort_check_count, 1)
+        except Exception as e:
+            logger.warning("Failed to read comfort violations: %s", e)
+            return 0, self._comfort_check_count
 
     # ------------------------------------------------------------------
     # Equipment type extraction
@@ -764,11 +827,17 @@ class EventIntelligenceService:
                 self._event_history.append(event)
                 all_events.append(event)
 
+        # Persist comfort violations for quality gate collector
+        comfort_violations = [e for e in all_events if e.event_type == OperationalEventType.COMFORT_VIOLATION]
+        self._comfort_check_count += len(equipment_telemetry)
+        self._persist_comfort_violations(site_id, comfort_violations, len(equipment_telemetry))
+
         logger.info(
-            "Processed site %s: %d equipment, %d events detected",
+            "Processed site %s: %d equipment, %d events detected, %d comfort violations",
             site_id,
             len(equipment_telemetry),
             len(all_events),
+            len(comfort_violations),
         )
         return all_events
 

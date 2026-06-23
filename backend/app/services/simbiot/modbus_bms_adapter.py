@@ -33,6 +33,30 @@ from app.services.simbiot.bms_adapter import (
 logger = logging.getLogger(__name__)
 
 
+def _hierarchy_from_metadata(metadata: dict[str, Any], *, default_source: str) -> dict[str, Any] | None:
+    hierarchy = metadata.get("hierarchy")
+    if isinstance(hierarchy, dict):
+        return {
+            "available": bool(hierarchy.get("nodes") or hierarchy.get("relationships")),
+            "source": hierarchy.get("source") or default_source,
+            "nodes": hierarchy.get("nodes") or [],
+            "relationships": hierarchy.get("relationships") or [],
+            "raw": hierarchy,
+        }
+
+    nodes = metadata.get("hierarchy_nodes") or metadata.get("nodes")
+    relationships = metadata.get("hierarchy_relationships") or metadata.get("relationships")
+    if nodes or relationships:
+        return {
+            "available": True,
+            "source": metadata.get("hierarchy_source") or default_source,
+            "nodes": nodes or [],
+            "relationships": relationships or [],
+            "raw": {"nodes": nodes or [], "relationships": relationships or []},
+        }
+    return None
+
+
 class ModbusBmsAdapter(BmsAdapter):
     """Modbus TCP adapter for electrical equipment."""
 
@@ -51,6 +75,7 @@ class ModbusBmsAdapter(BmsAdapter):
         return BmsAdapterCapabilities(
             supports_device_discovery=False,  # No auto-discovery in Modbus
             supports_point_discovery=False,
+            supports_hierarchy_discovery=True,
             supports_reads=True,
             supports_writes=True,
             supports_subscriptions=False,  # Poll-only protocol
@@ -167,6 +192,35 @@ class ModbusBmsAdapter(BmsAdapter):
                 )
             )
         return points
+
+    async def discover_hierarchy(self) -> dict[str, Any]:
+        """Return configured hierarchy from the Modbus register map.
+
+        Modbus TCP has no native semantic hierarchy. Relationships must come
+        from the uploaded register map or adapter metadata.
+        """
+        metadata = self._config.metadata if self._config else {}
+        configured = _hierarchy_from_metadata(metadata, default_source="modbus_register_map")
+        if configured:
+            return configured
+
+        nodes = [
+            {
+                "id": equipment_id,
+                "equipment_id": equipment_id,
+                "type": "equipment",
+                "name": equipment_id,
+                "source": "modbus_register_map",
+            }
+            for equipment_id in self._register_map
+        ]
+        return {
+            "available": False,
+            "source": "modbus_register_map",
+            "nodes": nodes,
+            "relationships": [],
+            "message": "Modbus does not expose native hierarchy; add hierarchy relationships to the register-map metadata.",
+        }
 
     async def read_point(self, device_id: str, point_id: str) -> BmsPointValue:
         self._ensure_connected()

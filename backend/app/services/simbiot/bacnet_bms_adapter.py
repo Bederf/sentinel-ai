@@ -46,6 +46,7 @@ class BacnetBmsAdapter(BmsAdapter):
         return BmsAdapterCapabilities(
             supports_device_discovery=True,
             supports_point_discovery=True,
+            supports_hierarchy_discovery=False,
             supports_reads=True,
             supports_writes=True,
             supports_subscriptions=False,
@@ -106,6 +107,23 @@ class BacnetBmsAdapter(BmsAdapter):
             use_cache=False,
         )
         return [await self._descriptor_from_point(bacnet_device_id, point) for point in points]
+
+    async def discover_hierarchy(self) -> dict[str, object]:
+        """BACnet hierarchy requires Structured View object traversal.
+
+        Direct BACnet point discovery is usually flat. The correct native
+        hierarchy source is BACnet Structured View (object type 29), but the
+        current shared BACnet client does not yet expose Structured View member
+        traversal. Until that exists, direct BACnet must fall back to naming
+        inference/manual mapping.
+        """
+        return {
+            "available": False,
+            "source": "bacnet_structured_view",
+            "nodes": [],
+            "relationships": [],
+            "message": "BACnet Structured View hierarchy discovery is not implemented in the direct BACnet adapter yet.",
+        }
 
     async def read_point(self, device_id: str, point_id: str) -> BmsPointValue:
         self._ensure_connected()

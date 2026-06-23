@@ -73,8 +73,69 @@ This contract is for the building boundary, not the per-device boundary.
 Optional operations:
 
 - `read_points(device_id, point_ids)` for efficient bulk reads
+- `discover_hierarchy()` for native BMS hierarchy when available
 - `subscribe_points(device_id, point_ids)` and `unsubscribe(subscription_id)`
   for push-style updates
+
+## Hierarchy Discovery
+
+SIMBIOT onboarding must distinguish point containment from engineering
+meaning. A BMS may know that six points belong under `AHU-R-001`; it may not
+know that the rooftop AHU physically sits on the roof and serves Level 2 north,
+east, and west zones.
+
+Adapters that can expose native hierarchy should implement
+`discover_hierarchy()` and set `supports_hierarchy_discovery=True`.
+
+Expected normalized response:
+
+```json
+{
+  "available": true,
+  "source": "desigo_plant_tree",
+  "nodes": [
+    { "id": "Plant/HVAC/AHU-R-001", "canonical_code": "S002-AHU-R-001", "type": "equipment" },
+    { "id": "Location/L2/North", "zone_id": "Zone-201", "type": "zone" }
+  ],
+  "relationships": [
+    {
+      "parent": "Plant/HVAC/AHU-R-001",
+      "child": "Location/L2/North",
+      "relationship_type": "serves",
+      "evidence_basis": "Desigo Plant > HVAC > AHU-R-001"
+    }
+  ]
+}
+```
+
+Source-specific confidence defaults:
+
+| Source | Default Confidence | Default Review |
+| --- | ---: | --- |
+| `desigo_plant_tree` / `desigo_location_tree` | 0.95 | approved |
+| `bacnet_structured_view` | 0.90 | approved |
+| `niagara_station_tree` | 0.90 | approved |
+| `bridge_hierarchy` | 0.85 | suggested |
+| `obix_config_hierarchy` | 0.85 | suggested |
+| `knx_ets_export` | 0.80 | suggested |
+| `modbus_register_map` | 0.75 | suggested |
+| `naming_inference` | 0.75 | suggested |
+| `manual_onboarding` | 0.70 | suggested |
+| `manual_simulation` | 0.55 | suggested |
+
+When a BMS or bridge only exposes flat points, `discover_hierarchy()` returns
+`available=false`. Onboarding then falls back to naming inference and manual
+mapping instead of blocking activation.
+
+Protocol support in SIMBIOT:
+
+| SIMBIOT Connection Type | Hierarchy Source | Current Behavior |
+| --- | --- | --- |
+| Bridge | `/api/sites/{site_id}/hierarchy` | Imports bridge-proxied Desigo/Niagara/BACnet hierarchy when available |
+| oBIX | Adapter config hierarchy metadata | Imports `metadata.hierarchy`, `hierarchy_nodes`, or `hierarchy_relationships`; station-tree browsing is still future work |
+| BACnet direct | BACnet Structured Views | Explicitly unavailable until Structured View traversal is implemented in the BACnet client |
+| Modbus TCP | Register-map metadata | Imports configured hierarchy; Modbus wire protocol itself has no native hierarchy |
+| KNX | ETS/group-address metadata | Imports configured hierarchy or derives equipment-zone links from group addresses with `equipment_id` and `zone_id` |
 
 ## Standard data shapes
 

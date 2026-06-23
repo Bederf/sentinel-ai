@@ -13,7 +13,7 @@ The evaluator never recomputes metrics — it aggregates from existing services.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 from app.services.quality_gate_policy import (
     METRIC_REASON_CODES,
@@ -301,9 +301,9 @@ class QualityGateEvaluator:
                         metrics["truth_check_pass_rate_pct"] = agreement_pct
 
         async def _collect_mv():
-            from app.services.mv_verification_service import MVVerificationService
+            from app.services.mv_verification_service import get_mv_verification_service
 
-            mv_svc = MVVerificationService()
+            mv_svc = get_mv_verification_service()
             if site_id:
                 summary = mv_svc.get_verification_summary(site_id)
                 avg_acc = summary.get("average_accuracy")
@@ -313,11 +313,116 @@ class QualityGateEvaluator:
                 rollbacks = summary.get("rollbacks_recommended", 0)
                 if total_verifications > 0:
                     metrics["rollback_rate_7d_pct"] = (rollbacks / total_verifications) * 100.0
+                    return
+
+                # Production outcome verification is persisted on recommendations.
+                # The JSON-backed M&V service can be empty after restarts, so fall
+                # back to measured recommendation outcomes before using live defaults.
+                try:
+                    from app.database.supabase_client import get_supabase_client
+
+                    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+                    sb = get_supabase_client()
+                    result = (
+                        sb.table("recommendations")
+                        .select("expected_impact,baseline_energy_kwh,actual_saving_kwh,outcome_validated,status")
+                        .eq("site_id", site_id)
+                        .gte("timestamp", cutoff)
+                        .not_.is_("actual_saving_kwh", "null")
+                        .execute()
+                    )
+                    measured = result.data or []
+                    if measured:
+                        accuracies: list[float] = []
+                        rollbacks = 0
+                        for row in measured:
+                            actual_saving = float(row.get("actual_saving_kwh") or 0.0)
+                            if actual_saving < 0:
+                                rollbacks += 1
+
+                            baseline = row.get("baseline_energy_kwh")
+                            expected = row.get("expected_impact") or {}
+                            expected_pct = (
+                                expected.get("energy_savings_percent") if isinstance(expected, dict) else None
+                            )
+                            if baseline is not None and expected_pct is not None:
+                                predicted_saving = float(baseline) * (float(expected_pct) / 100.0)
+                                if abs(predicted_saving) > 0:
+                                    accuracy = max(
+                                        0.0,
+                                        min(
+                                            1.0,
+                                            1.0 - (abs(predicted_saving - actual_saving) / abs(predicted_saving)),
+                                        ),
+                                    )
+                                    accuracies.append(accuracy)
+
+                        if accuracies:
+                            metrics["mv_accuracy_7d_pct"] = (sum(accuracies) / len(accuracies)) * 100.0
+                        metrics["rollback_rate_7d_pct"] = (rollbacks / len(measured)) * 100.0
+                except Exception as exc:
+                    logger.warning("Failed to collect recommendation outcome M&V metrics: %s", exc)
+
+        async def _collect_comfort_violations():
+            from app.services.event_intelligence_service import get_event_intelligence_service
+
+            ei_svc = get_event_intelligence_service()
+            if site_id:
+                cv_count, total_checks = ei_svc.get_comfort_violation_count_7d(site_id)
+                if total_checks > 0:
+                    metrics["comfort_violation_rate_7d_pct"] = (cv_count / total_checks) * 100.0
+                    return
+
+                # EventIntelligence keeps its total check denominator in memory.
+                # After restart, derive the 7-day comfort rate from normalized
+                # room-temperature telemetry instead of showing the live default.
+                try:
+                    from app.database.supabase_client import get_supabase_client
+
+                    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+                    sb = get_supabase_client()
+                    total = (
+                        sb.table("equipment_sensor_readings")
+                        .select("id", count="exact")
+                        .eq("site_id", site_id)
+                        .in_("sensor_type", ["room_temp", "zone_temp", "temperature_c"])
+                        .gte("recorded_at", cutoff)
+                        .limit(1)
+                        .execute()
+                    )
+                    total_checks = int(total.count or 0)
+                    if total_checks <= 0:
+                        return
+
+                    low = (
+                        sb.table("equipment_sensor_readings")
+                        .select("id", count="exact")
+                        .eq("site_id", site_id)
+                        .in_("sensor_type", ["room_temp", "zone_temp", "temperature_c"])
+                        .gte("recorded_at", cutoff)
+                        .lt("value", 18)
+                        .limit(1)
+                        .execute()
+                    )
+                    high = (
+                        sb.table("equipment_sensor_readings")
+                        .select("id", count="exact")
+                        .eq("site_id", site_id)
+                        .in_("sensor_type", ["room_temp", "zone_temp", "temperature_c"])
+                        .gte("recorded_at", cutoff)
+                        .gt("value", 26)
+                        .limit(1)
+                        .execute()
+                    )
+                    violations = int(low.count or 0) + int(high.count or 0)
+                    metrics["comfort_violation_rate_7d_pct"] = (violations / total_checks) * 100.0
+                except Exception as exc:
+                    logger.warning("Failed to collect telemetry comfort violation metrics: %s", exc)
 
         async def _collect_ml_feedback():
-            from app.services.ml_feedback_service import MLFeedbackService
+            from app.services.ml_feedback_service import get_ml_feedback_service
 
-            fb_svc = MLFeedbackService()
+            fb_svc = get_ml_feedback_service()
             fb_summary = fb_svc.get_feedback_summary()
             total_records = fb_summary.total_feedback_records
             predictions_evaluated = fb_summary.predictions_evaluated
@@ -325,8 +430,11 @@ class QualityGateEvaluator:
                 metrics["feedback_capture_rate_7d_pct"] = min(
                     (total_records / max(predictions_evaluated, 1)) * 100.0, 100.0
                 )
-            if fb_summary.avg_prediction_accuracy > 0:
-                metrics["label_lag_p95_hours"] = max(1.0, 48.0 * (1.0 - fb_summary.avg_prediction_accuracy))
+            if predictions_evaluated > 0:
+                accuracy = fb_summary.avg_prediction_accuracy
+                if accuracy <= 0:
+                    accuracy = 0.01
+                metrics["label_lag_p95_hours"] = max(1.0, 48.0 * (1.0 - accuracy))
 
         async def _collect_drift_alerts():
             from datetime import timedelta
@@ -349,6 +457,7 @@ class QualityGateEvaluator:
             ("monitoring", _collect_monitoring),
             ("truth_check", _collect_truth_check),
             ("mv_verification", _collect_mv),
+            ("comfort_violations", _collect_comfort_violations),
             ("ml_feedback", _collect_ml_feedback),
             ("drift_alerts", _collect_drift_alerts),
         ]

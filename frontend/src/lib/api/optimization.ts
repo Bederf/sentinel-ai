@@ -85,7 +85,16 @@ export const optimizationApi = {
     siteId: string,
     filters: { status?: string; riskLevel?: string }
   ) =>
-    fetchApi<{ recommendations: Recommendation[] }>(
+    fetchApi<{
+      recommendations: Recommendation[]
+      aggregates: {
+        total: number
+        actioned: number
+        verified: number
+        saving_kwh: number
+        saving_zar: number
+      }
+    }>(
       `/api/recommendations/history/${siteId}`,
       { method: 'POST', body: JSON.stringify(filters) }
     ),

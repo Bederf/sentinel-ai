@@ -8,9 +8,17 @@ import { queryClient } from './lib/queryClient'
 
 // PWA foundation — caches last decision payload for offline/kiosk resilience
 if ("serviceWorker" in navigator) {
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+
   window.addEventListener("load", () => {
     navigator.serviceWorker
-      .register("/service-worker.js")
+      .register("/service-worker.js", { updateViaCache: "none" })
+      .then((registration) => registration.update())
       .catch((err) => console.warn("Service worker registration failed:", err));
   });
 }

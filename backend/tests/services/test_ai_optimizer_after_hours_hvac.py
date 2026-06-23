@@ -1,6 +1,7 @@
 """Regression tests for deterministic after-hours HVAC advisories."""
 
 from datetime import datetime
+from typing import Any
 
 import pytest
 
@@ -106,8 +107,10 @@ def _ahu() -> HVACDevice:
     )
 
 
-def _conditions(timestamp: str, occupancy: float = 0, hvac_kw: float = 24.0) -> dict:
-    return {
+def _conditions(
+    timestamp: str, occupancy: float = 0, hvac_kw: float = 24.0, site_peak_kw: float | None = None
+) -> dict[str, Any]:
+    conditions: dict[str, Any] = {
         "timestamp": timestamp,
         "indoor_temp": 22.0,
         "outdoor_temp": 22.0,
@@ -123,6 +126,10 @@ def _conditions(timestamp: str, occupancy: float = 0, hvac_kw: float = 24.0) -> 
         },
         "active_urgent_work_orders": [],
     }
+    if site_peak_kw is not None:
+        conditions["site_peak_kw"] = site_peak_kw
+        conditions["electrical"]["site_peak_kw"] = site_peak_kw
+    return conditions
 
 
 def test_day_keyed_247_hospital_schedule_is_inside_operating_hours_on_weekday():
@@ -237,6 +244,31 @@ def test_after_hours_hvac_rule_does_not_fire_when_occupied():
     )
 
     assert _after_hours_recs(result) == []
+
+
+def test_closed_empty_hvac_context_uses_site_specific_peak_threshold():
+    optimizer = _optimizer()
+
+    context = optimizer._closed_empty_hvac_context(
+        "site-002",
+        _conditions("2026-06-18T22:00:00", occupancy=0, hvac_kw=14.21, site_peak_kw=100.0),
+    )
+
+    assert context is not None
+    assert context["threshold_kw"] == pytest.approx(8.0)
+    assert context["hvac_kw"] == pytest.approx(14.21)
+
+
+def test_closed_empty_hvac_context_uses_conservative_fallback_when_peak_is_missing():
+    optimizer = _optimizer()
+
+    context = optimizer._closed_empty_hvac_context(
+        "site-002",
+        _conditions("2026-06-18T22:00:00", occupancy=0, hvac_kw=14.21),
+    )
+
+    assert context is not None
+    assert context["threshold_kw"] == pytest.approx(2.5)
 
 
 def test_after_hours_advisory_is_enforced_when_llm_returns_no_recommendations():

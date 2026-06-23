@@ -101,6 +101,14 @@ class Settings(BaseSettings):
     # Internal service key for service-to-service API auth (X-Internal-Service header)
     internal_service_key: str = Field(default="sentinel-internal", validation_alias="INTERNAL_SERVICE_KEY")
 
+    # DDMP / Demand Response thresholds (used by curtailable_load MCP tool).
+    # ddmp_minimum_kw: Eskom DDMP programme minimum per site (0.2 MW = 200 kW).
+    #   See demand_response_service._calculate_ddmp_eligible docstring.
+    # ddmp_aggregation_cap_kw: Internal SENTINEL multi-site aggregation cap
+    #   used to assess whether the fleet collectively clears the programme bar.
+    ddmp_minimum_kw: float = 200.0
+    ddmp_aggregation_cap_kw: float = 500.0
+
     # Claude AI settings
     anthropic_api_key: str = ""
     claude_model: str = "claude-sonnet-4-20250514"
@@ -309,8 +317,8 @@ class Settings(BaseSettings):
     optimization_tier3_min: float = 0.85  # Above this -> tier3_auto_execute
     optimization_fcu_confidence_cap: float = 0.45  # FCU actions capped at this confidence
     recommendation_advisory_info_retention_days: int = 7
-    after_hours_hvac_load_threshold_pct: float = 0.15
-    after_hours_hvac_load_threshold_kw: float = 15.0
+    after_hours_hvac_load_threshold_pct: float = 0.08
+    after_hours_hvac_load_threshold_kw: float = 2.5
     after_hours_hvac_advisory_cooldown_hours: int = 2
 
     # MCP Authentication (Phase 81 - MCP SSE Security)

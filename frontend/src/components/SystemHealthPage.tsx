@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useServerEvents } from '@/hooks/useServerEvents';
 
 import {
@@ -30,6 +30,21 @@ const GATE_LABEL_MAP: Record<string, string> = {
   source_provenance: 'Source Provenance',
   value_validity: 'Value Validity',
   timestamp_integrity: 'Timestamp Integrity',
+};
+
+const PLATFORM_COMPONENT_LABELS: Record<string, string> = {
+  supabase: 'Supabase Registry',
+  redis_cache: 'Redis Cache',
+  event_bus: 'Event Bus',
+  n8n: 'n8n Workflows',
+  servicenow: 'ServiceNow',
+  notifications: 'Notifications',
+  device_manager: 'Device Manager',
+  lighting: 'Lighting Telemetry',
+  supervisor: 'BMS Supervisor',
+  field_network: 'Field Network',
+  obix: 'oBIX',
+  bms_connectivity: 'BMS Connectivity',
 };
 import { monitoringApi } from '@/lib/api';
 import { authorizedFetch } from '../lib/api/client';
@@ -93,6 +108,32 @@ interface DiscoveredEquipment {
   zone_message: string | null;
 }
 
+interface UnmappedEquipment {
+  id: string;
+  code: string;
+  name: string | null;
+  equipment_type: string | null;
+  raw_code: string | null;
+  canonical_code: string | null;
+  canonical_zone_id: string | null;
+  reason: string | null;
+  zone_key: string | null;
+}
+
+interface UnmatchedPoint {
+  point_id: string;
+  point_name: string;
+  last_seen: string | null;
+  occurrence_count: number;
+}
+
+interface ManualMappingDraft {
+  canonical_code: string;
+  equipment_type: string;
+  canonical_zone_id: string;
+  relationship_type: string;
+}
+
 export default function SystemHealthPage() {
   useServerEvents();
 
@@ -108,7 +149,13 @@ export default function SystemHealthPage() {
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('site-002');
   const [discoveredEquipment, setDiscoveredEquipment] = useState<DiscoveredEquipment[]>([]);
+  const [unmappedEquipment, setUnmappedEquipment] = useState<UnmappedEquipment[]>([]);
+  const [unmatchedPoints, setUnmatchedPoints] = useState<UnmatchedPoint[]>([]);
+  const [unmatchedPointsTotal, setUnmatchedPointsTotal] = useState(0);
+  const [manualMappingDrafts, setManualMappingDrafts] = useState<Record<string, ManualMappingDraft>>({});
   const [discoveryActionId, setDiscoveryActionId] = useState<string | null>(null);
+  const [manualMappingActionId, setManualMappingActionId] = useState<string | null>(null);
+  const mappingReviewRef = useRef<HTMLDivElement | null>(null);
 
   // Load sites list
   useEffect(() => {
@@ -132,6 +179,8 @@ export default function SystemHealthPage() {
     loadUptimeData();
     loadGateData();
     loadDiscoveredEquipment();
+    loadUnmappedEquipment();
+    loadUnmatchedPoints();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSiteId]);
 
@@ -142,12 +191,16 @@ export default function SystemHealthPage() {
     const uptimeInterval = setInterval(loadUptimeData, 600000);
     const gateInterval = setInterval(loadGateData, 60000);
     const discoveryInterval = setInterval(loadDiscoveredEquipment, 60000);
+    const unmappedInterval = setInterval(loadUnmappedEquipment, 60000);
+    const unmatchedInterval = setInterval(loadUnmatchedPoints, 60000);
     return () => {
       clearInterval(healthInterval);
       clearInterval(freshnessInterval);
       clearInterval(uptimeInterval);
       clearInterval(gateInterval);
       clearInterval(discoveryInterval);
+      clearInterval(unmappedInterval);
+      clearInterval(unmatchedInterval);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedSiteId]);
@@ -243,6 +296,97 @@ export default function SystemHealthPage() {
       }
     } catch (err) {
       console.error('Discovered equipment fetch error:', err);
+    }
+  };
+
+  const loadUnmappedEquipment = async () => {
+    try {
+      const res = await authorizedFetch(`/api/system/sites/${selectedSiteId}/unmapped-equipment`);
+      if (res.ok) {
+        const data = await res.json();
+        const items: UnmappedEquipment[] = data.items || [];
+        setUnmappedEquipment(items);
+        setManualMappingDrafts((previous) => {
+          const next: Record<string, ManualMappingDraft> = {};
+          for (const item of items) {
+            next[item.id] = previous[item.id] || {
+              canonical_code: item.canonical_code || item.code || '',
+              equipment_type: item.equipment_type || '',
+              canonical_zone_id: item.canonical_zone_id || item.zone_key || '',
+              relationship_type: '',
+            };
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error('Unmapped equipment fetch error:', err);
+    }
+  };
+
+  const loadUnmatchedPoints = async () => {
+    try {
+      const result = await monitoringApi.getUnmatchedPoints(selectedSiteId, 100, 0);
+      setUnmatchedPoints(result.points || []);
+      setUnmatchedPointsTotal(result.total || 0);
+    } catch (err) {
+      console.error('Unmatched points fetch error:', err);
+    }
+  };
+
+  const openMappingReview = () => {
+    setSelectedTab('health');
+    window.setTimeout(() => {
+      mappingReviewRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      mappingReviewRef.current?.focus({ preventScroll: true });
+    }, 50);
+  };
+
+  const updateManualMappingDraft = (id: string, patch: Partial<ManualMappingDraft>) => {
+    setManualMappingDrafts((previous) => ({
+      ...previous,
+      [id]: {
+        canonical_code: '',
+        equipment_type: '',
+        canonical_zone_id: '',
+        relationship_type: '',
+        ...(previous[id] || {}),
+        ...patch,
+      },
+    }));
+  };
+
+  const handleManualMappingSave = async (item: UnmappedEquipment) => {
+    const draft = manualMappingDrafts[item.id];
+    if (!draft?.canonical_code.trim()) {
+      setError('Canonical code is required before saving a manual mapping.');
+      return;
+    }
+    try {
+      setManualMappingActionId(item.id);
+      const res = await authorizedFetch(
+        `/api/system/sites/${selectedSiteId}/unmapped-equipment/${item.id}/map`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            canonical_code: draft.canonical_code.trim(),
+            equipment_type: draft.equipment_type.trim() || undefined,
+            canonical_zone_id: draft.canonical_zone_id.trim() || undefined,
+            relationship_type: draft.relationship_type || undefined,
+          }),
+        },
+      );
+      if (!res.ok) {
+        const payload = await res.json().catch(() => ({}));
+        throw new Error(payload.detail || 'Failed to save manual mapping');
+      }
+      await loadUnmappedEquipment();
+      await loadHealthData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save manual mapping');
+    } finally {
+      setManualMappingActionId(null);
     }
   };
 
@@ -512,10 +656,20 @@ export default function SystemHealthPage() {
                     <p style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Mapped Points</p>
                     <div className="text-3xl font-semibold tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.total_points_mapped || 0}</div>
                   </div>
-                  <div className="rounded-lg p-2.5" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+                  <button
+                    type="button"
+                    onClick={openMappingReview}
+                    className="rounded-lg p-2.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    style={{
+                      background: (integrationHealth?.unmatched_points || 0) > 0 ? "rgba(245, 158, 11, 0.10)" : "var(--color-sentinel-bg-secondary)",
+                      border: (integrationHealth?.unmatched_points || 0) > 0 ? "1px solid rgba(245, 158, 11, 0.40)" : "1px solid var(--color-sentinel-border)",
+                    }}
+                    aria-label="Open point mapping review"
+                    title="Open point mapping review"
+                  >
                     <p style={{ color: "var(--color-sentinel-text-secondary)" }} className="uppercase text-[10px] tracking-wide">Unmatched</p>
-                    <div className="text-3xl font-semibold tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>{integrationHealth?.unmatched_points || 0}</div>
-                  </div>
+                    <div className="text-3xl font-semibold tabular-nums" style={{ color: (integrationHealth?.unmatched_points || 0) > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-text-primary)" }}>{integrationHealth?.unmatched_points || 0}</div>
+                  </button>
                 </div>
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -529,6 +683,8 @@ export default function SystemHealthPage() {
               <PhaseProgressCard
                 currentPhase={commissioning?.ingestion_mode ?? null}
                 isLoading={loading}
+                canPromote={commissioning?.can_promote}
+                qualityGateStatus={qualityGate?.overall_status ?? null}
                 gates={commissioning ? GATE_IDS.map(id => ({
                   name: id,
                   passed: !commissioning.blocking_gates.includes(id),
@@ -541,6 +697,79 @@ export default function SystemHealthPage() {
               />
 
               <AdapterHealthCard siteId={selectedSiteId} key={selectedSiteId} />
+
+              <div
+                ref={mappingReviewRef}
+                tabIndex={-1}
+                className="rounded-lg p-4 scroll-mt-6 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}
+              >
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Point Mapping Review
+                    </p>
+                    <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Integration points requiring manual mapping
+                    </h2>
+                    <p className="mt-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      These BMS points have not been matched to an onboarded asset or approved alias yet.
+                    </p>
+                  </div>
+                  <span
+                    className="inline-flex items-center rounded px-2 py-1 text-xs font-medium"
+                    style={{
+                      background: unmatchedPointsTotal > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                      border: unmatchedPointsTotal > 0 ? "1px solid rgba(245, 158, 11, 0.35)" : "1px solid rgba(16, 185, 129, 0.35)",
+                      color: unmatchedPointsTotal > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)",
+                    }}
+                  >
+                    {unmatchedPointsTotal} unmatched
+                  </span>
+                </div>
+
+                {unmatchedPointsTotal === 0 && (
+                  <div className="mt-4 rounded p-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      No integration points are waiting for manual mapping.
+                    </p>
+                  </div>
+                )}
+
+                {unmatchedPointsTotal > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {unmatchedPoints.map((point) => (
+                      <div
+                        key={point.point_id}
+                        className="rounded-lg p-3"
+                        style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
+                      >
+                        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                          <div className="min-w-0">
+                            <p className="font-mono text-sm font-semibold break-all" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                              {point.point_name}
+                            </p>
+                            <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                              Seen {point.occurrence_count} time(s), last {formatRelativeTime(point.last_seen)}
+                            </p>
+                          </div>
+                          <span
+                            className="shrink-0 rounded px-2 py-1 text-[11px] uppercase"
+                            style={{ background: "rgba(245, 158, 11, 0.14)", color: "var(--color-sentinel-amber)" }}
+                          >
+                            Needs point map
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                    {unmatchedPoints.length < unmatchedPointsTotal && (
+                      <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                        Showing {unmatchedPoints.length} of {unmatchedPointsTotal} unmatched points.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -645,24 +874,158 @@ export default function SystemHealthPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {Object.entries(currentHealth.components || {}).map(
-                  ([key, component]: [string, any]) => {
-                    const labels: Record<string, string> = {
-                      supabase: "Supabase",
-                      redis_cache: "Redis Cache",
-                      event_bus: "Event Bus",
-                      n8n: "n8n Workflows",
-                      servicenow: "ServiceNow",
-                      notifications: "Notifications",
-                      device_manager: "Device Manager",
-                    };
-                    return (
+              <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wider font-medium" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Manual Mapping
+                    </p>
+                    <h2 className="mt-1 text-base font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                      Active equipment requiring canonical mapping
+                    </h2>
+                    <p className="mt-1 text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Equipment that automatic onboarding could not safely map stays here until a reviewed canonical code is saved.
+                    </p>
+                  </div>
+                  <span
+                    className="inline-flex items-center rounded px-2 py-1 text-xs font-medium"
+                    style={{
+                      background: unmappedEquipment.length > 0 ? "rgba(245, 158, 11, 0.15)" : "rgba(16, 185, 129, 0.15)",
+                      border: unmappedEquipment.length > 0 ? "1px solid rgba(245, 158, 11, 0.35)" : "1px solid rgba(16, 185, 129, 0.35)",
+                      color: unmappedEquipment.length > 0 ? "var(--color-sentinel-amber)" : "var(--color-sentinel-green)",
+                    }}
+                  >
+                    {unmappedEquipment.length} pending
+                  </span>
+                </div>
+
+                {unmappedEquipment.length === 0 && (
+                  <div className="mt-4 rounded p-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
+                    <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      No active equipment is waiting for manual canonical mapping.
+                    </p>
+                  </div>
+                )}
+
+                {unmappedEquipment.length > 0 && (
+                  <div className="mt-4 space-y-3">
+                    {unmappedEquipment.map((item) => {
+                      const draft = manualMappingDrafts[item.id] || {
+                        canonical_code: item.canonical_code || item.code,
+                        equipment_type: item.equipment_type || '',
+                        canonical_zone_id: item.canonical_zone_id || item.zone_key || '',
+                        relationship_type: '',
+                      };
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-lg p-3"
+                          style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}
+                        >
+                          <div className="flex flex-col gap-3">
+                            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                              <div className="min-w-0">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <p className="font-mono text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                    {item.code}
+                                  </p>
+                                  <span className="rounded px-2 py-0.5 text-[11px] uppercase" style={{ background: "rgba(148, 163, 184, 0.16)", color: "var(--color-sentinel-text-secondary)" }}>
+                                    {item.equipment_type || 'unknown'}
+                                  </span>
+                                </div>
+                                <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                  {item.name || 'Unnamed equipment'} · {item.reason?.replace(/_/g, ' ') || 'manual review required'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="grid gap-2 md:grid-cols-4">
+                              <label className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                Canonical code
+                                <input
+                                  value={draft.canonical_code}
+                                  onChange={(event) => updateManualMappingDraft(item.id, { canonical_code: event.target.value })}
+                                  className="mt-1 w-full rounded px-2 py-2 font-mono text-xs"
+                                  style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }}
+                                />
+                              </label>
+                              <label className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                Type
+                                <input
+                                  value={draft.equipment_type}
+                                  onChange={(event) => updateManualMappingDraft(item.id, { equipment_type: event.target.value })}
+                                  className="mt-1 w-full rounded px-2 py-2 text-xs"
+                                  style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }}
+                                />
+                              </label>
+                              <label className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                Zone
+                                <input
+                                  value={draft.canonical_zone_id}
+                                  onChange={(event) => updateManualMappingDraft(item.id, { canonical_zone_id: event.target.value })}
+                                  placeholder="Optional"
+                                  className="mt-1 w-full rounded px-2 py-2 font-mono text-xs"
+                                  style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }}
+                                />
+                              </label>
+                              <label className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                Relationship
+                                <select
+                                  value={draft.relationship_type}
+                                  onChange={(event) => updateManualMappingDraft(item.id, { relationship_type: event.target.value })}
+                                  className="mt-1 w-full rounded px-2 py-2 text-xs"
+                                  style={{ background: "var(--color-sentinel-bg-primary)", border: "1px solid var(--color-sentinel-border)", color: "var(--color-sentinel-text-primary)" }}
+                                >
+                                  <option value="">Auto</option>
+                                  <option value="serves">Serves</option>
+                                  <option value="located_in">Located in</option>
+                                  <option value="controls">Controls</option>
+                                  <option value="monitors">Monitors</option>
+                                  <option value="plant">Plant</option>
+                                </select>
+                              </label>
+                            </div>
+
+                            <div className="flex justify-end">
+                              <button
+                                type="button"
+                                onClick={() => handleManualMappingSave(item)}
+                                disabled={manualMappingActionId === item.id || !draft.canonical_code.trim()}
+                                className="rounded px-3 py-2 text-xs font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                                style={{
+                                  background: "rgba(16, 185, 129, 0.15)",
+                                  border: "1px solid rgba(16, 185, 129, 0.35)",
+                                  color: "var(--color-sentinel-green)",
+                                }}
+                              >
+                                Save Mapping
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="mb-3">
+                  <p className="text-base font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Platform Components
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Global service probes across SENTINEL, not filtered by the selected site.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {Object.entries(currentHealth.components || {}).map(
+                    ([key, component]: [string, any]) => (
                       <div key={key} className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">
                             <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                              {labels[key] || key}
+                              {PLATFORM_COMPONENT_LABELS[key] || key}
                             </p>
                             <div className="text-3xl font-semibold tabular-nums" style={{ color: "var(--color-sentinel-text-primary)" }}>{component.score}</div>
                           </div>
@@ -675,9 +1038,9 @@ export default function SystemHealthPage() {
                           </p>
                         )}
                       </div>
-                    );
-                  }
-                )}
+                    )
+                  )}
+                </div>
               </div>
             </>
           )}

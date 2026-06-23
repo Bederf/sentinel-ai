@@ -255,7 +255,23 @@ async def get_site_alerts(request: Request, site_id: str, offset: int = 0, limit
         raise HTTPException(status_code=400, detail="Limit cannot exceed 100")
 
     try:
-        return SiteAlerts(site_id=site_id, alerts=[], total_count=0, offset=offset, limit=limit)
+        alert_repo = AlertRepository()
+        alerts = alert_repo.get_active_by_site(site_id)
+        alerts = sorted(alerts, key=lambda item: str(item.get("created_at") or ""), reverse=True)
+        paged_alerts = alerts[offset : offset + limit]
+
+        items = [
+            AlertItem(
+                id=str(alert.get("id") or ""),
+                equipment_id=str(alert.get("equipment_id") or ""),
+                equipment_name=str(alert.get("title") or alert.get("equipment_id") or "Site alert"),
+                severity=str(alert.get("severity") or "warning"),
+                description=str(alert.get("message") or alert.get("title") or ""),
+                created_at=str(alert.get("created_at") or ""),
+            )
+            for alert in paged_alerts
+        ]
+        return SiteAlerts(site_id=site_id, alerts=items, total_count=len(alerts), offset=offset, limit=limit)
     except Exception as e:
         logger.error(f"Error getting site alerts: {e}")
         raise HTTPException(status_code=500, detail=str(e))

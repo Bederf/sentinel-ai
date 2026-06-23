@@ -123,12 +123,13 @@ class SystemHealthService:
     async def _check_supabase(self) -> dict[str, Any]:
         """Probe Supabase with a lightweight query."""
         try:
-            result = self.client.table("sites").select("id", count="exact").limit(1).execute()
-            count = result.count if result.count is not None else len(result.data or [])
+            result = self.client.table("sites").select("code", count="exact").execute()
+            records = result.data or []
+            sentinel_count = sum(1 for row in records if str(row.get("code", "")).startswith("site-"))
             return {
                 "score": 95,
                 "status": "healthy",
-                "note": f"Connected · {count} building(s)",
+                "note": f"Connected · {sentinel_count} commercial SENTINEL site(s)",
             }
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"Query failed: {e}"}
@@ -301,74 +302,148 @@ class SystemHealthService:
             return {"score": 40, "status": "degraded", "note": f"Check failed: {e}"}
 
     async def _check_lighting(self) -> dict[str, Any]:
-        """Check lighting telemetry flow via bridge live data + Supabase energy history.
+        """Check lighting telemetry for active commercial sites that use lighting.
 
-        Probes two paths:
-        1. Live: fetches /telemetry from the bridge directly for lighting_kw.
-           This confirms the DALI controllers are reachable even before the
-           midnight energy flush writes energy_consumption_history.
-        2. Historical: checks energy_consumption_history for accumulated lighting_kwh
-           (written by ShadowModePollingService at midnight flush).
-
-        Either path healthy = lighting is flowing.
+        Residential rows and inactive/future sites are intentionally excluded
+        from this commercial SENTINEL platform probe.
         """
         try:
-            # ── 1. Live bridge check (primary — works during the day) ──────────
+            from datetime import date, datetime, timedelta, timezone
+
             from app.config.settings import settings
+            from app.database.supabase_client import get_supabase_client
+
+            supabase = get_supabase_client()
+            modules_result = (
+                supabase.table("site_modules")
+                .select("site_id,module_type,status")
+                .in_("module_type", ["lighting", "lighting_control"])
+                .eq("status", "active")
+                .execute()
+            )
+            module_site_ids = {
+                str(row.get("site_id"))
+                for row in (modules_result.data or [])
+                if str(row.get("site_id", "")).startswith("site-")
+            }
+            if not module_site_ids:
+                return {
+                    "score": 70,
+                    "status": "not_configured",
+                    "note": "No active commercial SENTINEL site has lighting telemetry enabled",
+                }
+
+            sites_result = (
+                supabase.table("sites")
+                .select("code,name,sentinel_processing_enabled")
+                .in_("code", sorted(module_site_ids))
+                .eq("sentinel_processing_enabled", True)
+                .execute()
+            )
+            lighting_sites = sorted(
+                str(row.get("code"))
+                for row in (sites_result.data or [])
+                if str(row.get("code", "")).startswith("site-")
+            )
+            if not lighting_sites:
+                return {
+                    "score": 70,
+                    "status": "not_configured",
+                    "note": "Lighting modules exist only on inactive commercial sites",
+                }
 
             bridge_base = getattr(settings, "simbiot_api_url", None) or getattr(settings, "bridge_base_url", None)
             bridge_token = getattr(settings, "simbiot_api_key", None) or getattr(settings, "bridge_api_token", None)
 
+            live_values: dict[str, float] = {}
             if bridge_base and bridge_token:
                 try:
                     import httpx
 
                     async with httpx.AsyncClient(timeout=5.0) as client:
-                        resp = await client.get(
-                            f"{bridge_base}/api/sites/site-002/telemetry",
-                            headers={"Authorization": f"Bearer {bridge_token}"},
-                        )
-                        resp.raise_for_status()
-                        power = resp.json().get("power", {})
-                        lighting_kw = power.get("lighting_kw")
+                        for site_code in lighting_sites:
+                            resp = await client.get(
+                                f"{bridge_base}/api/sites/{site_code}/telemetry",
+                                headers={"Authorization": f"Bearer {bridge_token}"},
+                            )
+                            resp.raise_for_status()
+                            power = resp.json().get("power", {})
+                            lighting_kw = power.get("lighting_kw")
+                            if lighting_kw is not None:
+                                live_values[site_code] = float(lighting_kw)
 
-                    if lighting_kw is not None:
-                        # Bridge live data confirms DALI controllers are reachable
+                    if live_values:
+                        sites_text = ", ".join(f"{site_code} {kw:.1f} kW" for site_code, kw in live_values.items())
                         return {
                             "score": 90,
                             "status": "healthy",
-                            "note": f"Lighting live · {lighting_kw:.1f} kW (bridge /telemetry)",
+                            "note": f"Lighting telemetry live · {sites_text}",
                         }
                 except Exception:
                     pass  # Fall through to historical check
 
-            # ── 2. Historical check (works after midnight flush) ───────────────
-            from datetime import date, timedelta
-
-            from app.database.supabase_client import get_supabase_client
-
-            supabase = get_supabase_client()
-            since = date.today() - timedelta(days=7)
-            result = (
-                supabase.table("energy_consumption_history")
-                .select("lighting_kwh", count="exact")
-                .eq("site_id", "site-002")
-                .gte("date", since.isoformat())
+            recent_cutoff = datetime.now(timezone.utc) - timedelta(minutes=15)
+            live_result = (
+                supabase.table("equipment_sensor_readings")
+                .select("site_id,equipment_id,sensor_type,value,unit,recorded_at")
+                .in_("site_id", lighting_sites)
+                .in_("sensor_type", ["lighting_kw", "power_watts", "lux", "brightness", "on_off", "energy_kwh"])
+                .gte("recorded_at", recent_cutoff.isoformat())
+                .order("recorded_at", desc=True)
+                .limit(25)
                 .execute()
             )
-            count = result.count or 0
-
-            if count > 0:
+            live_rows = live_result.data or []
+            if live_rows:
+                latest_row = live_rows[0]
+                latest_site = str(latest_row.get("site_id") or "")
+                latest_at = str(latest_row.get("recorded_at") or "")
+                kw_rows = [row for row in live_rows if row.get("sensor_type") == "lighting_kw"]
+                if kw_rows:
+                    kw_row = kw_rows[0]
+                    return {
+                        "score": 90,
+                        "status": "healthy",
+                        "note": (
+                            f"Lighting telemetry live in Supabase · {kw_row.get('site_id')} "
+                            f"lighting_kw={float(kw_row.get('value') or 0):.2f} kW"
+                        ),
+                    }
                 return {
                     "score": 90,
                     "status": "healthy",
-                    "note": f"Lighting telemetry flowing · {count} day(s) with kWh data in last 7 days",
+                    "note": (
+                        f"Lighting telemetry live in Supabase · {len(live_rows)} recent point(s), "
+                        f"latest {latest_site} at {latest_at}"
+                    ),
                 }
 
+            since = date.today() - timedelta(days=7)
+            result = (
+                supabase.table("energy_consumption_history")
+                .select("site_id,date,lighting_kwh")
+                .in_("site_id", lighting_sites)
+                .gte("date", since.isoformat())
+                .execute()
+            )
+            history_rows = [row for row in (result.data or []) if row.get("lighting_kwh") is not None]
+
+            if history_rows:
+                sites_with_history = sorted({str(row.get("site_id")) for row in history_rows})
+                latest_date = max(str(row.get("date")) for row in history_rows if row.get("date"))
+                return {
+                    "score": 90,
+                    "status": "healthy",
+                    "note": (
+                        f"Lighting energy history present for {len(sites_with_history)} site(s) through {latest_date}"
+                    ),
+                }
+
+            sites_text = ", ".join(lighting_sites)
             return {
-                "score": 0,
-                "status": "critical",
-                "note": "No lighting data — bridge unreachable and no kWh history in Supabase",
+                "score": 45,
+                "status": "degraded",
+                "note": f"Lighting enabled for {sites_text}, but no live bridge data or 7-day kWh history was found",
             }
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Error: {e}"}

@@ -6,7 +6,7 @@ Tier 2 -> Tier 3: Aggregate telemetry_hourly into telemetry_daily.
                   Run weekly. Processes hours older than 7 days not yet aggregated.
 
 After aggregation completes, raw rows within the aggregated window are eligible
-for deletion by SupabaseRetentionService (90-day window).
+for deletion by SupabaseRetentionService (10-day operational window).
 """
 
 from __future__ import annotations

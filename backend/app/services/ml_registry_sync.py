@@ -14,10 +14,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from app.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 _REGISTRY_PATH = Path(__file__).parent.parent.parent / "ml" / "models" / "registry.json"
-_DATABASE_URL = os.getenv("PGBOUNCER_URL") or os.getenv("DATABASE_URL")
+_DATABASE_URL = os.getenv("PGBOUNCER_URL") or settings.database_url or os.getenv("DATABASE_URL")
 if not _DATABASE_URL:
     raise ValueError("DATABASE_URL environment variable not set")
 

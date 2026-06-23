@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import json
 import logging
+
+from app.config.settings import settings
 import os
 import uuid
 from datetime import UTC, datetime
@@ -328,7 +330,7 @@ def run_bess_dispatch_consumer(site_id: str) -> dict[str, Any]:
     """Single execution cycle for one site. Called by APScheduler (sync context)."""
     import psycopg2
 
-    database_url = os.getenv("DATABASE_URL")
+    database_url = settings.database_url or os.getenv("DATABASE_URL")
     if not database_url:
         raise ValueError("DATABASE_URL not set")
 

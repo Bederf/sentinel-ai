@@ -1,9 +1,9 @@
 """
-Niagara point discovery and mapping API endpoints.
+BMS point discovery and mapping API endpoints.
 
 REST API for AI-assisted point discovery, classification, mapping review,
-approval, and manual correction workflows. Enables rapid Niagara
-commissioning with chat-based review.
+approval, and manual correction workflows. The route prefix is legacy
+``/api/niagara`` for compatibility, but the workflow is vendor agnostic.
 """
 
 import logging
@@ -23,7 +23,7 @@ from app.services.niagara.point_discovery import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/niagara", tags=["niagara-discovery"])
+router = APIRouter(prefix="/api/niagara", tags=["bms-discovery"])
 
 
 # ---------------------------------------------------------------------------
@@ -73,6 +73,7 @@ class ApproveResponse(BaseModel):
     success: bool
     equipment_created: int = 0
     message: str = ""
+    canonicalization_summary: dict[str, Any] | None = None
 
 
 class CorrectRequest(BaseModel):
@@ -202,7 +203,7 @@ async def discover_from_csv(
     """
     Upload a BMS point list CSV and run AI-assisted classification.
 
-    Accepts the standard Desigo/Niagara CSV format:
+    Accepts standard BMS CSV exports, including Desigo and Niagara formats:
         name,object_type,instance,units,present_value,description,min_value,max_value,writable
 
     Classifies ALL points (HVAC, lighting, fire, security, meters) using
@@ -387,10 +388,30 @@ async def approve_mapping(
             # Enqueue baseline capture for newly created equipment (Phase 109A)
             await _enqueue_baseline_captures(discovery_id, site_id, result.get("equipment_created", 0))
 
+            canonicalization_summary = None
+            if site_id:
+                try:
+                    from app.services.onboarding_canonicalization_service import OnboardingCanonicalizationService
+
+                    canonicalization_summary = OnboardingCanonicalizationService().canonicalize_site(
+                        site_id, commit=True
+                    )
+                except Exception as canon_exc:
+                    logger.error(
+                        "Post-approval equipment canonicalization failed for %s: %s",
+                        site_id,
+                        canon_exc,
+                    )
+                    canonicalization_summary = {
+                        "error": str(canon_exc),
+                        "needs_review": None,
+                    }
+
             return ApproveResponse(
                 success=True,
                 equipment_created=result.get("equipment_created", 0),
                 message=f"Approved {result['equipment_created']} equipment. Models saved.",
+                canonicalization_summary=canonicalization_summary,
             )
         else:
             return ApproveResponse(

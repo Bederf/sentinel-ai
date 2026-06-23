@@ -21,10 +21,11 @@ Define automated retention and deletion controls for POPIA-aligned data minimiza
 
 ## 2. Components
 
-- Enforcement service: `backend/app/services/popia_retention_service.py`
-- Scheduler job: `background_scheduler.add_popia_retention_job` in `backend/app/services/background_scheduler.py`
+- JSON-file retention: `backend/app/services/popia_retention_service.py`
+- SQL-table retention: `backend/app/services/supabase_retention_service.py`
+- Scheduler job: `background_scheduler.add_supabase_retention_job` in `backend/app/services/background_scheduler.py`
 - Startup wiring: `backend/app/startup/events.py`
-- Run log: `backend/app/data/popia_retention_runs.json`
+- Run log: `retention_enforcement_log` SQL table
 
 ## 3. Covered Datasets
 
@@ -61,9 +62,9 @@ Implemented in `backend/app/services/supabase_retention_service.py`, wired into 
 
 ### 6.1 Retention Tiers
 
-| Tier | Tables | Retention | POPIA Basis |
+ | Tier | Tables | Retention | POPIA Basis |
 |------|--------|-----------|-------------|
-| **ML_TRAINING** | `equipment_fault_events` (recorded_at), `adapter_health` (timestamp), `adapter_health_current` (updated_at), `adapter_health_alerts` (created_at), `space_occupancy_events` (timestamp), `equipment_sensor_readings` (recorded_at), `alerts` (created_at) | 7 days | S14(1) — data no longer necessary after ML processing |
+| **ML_TRAINING** | `equipment_fault_events` (recorded_at), `adapter_health` (timestamp), `adapter_health_current` (updated_at), `adapter_health_alerts` (created_at), `space_occupancy_events` (timestamp), `equipment_sensor_readings` (recorded_at), `drift_detection_log` (recorded_at), `alerts` (created_at) | 7-10 days | S14(1) — data no longer necessary after ML processing |
 | **SNAPSHOT** | `asset_health_snapshots`, `system_health_snapshots` | 30 days | S14(1) — stale operational data |
 | **AUDIT_TRAIL** | `recommendations`, `parasite_decisions` | 5 years | S14(2) — lawful purpose (audit/compliance) |
 
@@ -96,18 +97,12 @@ cryptographic proof of continuous POPIA S14 compliance enforcement.
 
 ### 6.5 Known Operational Notes
 
-- **adapter_health batch deletion**: The `adapter_health` table can exceed 1.5 M rows. A single
-  DELETE via PostgREST API triggers a statement timeout. The service handles this by relying on
-  PostgREST's default pagination (1000 rows/batch). Nightly scheduled runs will gradually clean
-  overdue rows in compliant batches.
-- **adapter_health_current**: Has no primary key — `_count_url()` uses `select=updated_at` instead
-  of `select=id`.
+- **Direct psycopg2 (no REST API)**: As of 2026-06-22, the retention service uses direct
+  PostgreSQL connections (`psycopg2`) instead of the Supabase REST API. This avoids dependency on
+  `SUPABASE_SERVICE_ROLE_KEY` being set in the environment for admin-write operations.
 - **Date column mapping**: Each table uses its actual date column (`recorded_at`, `timestamp`,
   `updated_at`, `snapshot_at` as applicable — see tier table above).
-- **JWT encoding**: ISO timestamps use `+` for UTC offset; `urllib.parse.quote()` is required when
-  building the PostgREST filter URL to encode `+` as `%2B`.
-- **service_role DELETE grants**: `GRANT DELETE ON <table> TO service_role` was applied directly to
-  the Supabase DB and added to the migration for all 11 POPIA tier tables.
+- **adapter_health_current**: Has no primary key — delete uses `WHERE updated_at < cutoff` directly.
 
 > **Note (2026-05-22):** `recommendations` and `parasite_decisions` retained columns are limited to
 > those with actual data following Phase 208-12 null column cleanup. Execution log is the

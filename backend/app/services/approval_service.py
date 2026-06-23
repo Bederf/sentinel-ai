@@ -104,9 +104,10 @@ class ApprovalService:
             QualityGateResult from evaluator
         """
         from app.services.quality_gate_evaluator import QualityGateEvaluator
+        from app.services.recommendation_preflight_service import resolve_site_quality_gate_mode
 
         evaluator = QualityGateEvaluator()
-        mode = settings.resolved_ingestion_mode.value
+        mode, _profile_context = resolve_site_quality_gate_mode(site_id)
         metrics = await evaluator.collect_metrics(site_id)
         return evaluator.evaluate(mode, metrics, site_id=site_id)
 

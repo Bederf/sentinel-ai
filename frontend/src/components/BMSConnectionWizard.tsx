@@ -17,16 +17,18 @@ import {
 } from "lucide-react";
 import type {
   Site,
-  NiagaraMappingSummary,
+  BMSMappingSummary,
   DiscoverClassifyResponse,
   BMSVendor,
   BACnetDevice,
   SimbiotCapabilitiesSummary,
+  OnboardingCanonicalizationSummary,
+  OnboardingHierarchySummary,
 } from '@/lib/api';
 import { sitesApi, type OnboardingFactSource } from '@/lib/api/sites';
 import { siteGeocodeApi } from '@/lib/api/zone_ingestion';
 import { siteProfileApi } from '@/lib/api/sites';
-import { api, niagaraApi, resolveSimbiotProtocol, buildingConfigApi } from '@/lib/api';
+import { api, bmsConnectionApi, resolveSimbiotProtocol, buildingConfigApi } from '@/lib/api';
 import { HelpSection } from "./HelpSection";
 import { Tooltip } from "./Tooltip";
 import { EquipmentVerificationWizard } from "./EquipmentVerificationWizard";
@@ -48,7 +50,7 @@ const BMS_VENDORS = [
 // ============= BMS Vendor Help Text =============
 
 const VENDOR_HELP_TEXT: Record<BMSVendor, string> = {
-  niagara: "Tridium Niagara uses oBIX for credential authentication and BACnet/IP for point discovery. Enter the JACE/Supervisor host IP and port (default 47808). The system will authenticate using provided credentials to access the object model.",
+  niagara: "Tridium Niagara uses oBIX for credential authentication and BACnet/IP for point discovery. Enter the JACE/Supervisor host IP and port. The system will authenticate using provided credentials to access the object model.",
   desigo: "Siemens Desigo CC uses standard BACnet/IP without credential authentication. Ensure UDP port 47808 is open and accessible from this system. No username/password required—access is network-based.",
   metasys: "Johnson Controls Metasys uses BACnet/IP protocol. Configure the Metasys system to enable BACnet interoperability. Provide the gateway or controller IP address and ensure BACnet UDP 47808 is accessible.",
   honeywell: "Honeywell EBI (Enterprise Building Integrator) uses BACnet/IP for communications. Ensure the EBI gateway is accessible over the network. Verify BACnet services are enabled in your EBI configuration.",
@@ -120,12 +122,16 @@ interface WizardState {
   connectionMessage: string;
   discoveryId: string | null;
   discoverySummary: DiscoverClassifyResponse | null;
-  mappings: NiagaraMappingSummary | null;
+  mappings: BMSMappingSummary | null;
   expandedEquipment: Set<string>;
   approvedBy: string;
   approveStatus: ApproveStatus;
   approveMessage: string;
-  approveResult: { equipment_created: number } | null;
+  approveResult: {
+    equipment_created: number;
+    canonicalization_summary?: OnboardingCanonicalizationSummary;
+    hierarchy_summary?: OnboardingHierarchySummary;
+  } | null;
   capabilitySummary: SimbiotCapabilitiesSummary | null;
   capabilityError: string | null;
   onboardingFactsLoading: boolean;
@@ -149,9 +155,18 @@ type WizardAction =
   | { type: "SET_CONNECTION_STATUS"; status: ConnectionStatus; message?: string }
   | { type: "SET_STEP"; step: number }
   | { type: "SET_DISCOVERY"; id: string; summary: DiscoverClassifyResponse }
-  | { type: "SET_MAPPINGS"; mappings: NiagaraMappingSummary }
+  | { type: "SET_MAPPINGS"; mappings: BMSMappingSummary }
   | { type: "TOGGLE_EQUIPMENT"; equipmentId: string }
-  | { type: "SET_APPROVE_STATUS"; status: ApproveStatus; message?: string; result?: { equipment_created: number } }
+  | {
+      type: "SET_APPROVE_STATUS";
+      status: ApproveStatus;
+      message?: string;
+      result?: {
+        equipment_created: number;
+        canonicalization_summary?: OnboardingCanonicalizationSummary;
+        hierarchy_summary?: OnboardingHierarchySummary;
+      };
+    }
   | { type: "SET_CAPABILITIES"; summary: SimbiotCapabilitiesSummary | null; error?: string | null }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_ERROR"; error: string | null }
@@ -484,7 +499,7 @@ export function BMSConnectionWizard({
   const siteIdRef = useRef(initialSiteId || "");
   const createSitePromiseRef = useRef<Promise<string> | null>(null);
 
-  const isNiagara = state.bmsVendor === "niagara";
+  const usesObix = state.bmsVendor === "niagara";
   const vendorLabel = BMS_VENDORS.find((v) => v.value === state.bmsVendor)?.label ?? state.bmsVendor;
 
   const buildConnectionMessage = useCallback((devices: BACnetDevice[], selectedId: number | null): string => {
@@ -682,7 +697,7 @@ export function BMSConnectionWizard({
     }
 
     const portNum = Number(state.port);
-    const portFallback = isNiagara ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
+    const portFallback = usesObix ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
     const safePort = state.port && Number.isFinite(portNum) && portNum > 0 && portNum <= 65535
       ? portNum
       : portFallback;
@@ -691,7 +706,7 @@ export function BMSConnectionWizard({
       const isBridge = state.bmsVendor === 'bridge';
 
       if (state.bmsVendor === 'niagara') {
-        const res = await niagaraApi.configureOBIX({
+        const res = await bmsConnectionApi.configureOBIX({
           host: state.host,
           port: safePort,
           username: state.username,
@@ -712,7 +727,7 @@ export function BMSConnectionWizard({
       let bacnetDevices: BACnetDevice[] = [];
       if (!isBridge && state.bmsVendor !== 'niagara') {
         try {
-          const bacnetRes = await niagaraApi.testBACnetConnection({
+          const bacnetRes = await bmsConnectionApi.testBACnetConnection({
             timeout: 5,
             host: state.host.trim(),
           });
@@ -730,7 +745,7 @@ export function BMSConnectionWizard({
         dispatch({
           type: "SET_CONNECTION_STATUS",
           status: "connected",
-          message: isBridge ? "Bridge connection ready" : state.bmsVendor === 'niagara' ? "Niagara oBIX connection successful" : buildConnectionMessage(bacnetDevices, selectedDeviceId),
+          message: isBridge ? "Bridge connection ready" : state.bmsVendor === 'niagara' ? "oBIX connection successful" : buildConnectionMessage(bacnetDevices, selectedDeviceId),
         });
       } else {
         dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
@@ -743,7 +758,7 @@ export function BMSConnectionWizard({
         return;
       }
       try {
-        const capabilities = await niagaraApi.getSimbiotCapabilities({
+        const capabilities = await bmsConnectionApi.getSimbiotCapabilities({
           site_id: resolvedSiteId,
           bms_vendor: state.bmsVendor,
           host: state.host.trim(),
@@ -774,7 +789,7 @@ export function BMSConnectionWizard({
               use_https: state.useHttps,
               bms_vendor: state.bmsVendor,
             };
-        await niagaraApi.saveSimbiotAdapterConfig({
+        await bmsConnectionApi.saveSimbiotAdapterConfig({
           site_id: resolvedSiteId,
           protocol: adapterProtocol,
           config: adapterConfig,
@@ -792,7 +807,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [buildConnectionMessage, ensureSiteCreated, isNiagara, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
+  }, [buildConnectionMessage, ensureSiteCreated, usesObix, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
 
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
@@ -800,8 +815,8 @@ export function BMSConnectionWizard({
       dispatch({ type: "SET_ERROR", error: "Create the site before starting discovery" });
       return;
     }
-    const isBridgeOrNiagara = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
-    if (state.selectedDeviceId == null && !isBridgeOrNiagara) {
+    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+    if (state.selectedDeviceId == null && !usesDirectCapabilities) {
       dispatch({ type: "SET_ERROR", error: "Select the BACnet device to ingest before discovery" });
       return;
     }
@@ -816,16 +831,16 @@ export function BMSConnectionWizard({
       await new Promise(r => setTimeout(r, 800));
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
 
-      if (isBridgeOrNiagara) {
-        // Bridge/Niagara: re-fetch capabilities if state was lost (e.g. page refresh)
-        const isNiagaraNow = state.bmsVendor === 'niagara';
-        const bridgePort = isNiagaraNow ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
+      if (usesDirectCapabilities) {
+        // Bridge/oBIX: re-fetch capabilities if state was lost (e.g. page refresh)
+        const usesObixNow = state.bmsVendor === 'niagara';
+        const bridgePort = usesObixNow ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
         const discPort = Number(state.port);
         const discSafePort = state.port && Number.isFinite(discPort) && discPort > 0 && discPort <= 65535 ? discPort : bridgePort;
         let cap = state.capabilitySummary;
         if (!cap) {
           try {
-            const fresh = await niagaraApi.getSimbiotCapabilities({
+            const fresh = await bmsConnectionApi.getSimbiotCapabilities({
               site_id: state.siteId,
               bms_vendor: state.bmsVendor,
               host: state.host.trim(),
@@ -850,7 +865,7 @@ export function BMSConnectionWizard({
           },
         });
       } else {
-        const res = await niagaraApi.discoverAndClassify({
+        const res = await bmsConnectionApi.discoverAndClassify({
           device_ip: state.host,
           site_id: state.siteId,
           device_bacnet_id: state.selectedDeviceId ?? undefined,
@@ -875,13 +890,13 @@ export function BMSConnectionWizard({
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
     if (!state.discoveryId) return;
-    const isBridgeOrNiagara = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
 
     try {
-      if (isBridgeOrNiagara) {
-        // Bridge/Niagara: no separate mappings — use capabilities data for UI
+      if (usesDirectCapabilities) {
+        // Bridge/oBIX: no separate mappings — use capabilities data for UI
         const cap = state.capabilitySummary || { points: 0, devices: 0, writable_points: 0 };
         const totalPts = cap.points ?? 0;
         dispatch({
@@ -904,7 +919,7 @@ export function BMSConnectionWizard({
           },
         });
       } else {
-        const res = await niagaraApi.getMappings(state.discoveryId);
+        const res = await bmsConnectionApi.getMappings(state.discoveryId);
         dispatch({ type: "SET_MAPPINGS", mappings: res });
       }
     } catch (err) {
@@ -921,20 +936,65 @@ export function BMSConnectionWizard({
     dispatch({ type: "SET_APPROVE_STATUS", status: "approving" });
 
     try {
-      const isBridgeOrNiagara = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
       let res;
-      if (isBridgeOrNiagara) {
-        // Bridge/Niagara: skip mappings approval, just enable processing
+      if (usesDirectCapabilities) {
+        // Bridge/oBIX: skip mappings approval, just enable processing
+        let canonicalizationSummary: OnboardingCanonicalizationSummary | undefined;
+        let hierarchySummary: OnboardingHierarchySummary | undefined;
         if (state.siteId) {
+          canonicalizationSummary = await bmsConnectionApi.canonicalizeOnboardingEquipment(state.siteId, true);
+          try {
+            hierarchySummary = await bmsConnectionApi.ingestOnboardingHierarchy(state.siteId, true, true);
+          } catch (err) {
+            hierarchySummary = {
+              site_id: state.siteId,
+              site_uuid: "",
+              commit: true,
+              available: false,
+              source: null,
+              nodes_total: 0,
+              relationships_total: 0,
+              equipment_relationships_upserted: 0,
+              zone_relationships_upserted: 0,
+              relationships_skipped: 0,
+              review_status_counts: {},
+              error: err instanceof Error ? err.message : "Hierarchy ingestion failed",
+            };
+          }
           await api.toggleSiteProcessing(state.siteId, true);
         }
-        res = { success: true, message: "Site activated", equipment_created: 0 };
+        res = {
+          success: true,
+          message: "Site activated",
+          equipment_created: 0,
+          canonicalization_summary: canonicalizationSummary,
+          hierarchy_summary: hierarchySummary,
+        };
       } else {
-        res = await niagaraApi.approveMappings(
+        res = await bmsConnectionApi.approveMappings(
           state.discoveryId,
           state.approvedBy,
         );
         if (res.success && state.siteId) {
+          try {
+            res.hierarchy_summary = await bmsConnectionApi.ingestOnboardingHierarchy(state.siteId, true, true);
+          } catch (err) {
+            res.hierarchy_summary = {
+              site_id: state.siteId,
+              site_uuid: "",
+              commit: true,
+              available: false,
+              source: null,
+              nodes_total: 0,
+              relationships_total: 0,
+              equipment_relationships_upserted: 0,
+              zone_relationships_upserted: 0,
+              relationships_skipped: 0,
+              review_status_counts: {},
+              error: err instanceof Error ? err.message : "Hierarchy ingestion failed",
+            };
+          }
           await api.toggleSiteProcessing(state.siteId, true);
         }
       }
@@ -942,13 +1002,17 @@ export function BMSConnectionWizard({
         type: "SET_APPROVE_STATUS",
         status: res.success ? "approved" : "failed",
         message: res.message,
-        result: { equipment_created: res.equipment_created },
+        result: {
+          equipment_created: res.equipment_created,
+          canonicalization_summary: res.canonicalization_summary,
+          hierarchy_summary: res.hierarchy_summary,
+        },
       });
 
       // On success, advance to tenant access setup for bridge sites, or verification for BACnet.
       if (res.success) {
         setTimeout(() => {
-          if (isBridgeOrNiagara) {
+          if (usesDirectCapabilities) {
             dispatch({ type: "SET_STEP", step: 5 });
           } else {
             dispatch({ type: "SET_VERIFICATION_WIZARD", show: true });
@@ -1618,7 +1682,7 @@ export function BMSConnectionWizard({
                 style={inputStyle}
               />
             </div>
-            {isNiagara && (
+            {usesObix && (
             <div className="col-span-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -1671,8 +1735,8 @@ export function BMSConnectionWizard({
               </div>
             )}
           </div>
-        {/* BACnet-only info for non-Niagara vendors */}
-        {!isNiagara && (
+        {/* BACnet-only info for vendors that do not use oBIX in this wizard */}
+        {!usesObix && (
           <div
             className="p-3 rounded text-sm mt-4"
             style={{
@@ -2362,6 +2426,143 @@ export function BMSConnectionWizard({
               {state.approveMessage}
             </p>
           )}
+          {state.approveResult?.canonicalization_summary && (
+            <div
+              className="w-full max-w-xl rounded p-4 text-left space-y-3"
+              style={{
+                background: state.approveResult.canonicalization_summary.error
+                  ? "var(--color-sentinel-red)11"
+                  : "var(--color-sentinel-bg-secondary)",
+                border: state.approveResult.canonicalization_summary.error
+                  ? "1px solid var(--color-sentinel-red)"
+                  : "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h5
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  Canonicalization
+                </h5>
+                <span
+                  className="text-xs px-2 py-1 rounded"
+                  style={{
+                    background: "var(--color-sentinel-blue)22",
+                    color: "var(--color-sentinel-blue)",
+                  }}
+                >
+                  {state.approveResult.canonicalization_summary.commit ? "Applied" : "Preview"}
+                </span>
+              </div>
+              {state.approveResult.canonicalization_summary.error ? (
+                <p className="text-sm" style={{ color: "var(--color-sentinel-red)" }}>
+                  {state.approveResult.canonicalization_summary.error}
+                </p>
+              ) : (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <SummaryCard
+                      label="Canonicalized"
+                      value={state.approveResult.canonicalization_summary.equipment_canonicalized}
+                      color="var(--color-sentinel-green)"
+                    />
+                    <SummaryCard
+                      label="Needs Review"
+                      value={state.approveResult.canonicalization_summary.needs_review ?? "—"}
+                      color={
+                        (state.approveResult.canonicalization_summary.needs_review ?? 0) > 0
+                          ? "var(--color-sentinel-amber)"
+                          : "var(--color-sentinel-green)"
+                      }
+                    />
+                    <SummaryCard
+                      label="Zones Added"
+                      value={state.approveResult.canonicalization_summary.zone_proposals_count}
+                      color="var(--color-sentinel-blue)"
+                    />
+                  </div>
+                  {(state.approveResult.canonicalization_summary.needs_review ?? 0) > 0 && (
+                    <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                      Remaining items stay in review until their equipment type, zone, or plant policy is confirmed.
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {state.approveResult?.hierarchy_summary && (
+            <div
+              className="w-full max-w-xl rounded p-4 text-left space-y-3"
+              style={{
+                background: state.approveResult.hierarchy_summary.error
+                  ? "var(--color-sentinel-red)11"
+                  : "var(--color-sentinel-bg-secondary)",
+                border: state.approveResult.hierarchy_summary.error
+                  ? "1px solid var(--color-sentinel-red)"
+                  : "1px solid var(--color-sentinel-border)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <h5
+                  className="text-sm font-semibold"
+                  style={{ color: "var(--color-sentinel-text-primary)" }}
+                >
+                  BMS Hierarchy
+                </h5>
+                <span
+                  className="text-xs px-2 py-1 rounded"
+                  style={{
+                    background: state.approveResult.hierarchy_summary.available
+                      ? "var(--color-sentinel-green)22"
+                      : "var(--color-sentinel-amber)22",
+                    color: state.approveResult.hierarchy_summary.available
+                      ? "var(--color-sentinel-green)"
+                      : "var(--color-sentinel-amber)",
+                  }}
+                >
+                  {state.approveResult.hierarchy_summary.available ? "Imported" : "Unavailable"}
+                </span>
+              </div>
+              {state.approveResult.hierarchy_summary.error ? (
+                <p className="text-sm" style={{ color: "var(--color-sentinel-red)" }}>
+                  {state.approveResult.hierarchy_summary.error}
+                </p>
+              ) : state.approveResult.hierarchy_summary.available ? (
+                <>
+                  <div className="grid grid-cols-3 gap-2">
+                    <SummaryCard
+                      label="Equipment Links"
+                      value={state.approveResult.hierarchy_summary.equipment_relationships_upserted}
+                      color="var(--color-sentinel-green)"
+                    />
+                    <SummaryCard
+                      label="Zone Links"
+                      value={state.approveResult.hierarchy_summary.zone_relationships_upserted}
+                      color="var(--color-sentinel-blue)"
+                    />
+                    <SummaryCard
+                      label="Skipped"
+                      value={state.approveResult.hierarchy_summary.relationships_skipped}
+                      color={
+                        state.approveResult.hierarchy_summary.relationships_skipped > 0
+                          ? "var(--color-sentinel-amber)"
+                          : "var(--color-sentinel-green)"
+                      }
+                    />
+                  </div>
+                  <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Source: {state.approveResult.hierarchy_summary.source || "BMS hierarchy"}
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                  {state.approveResult.hierarchy_summary.message ||
+                    "No native hierarchy was provided by the BMS adapter. Manual mapping remains the fallback."}
+                </p>
+              )}
+            </div>
+          )}
           <button
             onClick={() => {
               dispatch({ type: "SET_STEP", step: 5 });
@@ -2481,7 +2682,7 @@ export function BMSConnectionWizard({
                 <div className="flex items-center gap-2">
                   <span style={{ color: "var(--color-sentinel-green)" }}>✓</span>
                   <span style={{ color: "var(--color-sentinel-text-primary)" }}>
-                    Equipment IDs converted to v2.0 standard (site-name-zone)
+                    Equipment IDs converted to SENTINEL canonical codes
                   </span>
                 </div>
                 <div className="flex items-center gap-2">

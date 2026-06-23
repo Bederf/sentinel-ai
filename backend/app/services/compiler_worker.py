@@ -14,6 +14,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from app.config.settings import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -166,7 +168,7 @@ class CompilerWorker:
 
         import psycopg2
 
-        database_url = os.getenv("DATABASE_URL")
+        database_url = settings.database_url or os.getenv("DATABASE_URL")
         if not database_url:
             raise ValueError("DATABASE_URL not set")
         return psycopg2.connect(database_url)

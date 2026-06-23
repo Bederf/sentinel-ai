@@ -418,6 +418,47 @@ class RecommendationRepository(SupabaseRepository):
             logger.error("Supabase history query failed: %s", e)
             return []
 
+    async def get_history_aggregates(
+        self,
+        site_id: str,
+    ) -> dict[str, Any]:
+        """Get aggregate counts and savings across all non-pending recommendations.
+
+        Returns counts without limit — accurate for the summary card.
+        """
+        client = await self.get_client()
+        if not client:
+            return {"total": 0, "actioned": 0, "verified": 0, "saving_kwh": 0.0, "saving_zar": 0.0}
+        try:
+            base = (
+                client.table("recommendations")
+                .eq("site_id", site_id)
+                .eq("action_type", "ai_optimization")
+                .neq("status", "pending")
+                .eq("shadow_mode", False)
+            )
+            result = await base.select(
+                "status, outcome_validated, actual_saving_kwh, actual_saving_zar", count="exact"
+            ).execute()
+            rows = result.data or []
+            total = len(rows)
+            actioned = sum(1 for r in rows if r.get("status") in ("executed", "auto_executed"))
+            verified = sum(
+                1 for r in rows if r.get("outcome_validated") is True or r.get("actual_saving_kwh") is not None
+            )
+            saving_kwh = sum(float(r.get("actual_saving_kwh") or 0) for r in rows)
+            saving_zar = sum(float(r.get("actual_saving_zar") or 0) for r in rows)
+            return {
+                "total": total,
+                "actioned": actioned,
+                "verified": verified,
+                "saving_kwh": round(saving_kwh, 2),
+                "saving_zar": round(saving_zar, 2),
+            }
+        except Exception as e:
+            logger.error("Supabase history aggregates query failed: %s", e)
+            return {"total": 0, "actioned": 0, "verified": 0, "saving_kwh": 0.0, "saving_zar": 0.0}
+
 
 _repository: RecommendationRepository | None = None
 

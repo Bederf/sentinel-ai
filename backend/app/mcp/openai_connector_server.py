@@ -5,8 +5,8 @@ Implements the exact `search` and `fetch` tools required by OpenAI connectors
 and Deep Research with strict JSON-encoded text content responses.
 
 Data Sources (in order of preference):
-1. Supabase (primary) - buildings, equipment, alerts, predictions, work_orders, documents
-2. JSON files (fallback) - reference_devices.json, equipment.json, alerts.json
+1. Supabase (primary) - buildings, equipment, predictions, work_orders, documents
+2. JSON files (fallback) - reference_devices.json, equipment.json
 
 Ref: https://platform.openai.com/docs/mcp
 
@@ -35,7 +35,6 @@ logger = logging.getLogger(__name__)
 # Data paths (fallback)
 DATA_DIR = Path(__file__).parent.parent / "data"
 EQUIPMENT_FILE = DATA_DIR / "equipment.json"
-ALERTS_FILE = DATA_DIR / "alerts.json"
 SITES_DIR = DATA_DIR / "sites"
 
 # Base URL for document links (set from settings at runtime)
@@ -156,21 +155,6 @@ class SupabaseDataLoader:
             return all_equipment
         except Exception as e:
             logger.error(f"Failed to load equipment from Supabase: {e}")
-            return []
-
-    def load_alerts(self) -> list[dict[str, Any]]:
-        """Load alerts from Supabase with related info."""
-        try:
-            response = (
-                self.client.table("alerts")
-                .select("*, equipment(name, code, type), sites(name, code)")
-                .order("created_at", desc=True)
-                .limit(100)
-                .execute()
-            )
-            return response.data or []
-        except Exception as e:
-            logger.error(f"Failed to load alerts from Supabase: {e}")
             return []
 
     def load_predictions(self) -> list[dict[str, Any]]:
@@ -323,54 +307,6 @@ def _build_equipment_document(equipment: dict, source: str = "supabase") -> dict
             "model": equipment.get("model"),
             "health_score": equipment.get("health_score"),
             "status": equipment.get("status"),
-            "site_id": site_id,
-            "source": source,
-        },
-    }
-
-
-def _build_alert_document(alert: dict, source: str = "supabase") -> dict[str, Any]:
-    """Build searchable document for an alert."""
-    alert_id = alert.get("id", "unknown")
-    equipment_name = ""
-    site_name = ""
-    site_id = alert.get("site_id")
-
-    if alert.get("equipment"):
-        equipment_name = alert["equipment"].get("name", "")
-    if alert.get("sites"):
-        site_name = alert["sites"].get("name", "")
-        site_id = alert["sites"].get("code") or site_id
-
-    text_parts = [
-        f"Alert: {alert.get('title', 'Unknown Alert')}",
-        f"Severity: {alert.get('severity', 'N/A')}",
-        f"Status: {alert.get('status', 'N/A')}",
-        f"Type: {alert.get('type', 'N/A')}",
-    ]
-
-    if equipment_name:
-        text_parts.append(f"Equipment: {equipment_name}")
-    if site_name:
-        text_parts.append(f"Building: {site_name}")
-    if alert.get("message"):
-        text_parts.append(f"Message: {alert['message']}")
-    if alert.get("created_at"):
-        text_parts.append(f"Created: {alert['created_at']}")
-    if alert.get("acknowledged_by"):
-        text_parts.append(f"Acknowledged by: {alert['acknowledged_by']}")
-
-    return {
-        "id": f"alert-{alert_id}",
-        "title": f"Alert: {alert.get('title', 'Unknown')} ({alert.get('severity', 'N/A')})",
-        "text": "\n".join(text_parts),
-        "url": f"{BASE_URL}/api/alerts/{alert_id}",
-        "doc_type": "alert",
-        "metadata": {
-            "alert_id": str(alert_id),
-            "severity": alert.get("severity"),
-            "status": alert.get("status"),
-            "type": alert.get("type"),
             "site_id": site_id,
             "source": source,
         },
@@ -560,10 +496,6 @@ def _build_searchable_documents() -> list[dict[str, Any]]:
         for equipment in loader.load_equipment():
             documents.append(_build_equipment_document(equipment, "supabase"))
 
-        # Load alerts
-        for alert in loader.load_alerts():
-            documents.append(_build_alert_document(alert, "supabase"))
-
         # Load predictions
         for prediction in loader.load_predictions():
             documents.append(_build_prediction_document(prediction, "supabase"))
@@ -599,13 +531,6 @@ def _build_searchable_documents() -> list[dict[str, Any]]:
                 "model": device.get("metadata", {}).get("model"),
             }
             documents.append(_build_equipment_document(equipment, "json"))
-
-        # Load alerts from JSON
-        if ALERTS_FILE.exists():
-            alerts = _load_json(ALERTS_FILE)
-            if isinstance(alerts, list):
-                for alert in alerts:
-                    documents.append(_build_alert_document(alert, "json"))
 
         logger.info(f"OpenAI Connector: Loaded {len(documents)} documents from JSON files")
 
@@ -700,7 +625,7 @@ class OpenAIConnectorMCPServer:
             {
                 "name": "search",
                 "description": (
-                    "Search SENTINEL BMS data including buildings, equipment, alerts, "
+                    "Search SENTINEL BMS data including buildings, equipment, "
                     "predictions, work orders, and technical documentation. "
                     "Returns matching document references."
                 ),
@@ -711,7 +636,7 @@ class OpenAIConnectorMCPServer:
                             "type": "string",
                             "description": (
                                 "Search query to find relevant documents "
-                                "(e.g., 'chiller maintenance', 'Sandton building alerts', "
+                                "(e.g., 'chiller maintenance', 'Sandton building equipment', "
                                 "'high risk predictions')"
                             ),
                         }
@@ -736,7 +661,7 @@ class OpenAIConnectorMCPServer:
             # Category A: Live Data (6 tools)
             {
                 "name": "get_site_status",
-                "description": "Get current operational status for a building site including alerts, equipment health, and recommendations.",
+                "description": "Get current operational status for a building site including equipment health and recommendations.",
                 "inputSchema": {
                     "type": "object",
                     "properties": {
@@ -1252,57 +1177,6 @@ class OpenAIConnectorMCPServer:
             site_result = client.table("sites").select("name, code, region, type").eq("code", site_code).execute()
             site_data = site_result.data[0] if site_result.data else {}
 
-            # Get active high/critical alerts (alerts uses site UUID). These can contain
-            # repeated poll-cycle rows for the same fault, so expose both raw rows and
-            # deduplicated alert groups.
-            alerts_result = (
-                client.table("alerts")
-                .select("id, equipment_id, severity, status, message, created_at")
-                .eq("site_id", site_uuid)
-                .eq("status", "active")
-                .in_("severity", ["high", "critical"])
-                .execute()
-            )
-            alert_rows = alerts_result.data or []
-            critical_alert_rows = len(alert_rows)
-            alert_groups_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
-            static_alert_groups_by_key: dict[tuple[str, str, str], dict[str, Any]] = {}
-            for alert in alert_rows:
-                message = str(alert.get("message") or "").strip()
-                key = (
-                    str(alert.get("equipment_id") or "site"),
-                    str(alert.get("severity") or "unknown"),
-                    message,
-                )
-                is_static_alert = any(message.lower().startswith(prefix) for prefix in STATIC_ALERT_PREFIXES)
-                target_groups = static_alert_groups_by_key if is_static_alert else alert_groups_by_key
-                group = target_groups.setdefault(
-                    key,
-                    {
-                        "equipment_id": alert.get("equipment_id"),
-                        "severity": alert.get("severity"),
-                        "message": message,
-                        "occurrences": 0,
-                        "latest_seen_at": alert.get("created_at"),
-                        "excluded_reason": "health_scoring_exempt_static_endpoint" if is_static_alert else None,
-                    },
-                )
-                group["occurrences"] += 1
-                created_at = alert.get("created_at")
-                if created_at and (not group.get("latest_seen_at") or created_at > group["latest_seen_at"]):
-                    group["latest_seen_at"] = created_at
-            critical_alert_groups = sorted(
-                alert_groups_by_key.values(),
-                key=lambda group: (group.get("latest_seen_at") or "", group.get("occurrences") or 0),
-                reverse=True,
-            )
-            critical_alerts = len(critical_alert_groups)
-            static_alert_groups_excluded = sorted(
-                static_alert_groups_by_key.values(),
-                key=lambda group: (group.get("latest_seen_at") or "", group.get("occurrences") or 0),
-                reverse=True,
-            )
-
             # Get equipment at risk (equipment uses site UUID)
             equip_result = (
                 client.table("equipment")
@@ -1335,46 +1209,40 @@ class OpenAIConnectorMCPServer:
 
             # Determine overall status
             overall_status = "green"
-            if critical_alerts > 0:
-                overall_status = "red"
-            elif len(equipment_at_risk) > 3:
+            if len(equipment_at_risk) > 3:
                 overall_status = "amber"
 
             top_status_drivers = [
                 {
-                    "equipment_id": group.get("equipment_id"),
-                    "alert": group.get("message"),
-                    "severity": group.get("severity"),
-                    "occurrences": group.get("occurrences"),
-                    "latest_seen_at": group.get("latest_seen_at"),
+                    "equipment_id": item.get("equipment_id"),
+                    "type": item.get("type"),
+                    "risk_level": item.get("risk_level"),
+                    "health_score": item.get("health_score"),
+                    "health_confidence": item.get("health_confidence"),
+                    "health_trend": item.get("health_trend"),
                 }
-                for group in critical_alert_groups[:5]
+                for item in equipment_at_risk[:5]
             ]
-            if critical_alerts > 0:
-                status_reason = (
-                    f"Red because {critical_alerts} active high/critical alert groups are still open "
-                    f"after deduplicating {critical_alert_rows} raw alert rows."
-                )
-                status_interpretation = (
-                    "This is an active-alert status, not a statement that the whole HVAC plant is stopped. "
-                    "This senior-manager MCP does not expose point-level runtime telemetry."
-                )
-            elif len(equipment_at_risk) > 3:
+            if len(equipment_at_risk) > 3:
                 status_reason = (
                     f"Amber because {len(equipment_at_risk)} health-scored equipment assets are flagged at risk."
                 )
-                status_interpretation = "No active high/critical alert groups are currently driving a red site state."
+                status_interpretation = "MCP status is based on equipment health and available operational summaries."
             else:
                 status_reason = (
-                    "Green because there are no active high/critical alert groups and limited equipment risk."
+                    "Green because limited health-scored equipment risk is visible through the MCP connector."
                 )
-                status_interpretation = "No material building-status driver is currently active."
+                status_interpretation = "No material MCP-visible building-status driver is currently active."
 
             # Get ML training status from sites.ml_hours_ingested
             ml_status = "unknown"
             ml_hours = 0.0
+            ml_hours_as_of: str | None = None
+            ml_hours_age_hours: float | None = None
             try:
-                site_result = client.table("sites").select("ml_hours_ingested").eq("id", site_uuid).execute()
+                site_result = (
+                    client.table("sites").select("ml_hours_ingested, updated_at").eq("id", site_uuid).execute()
+                )
                 if site_result.data:
                     ml_hours = float(site_result.data[0].get("ml_hours_ingested") or 0)
                     if ml_hours >= 72:
@@ -1383,6 +1251,17 @@ class OpenAIConnectorMCPServer:
                         ml_status = f"training ({ml_hours:.0f}h / 72h)"
                     else:
                         ml_status = "not_started"
+                    # Surface freshness so downstream readers don't treat a stale
+                    # counter as a current measurement (sites.ml_hours_ingested
+                    # is updated on its own external schedule, not per request).
+                    raw_updated = site_result.data[0].get("updated_at")
+                    if raw_updated:
+                        ml_hours_as_of = str(raw_updated)
+                        try:
+                            updated_dt = datetime.fromisoformat(str(raw_updated).replace("Z", "+00:00"))
+                            ml_hours_age_hours = round((datetime.now(UTC) - updated_dt).total_seconds() / 3600.0, 2)
+                        except (TypeError, ValueError):
+                            ml_hours_age_hours = None
             except Exception:
                 pass
 
@@ -1397,17 +1276,13 @@ class OpenAIConnectorMCPServer:
                     f"{site_data.get('name', site_id)} is {overall_status.upper()}. {status_reason} "
                     f"{status_interpretation}"
                 ),
-                "critical_alerts": critical_alerts,
-                "critical_alert_groups": critical_alert_groups[:10],
-                "critical_alert_raw_rows": critical_alert_rows,
-                "critical_alert_count_basis": "deduplicated_active_high_or_critical_alert_groups_excluding_static_endpoints",
-                "health_scoring_exempt_alert_groups_excluded": len(static_alert_groups_excluded),
-                "health_scoring_exempt_alert_group_examples": static_alert_groups_excluded[:5],
                 "maintenance_recommendations_visibility": (
                     "Hidden from CEO site status. Use get_recommendations only when the user asks for maintenance "
                     "recommendations or technical follow-up actions."
                 ),
                 "ml_training_status": ml_status,
+                "ml_hours_as_of": ml_hours_as_of,
+                "ml_hours_age_hours": ml_hours_age_hours,
                 "equipment_at_risk": equipment_at_risk,
                 "presentation_guidance": {
                     "audience": "senior_manager",
@@ -1417,7 +1292,6 @@ class OpenAIConnectorMCPServer:
                     ),
                     "equipment_reference": "Use equipment_id/code as the primary label. Do not lead with friendly equipment names.",
                     "recommendations": "Do not mention maintenance recommendation backlog in site status unless asked.",
-                    "raw_rows": "Do not show critical_alert_raw_rows unless the user asks for diagnostics or data quality detail.",
                     "telemetry": "Do not expose point-level runtime telemetry through this senior-manager MCP.",
                 },
                 "summary": (f"{site_data.get('name', site_id)} is {overall_status.upper()}: {status_reason}"),
@@ -1827,7 +1701,8 @@ class OpenAIConnectorMCPServer:
                 "confidence": result.confidence,
                 "limiting_factor": result.limiting_factor,
                 "ddmp_eligible": result.ddmp_eligible,
-                "ddmp_threshold_kw": 500,
+                "ddmp_minimum_kw": settings.ddmp_minimum_kw,
+                "ddmp_aggregation_cap_kw": settings.ddmp_aggregation_cap_kw,
                 "zone_breakdown": [
                     {"zone_id": z.zone_id, "zone_name": z.zone_name, "curtailable_kw": z.curtailable_kw}
                     for z in (result.zone_breakdown or [])
@@ -1847,7 +1722,8 @@ class OpenAIConnectorMCPServer:
                     "confidence": 0.0,
                     "limiting_factor": "no_live_sensor_data",
                     "ddmp_eligible": False,
-                    "ddmp_threshold_kw": 500,
+                    "ddmp_minimum_kw": settings.ddmp_minimum_kw,
+                    "ddmp_aggregation_cap_kw": settings.ddmp_aggregation_cap_kw,
                     "data_freshness": "unavailable",
                     "data_freshness_warning": (
                         "Live sensor data unavailable for demand response calculation. "
@@ -2015,12 +1891,6 @@ class OpenAIConnectorMCPServer:
                 except Exception:
                     pass
 
-            # Get open alerts count (alerts use equipment UUID)
-            alerts_result = (
-                client.table("alerts").select("id").eq("equipment_id", equip_uuid).eq("status", "active").execute()
-            )
-            open_alerts = len(alerts_result.data) if alerts_result.data else 0
-
             # Get active predictions count (predictions use equipment UUID)
             # ⚠️ MUST filter by status='active' — resolved/work_order_raised are not current risks
             preds_result = (
@@ -2044,8 +1914,8 @@ class OpenAIConnectorMCPServer:
 
             # Calculate failure risk — use all signals, not just >70 threshold
             failure_risk = {"score": 0.0, "reason": "No risk factors detected", "timeline_hours": None}
-            if active_predictions or open_alerts > 0:
-                # Factor in prediction count, highest probability, and open alerts
+            if active_predictions:
+                # Factor in prediction count and highest probability.
                 pred_count = len(active_predictions)
                 highest_prob = max((p.get("probability_percent", 0) for p in active_predictions), default=0)
                 # Score: weighted combination — 60% highest prob, 40% pred count signal
@@ -2056,7 +1926,7 @@ class OpenAIConnectorMCPServer:
                 elif pred_count >= 2:
                     failure_risk["reason"] = f"{pred_count} active predictions — equipment requires attention"
                 else:
-                    failure_risk["reason"] = "Elevated risk — open alerts and predictions present"
+                    failure_risk["reason"] = "Elevated risk — active prediction present"
                 # Use the most urgent prediction timeline
                 for p in active_predictions:
                     if p.get("probability_percent", 0) == highest_prob:
@@ -2215,7 +2085,6 @@ class OpenAIConnectorMCPServer:
                 "status": equip.get("status"),
                 "maintenance_history": {"last_service": equip.get("last_service")},
                 "failure_risk": failure_risk,
-                "open_alerts": open_alerts,
                 "active_predictions": len(active_predictions),
                 "last_updated": last_updated,
             }
@@ -2406,16 +2275,21 @@ class OpenAIConnectorMCPServer:
                 for site in sites_data:
                     site_code = site.get("code")
                     site_uuid = site.get("id")
-                    # Get alert counts (alerts uses site UUID)
-                    alerts_result = (
-                        client.table("alerts")
-                        .select("id, severity")
+                    equipment_result = (
+                        client.table("equipment")
+                        .select("id, status, type, health_score")
                         .eq("site_id", site_uuid)
-                        .eq("status", "active")
+                        .in_("status", ["warning", "critical", "fault"])
                         .execute()
                     )
-                    critical = sum(1 for a in (alerts_result.data or []) if a.get("severity") == "critical")
-                    warnings = sum(1 for a in (alerts_result.data or []) if a.get("severity") == "warning")
+                    at_risk_equipment = [
+                        row
+                        for row in (equipment_result.data or [])
+                        if str(row.get("type") or "").lower() in HEALTH_SCORED_EQUIPMENT_TYPES
+                        and row.get("health_score") is not None
+                    ]
+                    critical = sum(1 for row in at_risk_equipment if row.get("status") in {"critical", "fault"})
+                    warnings = sum(1 for row in at_risk_equipment if row.get("status") == "warning")
 
                     status = "green"
                     if critical > 0:
@@ -2429,6 +2303,7 @@ class OpenAIConnectorMCPServer:
                             "site_name": site.get("name"),
                             "value": None,
                             "status": status,
+                            "basis": "equipment_health_only",
                             "trend": "stable",
                         }
                     )
