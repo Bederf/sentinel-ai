@@ -32,6 +32,7 @@ from app.models.optimization import (
 from app.services.device_abstraction import device_manager
 from app.services.lighting_service import get_lighting_service
 from app.services.model_gateway import model_gateway
+from app.services.occupancy_fusion_service import get_occupancy_fusion_service
 from app.services.safety_interlocks import safety_engine
 
 UTC = UTC
@@ -363,6 +364,37 @@ class AIOptimizerService:
             current_conditions,
         )
 
+        # ── Fault Safety Gate: hard pre-check before LLM/rule path ──────────
+        # Blocks equipment with active critical/high alerts or urgent work
+        # orders on the equipment itself or any plant-group mate. This is a
+        # deterministic exclusion, NOT a prompt instruction.
+        fault_gate_advisories: list[dict[str, Any]] = []
+        fault_gate_context = await self._load_fault_gate_context(
+            site_id,
+            current_conditions,
+            equipment_inventory,
+        )
+        if fault_gate_context:
+            current_conditions["_fault_gate_context"] = fault_gate_context
+            pre_filter_count = sum(len(v) for v in optimization_equipment_inventory.values())
+            optimization_equipment_inventory = self._filter_equipment_inventory_by_fault_gate(
+                optimization_equipment_inventory,
+                current_conditions,
+            )
+            post_filter_count = sum(len(v) for v in optimization_equipment_inventory.values())
+            if post_filter_count < pre_filter_count:
+                logger.warning(
+                    "[AI-OPT] Fault gate removed %d/%d equipment from optimization inventory for %s",
+                    pre_filter_count - post_filter_count,
+                    pre_filter_count,
+                    site_id,
+                )
+            # Generate advisory recommendations for suppressed equipment
+            decisions = fault_gate_context.get("decisions", {})
+            for code, decision in decisions.items():
+                if decision.get("suppress"):
+                    fault_gate_advisories.append(self._fault_gate_advisory(site_id, code, decision))
+
         logger.info(f"Site {site_id} equipment inventory: {self._summarize_inventory(equipment_inventory)}")
 
         # Fetch DALI lighting zone data
@@ -475,7 +507,7 @@ class AIOptimizerService:
         )
 
         # Build optimization prompt for Claude with ALL available equipment
-        prompt = self._build_optimization_prompt(
+        prompt = await self._build_optimization_prompt(
             site,
             current_conditions,
             weather_forecast,
@@ -518,6 +550,10 @@ class AIOptimizerService:
                 f"first_rec_keys={[list(r.keys()) if r else 'empty' for r in recommendation.recommendations[:2]]}"
             )
 
+            # Append fault gate advisories (hard excluded equipment)
+            if fault_gate_advisories:
+                recommendation.recommendations.extend(fault_gate_advisories)
+
             await self._expire_stale_served_zone_runtime_recommendations(site_id, recommendation.recommendations)
 
             # Phase 109: Apply quality gate evaluation to recommendations
@@ -543,6 +579,9 @@ class AIOptimizerService:
             # Apply scoring to fallback recommendations too
             if profile:
                 rec = self._score_and_rank_recommendations(rec, profile)
+            # Append fault gate advisories (hard excluded equipment) to fallback
+            if fault_gate_advisories:
+                rec.recommendations.extend(fault_gate_advisories)
             await self._expire_stale_served_zone_runtime_recommendations(site_id, rec.recommendations)
             # Phase 109: Apply quality gate to fallback recommendations too
             rec = await self._apply_quality_gate(site_id, rec)
@@ -1276,6 +1315,45 @@ class AIOptimizerService:
                     )
             except Exception as e:
                 logger.warning(f"[AI-OPT] Could not fetch urgent work orders: {e}")
+
+            # ── Active critical/high alerts — block recommendations on faulted equipment ──
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb_alerts = get_supabase_client()
+                site_resp_alerts = sb_alerts.table("sites").select("id").eq("code", site_id).execute()
+                if site_resp_alerts.data:
+                    site_uuid_alerts = site_resp_alerts.data[0]["id"]
+                    alerts_resp = (
+                        sb_alerts.table("alerts")
+                        .select("id,equipment_id,severity,status,message,created_at")
+                        .eq("site_id", site_uuid_alerts)
+                        .eq("status", "active")
+                        .in_("severity", ["high", "critical"])
+                        .execute()
+                    )
+                    if alerts_resp.data:
+                        conditions["active_critical_alerts"] = [
+                            {
+                                "alert_id": a.get("id"),
+                                "equipment_id": a.get("equipment_id"),
+                                "severity": a.get("severity"),
+                                "message": a.get("message"),
+                                "created_at": (
+                                    a.get("created_at").isoformat()
+                                    if hasattr(a.get("created_at"), "isoformat")
+                                    else a.get("created_at")
+                                ),
+                            }
+                            for a in alerts_resp.data
+                        ]
+                        logger.warning(
+                            "[AI-OPT] Active critical/high alerts: %d — %s",
+                            len(conditions["active_critical_alerts"]),
+                            [a.get("message", "")[:60] for a in conditions["active_critical_alerts"][:5]],
+                        )
+            except Exception as e:
+                logger.warning(f"[AI-OPT] Could not fetch active critical alerts: {e}")
 
             # ── Carbon context (calculated from electrical telemetry) ──
             with contextlib.suppress(Exception):
@@ -2263,8 +2341,27 @@ If no action needed, return empty recommendations array.
         )
         return any(token in tokens for token in ("server", "clinical", "icu", "theatre", "lab", "plant"))
 
-    def _format_live_occupancy_context(self, current_conditions: dict[str, Any]) -> dict[str, Any]:
-        """Summarize live occupancy without letting calendar assumptions override telemetry."""
+    async def _format_live_occupancy_context(self, current_conditions: dict[str, Any], site_id: str) -> dict[str, Any]:
+        """Multi-signal fused occupancy context.
+
+        Uses OccupancyFusionService to fuse all available signals (SIMBIOT
+        aggregate, DALI PIR, CO2, security badges, AHU heat load) into a
+        single verdict. Falls back to legacy single-source logic only when
+        the fusion service has no signals at all.
+        """
+        try:
+            fusion = get_occupancy_fusion_service()
+            fused = await fusion.get_fused_occupancy(site_id)
+            if fused.signals:
+                detail = fused.to_prompt_detail()
+                label = "active" if fused.is_occupied else "low"
+                # Store fused verdict in conditions so closed-empty gates reuse it
+                current_conditions["_fused_occupancy"] = fused
+                return {"label": label, "detail": detail, "is_live": True, "fused": fused.to_gate_context()}
+        except Exception as e:
+            logger.warning("Occupancy fusion failed for %s, falling back: %s", site_id, e)
+
+        # ── Legacy fallback (unchanged) ──────────────────────────────
         site_aggregate = current_conditions.get("site_aggregate") or {}
         if isinstance(site_aggregate, dict):
             total_occupancy = site_aggregate.get("total_occupancy")
@@ -2622,7 +2719,6 @@ Records available: {ipmvp.get("records_available", 0)}""")
     def _format_constraints(self, site: dict[str, Any], conditions: dict | None = None) -> str:
         """Layer 4 — Module permissions, autonomous systems, safety limits, and active faults."""
         active_modules = (conditions or {}).get("active_modules", [])
-        urgent_wos = (conditions or {}).get("active_urgent_work_orders", [])
         perms = {
             "hvac_control": "HVAC setpoints, AHU scheduling, FCU adjustments",
             "energy_control": "Peak shaving, load shifting, demand management",
@@ -2662,17 +2758,19 @@ SAFETY LIMITS:
 - Do not increase load on equipment with health score < 70%
 """)
 
-        # Active urgent work orders \u2014 do not recommend adjustments on faulty equipment
-        if urgent_wos:
-            wo_lines = "\n".join(f"  - {wo['equipment_code']}: {wo['title']} ({wo['priority']})" for wo in urgent_wos)
+        # Fault safety gate — active critical alerts and urgent work orders
+        # have already been resolved at the pre-generation stage. Equipment
+        # with direct or plant-group-coupled faults is excluded from this
+        # inventory. The advisories for that equipment are appended separately.
+        fault_context = (conditions or {}).get("_fault_gate_context") or {}
+        fault_summary = fault_context.get("fault_summary") or {}
+        suppressed_total = fault_summary.get("suppressed_total", 0)
+        if suppressed_total:
             sections.append(f"""
-ACTIVE URGENT WORK ORDERS \u2014 do not recommend operational adjustments for these:
-{wo_lines}
-
-Equipment with open urgent/high-priority work orders is already under active
-maintenance. Recommending setpoint changes on this equipment could mask fault
-symptoms or interfere with the maintenance response. Flag the equipment as
-"under maintenance" in the recommendation instead.
+FAULT SAFETY GATE APPLIED — {suppressed_total} equipment excluded from this inventory:
+- Direct fault (critical alert or urgent WO): {fault_summary.get("faulted_direct", 0)}
+- Plant-group-coupled fault: {fault_summary.get("faulted_coupled", 0)}
+Excluded equipment will appear as advisory_info recommendations at the end of this analysis.
 """)
 
         return "\n".join(sections)
@@ -2774,7 +2872,7 @@ only. Never target a meter or sensor as the equipment to adjust.
 """
         return task_instruction
 
-    def _build_optimization_prompt(
+    async def _build_optimization_prompt(
         self,
         site: dict[str, Any],
         current_conditions: dict[str, Any],
@@ -2831,7 +2929,7 @@ only. Never target a meter or sensor as the equipment to adjust.
         op_end = op_hours.get("end", "18:00")
         now_sast = datetime.now()
         schedule_context = self._get_site_schedule_context(site["id"], now_sast)
-        occupancy_context = self._format_live_occupancy_context(current_conditions)
+        occupancy_context = await self._format_live_occupancy_context(current_conditions, site["id"])
         current_time_str = now_sast.strftime("%H:%M")
         current_weekday = now_sast.strftime("%A")
         is_occupied_hours = not schedule_context["uses_weekend_schedule"] and int(op_start.replace(":", "")) <= int(
@@ -3158,17 +3256,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                     f"[ANALYZE] _parse returned {len(normalised_recommendations)} recs — "
                     f"first target_equipment={[r.get('target_equipment') for r in normalised_recommendations[:2]]}"
                 )
-
-                # Hard filter: remove DALI equipment from AI optimization recs
-                filtered = []
-                DALI_PREFIXES = ("S002-DALI", "SITE-002-DALI", "DALI")
-                for r in normalised_recommendations:
-                    eq = (r.get("target_equipment") or "").upper()
-                    if any(eq.startswith(p.upper()) for p in DALI_PREFIXES):
-                        logger.info(f"[AI-OPT] Filtered DALI recommendation for {eq}")
-                        continue
-                    filtered.append(r)
-                normalised_recommendations = filtered
 
                 # Cap: max 3 recommendations per cycle — holistic prompt should produce 1-3
                 MAX_RECS = 3
@@ -3868,6 +3955,329 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             },
         }
 
+    # ── Fault Safety Gate ─────────────────────────────────────────────
+    # Hard pre-generation gate: blocks recommendations for any equipment
+    # whose plant group has an active critical/high alert or open
+    # urgent/high-priority work order. This is NOT a prompt instruction —
+    # it is a deterministic pre-check that removes affected equipment
+    # from the optimization inventory before the LLM or rule path sees it.
+
+    FAULT_GATE_RULE = "active_fault_or_work_order_blocks_plant_group"
+
+    async def _load_fault_gate_context(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+        equipment_inventory: dict[str, list[Device]],
+    ) -> dict[str, Any]:
+        """Load fault-gate context: plant groups, critical alerts, urgent work orders.
+
+        Builds a decisions dict per equipment code indicating whether it
+        should be suppressed from optimization because it or a plant-group
+        mate has an active fault condition.
+
+        Returns:
+            Dict with keys: decisions (equipment_code -> decision), rule,
+            faulted_equipment, plant_groups
+        """
+        decisions: dict[str, dict[str, Any]] = {}
+
+        # 1. Collect active critical/high alerts by equipment UUID
+        critical_alerts: list[dict[str, Any]] = current_conditions.get("active_critical_alerts", []) or []
+
+        # 2. Collect urgent/high work orders by equipment code
+        urgent_wos: list[dict[str, Any]] = current_conditions.get("active_urgent_work_orders", []) or []
+        wo_equipment_codes = {
+            str(wo.get("equipment_code") or "").upper().strip() for wo in urgent_wos if wo.get("equipment_code")
+        }
+
+        # 3. Resolve alert equipment_id -> equipment code & collect faulted codes
+        #    equipment_id may be a UUID (canonical) or a direct equipment code.
+        #    Try UUID -> code lookup first, fall back to treating as code directly.
+        alert_equipment_codes: set[str] = set()
+        if critical_alerts:
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb = get_supabase_client()
+                eq_ids = sorted({str(a.get("equipment_id") or "") for a in critical_alerts if a.get("equipment_id")})
+                eq_id_to_code: dict[str, str] = {}
+                if eq_ids:
+                    try:
+                        eq_resp = sb.table("equipment").select("id, code").in_("id", eq_ids).execute()
+                        eq_id_to_code = {e["id"]: e["code"] for e in (eq_resp.data or [])}
+                    except Exception:
+                        pass
+                    for alert in critical_alerts:
+                        eid = str(alert.get("equipment_id") or "")
+                        code = eq_id_to_code.get(eid) or eid
+                        alert["equipment_code"] = code
+                        alert_equipment_codes.add(code.upper())
+            except Exception as exc:
+                logger.warning("[AI-OPT] Failed to resolve alert equipment codes: %s", exc)
+                # Fallback: treat equipment_id as direct code
+                for alert in critical_alerts:
+                    eid = str(alert.get("equipment_id") or "")
+                    if eid:
+                        alert["equipment_code"] = eid
+                        alert_equipment_codes.add(eid.upper())
+
+        # 4. Build plant group map from equipment inventory
+        #    Reuses the same plant-group logic as coordinated_optimization_planner.
+        #    Groups are formed by zone_key/plant_group on equipment with types
+        #    ahu, chiller, cooling_tower, pump (the core plant group types).
+        plant_group_members: dict[str, set[str]] = {}
+        equipment_plant_group: dict[str, str] = {}
+
+        # Collect equipment codes and types from inventory
+        # Device.id carries the equipment code (e.g. "S002-AHU-B01")
+        plant_candidate_types = {"ahu", "chiller", "cooling_tower", "pump"}
+        all_equipment_codes: set[str] = set()
+        device_by_code: dict[str, Device] = {}
+
+        for device_type, devices in equipment_inventory.items():
+            for device in devices:
+                code = self._device_code(device).upper()
+                if not code:
+                    continue
+                all_equipment_codes.add(code)
+                device_by_code[code] = device
+                # Only plant-type equipment participates in plant groups
+                if device_type == "hvac":
+                    # Check device metadata for sub-type
+                    metadata = getattr(device, "metadata", {}) or {}
+                    eq_type = str(metadata.get("equipment_type") or metadata.get("type") or "").lower()
+                    zone_key = str(metadata.get("zone_key") or metadata.get("plant_group") or "").strip()
+                    if eq_type in plant_candidate_types and zone_key:
+                        plant_group_members.setdefault(zone_key.upper(), set()).add(code)
+                        equipment_plant_group[code] = zone_key.upper()
+
+        # Supplement plant-group data from Supabase for any equipment not covered
+        # by device metadata (common for bridge-backed equipment).
+        # This is a best-effort supplement; the gate works from device metadata alone.
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+            if site_resp.data:
+                site_uuid = site_resp.data[0]["id"]
+                try:
+                    eq_rows = (
+                        sb.table("equipment")
+                        .select("code,type,zone_key")
+                        .eq("site_id", site_uuid)
+                        .not_.is_("zone_key", "null")
+                        .execute()
+                    )
+                    for row in eq_rows.data or []:
+                        code = str(row.get("code") or "").upper().strip()
+                        zone_key = str(row.get("zone_key") or "").strip()
+                        eq_type = str(row.get("type") or "").lower()
+                        if code and zone_key and eq_type in plant_candidate_types:
+                            if code not in equipment_plant_group:
+                                plant_group_members.setdefault(zone_key.upper(), set()).add(code)
+                                equipment_plant_group[code] = zone_key.upper()
+                except Exception:
+                    pass  # Zone_key column may not exist or be accessible
+        except Exception as exc:
+            logger.debug("[AI-OPT] Could not supplement plant group data: %s", exc)
+
+        # 5. Supplement work orders with a broader query that catches high-priority
+        #    WOs too (S002 uses priority="high", not "urgent"/"critical").
+        active_wo_codes: set[str] = set(wo_equipment_codes)
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).execute()
+            if site_resp.data:
+                site_uuid = site_resp.data[0]["id"]
+                wo_resp = (
+                    sb.table("work_orders")
+                    .select("code,equipment_id,title,priority,status")
+                    .eq("site_id", site_uuid)
+                    .in_("status", ["open", "scheduled", "assigned", "in_progress", "pending"])
+                    .in_("priority", ["high", "urgent", "critical"])
+                    .order("created_at", desc=True)
+                    .limit(50)
+                    .execute()
+                )
+                if wo_resp.data:
+                    # Resolve equipment UUID -> code
+                    wo_eq_ids = sorted(
+                        {str(w.get("equipment_id") or "") for w in wo_resp.data if w.get("equipment_id")}
+                    )
+                    wo_eq_id_to_code: dict[str, str] = {}
+                    if wo_eq_ids:
+                        try:
+                            eq_resp = sb.table("equipment").select("id, code").in_("id", wo_eq_ids).execute()
+                            wo_eq_id_to_code = {e["id"]: e["code"] for e in (eq_resp.data or [])}
+                        except Exception:
+                            pass
+                    for wo in wo_resp.data:
+                        eid = str(wo.get("equipment_id") or "")
+                        wo_code = wo_eq_id_to_code.get(eid)
+                        if wo_code:
+                            active_wo_codes.add(wo_code.upper())
+        except Exception as exc:
+            logger.debug("[AI-OPT] Could not supplement work order codes: %s", exc)
+
+        # 6. Build faulted equipment set (direct alerts + WO)
+        faulted_equipment: set[str] = alert_equipment_codes | active_wo_codes
+
+        # 7. Resolve plant-group-mate fault: for each faulted equipment,
+        #    find all other equipment in the same plant group
+        coupled_faulted: set[str] = set()
+        for code in faulted_equipment:
+            group = equipment_plant_group.get(code)
+            if group:
+                members = plant_group_members.get(group, set())
+                for member in members:
+                    if member != code and member not in faulted_equipment:
+                        coupled_faulted.add(member)
+
+        # 8. Build decision per equipment code
+        for code in all_equipment_codes:
+            reasons: list[str] = []
+
+            # Direct fault checks
+            if code in alert_equipment_codes:
+                matching_alerts = [a for a in critical_alerts if str(a.get("equipment_code") or "").upper() == code]
+                for alert in matching_alerts:
+                    reasons.append(
+                        f"Active {alert.get('severity', 'critical')} alert: {alert.get('message', 'Unknown fault')}"
+                    )
+            if code in active_wo_codes:
+                reasons.append("Open urgent/high-priority work order on this equipment")
+
+            # Coupled fault check
+            if code in coupled_faulted:
+                # Find which faulted equipment is coupled
+                group = equipment_plant_group.get(code)
+                if group:
+                    faulted_mates = [m for m in plant_group_members.get(group, set()) if m in faulted_equipment]
+                    for mate in sorted(faulted_mates):
+                        mate_alerts = [a for a in critical_alerts if str(a.get("equipment_code") or "").upper() == mate]
+                        if mate_alerts:
+                            reasons.append(
+                                f"Coupled equipment {mate} has active {mate_alerts[0].get('severity', 'critical')} "
+                                f"alert: {mate_alerts[0].get('message', 'Unknown fault')}"
+                            )
+                        elif mate in active_wo_codes:
+                            reasons.append(f"Coupled equipment {mate} has open urgent work order")
+
+            if reasons:
+                decisions[code] = {
+                    "equipment_code": code,
+                    "suppress": True,
+                    "reason_codes": reasons,
+                    "fault_type": "direct" if code in (alert_equipment_codes | active_wo_codes) else "coupled",
+                }
+            else:
+                decisions[code] = {
+                    "equipment_code": code,
+                    "suppress": False,
+                    "reason_codes": [],
+                    "fault_type": "none",
+                }
+
+        fault_summary = {
+            "faulted_direct": len(alert_equipment_codes | active_wo_codes),
+            "faulted_coupled": len(coupled_faulted),
+            "suppressed_total": sum(1 for d in decisions.values() if d.get("suppress")),
+            "faulted_equipment_codes": sorted(faulted_equipment),
+            "coupled_faulted_codes": sorted(coupled_faulted),
+        }
+        logger.warning(
+            "[AI-OPT] Fault gate context for %s: %s",
+            site_id,
+            fault_summary,
+        )
+
+        return {
+            "rule": self.FAULT_GATE_RULE,
+            "decisions": decisions,
+            "fault_summary": fault_summary,
+            "plant_groups": {k: sorted(v) for k, v in plant_group_members.items()},
+        }
+
+    def _filter_equipment_inventory_by_fault_gate(
+        self,
+        equipment_inventory: dict[str, list[Device]],
+        current_conditions: dict[str, Any],
+    ) -> dict[str, list[Device]]:
+        """Remove fault-suppressed equipment from the optimization inventory.
+
+        Mirrors the served-zone gate exclusion pattern. Equipment that has
+        an active fault condition (direct or coupled via plant group) is
+        removed so the LLM/rule path never sees it as a tuning candidate.
+        """
+        context = current_conditions.get("_fault_gate_context") or {}
+        decisions = context.get("decisions") if isinstance(context, dict) else {}
+        if not isinstance(decisions, dict) or not decisions:
+            return equipment_inventory
+
+        filtered: dict[str, list[Device]] = {}
+        for device_type, devices in equipment_inventory.items():
+            allowed = []
+            for device in devices:
+                code = self._device_code(device).upper()
+                decision = decisions.get(code) or {}
+                if decision.get("suppress"):
+                    logger.warning(
+                        "[AI-OPT] Fault gate excluding %s from optimization: %s",
+                        code,
+                        "; ".join(decision.get("reason_codes", ["Unknown"])),
+                    )
+                    continue
+                allowed.append(device)
+            filtered[device_type] = allowed
+
+        return filtered
+
+    def _fault_gate_advisory(
+        self,
+        site_id: str,
+        target: str,
+        decision: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Generate an advisory recommendation for a fault-suppressed equipment."""
+        reason_codes = decision.get("reason_codes", ["Active fault condition"])
+        reason = (
+            f"{target} excluded from optimization — "
+            f"{' '.join(reason_codes)}. "
+            "Resolve before plant group tuning resumes."
+        )
+        return {
+            "equipment_id": target,
+            "target_equipment": target,
+            "point_name": "",
+            "current_value": None,
+            "recommended_value": None,
+            "unit": "manual_action",
+            "system": "hvac",
+            "action_type": "ai_optimization",
+            "action": {
+                "point": None,
+                "value": "Resolve active fault before tuning",
+                "execution_blocked": True,
+                "blocker": "active_fault_on_equipment_or_plant_group_mate",
+            },
+            "confidence": 1.0,
+            "status": "advisory_info",
+            "reason": reason,
+            "metadata": {
+                "rule": self.FAULT_GATE_RULE,
+                "advisory_type": "fault_safety_gate",
+                "fault_type": decision.get("fault_type", "unknown"),
+                "reason_codes": reason_codes,
+                "suppressed_optimization": True,
+                "site_id": site_id,
+                "non_expiring": True,
+            },
+        }
+
     async def _expire_stale_served_zone_runtime_recommendations(
         self,
         site_id: str,
@@ -3940,17 +4350,26 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             except (TypeError, ValueError):
                 return default
 
-        total_occupancy = site_aggregate.get("total_occupancy")
-        occupied_zones = site_aggregate.get("occupied_zones")
-        zone_count = site_aggregate.get("zone_count")
-        zero_occupancy = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
-            isinstance(occupied_zones, (int, float))
-            and float(occupied_zones) == 0
-            and isinstance(zone_count, (int, float))
-            and float(zone_count) > 0
-        )
-        if not zero_occupancy:
-            return None
+        # Use fused occupancy verdict when available (multi-signal)
+        fused = current_conditions.get("_fused_occupancy")
+        if fused is not None:
+            if not fused.may_suppress:
+                return None
+            total_occupancy = fused.occupancy_count
+            occupied_zones: Any = 0
+            zone_count: Any = 0
+        else:
+            total_occupancy = site_aggregate.get("total_occupancy")
+            occupied_zones = site_aggregate.get("occupied_zones")
+            zone_count = site_aggregate.get("zone_count")
+            zero_occupancy = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
+                isinstance(occupied_zones, (int, float))
+                and float(occupied_zones) == 0
+                and isinstance(zone_count, (int, float))
+                and float(zone_count) > 0
+            )
+            if not zero_occupancy:
+                return None
 
         current_time = self._current_conditions_time(current_conditions)
         if not self._is_outside_site_operating_hours(site_id, current_time):
@@ -5707,15 +6126,23 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         total_kw_float = _as_float(total_kw)
         after_hours_threshold_kw = self._after_hours_hvac_threshold_kw(site_id, current_conditions)
 
-        total_occupancy = site_aggregate.get("total_occupancy")
-        occupied_zones = site_aggregate.get("occupied_zones")
-        zone_count = site_aggregate.get("zone_count")
-        zero_occupancy = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
-            isinstance(occupied_zones, (int, float))
-            and float(occupied_zones) == 0
-            and isinstance(zone_count, (int, float))
-            and float(zone_count) > 0
-        )
+        # Use fused occupancy verdict when available (multi-signal)
+        fused = current_conditions.get("_fused_occupancy")
+        if fused is not None:
+            zero_occupancy = fused.may_suppress
+            total_occupancy = fused.occupancy_count
+            occupied_zones: Any = 0
+            zone_count: Any = 0
+        else:
+            total_occupancy = site_aggregate.get("total_occupancy")
+            occupied_zones = site_aggregate.get("occupied_zones")
+            zone_count = site_aggregate.get("zone_count")
+            zero_occupancy = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
+                isinstance(occupied_zones, (int, float))
+                and float(occupied_zones) == 0
+                and isinstance(zone_count, (int, float))
+                and float(zone_count) > 0
+            )
         current_time = self._current_conditions_time(current_conditions)
         outside_operating_hours = self._is_outside_site_operating_hours(site_id, current_time)
         urgent_equipment = {
