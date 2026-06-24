@@ -39,6 +39,11 @@ class EnergyRecord:
     occupied: bool = True
     load_shedding: bool = False
     holiday: bool = False
+    import_kwh: float | None = None
+    export_kwh: float | None = None
+    hvac_kwh: float | None = None
+    lighting_kwh: float | None = None
+    solar_generation_kwh: float | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -48,6 +53,11 @@ class EnergyRecord:
             "occupied": self.occupied,
             "load_shedding": self.load_shedding,
             "holiday": self.holiday,
+            "import_kwh": self.import_kwh,
+            "export_kwh": self.export_kwh,
+            "hvac_kwh": self.hvac_kwh,
+            "lighting_kwh": self.lighting_kwh,
+            "solar_generation_kwh": self.solar_generation_kwh,
         }
 
 
@@ -733,6 +743,7 @@ class IPMVPEngine:
         option: str = "C",
         recommendation_id: str | None = None,
         hourly_detail: bool = True,
+        baseline_cutoff: datetime | None = None,
     ) -> IPMVPReport:
         """Generate full IPMVP M&V report.
 
@@ -742,10 +753,15 @@ class IPMVPEngine:
             option: "C" (whole facility) or "A" (retrofit isolation)
             recommendation_id: Optional — for Option A, links to specific event
             hourly_detail: Include per-interval savings breakdown
+            baseline_cutoff: Date when site entered advisory phase (intervention start).
+                Records before cutoff train the baseline; records after are the
+                reporting period. When None, trains on the full window (valid for
+                pre-advisory or backwards compatibility).
         """
         logger.info(
             f"IPMVPEngine[{self.site_id}]: running Option {option} "
             f"report for {reporting_start.date()} → {reporting_end.date()}"
+            + (f" (baseline cutoff: {baseline_cutoff.date()})" if baseline_cutoff else "")
         )
 
         # 1. Fetch all data
@@ -754,13 +770,36 @@ class IPMVPEngine:
 
         # 2. Train baseline models (Option C)
         if option == "C":
-            occupied_model = self.regressor.train(records, "occupied")
-            unoccupied_model = self.regressor.train(records, "unoccupied")
+            # Split records into baseline training set and reporting set
+            if baseline_cutoff:
+                training_records = [r for r in records if r.timestamp < baseline_cutoff]
+                reporting_records = [r for r in records if r.timestamp >= baseline_cutoff]
+                if not training_records:
+                    logger.warning(
+                        "No pre-advisory records for baseline training "
+                        "(cutoff=%s, earliest=%s) — falling back to full window",
+                        baseline_cutoff.date(),
+                        records[0].timestamp.date() if records else "none",
+                    )
+                    training_records = records
+                    reporting_records = records
+                logger.info(
+                    "IPMVP baseline: %d training records (pre-%s), %d reporting records",
+                    len(training_records),
+                    baseline_cutoff.date(),
+                    len(reporting_records),
+                )
+            else:
+                training_records = records
+                reporting_records = records
+
+            occupied_model = self.regressor.train(training_records, "occupied")
+            unoccupied_model = self.regressor.train(training_records, "unoccupied")
             result = self.calculator.calculate(
                 recommendation_id=recommendation_id,
                 reporting_start=reporting_start,
                 reporting_end=reporting_end,
-                records=records,
+                records=reporting_records,
                 occupied_model=occupied_model,
                 unoccupied_model=unoccupied_model,
                 tariff=tariff,

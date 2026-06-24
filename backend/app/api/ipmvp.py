@@ -10,10 +10,13 @@ Endpoints:
     POST /api/ipmvp/{site_id}/report/option-a  — Option A for specific event
 """
 
+import logging
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
+
+logger = logging.getLogger(__name__)
 
 from app.services.ipmvp import (
     BaselineModel,
@@ -80,11 +83,19 @@ async def get_ipmvp_report(
     option: str = Query("C", description="C = Whole Facility, A = Retrofit Isolation"),
     recommendation_id: str | None = Query(None),
     hourly_detail: bool = Query(True),
+    baseline_cutoff: str | None = Query(
+        None, description="ISO date: baseline/reporting boundary. Auto-detected from phase promotion if omitted."
+    ),
 ):
     """Generate an IPMVP M&V report for the given site and reporting period.
 
     Option C: Whole Facility — uses OLS baseline regression to compute savings.
     Option A: Retrofit Isolation — compares pre/post metered periods for one event.
+
+    baseline_cutoff: When a site enters advisory phase, this date marks the
+    boundary between baseline (training) and reporting (savings measurement).
+    If omitted, auto-detected from phase_transition_log where the site
+    promoted from shadow_live to advisory.
 
     Returns uncertainty metrics (CV(RMSE)%) and flags high-uncertainty results.
     """
@@ -96,6 +107,34 @@ async def get_ipmvp_report(
     if option not in ("C", "A"):
         raise HTTPException(400, "option must be 'C' or 'A'")
 
+    # Auto-detect baseline cutoff from phase transition log if not provided
+    cutoff_dt: datetime | None = None
+    if baseline_cutoff:
+        cutoff_dt = _parse_dt(baseline_cutoff)
+    elif option == "C":
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            phase_log = (
+                sb.table("phase_transition_log")
+                .select("created_at")
+                .eq("site_id", site_id)
+                .eq("to_phase", "advisory")
+                .order("created_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if phase_log.data:
+                cutoff_dt = datetime.fromisoformat(
+                    phase_log.data[0]["created_at"].isoformat()
+                    if hasattr(phase_log.data[0]["created_at"], "isoformat")
+                    else str(phase_log.data[0]["created_at"])
+                ).replace(tzinfo=None)
+                logger.info("Auto-detected baseline cutoff from advisory promotion: %s", cutoff_dt.date())
+        except Exception as e:
+            logger.warning("Could not auto-detect baseline cutoff for %s: %s", site_id, e)
+
     engine = _build_engine(site_id)
 
     try:
@@ -105,6 +144,7 @@ async def get_ipmvp_report(
             option=option,
             recommendation_id=recommendation_id,
             hourly_detail=hourly_detail,
+            baseline_cutoff=cutoff_dt,
         )
     except NotImplementedError as e:
         raise HTTPException(503, str(e))
