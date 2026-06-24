@@ -1,0 +1,16 @@
+[Unit]
+Description=SENTINEL BMS Reverse Proxy (Caddy)
+After=network.target sentinel-backend.service sentinel-frontend.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+ExecStart=/usr/local/bin/caddy run --config /opt/bms-intelligence/Caddyfile --adapter caddyfile
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

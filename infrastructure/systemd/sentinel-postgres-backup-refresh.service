@@ -1,0 +1,15 @@
+[Unit]
+Description=SENTINEL PostgreSQL backup and standby refresh
+After=network.target
+After=sentinel-postgres-backup-db.service
+Requires=sentinel-postgres-backup-db.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/bms-intelligence
+ExecStart=/opt/bms-intelligence/scripts/backup/refresh_backup_target_db.sh
+StandardOutput=append:/opt/bms-intelligence/backups/logs/postgres-backup-refresh-systemd.log
+StandardError=append:/opt/bms-intelligence/backups/logs/postgres-backup-refresh-systemd.log
+
+[Install]
+WantedBy=multi-user.target

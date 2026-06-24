@@ -1,0 +1,170 @@
+tunnel: 65f19403-61a4-4779-8cb8-2e1f142216bb
+credentials-file: /etc/cloudflared/sentinel-bms-credentials.json
+
+protocol: auto
+
+connection:
+  ha-connections: 4
+  connect-timeout: 30s
+  tcp-keep-alive: 30s
+
+health-check:
+  enabled: true
+  path: /health
+  host: caddy
+  port: 80
+  interval: 15s
+  timeout: 10s
+  grace_period: 30s
+  retries: 3
+
+# Debugging: Enable metrics
+metrics: "0.0.0.0:8081"
+
+grace-period: 30s
+retries: 5
+retry-interval: 1s
+
+load-balancer:
+  strategy: consistent_hashing
+  health-check-interval: 10s
+  health-check-timeout: 5s
+
+ingress:
+
+  # API subdomain routes to Caddy (which proxies to backend)
+  - hostname: api.aimthelaw.co.za
+    service: http://localhost:80
+    originRequest:
+      httpHostHeader: api.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 100
+      keepAliveTimeout: 1m30s
+      h2Origin: false
+      noHappyEyeballs: false
+
+
+  # App subdomain routes to Caddy (which proxies to frontend)
+  - hostname: app.aimthelaw.co.za
+    service: http://localhost:80
+    originRequest:
+      httpHostHeader: app.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 50
+      keepAliveTimeout: 1m30s
+      h2Origin: false
+
+  # Main domain redirects to app (handled by Caddy)
+  - hostname: aimthelaw.co.za
+    service: http://localhost:80
+    originRequest:
+      httpHostHeader: aimthelaw.co.za
+      connectTimeout: 10s
+
+  # Ollama endpoint with service name
+  - hostname: ollama.aimthelaw.co.za
+    service: http://ollama:11434
+    originRequest:
+      httpHostHeader: ollama.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 50
+      keepAliveTimeout: 1m30s
+      noTLSVerify: false
+      disableChunkedEncoding: false
+      httpVersion: 1.1
+      noHappyEyeballs: false
+
+  # FNBuddy application on port 8010
+  - hostname: fnbuddy.aimthelaw.co.za
+    service: http://localhost:8010
+    originRequest:
+      httpHostHeader: fnbuddy.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 50
+      keepAliveTimeout: 1m30s
+      noTLSVerify: false
+      disableChunkedEncoding: false
+      httpVersion: 1.1
+
+  # N8N UI (k3s NodePort)
+  - hostname: n8n.aimthelaw.co.za
+    service: http://127.0.0.1:30678
+    originRequest:
+      httpHostHeader: n8n.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 50
+      keepAliveTimeout: 1m30s
+
+  # BMS Intelligence Dashboard (Frontend on port 9096 via Caddy)
+  - hostname: bms.aimthelaw.co.za
+    service: http://localhost:80
+    originRequest:
+      httpHostHeader: bms.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 50
+      keepAliveTimeout: 1m30s
+      disableChunkedEncoding: false
+      httpVersion: 1.1
+
+  # BMS Intelligence API (Backend on port 9097)
+  - hostname: bms-api.aimthelaw.co.za
+    service: http://localhost:9097
+    originRequest:
+      httpHostHeader: bms-api.aimthelaw.co.za
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 100
+      keepAliveTimeout: 1m30s
+      disableChunkedEncoding: false
+      httpVersion: 1.1
+
+  # SENTINEL BMS — New Domain: sentinel-ai.co.za (frontend)
+  - hostname: sentinel-ai.co.za
+    service: http://127.0.0.1:9096
+    originRequest:
+      httpHostHeader: sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+
+  # SENTINEL BMS API — New Domain: sentinel-ai.co.za (backend)
+  - hostname: sentinel-ai.co.za
+    path: /api/*
+    service: http://127.0.0.1:9095
+    originRequest:
+      httpHostHeader: sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+
+
+  # Grafana Dashboard
+  - hostname: grafana.sentinel-ai.co.za
+    service: http://localhost:3000
+    originRequest:
+      httpHostHeader: grafana.sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+
+  # Catch-all rule (required) - route to Caddy with default settings
+  - service: http://localhost:80
+    originRequest:
+      connectTimeout: 30s
+      tlsTimeout: 10s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 50
+      keepAliveTimeout: 1m30s

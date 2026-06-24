@@ -1,0 +1,65 @@
+tunnel: 65f19403-61a4-4779-8cb8-2e1f142216bb
+credentials-file: /home/bederf/.cloudflared/sentinel-bms-credentials.json
+
+protocol: http2
+ingress:
+  - hostname: api.sentinel-ai.co.za
+    service: http://127.0.0.1:9095
+    originRequest:
+      httpHostHeader: api.sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: bms.sentinel-ai.co.za
+    path: /api/*
+    service: http://127.0.0.1:9095
+    originRequest:
+      httpHostHeader: bms.sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: bms.sentinel-ai.co.za
+    service: http://127.0.0.1:9096
+    originRequest:
+      httpHostHeader: bms.sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: grafana.sentinel-ai.co.za
+    service: http://127.0.0.1:3000
+    originRequest:
+      httpHostHeader: grafana.sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: sentinel-ai.co.za
+    path: /api/*
+    service: http://127.0.0.1:9095
+    originRequest:
+      httpHostHeader: sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: sentinel-ai.co.za
+    service: http://127.0.0.1:9096
+    originRequest:
+      httpHostHeader: sentinel-ai.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: bms.aimthelaw.co.za
+    path: /api/*
+    service: http://127.0.0.1:9095
+    originRequest:
+      httpHostHeader: bms.aimthelaw.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - hostname: bms.aimthelaw.co.za
+    service: http://127.0.0.1:9096
+    originRequest:
+      httpHostHeader: bms.aimthelaw.co.za
+      connectTimeout: 10s
+      tlsTimeout: 5s
+      tcpKeepAlive: 30s
+  - service: http_status:404

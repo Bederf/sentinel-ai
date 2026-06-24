@@ -1,0 +1,16 @@
+[Unit]
+Description=Ensure SENTINEL backup Supabase Postgres container is running
+After=network.target
+
+[Service]
+Type=oneshot
+User=bederf
+Group=bederf
+WorkingDirectory=/opt/bms-intelligence
+ExecStart=/opt/bms-intelligence/scripts/backup/ensure_backup_postgres_container.sh
+RemainAfterExit=yes
+StandardOutput=append:/opt/bms-intelligence/backups/logs/postgres-backup-db-systemd.log
+StandardError=append:/opt/bms-intelligence/backups/logs/postgres-backup-db-systemd.log
+
+[Install]
+WantedBy=multi-user.target

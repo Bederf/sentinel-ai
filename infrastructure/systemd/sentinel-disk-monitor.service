@@ -1,0 +1,12 @@
+[Unit]
+Description=SENTINEL VPS disk health monitor
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+User=bederf
+Group=bederf
+Environment=PATH=/home/bederf/.npm-global/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/opt/bms-intelligence/infra/scripts/sentinel-disk-monitor.sh
+StandardOutput=append:/var/log/sentinel/disk-monitor-cron.log
+StandardError=append:/var/log/sentinel/disk-monitor-cron.log

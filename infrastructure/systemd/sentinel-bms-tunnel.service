@@ -1,0 +1,22 @@
+[Unit]
+Description=SENTINEL BMS Cloudflare Tunnel (sentinel-ai.co.za)
+After=network.target
+Wants=sentinel-backend.service sentinel-frontend.service
+
+[Service]
+Type=simple
+User=bederf
+Group=bederf
+ExecStart=/usr/local/bin/cloudflared tunnel --config /home/bederf/.cloudflared/config-sentinel-bms.yml run
+Restart=always
+RestartSec=10s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sentinel-bms-tunnel
+
+# Ensure backend and frontend are started before tunnel
+ExecCondition=/bin/systemctl is-active --quiet sentinel-backend.service
+ExecCondition=/bin/systemctl is-active --quiet sentinel-frontend.service
+
+[Install]
+WantedBy=multi-user.target

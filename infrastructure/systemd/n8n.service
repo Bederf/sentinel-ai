@@ -1,0 +1,60 @@
+[Unit]
+Description=n8n Workflow Automation (SENTINEL)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=bederf
+Group=bederf
+WorkingDirectory=/home/bederf
+
+# n8n binary (npm global install)
+ExecStart=/home/bederf/.npm-global/bin/n8n start
+
+# Core settings
+Environment="N8N_PORT=5678"
+Environment="N8N_PROTOCOL=http"
+Environment="N8N_HOST=localhost"
+Environment="GENERIC_TIMEZONE=Africa/Johannesburg"
+Environment="N8N_DEFAULT_BINARY_DATA_MODE=filesystem"
+
+# Webhook URL (for n8n to know its own external address)
+Environment="WEBHOOK_URL=http://localhost:5678/"
+
+# Security: basic auth for n8n UI
+Environment="N8N_BASIC_AUTH_ACTIVE=true"
+Environment="N8N_BASIC_AUTH_USER=sentinel"
+# Override in /etc/sentinel/n8n.env for production
+Environment="N8N_BASIC_AUTH_PASSWORD=change-me-in-production"
+
+# Execution settings
+Environment="N8N_METRICS=false"
+Environment="N8N_BLOCK_ENV_ACCESS_IN_NODE=false"
+
+# Visitor intake workflow vars
+Environment="INTAKE_IMAP_USER=info@sentinel-ai.co.za"
+Environment="SENTRY_BOT_API_KEY=sentry-bot-RncXWQCYticUnuG06L4qnSUj-heKAeV0NnMdHOvIlKM3TNUv"
+Environment="SENTRY_WEBHOOK_SECRET=sentry-bms-phase-41"
+Environment="SENTINEL_BACKEND_URL=http://127.0.0.1:9095"
+Environment="SMTP_FROM=info@sentinel-ai.co.za"
+Environment="SMTP_FROM_NAME=SENTINEL Reception"
+Environment="INTERNAL_EMAIL_DOMAINS=sentinel-ai.co.za"
+Environment="DEFAULT_BUILDING_ID=site-001"
+Environment="SENTINEL_PUBLIC_URL=https://bms.sentinel-ai.co.za"
+
+# Restart on failure
+Restart=on-failure
+RestartSec=10
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=n8n
+
+# Resource limits
+LimitNOFILE=65536
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

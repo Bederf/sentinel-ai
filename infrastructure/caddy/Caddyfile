@@ -1,63 +1,23 @@
-{
-  email admin@sentinel-ai.co.za
+ fr{
+    http_port 8090
+    https_port 8443
 }
 
-# Main HTTPS reverse proxy for SENTINEL BMS
-bms.sentinel-ai.co.za {
-  # Security headers
-  header / X-Frame-Options "SAMEORIGIN"
-  header / X-Content-Type-Options "nosniff"
-  header / X-XSS-Protection "1; mode=block"
-  header / Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-
-  # Frontend app (SPA)
-  handle / {
-    reverse_proxy frontend:80 {
-      header_up X-Real-IP {remote_host}
+:8090 {
+    # API → backend
+    handle /api/* {
+        reverse_proxy 127.0.0.1:9095 {
+            header_up Origin "https://bms.sentinel-ai.co.za"
+        }
     }
-  }
 
-  # API backend - proxy all /api/* requests
-  handle /api/* {
-    reverse_proxy backend:8000 {
-      header_up X-Real-IP {remote_host}
-      # Preserve auth and cookie headers
-      header_up Authorization {request_header.Authorization}
-      header_up Cookie {request_header.Cookie}
-      # Allow CORS headers
-      header_up Access-Control-Request-Headers {request_header.Access-Control-Request-Headers}
-      header_up Access-Control-Request-Method {request_header.Access-Control-Request-Method}
+    # Static assets → frontend (vite preview)
+    handle /assets/* {
+        reverse_proxy 127.0.0.1:9096
     }
-  }
 
-  # Health check endpoint
-  handle /health {
-    respond "OK" 200
-  }
-}
-
-# Grafana Dashboard
-grafana.sentinel-ai.co.za {
-  reverse_proxy localhost:3000 {
-    header_up X-Real-IP {remote_host}
-  }
-}
-
-# Prometheus (internal only - no public access)
-# prometheus.sentinel-ai.co.za {
-#   reverse_proxy localhost:9090
-# }
-
-# Redirect www to non-www
-www.sentinel-ai.co.za {
-  redir https://sentinel-ai.co.za{uri} permanent
-}
-
-# Legacy redirect: aimthelaw → sentinel-ai
-bms.aimthelaw.co.za {
-  redir https://bms.sentinel-ai.co.za{uri} permanent
-}
-
-www.bms.aimthelaw.co.za {
-  redir https://bms.sentinel-ai.co.za{uri} permanent
+    # Everything else → frontend
+    handle {
+        reverse_proxy 127.0.0.1:9096
+    }
 }

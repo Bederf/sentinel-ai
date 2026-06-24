@@ -1,0 +1,25 @@
+[Unit]
+Description=SENTINEL BMS Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=bederf
+Group=bederf
+WorkingDirectory=/opt/bms-intelligence/backend
+Environment="PYTHONUNBUFFERED=1"
+Environment="MIGRATION_SKIP=true"
+Environment="VIRTUAL_ENV=/opt/bms-intelligence/backend/venv"
+Environment="PYTHONPATH=/opt/bms-intelligence/backend/venv/lib/python3.11/site-packages"
+Environment="PATH=/home/bederf/.npm-global/bin:/opt/bms-intelligence/backend/venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="TZ=Africa/Johannesburg"
+Environment="AI_CLOUD_PROVIDER=openai"
+ExecStart=/opt/bms-intelligence/backend/venv/bin/python3 -m uvicorn app.main:app --host 0.0.0.0 --port 9095 --workers 2
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=sentinel-backend
+
+[Install]
+WantedBy=multi-user.target

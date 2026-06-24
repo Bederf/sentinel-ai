@@ -1,0 +1,13 @@
+[Unit]
+Description=SENTINEL k6 Synthetic Uptime Check
+
+[Service]
+Type=oneshot
+User=bederf
+Environment="SUPABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+ExecStart=k6 run /opt/bms-intelligence/load_tests/synthetic_uptime_check.js \
+  --env BASE_URL=http://144.91.122.235:9095 \
+  --env SITE_ID=site-002 \
+  --env SUPABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres \
+  --vus 1 \
+  --iterations 1

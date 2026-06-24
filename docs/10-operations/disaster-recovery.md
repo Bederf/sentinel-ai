@@ -401,6 +401,9 @@ After any recovery event:
 7. **No fencing automation**: standby promotion still depends on a manual isolation decision to avoid split brain.
 8. **Old local backup directories have mixed ownership**: retention cleanup can warn on old `nobody:nogroup` backup directories. Current refresh is non-fatal, but old directories should be cleaned up separately.
 9. **No full-chain RTO drill yet**: current local timing measures only dump plus restore. It excludes incident declaration, write freeze, service repointing, secrets, restarts, and smoke tests.
+10. **Secrets are a single point of failure**: `.env`, bridge tokens, Supabase service keys, Cloudflare tunnel credentials, MQTT passwords, and WireGuard keys exist only on the live server. No encrypted offsite bundle exists. Loss of the primary VPS means loss of all runtime secrets. A secrets-bundle workflow script exists at `infrastructure/secrets-bundle.sh` (age-encrypted tar, push to any offsite destination) but has not yet been run.
+11. **Infrastructure configuration is not fully captured as code**: systemd unit files, Cloudflare tunnel ingress rules, Caddy reverse-proxy config, MQTT ACLs, and Mosquitto listener config are now versioned in `infrastructure/systemd/`, `infrastructure/cloudflared/`, `infrastructure/caddy/`, and `infrastructure/mosquitto/`, but these snapshots must be kept in sync with live changes. A bootstrap script at `infrastructure/bootstrap.sh` can rebuild the system layer from these configs.
+12. **No infra-config drift detection**: there is no automated check that the live systemd units, Caddyfile, or Cloudflare tunnel config match what is versioned in `infrastructure/`. After any manual change to these files on the server, the `infrastructure/` copy must be updated manually or drift will compound.
 
 ## Scheduler Lock Behavior
 
@@ -417,3 +420,9 @@ Only the lock holder starts background jobs. Other workers skip scheduler startu
 - [Database backup and replication summary](../disaster-recovery-db-backup-summary.md)
 - [PostgreSQL logical backup note](operations-notes/postgres-logical-backup.md)
 - [BCP/DR procedures](../09-security/bcp-dr-procedures.md)
+- [Infra bootstrap script](../infrastructure/bootstrap.sh) — bare VPS to running system
+- [Secrets bundle workflow](../infrastructure/secrets-bundle.sh) — encrypted offsite secrets archive
+- [Systemd unit files](../infrastructure/systemd/) — service definitions for restore
+- [Cloudflare tunnel config](../infrastructure/cloudflared/) — ingress routing rules
+- [Caddy reverse-proxy config](../infrastructure/caddy/Caddyfile) — TLS and routing
+- [Mosquitto MQTT config](../infrastructure/mosquitto/) — broker ACLs and listener
