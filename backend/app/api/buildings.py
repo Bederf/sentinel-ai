@@ -923,7 +923,7 @@ async def create_building(building: BuildingCreate) -> dict:
             "optimization_settings": building.optimization_settings,
             "building_geometry": building.building_geometry,
             "optimization_enabled": False,
-            "onboarding_phase": "commissioning",
+            "onboarding_phase": "shadow_live",
         }
         client.table("sites").upsert(site_record, on_conflict="code").execute()
     except Exception as e:
@@ -936,6 +936,14 @@ async def create_building(building: BuildingCreate) -> dict:
         module_registry.ensure_base_modules(site_id, building.name)
     except Exception as e:
         logger.warning(f"Failed to seed base modules for {site_id}: {e}")
+
+    # Seed phase promotion gates so the site can progress through onboarding phases
+    try:
+        from app.services.site_creation_service import SiteCreationService
+
+        SiteCreationService().seed_phase_promotion_gates(site_id)
+    except Exception as e:
+        logger.warning(f"Failed to seed phase promotion gates for {site_id}: {e}")
 
     logger.info(f"Created building: {site_id}")
 

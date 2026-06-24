@@ -14,6 +14,7 @@ import {
   HelpCircle,
   Locate,
   Settings,
+  Upload,
 } from "lucide-react";
 import type {
   Site,
@@ -45,6 +46,8 @@ const BMS_VENDORS = [
   { value: "trend" as const, label: "Trend Controls IQ4", protocol: "BACnet/IP" },
   { value: "generic" as const, label: "Generic BACnet/IP", protocol: "BACnet/IP" },
   { value: "bridge" as const, label: "SIMBIOT Bridge (HTTP)", protocol: "Bridge API" },
+  { value: "mqtt-bridge" as const, label: "MQTT (Shared Bridge)", protocol: "MQTT" },
+  { value: "mqtt-direct" as const, label: "MQTT (Direct Broker)", protocol: "MQTT" },
 ];
 
 // ============= BMS Vendor Help Text =============
@@ -58,6 +61,8 @@ const VENDOR_HELP_TEXT: Record<BMSVendor, string> = {
   trend: "Trend Controls IQ4 uses BACnet/IP for point access. Configure your IQ4 controller to accept BACnet queries. Enter the controller IP address and ensure UDP 47808 is accessible.",
   generic: "For generic BACnet/IP systems, provide the controller or gateway IP address. The system will discover points using standard BACnet protocol. Enter credentials if your BMS or gateway requires authentication.",
   bridge: "SIMBIOT Bridge uses HTTP REST to connect through the WireGuard bridge (port 8080). Enter the bridge IP and API token. No BACnet/UDP required — works through any tunnel.",
+  "mqtt-bridge": "MQTT (Shared Bridge) connects via the shared Mosquitto instance (144.91.122.235:1883). Credentials and ACL are auto-provisioned per site. No manual broker config required.",
+  "mqtt-direct": "MQTT (Direct Broker) connects to a broker you control. Enter the broker host/port and credentials. No auto-provisioning — you manage broker access.",
 };
 
 // ============= Types =============
@@ -108,6 +113,9 @@ interface WizardState {
   tenantName: string;
   tenantAccessMode: string;
   tenantAccessConfirmed: boolean;
+  // Connection method: network discovery or CSV upload
+  connectionMethod: "network" | "csv";
+  csvFile: File | null;
   // BMS connection
   bmsVendor: BMSVendor;
   host: string;
@@ -173,7 +181,8 @@ type WizardAction =
   | { type: "SET_VERIFICATION_WIZARD"; show: boolean }
   | { type: "SET_DISCOVERY_PHASE"; phase: number }
   | { type: "SET_ZONE_INGESTION_WIZARD"; show: boolean }
-  | { type: "SET_GEOCODE"; latitude: number | null; longitude: number | null; orientation_degrees: number | null; address?: string };
+  | { type: "SET_GEOCODE"; latitude: number | null; longitude: number | null; orientation_degrees: number | null; address?: string }
+  | { type: "SET_CSV_UPLOAD_RESULT"; discoveryId: string; summary: DiscoverClassifyResponse };
 
 function wizardReducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
@@ -242,6 +251,15 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
         longitude: action.longitude,
         orientation_degrees: action.orientation_degrees,
         siteAddress: action.address ?? state.siteAddress,
+        loading: false,
+      };
+    case "SET_CSV_UPLOAD_RESULT":
+      return {
+        ...state,
+        discoveryId: action.discoveryId,
+        discoverySummary: action.summary,
+        connectionStatus: "connected",
+        connectionMessage: `CSV parsed — ${action.summary.points_count} points, ${action.summary.equipment_count} equipment groups`,
         loading: false,
       };
     default:
@@ -455,6 +473,9 @@ export function BMSConnectionWizard({
     sundayActive: false,
     clinicalZonesPresent: false,
     primaryObjective: "balanced",
+    // Connection method
+    connectionMethod: "network" as const,
+    csvFile: null,
     // BMS connection
     bmsVendor: "niagara",
     host: "",
@@ -687,15 +708,6 @@ export function BMSConnectionWizard({
       return;
     }
 
-    if (!state.host.trim()) {
-      dispatch({
-        type: "SET_CONNECTION_STATUS",
-        status: "failed",
-        message: "Please enter the BMS host or IP address",
-      });
-      return;
-    }
-
     const portNum = Number(state.port);
     const portFallback = usesObix ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
     const safePort = state.port && Number.isFinite(portNum) && portNum > 0 && portNum <= 65535
@@ -704,8 +716,18 @@ export function BMSConnectionWizard({
 
     try {
       const isBridge = state.bmsVendor === 'bridge';
+      const isMqttBridge = state.bmsVendor === 'mqtt-bridge';
+      const isMqttDirect = state.bmsVendor === 'mqtt-direct';
 
       if (state.bmsVendor === 'niagara') {
+        if (!state.host.trim()) {
+          dispatch({
+            type: "SET_CONNECTION_STATUS",
+            status: "failed",
+            message: "Please enter the BMS host or IP address",
+          });
+          return;
+        }
         const res = await bmsConnectionApi.configureOBIX({
           host: state.host,
           port: safePort,
@@ -724,8 +746,74 @@ export function BMSConnectionWizard({
         }
       }
 
+      if (isMqttDirect) {
+        if (!state.host.trim()) {
+          dispatch({
+            type: "SET_CONNECTION_STATUS",
+            status: "failed",
+            message: "Please enter the MQTT broker host or IP address",
+          });
+          return;
+        }
+        if (safePort === portFallback && safePort === 47808) {
+          dispatch({
+            type: "SET_CONNECTION_STATUS",
+            status: "failed",
+            message: "Enter a valid MQTT broker port (typically 1883 or 8883 for TLS)",
+          });
+          return;
+        }
+        resolvedSiteId = await ensureSiteCreated();
+        try {
+          await bmsConnectionApi.saveSimbiotAdapterConfig({
+            site_id: resolvedSiteId,
+            protocol: "mqtt",
+            config: {
+              bms_vendor: "mqtt-direct",
+              host: state.host.trim(),
+              port: safePort,
+              ...(state.username && { username: state.username }),
+              ...(state.password && { password: state.password }),
+            },
+            enabled: true,
+            poll_interval_seconds: 60,
+          });
+        } catch (saveErr) {
+          console.warn("MQTT direct adapter config save failed", saveErr);
+        }
+        dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "connected",
+          message: `MQTT broker configured — connecting to ${state.host.trim()}:${safePort}`,
+        });
+        return;
+      }
+
+      if (isMqttBridge) {
+        resolvedSiteId = await ensureSiteCreated();
+        try {
+          await bmsConnectionApi.saveSimbiotAdapterConfig({
+            site_id: resolvedSiteId,
+            protocol: "mqtt",
+            config: { bms_vendor: "mqtt-bridge" },
+            enabled: true,
+            poll_interval_seconds: 60,
+          });
+        } catch (saveErr) {
+          console.warn("MQTT bridge adapter config save failed", saveErr);
+        }
+        dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+        dispatch({
+          type: "SET_CONNECTION_STATUS",
+          status: "connected",
+          message: "MQTT bridge configured — credentials and ACL auto-provisioned",
+        });
+        return;
+      }
+
       let bacnetDevices: BACnetDevice[] = [];
-      if (!isBridge && state.bmsVendor !== 'niagara') {
+      if (!isBridge && state.bmsVendor !== 'niagara' && !isMqttBridge && !isMqttDirect) {
         try {
           const bacnetRes = await bmsConnectionApi.testBACnetConnection({
             timeout: 5,
@@ -793,7 +881,7 @@ export function BMSConnectionWizard({
           site_id: resolvedSiteId,
           protocol: adapterProtocol,
           config: adapterConfig,
-          enabled: false,  // New sites: bridge off by default
+          enabled: true,  // New sites: bridge on so phased pipeline progresses
           poll_interval_seconds: 300,
         });
         console.log("Saved adapter config for", resolvedSiteId);
@@ -809,13 +897,61 @@ export function BMSConnectionWizard({
     }
   }, [buildConnectionMessage, ensureSiteCreated, usesObix, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
 
+  // ---------- CSV Upload ----------
+  const handleCsvUpload = useCallback(async () => {
+    if (!state.csvFile) {
+      dispatch({ type: "SET_ERROR", error: "Select a CSV file first" });
+      return;
+    }
+    if (!state.csvFile.name.endsWith(".csv")) {
+      dispatch({ type: "SET_ERROR", error: "File must be a CSV (.csv extension)" });
+      return;
+    }
+    if (!state.siteName.trim()) {
+      dispatch({ type: "SET_ERROR", error: "Enter a site name before uploading" });
+      return;
+    }
+    dispatch({ type: "SET_LOADING", loading: true });
+    dispatch({ type: "SET_ERROR", error: null });
+
+    try {
+      const siteId = await ensureSiteCreated();
+      const result = await bmsConnectionApi.discoverFromCsv(siteId, state.csvFile, state.siteName);
+      dispatch({
+        type: "SET_CSV_UPLOAD_RESULT",
+        discoveryId: result.discovery_id,
+        summary: {
+          discovery_id: result.discovery_id,
+          points_count: result.points_count,
+          equipment_count: result.equipment_count,
+          status: result.status,
+          summary: result.summary as Record<string, string | number | boolean>,
+        },
+      });
+    } catch (err) {
+      dispatch({
+        type: "SET_ERROR",
+        error: err instanceof Error ? err.message : "CSV upload failed",
+      });
+    }
+  }, [state.csvFile, state.siteName, ensureSiteCreated]);
+
   // ---------- Step 2: Discover & Classify ----------
   const handleDiscover = useCallback(async () => {
     if (!state.siteId) {
       dispatch({ type: "SET_ERROR", error: "Create the site before starting discovery" });
       return;
     }
-    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+
+    // CSV mode: data already loaded from upload
+    if (state.connectionMethod === "csv" && state.discoveryId) {
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 4 });
+      await new Promise(r => setTimeout(r, 300));
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
+      return;
+    }
+
+    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara' || state.bmsVendor === 'mqtt-bridge' || state.bmsVendor === 'mqtt-direct';
     if (state.selectedDeviceId == null && !usesDirectCapabilities) {
       dispatch({ type: "SET_ERROR", error: "Select the BACnet device to ingest before discovery" });
       return;
@@ -885,16 +1021,23 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
-  }, [state.bmsVendor, state.capabilitySummary, state.host, state.password, state.port, state.selectedDeviceId, state.siteId, state.username]);
+  }, [state.bmsVendor, state.capabilitySummary, state.connectionMethod, state.discoveryId, state.host, state.password, state.port, state.selectedDeviceId, state.siteId, state.username]);
 
   // ---------- Step 3: Load Mappings ----------
   const handleLoadMappings = useCallback(async () => {
     if (!state.discoveryId) return;
-    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
+    const isCsvMode = state.connectionMethod === "csv";
+    const usesDirectCapabilities = (state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara' || state.bmsVendor === 'mqtt-bridge' || state.bmsVendor === 'mqtt-direct') && !isCsvMode;
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
 
     try {
+      await new Promise(r => setTimeout(r, 500));
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 2 }); // Scanning points...
+
+      await new Promise(r => setTimeout(r, 800));
+      dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
+
       if (usesDirectCapabilities) {
         // Bridge/oBIX: no separate mappings — use capabilities data for UI
         const cap = state.capabilitySummary || { points: 0, devices: 0, writable_points: 0 };
@@ -928,18 +1071,20 @@ export function BMSConnectionWizard({
         error: err instanceof Error ? err.message : "Failed to load mappings",
       });
     }
-  }, [state.discoveryId, state.bmsVendor, state.capabilitySummary, state.siteId]);
+  }, [state.discoveryId, state.bmsVendor, state.capabilitySummary, state.connectionMethod, state.siteId]);
 
   // ---------- Step 4: Approve ----------
   const handleApprove = useCallback(async () => {
     if (!state.discoveryId) return;
     dispatch({ type: "SET_APPROVE_STATUS", status: "approving" });
 
+    const isCsvMode = state.connectionMethod === "csv";
+    const usesDirectCapabilities = (state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara' || state.bmsVendor === 'mqtt-bridge' || state.bmsVendor === 'mqtt-direct') && !isCsvMode;
+    dispatch({ type: "SET_LOADING", loading: true });
+    dispatch({ type: "SET_ERROR", error: null });
+
     try {
-    const usesDirectCapabilities = state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara';
-      let res;
       if (usesDirectCapabilities) {
-        // Bridge/oBIX: skip mappings approval, just enable processing
         let canonicalizationSummary: OnboardingCanonicalizationSummary | undefined;
         let hierarchySummary: OnboardingHierarchySummary | undefined;
         if (state.siteId) {
@@ -1009,7 +1154,6 @@ export function BMSConnectionWizard({
         },
       });
 
-      // On success, advance to tenant access setup for bridge sites, or verification for BACnet.
       if (res.success) {
         setTimeout(() => {
           if (usesDirectCapabilities) {
@@ -1026,7 +1170,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Approval failed",
       });
     }
-  }, [state.approvedBy, state.bmsVendor, state.discoveryId, state.siteId]);
+  }, [state.approvedBy, state.bmsVendor, state.connectionMethod, state.discoveryId, state.siteId]);
 
   // ---------- Step navigation ----------
   const goNext = useCallback(async () => {
@@ -1051,10 +1195,13 @@ export function BMSConnectionWizard({
   const canGoNext = (): boolean => {
     switch (state.step) {
       case 1:
+        if (state.connectionMethod === "csv") {
+          return state.connectionStatus === "connected" && !!state.siteId && !!state.discoveryId;
+        }
         return (
           state.connectionStatus === "connected" &&
           !!state.siteId &&
-          (state.selectedDeviceId !== null || state.bmsVendor === 'niagara' || state.bmsVendor === 'bridge')
+          (state.selectedDeviceId !== null || state.bmsVendor === 'niagara' || state.bmsVendor === 'bridge' || state.bmsVendor === 'mqtt-bridge' || state.bmsVendor === 'mqtt-direct')
         );
       case 2:
         return !!state.discoveryId && !state.loading;
@@ -1547,288 +1694,403 @@ export function BMSConnectionWizard({
           </h4>
         </div>
 
-        {/* BMS Vendor selector */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" style={labelStyle}>
-            BMS Vendor
-          </label>
-          <select
-            value={state.bmsVendor}
-            onChange={(e) => {
-              dispatch({
-                type: "SET_FIELD",
-                field: "bmsVendor",
-                value: e.target.value,
-              });
-              dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
-              dispatch({ type: "SET_CAPABILITIES", summary: null, error: null });
-              dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
+        {/* Connection method toggle */}
+        <div className="flex gap-2 mb-4">
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "SET_FIELD", field: "connectionMethod", value: "network" })}
+            className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors"
+            style={{
+              background: state.connectionMethod === "network" ? "var(--color-sentinel-blue)" : "var(--color-sentinel-bg-primary)",
+              color: "#fff",
+              border: state.connectionMethod === "network" ? "none" : "1px solid var(--color-sentinel-border)",
+              opacity: state.connectionMethod === "network" ? 1 : 0.7,
             }}
-            className="w-full rounded px-3 py-2 text-sm"
-            style={inputStyle}
           >
-            {BMS_VENDORS.map((v) => (
-              <option key={v.value} value={v.value}>
-                {v.label} ({v.protocol})
-              </option>
-            ))}
-          </select>
-          {/* Vendor-specific help text */}
-          {state.bmsVendor && (
-            <div
-              className="mt-2 p-2 rounded text-xs"
-              style={{
-                background: "var(--color-sentinel-blue)11",
-                color: "var(--color-sentinel-text-secondary)",
-                border: "1px solid var(--color-sentinel-blue)22",
-              }}
-            >
-              <p className="flex items-start gap-2">
-                <HelpCircle className="w-3 h-3 mt-0.5 shrink-0" style={{ color: "var(--color-sentinel-blue)" }} />
-                <span>{VENDOR_HELP_TEXT[state.bmsVendor]}</span>
-              </p>
-            </div>
-          )}
+            <Search className="w-4 h-4" />
+            Auto-discover (BACnet/IP)
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "SET_FIELD", field: "connectionMethod", value: "csv" })}
+            className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-colors"
+            style={{
+              background: state.connectionMethod === "csv" ? "var(--color-sentinel-blue)" : "var(--color-sentinel-bg-primary)",
+              color: "#fff",
+              border: state.connectionMethod === "csv" ? "none" : "1px solid var(--color-sentinel-border)",
+              opacity: state.connectionMethod === "csv" ? 1 : 0.7,
+            }}
+          >
+            <ClipboardCheck className="w-4 h-4" />
+            Upload CSV export
+          </button>
         </div>
-        {/* BMS Connection fields */}
-        <div className="grid grid-cols-2 gap-4 mt-4">
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
-                <span>Host / IP Address</span>
-                <Tooltip content="IP address of your BMS controller, JACE, or Supervisor (e.g., 192.168.1.100)">
-                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
-                </Tooltip>
+
+        {/* Network discovery mode */}
+        {state.connectionMethod === "network" && (
+          <>
+            <div className="mb-4">
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                BMS Vendor
               </label>
-              <input
-                type="text"
-                value={state.host}
-                onChange={(e) =>
+              <select
+                value={state.bmsVendor}
+                onChange={(e) => {
                   dispatch({
                     type: "SET_FIELD",
-                    field: "host",
+                    field: "bmsVendor",
                     value: e.target.value,
-                  })
-                }
-                placeholder="192.168.1.100"
-                className="w-full rounded px-3 py-2 text-sm"
-                style={inputStyle}
-              />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
-                <span>Port</span>
-                <Tooltip content="BACnet/IP port (default 47808) or oBIX port (default 80, 443 for HTTPS)">
-                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
-                </Tooltip>
-              </label>
-              <input
-                type="number"
-                value={state.port}
-                onChange={(e) => {
-                  const raw = e.target.value;
-                  if (raw === "") {
-                    dispatch({ type: "SET_FIELD", field: "port", value: "" });
-                    return;
-                  }
-                  const parsed = parseInt(raw, 10);
-                  if (Number.isFinite(parsed)) {
-                    dispatch({ type: "SET_FIELD", field: "port", value: Math.min(Math.max(parsed, 1), 65535) });
-                  }
+                  });
+                  dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+                  dispatch({ type: "SET_CAPABILITIES", summary: null, error: null });
+                  dispatch({ type: "SET_CONNECTION_STATUS", status: "idle" });
                 }}
                 className="w-full rounded px-3 py-2 text-sm"
                 style={inputStyle}
-              />
+              >
+                {BMS_VENDORS.map((v) => (
+                  <option key={v.value} value={v.value}>
+                    {v.label} ({v.protocol})
+                  </option>
+                ))}
+              </select>
+              {state.bmsVendor && (
+                <div
+                  className="mt-2 p-2 rounded text-xs"
+                  style={{
+                    background: "var(--color-sentinel-blue)11",
+                    color: "var(--color-sentinel-text-secondary)",
+                    border: "1px solid var(--color-sentinel-blue)22",
+                  }}
+                >
+                  <p className="flex items-start gap-2">
+                    <HelpCircle className="w-3 h-3 mt-0.5 shrink-0" style={{ color: "var(--color-sentinel-blue)" }} />
+                    <span>{VENDOR_HELP_TEXT[state.bmsVendor]}</span>
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
-                <span>Username / API Key</span>
-                <Tooltip content="Optional credential for BMS or bridge authentication. Required if your BMS or gateway requires login.">
-                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
-                </Tooltip>
-              </label>
-              <input
-                type="text"
-                value={state.username}
-                onChange={(e) =>
-                  dispatch({
-                    type: "SET_FIELD",
-                    field: "username",
-                    value: e.target.value,
-                  })
-                }
-                placeholder="admin"
-                className="w-full rounded px-3 py-2 text-sm"
-                style={inputStyle}
-              />
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
-                <span>Password / Token</span>
-                <Tooltip content="Optional credential or API token for BMS or bridge authentication. Encrypted and never stored in logs.">
-                  <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
-                </Tooltip>
-              </label>
-              <input
-                type="password"
-                value={state.password}
-                onChange={(e) =>
-                  dispatch({
-                    type: "SET_FIELD",
-                    field: "password",
-                    value: e.target.value,
-                  })
-                }
-                className="w-full rounded px-3 py-2 text-sm"
-                style={inputStyle}
-              />
-            </div>
-            {usesObix && (
-            <div className="col-span-2">
-              <label className="flex items-center gap-2 cursor-pointer">
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                  <span>Host / IP Address</span>
+                  <Tooltip content="IP address of your BMS controller, JACE, or Supervisor (e.g., 192.168.1.100)">
+                    <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                  </Tooltip>
+                </label>
                 <input
-                  type="checkbox"
-                  checked={state.useHttps}
+                  type="text"
+                  value={state.host}
                   onChange={(e) =>
                     dispatch({
                       type: "SET_FIELD",
-                      field: "useHttps",
-                      value: e.target.checked,
+                      field: "host",
+                      value: e.target.value,
                     })
                   }
-                  className="w-4 h-4"
+                  placeholder="192.168.1.100"
+                  className="w-full rounded px-3 py-2 text-sm"
+                  style={inputStyle}
                 />
-                <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
-                  Use HTTPS
-                </span>
-              </label>
-            </div>
-            )}
-            {state.discoveredDevices.length > 0 && (
-              <div className="col-span-2">
-                <label className="block text-sm font-medium mb-1" style={labelStyle}>
-                  Discovered BACnet Device
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                  <span>Port</span>
+                  <Tooltip content="BACnet/IP port (default 47808) or oBIX port (default 80, 443 for HTTPS)">
+                    <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                  </Tooltip>
                 </label>
-                <select
-                  value={state.selectedDeviceId ?? ""}
+                <input
+                  type="number"
+                  value={state.port}
                   onChange={(e) => {
-                    const nextValue = e.target.value ? parseInt(e.target.value, 10) : null;
-                    dispatch({ type: "SET_FIELD", field: "selectedDeviceId", value: nextValue });
-                    dispatch({
-                      type: "SET_CONNECTION_STATUS",
-                      status: "connected",
-                      message: buildConnectionMessage(state.discoveredDevices, nextValue),
-                    });
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      dispatch({ type: "SET_FIELD", field: "port", value: "" });
+                      return;
+                    }
+                    const parsed = parseInt(raw, 10);
+                    if (Number.isFinite(parsed)) {
+                      dispatch({ type: "SET_FIELD", field: "port", value: Math.min(Math.max(parsed, 1), 65535) });
+                    }
                   }}
                   className="w-full rounded px-3 py-2 text-sm"
                   style={inputStyle}
-                >
-                  <option value="">Select a BACnet device</option>
-                  {state.discoveredDevices.map((device) => (
-                    <option key={device.device_id} value={device.device_id}>
-                      {(device.object_name || `Device ${device.device_id}`)} · {device.ip_address} · ID {device.device_id}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                  Discovery and point ingestion will use this device instance. Control remains gated by site phase and modules.
-                </p>
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                  <span>Username / API Key</span>
+                  <Tooltip content="Optional credential for BMS or bridge authentication. Required if your BMS or gateway requires login.">
+                    <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                  </Tooltip>
+                </label>
+                <input
+                  type="text"
+                  value={state.username}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_FIELD",
+                      field: "username",
+                      value: e.target.value,
+                    })
+                  }
+                  placeholder="admin"
+                  className="w-full rounded px-3 py-2 text-sm"
+                  style={inputStyle}
+                />
+              </div>
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
+                  <span>Password / Token</span>
+                  <Tooltip content="Optional credential or API token for BMS or bridge authentication. Encrypted and never stored in logs.">
+                    <HelpCircle className="w-4 h-4 text-gray-400 hover:text-blue-500 cursor-help" />
+                  </Tooltip>
+                </label>
+                <input
+                  type="password"
+                  value={state.password}
+                  onChange={(e) =>
+                    dispatch({
+                      type: "SET_FIELD",
+                      field: "password",
+                      value: e.target.value,
+                    })
+                  }
+                  className="w-full rounded px-3 py-2 text-sm"
+                  style={inputStyle}
+                />
+              </div>
+              {usesObix && (
+              <div className="col-span-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={state.useHttps}
+                    onChange={(e) =>
+                      dispatch({
+                        type: "SET_FIELD",
+                        field: "useHttps",
+                        value: e.target.checked,
+                      })
+                    }
+                    className="w-4 h-4"
+                  />
+                  <span className="text-sm" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                    Use HTTPS
+                  </span>
+                </label>
+              </div>
+              )}
+              {state.discoveredDevices.length > 0 && (
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                    Discovered BACnet Device
+                  </label>
+                  <select
+                    value={state.selectedDeviceId ?? ""}
+                    onChange={(e) => {
+                      const nextValue = e.target.value ? parseInt(e.target.value, 10) : null;
+                      dispatch({ type: "SET_FIELD", field: "selectedDeviceId", value: nextValue });
+                      dispatch({
+                        type: "SET_CONNECTION_STATUS",
+                        status: "connected",
+                        message: buildConnectionMessage(state.discoveredDevices, nextValue),
+                      });
+                    }}
+                    className="w-full rounded px-3 py-2 text-sm"
+                    style={inputStyle}
+                  >
+                    <option value="">Select a BACnet device</option>
+                    {state.discoveredDevices.map((device) => (
+                      <option key={device.device_id} value={device.device_id}>
+                        {(device.object_name || `Device ${device.device_id}`)} · {device.ip_address} · ID {device.device_id}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                    Discovery and point ingestion will use this device instance. Control remains gated by site phase and modules.
+                  </p>
+                </div>
+              )}
+            </div>
+            {!usesObix && (
+              <div
+                className="p-3 rounded text-sm mt-4"
+                style={{
+                  background: "var(--color-sentinel-bg-primary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-secondary)",
+                }}
+              >
+                Credentials are optional for {vendorLabel}. SENTINEL will verify BACnet connectivity,
+                list matching controllers for the host you entered, and use your selected device for discovery.
               </div>
             )}
-          </div>
-        {/* BACnet-only info for vendors that do not use oBIX in this wizard */}
-        {!usesObix && (
-          <div
-            className="p-3 rounded text-sm mt-4"
-            style={{
-              background: "var(--color-sentinel-bg-primary)",
-              border: "1px solid var(--color-sentinel-border)",
-              color: "var(--color-sentinel-text-secondary)",
-            }}
-          >
-            Credentials are optional for {vendorLabel}. SENTINEL will verify BACnet connectivity,
-            list matching controllers for the host you entered, and use your selected device for discovery.
+          </>
+        )}
+
+        {/* CSV upload mode */}
+        {state.connectionMethod === "csv" && (
+          <div className="space-y-4">
+            <div
+              className="p-4 rounded text-sm"
+              style={{
+                background: "var(--color-sentinel-bg-primary)",
+                border: "2px dashed var(--color-sentinel-border)",
+                color: "var(--color-sentinel-text-secondary)",
+              }}
+            >
+              <p className="mb-3">
+                Upload a BMS point list CSV export. The system will parse the file, extract
+                equipment IDs from hierarchical naming, and classify points using AI.
+              </p>
+              <p className="text-xs mb-3" style={{ opacity: 0.7 }}>
+                Expected format: name, object_type, instance, units, present_value, description, min_value, max_value, writable
+              </p>
+              <input
+                type="file"
+                accept=".csv"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  dispatch({ type: "SET_FIELD", field: "csvFile", value: file });
+                }}
+                className="block w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-medium hover:file:cursor-pointer"
+                style={{
+                  color: "var(--color-sentinel-text-secondary)",
+                }}
+              />
+            </div>
+            <button
+              onClick={handleCsvUpload}
+              disabled={state.loading || !state.siteName.trim() || !state.csvFile}
+              className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
+              style={{
+                background: "var(--color-sentinel-blue)",
+                color: "#fff",
+              }}
+            >
+              {state.loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Upload className="w-4 h-4" />
+              )}
+              Upload &amp; Classify
+            </button>
           </div>
         )}
       </div>
 
-      {/* Test connection / Create Site button */}
-      <button
-        onClick={handleTestConnection}
-        disabled={
-          state.connectionStatus === "testing" ||
-          !state.siteName.trim() ||
-          !state.host.trim()
-        }
-        className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
-        style={{
-          background: "var(--color-sentinel-blue)",
-          color: "#fff",
-        }}
-      >
-        {state.connectionStatus === "testing" ? (
-          <Loader2 className="w-4 h-4 animate-spin" />
-        ) : (
-          <Wifi className="w-4 h-4" />
-        )}
-        Test Connection
-      </button>
-
-      {/* Connection result */}
-      {state.connectionStatus === "connected" && (
-        <div className="space-y-3">
-          <div
-            className="flex items-start gap-2 p-3 rounded text-sm"
+      {/* Network: Test connection / CSV: Success result */}
+      {state.connectionMethod === "network" && (
+        <>
+          <button
+            onClick={handleTestConnection}
+            disabled={
+              state.connectionStatus === "testing" ||
+              !state.siteName.trim() ||
+              (state.bmsVendor !== 'mqtt-bridge' && !state.host.trim())
+            }
+            className="flex items-center gap-2 px-4 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
             style={{
-              background: "var(--color-sentinel-green)11",
-              border: "1px solid var(--color-sentinel-green)",
-              color: "var(--color-sentinel-green)",
+              background: "var(--color-sentinel-blue)",
+              color: "#fff",
             }}
           >
-            <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
-            <span>{state.connectionMessage}</span>
-          </div>
-          {state.capabilitySummary && (
-            <div
-              className="rounded p-3"
-              style={{
-                background: "var(--color-sentinel-bg-secondary)",
-                border: "1px solid var(--color-sentinel-border)",
-              }}
-            >
-              <p
-                className="text-xs uppercase tracking-wide mb-2"
-                style={{ color: "var(--color-sentinel-text-secondary)" }}
+            {state.connectionStatus === "testing" ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Wifi className="w-4 h-4" />
+            )}
+            Test Connection
+          </button>
+
+          {state.connectionStatus === "connected" && (
+            <div className="space-y-3">
+              <div
+                className="flex items-start gap-2 p-3 rounded text-sm"
+                style={{
+                  background: "var(--color-sentinel-green)11",
+                  border: "1px solid var(--color-sentinel-green)",
+                  color: "var(--color-sentinel-green)",
+                }}
               >
-                Control Capabilities (SIMBIOT)
-              </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                <SummaryCard label="Devices" value={state.capabilitySummary.devices} color="var(--color-sentinel-blue)" />
-                <SummaryCard label="Points" value={state.capabilitySummary.points} color="var(--color-sentinel-text-primary)" />
-                <SummaryCard label="Writable" value={state.capabilitySummary.writable_points} color="var(--color-sentinel-amber)" />
-                <SummaryCard label="Controllable" value={state.capabilitySummary.controllable_devices} color="var(--color-sentinel-green)" />
+                <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                <span>{state.connectionMessage}</span>
               </div>
-              {state.capabilitySummary.writable_points === 0 && (
-                <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-amber)" }}>
-                  Telemetry-only mode detected. No writable command points exposed yet.
-                </p>
+              {state.capabilitySummary && (
+                <div
+                  className="rounded p-3"
+                  style={{
+                    background: "var(--color-sentinel-bg-secondary)",
+                    border: "1px solid var(--color-sentinel-border)",
+                  }}
+                >
+                  <p
+                    className="text-xs uppercase tracking-wide mb-2"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    Control Capabilities (SIMBIOT)
+                  </p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                    <SummaryCard label="Devices" value={state.capabilitySummary.devices} color="var(--color-sentinel-blue)" />
+                    <SummaryCard label="Points" value={state.capabilitySummary.points} color="var(--color-sentinel-text-primary)" />
+                    <SummaryCard label="Writable" value={state.capabilitySummary.writable_points} color="var(--color-sentinel-amber)" />
+                    <SummaryCard label="Controllable" value={state.capabilitySummary.controllable_devices} color="var(--color-sentinel-green)" />
+                  </div>
+                  {state.capabilitySummary.writable_points === 0 && (
+                    <p className="text-xs mt-2" style={{ color: "var(--color-sentinel-amber)" }}>
+                      Telemetry-only mode detected. No writable command points exposed yet.
+                    </p>
+                  )}
+                </div>
+              )}
+              {state.capabilityError && (
+                <div
+                  className="text-xs px-3 py-2 rounded"
+                  style={{
+                    background: "var(--color-sentinel-red)11",
+                    border: "1px solid var(--color-sentinel-red)",
+                    color: "var(--color-sentinel-red)",
+                  }}
+                >
+                  Capabilities check failed: {state.capabilityError}
+                </div>
               )}
             </div>
           )}
-          {state.capabilityError && (
+          {state.connectionStatus === "failed" && (
             <div
-              className="text-xs px-3 py-2 rounded"
+              className="flex items-start gap-2 p-3 rounded text-sm"
               style={{
                 background: "var(--color-sentinel-red)11",
                 border: "1px solid var(--color-sentinel-red)",
                 color: "var(--color-sentinel-red)",
               }}
             >
-              Capabilities check failed: {state.capabilityError}
+              <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+              <span>{state.connectionMessage}</span>
             </div>
           )}
+        </>
+      )}
+
+      {/* CSV upload result */}
+      {state.connectionMethod === "csv" && state.connectionStatus === "connected" && (
+        <div
+          className="flex items-start gap-2 p-3 rounded text-sm"
+          style={{
+            background: "var(--color-sentinel-green)11",
+            border: "1px solid var(--color-sentinel-green)",
+            color: "var(--color-sentinel-green)",
+          }}
+        >
+          <CheckCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <span>{state.connectionMessage}</span>
         </div>
       )}
-      {state.connectionStatus === "failed" && (
+
+      {state.connectionMethod === "csv" && state.error && (
         <div
           className="flex items-start gap-2 p-3 rounded text-sm"
           style={{
@@ -1838,7 +2100,7 @@ export function BMSConnectionWizard({
           }}
         >
           <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
-          <span>{state.connectionMessage}</span>
+          <span>{state.error}</span>
         </div>
       )}
     </div>
@@ -1857,16 +2119,17 @@ export function BMSConnectionWizard({
           className="text-sm"
           style={{ color: "var(--color-sentinel-text-secondary)" }}
         >
-          AI is scanning BACnet points and classifying them into equipment
-          groups using Brick Schema ontology.
+          {state.connectionMethod === "csv"
+            ? "CSV points parsed and classified into equipment groups using Brick Schema ontology."
+            : "AI is scanning BACnet points and classifying them into equipment groups using Brick Schema ontology."}
         </p>
       </div>
 
       {/* Help section */}
       <HelpSection title="What's Happening" variant="info">
-        SENTINEL is discovering BACnet points from your BMS and using AI to classify them into
-        equipment groups. This involves connecting to the BMS, scanning available points, and
-        analyzing their names and characteristics to infer equipment types and zones.
+        {state.connectionMethod === "csv"
+          ? "SENTINEL has parsed your CSV export, extracted hierarchical equipment IDs from point names, and classified each point using Haystack/Brick ontology. The results below show what was found."
+          : "SENTINEL is discovering BACnet points from your BMS and using AI to classify them into equipment groups. This involves connecting to the BMS, scanning available points, and analyzing their names and characteristics to infer equipment types and zones."}
       </HelpSection>
 
       {state.loading && (

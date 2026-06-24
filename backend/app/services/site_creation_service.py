@@ -154,7 +154,7 @@ class SiteCreationService:
                         site_name,
                         building_type,
                     )
-                    self._seed_phase_promotion_gates(site_code)
+                    self.seed_phase_promotion_gates(site_code)
                     return result.data[0]
 
                 raise RuntimeError(f"No data returned when creating site {site_code}")
@@ -184,7 +184,7 @@ class SiteCreationService:
         result = self.supabase.table("sites").select("*").eq("code", site_code).execute()
         return result.data[0] if result.data else None
 
-    def _seed_phase_promotion_gates(self, site_code: str) -> None:
+    def seed_phase_promotion_gates(self, site_code: str) -> None:
         """Seed standard phase promotion gates for a newly created site.
 
         Mirrors the gates defined in the 20260509_001 migration for site-002.
