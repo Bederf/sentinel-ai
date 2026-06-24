@@ -24,6 +24,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from app.services.ai_optimizer import get_ai_optimizer
 from app.services.audit_logger import AuditLogger
+from app.services.occupancy_fusion_service import get_occupancy_fusion_service
 from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
 
 EXPIRY_HOURS = 24  # Expire pending recommendations older than 24 hours
@@ -885,12 +886,27 @@ class BackgroundSchedulerService:
         hvac_kw: float,
         is_occupied_hours: bool,
         now: datetime | None = None,
+        fused_verdict: Any | None = None,
     ) -> bool:
-        """Trigger analysis for sustained after-hours HVAC load in an empty building."""
+        """Trigger analysis for sustained after-hours HVAC load in an empty building.
+
+        Uses fused occupancy verdict when available (multi-signal). Falls back
+        to the legacy single-source float when fusion is unavailable.
+
+        Gate rule: only trigger when the fused verdict is confident AND agreed
+        AND truly unoccupied. When signals conflict or confidence is low, do
+        NOT trigger — err toward "building is occupied" to avoid false suppression.
+        """
         from app.config.settings import settings
         from app.database.supabase_client import get_supabase_client
 
-        if is_occupied_hours or occupancy != 0:
+        if is_occupied_hours:
+            return False
+
+        if fused_verdict is not None:
+            if not fused_verdict.may_suppress:
+                return False
+        elif occupancy != 0:
             return False
         site_peak_kw = None
         try:
@@ -1140,6 +1156,14 @@ class BackgroundSchedulerService:
                                 if security_entries > 100
                                 else 0
                             )
+                            # Fused occupancy verdict for gate decisions
+                            fused_verdict = None
+                            try:
+                                fusion = get_occupancy_fusion_service()
+                                fused_verdict = asyncio.run(fusion.get_fused_occupancy(site_id))
+                                current_occ = fused_verdict.occupancy_count  # override with fused count
+                            except Exception:
+                                logger.debug("Occupancy fusion unavailable for %s, using bridge telemetry", site_id)
                             h = datetime.now().hour
                             current_tariff = "peak" if (7 <= h < 10) or (17 <= h < 20) else "off_peak"
                             is_occupied = datetime.now().weekday() < 5 and 7 <= datetime.now().hour < 18
@@ -1189,6 +1213,7 @@ class BackgroundSchedulerService:
                                 current_occ,
                                 current_hvac_kw,
                                 is_occupied,
+                                fused_verdict=fused_verdict,
                             ):
                                 logger.info(
                                     "[AI-OPT] After-hours HVAC load %.1f kW with zero occupancy — triggering cycle",
@@ -7343,22 +7368,76 @@ class BackgroundSchedulerService:
 
     @track_job_metrics("ipmvp_sync")
     def _run_ipmvp_sync(self):
-        """Run IPMVP data sync in a new event loop."""
+        """Run IPMVP data sync and persist monthly savings for Grafana."""
         import asyncio
+        from datetime import UTC, datetime
 
         try:
             from app.services.ipmvp.site002_fetcher import Site002DataFetcher
 
             fetcher = Site002DataFetcher()
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(fetcher.run_full_sync(days_back=7))
-                logger.info("[IPMVP] Sync result: %s", result)
-            finally:
-                loop.close()
+            result = asyncio.run(fetcher.run_full_sync(days_back=7))
+            logger.info("[IPMVP] Sync result: %s", result)
         except Exception as e:
             logger.error("[IPMVP] Sync failed: %s", e, exc_info=True)
+
+        # Compute and persist month-to-date savings for all active sites
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            from app.services.ipmvp import IPMVPEngine
+
+            sb = get_supabase_client()
+            sites_resp = (
+                sb.table("sites")
+                .select("code")
+                .in_("onboarding_phase", ["advisory", "supervised", "automatic"])
+                .execute()
+            )
+            active_sites = [s["code"] for s in sites_resp.data or []]
+
+            for site_id in active_sites:
+                try:
+                    fetcher = Site002DataFetcher(site_id=site_id)
+                    engine = IPMVPEngine(site_id=site_id, fetcher=fetcher)
+                    now = datetime.now(tz=UTC)
+                    month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                    report = asyncio.run(
+                        engine.run_report(
+                            reporting_start=month_start,
+                            reporting_end=now,
+                            option="C",
+                            hourly_detail=False,
+                        )
+                    )
+
+                    sb.table("ipmvp_savings").upsert(
+                        {
+                            "site_id": site_id,
+                            "period_start": month_start.date().isoformat(),
+                            "period_end": now.date().isoformat(),
+                            "savings_kwh": round(report.overall_savings_kwh, 2),
+                            "savings_zar": round(report.overall_savings_zar, 2),
+                            "cv_rmse_pct": report.aggregate_cv_rmse_pct,
+                            "n_results": len(report.results),
+                            "option": "C",
+                            "methodology": report.methodology,
+                            "generated_at": now.isoformat(),
+                        },
+                        on_conflict="site_id, period_start, period_end, option",
+                    ).execute()
+                    logger.info(
+                        "[IPMVP] Saved month-to-date report for %s: %.2f kWh / R%.2f (CV=%.1f%%)",
+                        site_id,
+                        report.overall_savings_kwh,
+                        report.overall_savings_zar,
+                        report.aggregate_cv_rmse_pct,
+                    )
+                except Exception as site_err:
+                    logger.warning("[IPMVP] Failed to compute monthly report for %s: %s", site_id, site_err)
+
+        except Exception as e:
+            logger.error("[IPMVP] Failed to persist monthly savings: %s", e, exc_info=True)
 
     # ── Compiler Worker ─────────────────────────────────────────────────────────
 
@@ -7650,6 +7729,150 @@ class BackgroundSchedulerService:
         return normalised
 
     @staticmethod
+    def _resolve_dali_reading_name(
+        object_name: str,
+        object_type: str,
+        unit: str | None,
+        instance: int | None,
+    ) -> str | None:
+        DALI_READING_NAMES = {
+            "brightness",
+            "power_watts",
+            "power_w",
+            "power",
+            "lamp_wattage_rated",
+            "lamp_wattage",
+            "energy_kwh",
+            "occupancy",
+            "on_off",
+            "lamp_status",
+            "lamp_failure",
+            "lamp_failures",
+            "fault_state",
+            "system_status",
+            "status",
+            "control_gear_status",
+            "lux",
+            "lamp_hours",
+            "lamp_operating_hours",
+            "gear_operating_hours",
+            "lamp_on_time_total",
+            "lamp_on_time",
+            "driver_temp",
+            "color_temp",
+            "color_temp_k",
+            "driver_voltage",
+            "driver_current",
+            "lamp_strikes",
+            "lamp_failure_count",
+            "lamp_strike_count",
+            "emergency_battery",
+            "emergency_battery_hours",
+            "emergency_mode",
+            "input_voltage",
+            "output_current",
+            "motion_count",
+            "standby_level",
+            "firmware_version",
+            "fw_version",
+            "device_type",
+            "luminaire_type",
+            "serial_number",
+            "gtin",
+            "manufacturer_id",
+            "unique_device_id",
+            "device_uid",
+            "power_factor",
+            "max_level",
+            "min_level",
+            "physical_min_level",
+            "last_diagnostic_code",
+            "diag_code",
+            "scene_active",
+            "scene_0_7",
+            "scene_8_15",
+            "group_0_7",
+            "group_8_15",
+            "group_command",
+            "groups_0_7",
+            "groups_8_15",
+            "gear_hours",
+        }
+        name_lower = object_name.lower().replace(" ", "_")
+
+        if name_lower in DALI_READING_NAMES:
+            return name_lower
+
+        if unit:
+            unit_lower = unit.lower().replace("/", "_")
+            unit_map = {
+                "w": "power_watts",
+                "kw": "power_watts",
+                "watts": "power_watts",
+                "kwh": "energy_kwh",
+                "wh": "energy_kwh",
+                "lux": "lux",
+                "lx": "lux",
+                "h": "lamp_hours",
+                "hours": "lamp_hours",
+                "hr": "lamp_hours",
+                "c": "driver_temp",
+                "deg_c": "driver_temp",
+                "temp": "driver_temp",
+                "%": "brightness",
+                "percent": "brightness",
+                "v": "driver_voltage",
+                "volt": "driver_voltage",
+                "ma": "driver_current",
+                "a": "driver_current",
+                "count": "lamp_strikes",
+                "strikes": "lamp_strikes",
+                "fail": "lamp_failures",
+                "fails": "lamp_failures",
+                "version": "firmware_version",
+                "gtin": "gtin",
+                "serial": "serial_number",
+                "minutes": "emergency_battery_hours",
+            }
+            mapped = unit_map.get(unit_lower)
+            if mapped:
+                return mapped
+
+        if object_type.startswith("binary"):
+            if "occupancy" in name_lower or "presence" in name_lower:
+                return "occupancy"
+            if "status" in name_lower or "fault" in name_lower:
+                return "lamp_status"
+            if "emergency" in name_lower:
+                return "emergency_battery"
+            if "motion" in name_lower:
+                return "motion_count"
+            return "on_off"
+
+        if object_type.startswith("analog"):
+            instance_map = {
+                1: "power_watts",
+                2: "brightness",
+                3: "energy_kwh",
+                4: "lamp_hours",
+                5: "driver_temp",
+                6: "lamp_strikes",
+                7: "lamp_failures",
+            }
+            if instance is not None and instance in instance_map:
+                return instance_map[instance]
+            if "motion" in name_lower:
+                return "motion_count"
+            if "standby" in name_lower:
+                return "standby_level"
+            if "emergency" in name_lower and "hours" in name_lower:
+                return "emergency_battery_hours"
+            if "emergency" in name_lower:
+                return "emergency_mode"
+
+        return None
+
+    @staticmethod
     def _build_bridge_point_mappings(
         site_uuid: str,
         objects: list[dict],
@@ -7686,13 +7909,32 @@ class BackgroundSchedulerService:
             if unit:
                 parameter_type = f"{parameter_type or 'point'}:{unit}"
 
+            parameter_name = object_name or object_id.rsplit(".", 1)[-1]
+            if canonical_equipment_id and "-DALI-" in canonical_equipment_id.upper():
+                raw_name = parameter_name
+                name_lower = raw_name.lower().strip()
+                for prefix in ("a_", "b_", "c_", "d_", "e_", "n_", "s_", "w_"):
+                    if name_lower.startswith(prefix):
+                        stripped = name_lower[len(prefix) :]
+                        if stripped:
+                            parameter_name = stripped
+                            break
+                resolved = BackgroundSchedulerService._resolve_dali_reading_name(
+                    object_name=parameter_name,
+                    object_type=object_type,
+                    unit=unit,
+                    instance=instance,
+                )
+                if resolved:
+                    parameter_name = resolved
+
             canonical_known = canonical_equipment_id in known_codes
             mappings.append(
                 {
                     "site_id": site_uuid,
                     "bms_point_id": object_id,
                     "extracted_asset_id": canonical_equipment_id or None,
-                    "parameter_name": object_name or object_id.rsplit(".", 1)[-1],
+                    "parameter_name": parameter_name,
                     "parameter_type": parameter_type,
                     "match_confidence": "exact" if canonical_known else "unmatched",
                     "is_verified": canonical_known and bridge_writable,
