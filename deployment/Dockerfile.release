@@ -1,0 +1,24 @@
+# SENTINEL Backend Release Dockerfile
+# Uses a pre-compiled PyInstaller binary — no Python source in the image.
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    ca-certificates \
+    tesseract-ocr \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN useradd -m -u 1000 sentinel
+USER sentinel
+
+WORKDIR /app
+
+COPY dist/sentinel-backend /app/sentinel-backend
+COPY .env.template /app/.env.template
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/api/health || exit 1
+
+ENTRYPOINT ["/app/sentinel-backend"]
