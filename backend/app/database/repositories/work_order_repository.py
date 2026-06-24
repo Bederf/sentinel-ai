@@ -447,16 +447,20 @@ class WorkOrderRepository:
             return []
 
     async def get_open_urgent_work_orders(self, site_id: str) -> list[dict[str, Any]]:
-        """Get all open urgent/critical work orders for a site.
+        """Get all open high/urgent/critical work orders for a site.
 
-        Used by AI optimizer to prevent recommending operational adjustments
+        Used by safety gates to prevent recommending operational adjustments
         on equipment that already has an active fault condition.
+
+        Priority filter covers high/urgent/critical — S002 labels open WOs
+        as 'high', not 'urgent'/'critical'. Status filter excludes completed,
+        closed, cancelled, and resolved states.
 
         Args:
             site_id: Site code (e.g., "site-002")
 
         Returns:
-            List of open work orders with priority urgent/critical
+            List of open work orders with priority high/urgent/critical
         """
         if not self.client:
             return []
@@ -473,7 +477,7 @@ class WorkOrderRepository:
                 .select(self._LIST_COLUMNS)
                 .eq("site_id", site_uuid)
                 .in_("status", ["open", "scheduled", "assigned", "in_progress", "pending"])
-                .in_("priority", ["urgent", "critical"])
+                .in_("priority", ["high", "urgent", "critical"])
                 .order("created_at", desc=True)
                 .limit(50)
                 .execute()
