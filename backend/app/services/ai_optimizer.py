@@ -3433,11 +3433,21 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                     f"site={site_id}, rec_count={len(normalised_recommendations)}, "
                     f"first_keys={[next(iter(r.keys())) if r else 'empty' for r in normalised_recommendations[:2]]}"
                 )
+                _llm_savings = result.get("projected_savings") or {}
+                _llm_cost = _llm_savings.get("cost_zar_per_hour")
+                _MAX_PLAUSIBLE_COST_ZAR = 500.0  # R500/h ≈ 110 kW at peak tariff
+                if isinstance(_llm_cost, (int, float)) and _llm_cost > _MAX_PLAUSIBLE_COST_ZAR:
+                    logger.warning(
+                        "[AI-OPT] LLM projected_savings.cost_zar_per_hour %.2f exceeds physical ceiling %.2f — clamped",
+                        _llm_cost,
+                        _MAX_PLAUSIBLE_COST_ZAR,
+                    )
+                    _llm_savings = {**_llm_savings, "cost_zar_per_hour": _MAX_PLAUSIBLE_COST_ZAR}
                 return OptimizationRecommendation(
                     site_id=site_id,
                     timestamp=datetime.now().isoformat(),
                     recommendations=normalised_recommendations,
-                    projected_savings=result.get("projected_savings", {}),
+                    projected_savings=_llm_savings,
                     confidence=result.get("confidence", 0.7),
                     reasoning=result.get("reasoning", ""),
                     profile=profile.get("name") if profile else None,
@@ -5973,6 +5983,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         "recommended_value": recommended_value,
                         "unit": "°C",
                         "reason": reason,
+                        "system": "hvac",
                     }
                 )
 
@@ -6695,13 +6706,17 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         recommendations = self._sort_recommendations_by_priority(recommendations, hvac_devices)
 
         # Calculate projected savings based on number and type of recommendations
-        hvac_recs = [r for r in recommendations if r.get("system") == "hvac" or r.get("system") is None]
+        # system="hvac" is now explicitly set by add_recommendation; the is None fallback
+        # previously caused ALL recommendations to count as HVAC, producing inflated totals.
+        hvac_recs = [r for r in recommendations if r.get("system") == "hvac"]
         lighting_recs = [r for r in recommendations if r.get("system") == "lighting"]
         power_recs = [r for r in recommendations if r.get("system") == "power"]
         solar_recs = [r for r in recommendations if r.get("system") == "solar"]
         bess_recs = [r for r in recommendations if r.get("system") == "bess"]
 
-        hvac_savings = 5.0 + (len(hvac_recs) * 4.5)  # kWh base for HVAC
+        # 1.5 kWh per HVAC recommendation; capped at 60 kWh — plausible for a 200-500 kW
+        # commercial building where realistic HVAC savings are 5-15% of total load.
+        hvac_savings = min(5.0 + (len(hvac_recs) * 1.5), 60.0)
         lighting_savings = lighting_savings_kw  # Calculated above for lighting
         power_savings = len(power_recs) * 2.0  # Modest savings from power optimization
         solar_savings = len(solar_recs) * 1.0  # Alert-based, modest direct savings
