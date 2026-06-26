@@ -68,11 +68,34 @@ class RecommendationRepository(SupabaseRepository):
 
     def _normalise_source_fields(self, rec_dict: dict[str, Any]) -> dict[str, Any]:
         """Ensure AI optimization recommendations remain visible to phase gates."""
-        action_type = str(rec_dict.get("action_type") or "")
-        if action_type not in {"ai_optimization", "coordinated_optimization"}:
-            return rec_dict
-
         normalised = dict(rec_dict)
+        metadata = normalised.get("metadata") or {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        action_type = str(normalised.get("action_type") or "")
+        family = (
+            "maintenance"
+            if action_type
+            in {
+                "health_maintenance",
+                "maintenance",
+                "maintenance_gap",
+                "maintenance_schedule",
+                "inspect",
+                "repair",
+                "replace",
+                "schedule_maintenance",
+            }
+            or str(normalised.get("source") or "") in {"maintenance_recommender", "reflex_reconciliation"}
+            else "ai"
+        )
+        metadata.setdefault("recommendation_family", family)
+        normalised["metadata"] = metadata
+        if action_type not in {"ai_optimization", "coordinated_optimization"}:
+            normalised.setdefault("recommendation_family", family)
+            return normalised
+
         if not normalised.get("source"):
             normalised["source"] = "ai_optimizer"
 
@@ -90,6 +113,7 @@ class RecommendationRepository(SupabaseRepository):
             else:
                 normalised["source_type"] = "ml_model"
 
+        normalised.setdefault("recommendation_family", family)
         return normalised
 
     async def create(self, rec: Recommendation) -> Recommendation:
@@ -368,6 +392,34 @@ class RecommendationRepository(SupabaseRepository):
             return count
         except Exception as e:
             logger.warning("expire_superseded_setpoints failed for %s/%s: %s", target_equipment, point_name, e)
+            return 0
+
+    async def expire_all_pending_for_equipment(self, site_id: str, target_equipment: str) -> int:
+        """Expire all pending ai_optimization recs for equipment — called when fault gate blocks it."""
+        client = await self.get_client()
+        if not client:
+            return 0
+        try:
+            result = await (
+                client.table("recommendations")
+                .update({"status": "expired"})
+                .eq("site_id", site_id)
+                .eq("target_equipment", target_equipment)
+                .eq("status", "pending")
+                .eq("action_type", "ai_optimization")
+                .execute()
+            )
+            count = len(result.data or [])
+            if count:
+                cache.delete_pattern("recommendations:*")
+                logger.info(
+                    "[REC-FAULT-GATE] Expired %d stale pending recs for fault-gated equipment %s",
+                    count,
+                    target_equipment,
+                )
+            return count
+        except Exception as e:
+            logger.warning("expire_all_pending_for_equipment failed for %s: %s", target_equipment, e)
             return 0
 
     async def _supabase_update(self, rec_id: str, rec_dict: dict[str, Any]) -> dict[str, Any] | None:

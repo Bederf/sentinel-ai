@@ -545,8 +545,13 @@ def _build_manual_advisory_recommendation(
     first_adjustment = adjustments[0] if adjustments and isinstance(adjustments[0], dict) else {}
     metadata = rec_dict.get("metadata", {}) or {}
     rule = metadata.get("rule")
+    is_fault_advisory = metadata.get("advisory_type") == "fault_safety_gate"
 
-    if rule in {"after_hours_zero_occupancy_hvac_load", "closed_empty_building_hvac_running"}:
+    if is_fault_advisory:
+        manual_prefix = ""
+        blocker = "active_fault_on_equipment_or_plant_group_mate"
+        operator_label = "Fault condition — resolve before optimization resumes"
+    elif rule in {"after_hours_zero_occupancy_hvac_load", "closed_empty_building_hvac_running"}:
         manual_prefix = "After-hours HVAC plant operation requires operator review."
         blocker = "missing_verified_plant_enable_or_schedule_point"
         operator_label = "Correct BMS closed-hours HVAC schedule"
@@ -556,7 +561,7 @@ def _build_manual_advisory_recommendation(
         operator_label = "Manual action recommended — no BACnet write available"
 
     manual_reason = rec_dict.get("reason", "")
-    if manual_prefix not in manual_reason:
+    if manual_prefix and manual_prefix not in manual_reason:
         manual_reason = f"{manual_prefix} {manual_reason}".strip()
 
     current_value = rec_dict.get("current_value")
@@ -564,7 +569,11 @@ def _build_manual_advisory_recommendation(
         current_value = action.get("current_value")
     if current_value is None:
         current_value = first_adjustment.get("current_value")
-    unit_value = rec_dict.get("unit") or action.get("unit", "") or first_adjustment.get("unit", "")
+    unit_value = (
+        ""
+        if is_fault_advisory
+        else (rec_dict.get("unit") or action.get("unit", "") or first_adjustment.get("unit", ""))
+    )
     point_resolution = rec_dict.get("point_resolution") or {
         "raw": None,
         "resolved": None,
@@ -592,7 +601,7 @@ def _build_manual_advisory_recommendation(
             "recommended_value": action_value,
             "unit": unit_value,
             "energy_savings_percent": rec_dict.get("savings_kwh", 5),
-            "cost_zar": projected_savings.get("cost_zar_per_hour"),
+            "cost_zar": None if is_fault_advisory else projected_savings.get("cost_zar_per_hour"),
         },
         confidence=str(confidence_num),
         confidence_score=confidence_num,
@@ -1521,12 +1530,33 @@ class BackgroundSchedulerService:
                                     existing_value = _normalize_value_for_dedup(existing.action.get("value", ""))
                                 unresolved_keys.add((existing.target_equipment, "", existing_value))
 
+                            # Site-level dedup for HVAC-SCHEDULE advisories (Bug 4)
+                            existing_hvac_advisory = any(
+                                isinstance(e.action, dict)
+                                and str(e.action.get("value") or "").startswith(
+                                    "Shut down or setback non-critical HVAC"
+                                )
+                                for e in existing_pending
+                                if e.action_type == "ai_optimization"
+                            )
+
                             validation_results = validation.get("validation_results", [])
                             for rec_dict in control_recs:
                                 action = rec_dict.get("action") or {}
                                 point_name = rec_dict.get("point_name") or action.get("point") or ""
                                 if point_name:
                                     continue
+
+                                # HVAC-SCHEDULE site-level dedup — skip if one already pending
+                                _rd_meta = rec_dict.get("metadata", {}) or {}
+                                if _rd_meta.get("rule") in {
+                                    "closed_empty_building_hvac_running",
+                                    "after_hours_zero_occupancy_hvac_load",
+                                }:
+                                    if existing_hvac_advisory:
+                                        skipped_count += 1
+                                        continue
+                                    existing_hvac_advisory = True
 
                                 equipment_id = rec_dict.get("target_equipment") or rec_dict.get("equipment_id", "")
                                 adjustments = rec_dict.get("adjustments") or []
@@ -1564,6 +1594,20 @@ class BackgroundSchedulerService:
                                     confidence_num = max(0.0, min(1.0, float(confidence_raw)))
                                 except (TypeError, ValueError):
                                     confidence_num = 0.7
+
+                                # Bug 3: expire stale pending recs for fault-gated equipment
+                                if _rd_meta.get("advisory_type") == "fault_safety_gate":
+                                    try:
+                                        asyncio.run_coroutine_threadsafe(
+                                            recommendation_repo.expire_all_pending_for_equipment(site_id, equipment_id),
+                                            self._main_loop,
+                                        ).result(timeout=30)
+                                    except Exception as _exp_err:
+                                        logger.warning(
+                                            "[FAULT-GATE] Could not expire stale recs for %s: %s",
+                                            equipment_id,
+                                            _exp_err,
+                                        )
 
                                 rec = _build_manual_advisory_recommendation(
                                     site_id=site_id,
@@ -1615,6 +1659,16 @@ class BackgroundSchedulerService:
                                     existing_value = _normalize_value_for_dedup(existing.action.get("value", ""))
                                 unresolved_keys.add((existing.target_equipment, existing_point, existing_value))
 
+                            # Site-level dedup for HVAC-SCHEDULE advisories (Bug 4)
+                            existing_hvac_advisory = any(
+                                isinstance(e.action, dict)
+                                and str(e.action.get("value") or "").startswith(
+                                    "Shut down or setback non-critical HVAC"
+                                )
+                                for e in existing_pending
+                                if e.action_type == "ai_optimization"
+                            )
+
                             validation_results = validation.get("validation_results", [])
                             advisory_recs: list[dict] = []
                             for rec_dict in control_recs:
@@ -1644,6 +1698,17 @@ class BackgroundSchedulerService:
                                 advisory_recs.append(rec_dict)
 
                             for rec_dict in advisory_recs:
+                                # HVAC-SCHEDULE site-level dedup — skip if one already pending
+                                _rd_meta = rec_dict.get("metadata", {}) or {}
+                                if _rd_meta.get("rule") in {
+                                    "closed_empty_building_hvac_running",
+                                    "after_hours_zero_occupancy_hvac_load",
+                                }:
+                                    if existing_hvac_advisory:
+                                        skipped_count += 1
+                                        continue
+                                    existing_hvac_advisory = True
+
                                 equipment_id = rec_dict.get("target_equipment") or rec_dict.get("equipment_id", "")
                                 action = rec_dict.get("action") or {}
                                 adjustments = rec_dict.get("adjustments") or []
@@ -1692,13 +1757,21 @@ class BackgroundSchedulerService:
                                 except (TypeError, ValueError):
                                     confidence_num = 0.7
 
+                                is_fault_advisory = _rd_meta.get("advisory_type") == "fault_safety_gate"
+
                                 current_value = rec_dict.get("current_value")
                                 if current_value is None:
                                     current_value = action.get("current_value")
                                 if current_value is None:
                                     current_value = first_adjustment.get("current_value")
                                 unit_value = (
-                                    rec_dict.get("unit") or action.get("unit", "") or first_adjustment.get("unit", "")
+                                    ""
+                                    if is_fault_advisory
+                                    else (
+                                        rec_dict.get("unit")
+                                        or action.get("unit", "")
+                                        or first_adjustment.get("unit", "")
+                                    )
                                 )
                                 point_resolution = rec_dict.get("point_resolution") or {
                                     "raw": raw_point,
@@ -1708,10 +1781,34 @@ class BackgroundSchedulerService:
                                     "note": "unresolved or unlicensed BMS point",
                                 }
 
-                                manual_reason = rec_dict.get("reason", "")
-                                manual_prefix = "No writable BACnet point resolved — manual operator action required."
-                                if manual_prefix not in manual_reason:
-                                    manual_reason = f"{manual_prefix} {manual_reason}".strip()
+                                if is_fault_advisory:
+                                    manual_reason = rec_dict.get("reason", "")
+                                    manual_prefix = ""
+                                    rec_blocker = "active_fault_on_equipment_or_plant_group_mate"
+                                    rec_operator_label = "Fault condition — resolve before optimization resumes"
+                                else:
+                                    manual_reason = rec_dict.get("reason", "")
+                                    manual_prefix = (
+                                        "No writable BACnet point resolved — manual operator action required."
+                                    )
+                                    if manual_prefix not in manual_reason:
+                                        manual_reason = f"{manual_prefix} {manual_reason}".strip()
+                                    rec_blocker = "unresolved_bms_point"
+                                    rec_operator_label = "Manual action recommended — no BACnet write available"
+
+                                # Bug 3: expire stale pending recs for fault-gated equipment
+                                if is_fault_advisory:
+                                    try:
+                                        asyncio.run_coroutine_threadsafe(
+                                            recommendation_repo.expire_all_pending_for_equipment(site_id, equipment_id),
+                                            self._main_loop,
+                                        ).result(timeout=30)
+                                    except Exception as _exp_err:
+                                        logger.warning(
+                                            "[FAULT-GATE] Could not expire stale recs for %s: %s",
+                                            equipment_id,
+                                            _exp_err,
+                                        )
 
                                 rec = Recommendation(
                                     site_id=site_id,
@@ -1723,7 +1820,7 @@ class BackgroundSchedulerService:
                                         "point": None,
                                         "value": action_value,
                                         "execution_blocked": True,
-                                        "blocker": "unresolved_bms_point",
+                                        "blocker": rec_blocker,
                                     },
                                     reason=manual_reason,
                                     expected_impact={
@@ -1731,7 +1828,9 @@ class BackgroundSchedulerService:
                                         "recommended_value": action_value,
                                         "unit": unit_value,
                                         "energy_savings_percent": rec_dict.get("savings_kwh", 5),
-                                        "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
+                                        "cost_zar": None
+                                        if is_fault_advisory
+                                        else optimization_result.projected_savings.get("cost_zar_per_hour"),
                                     },
                                     confidence=str(confidence_num),
                                     confidence_score=confidence_num,
@@ -1744,9 +1843,9 @@ class BackgroundSchedulerService:
                                     point_resolution=point_resolution,
                                     metadata={
                                         "execution_status": "manual_action_required",
-                                        "blocker": "unresolved_bms_point",
+                                        "blocker": rec_blocker,
                                         "manual_action_required": True,
-                                        "operator_label": "Manual action recommended — no BACnet write available",
+                                        "operator_label": rec_operator_label,
                                         "point_resolution": point_resolution,
                                         "validation_results": validation_results,
                                         "equipment_name": rec_dict.get("equipment_name")
@@ -2069,6 +2168,12 @@ class BackgroundSchedulerService:
                         trimmed = text[: max_chars - 1].rsplit(" ", 1)[0]
                         return f"{trimmed or text[: max_chars - 1]}…"
 
+                    def _md_safe(text: str | None) -> str:
+                        """Escape * and _ so LLM-generated text can't break Telegram MarkdownV1."""
+                        if not text:
+                            return text or ""
+                        return text.replace("*", "\\*").replace("_", "\\_")
+
                     def _extract_context(reason: str) -> list[str]:
                         import re
 
@@ -2134,6 +2239,11 @@ class BackgroundSchedulerService:
                         recommended = impact.get("recommended_value")
                         target = recommended if recommended is not None else val
                         target_text = f"{target}{unit}" if target is not None else "recommended setting"
+
+                        if source_metadata.get("advisory_type") == "fault_safety_gate":
+                            action = str(val or "Resolve fault condition before optimization resumes")
+                            why = _trim_text(r.reason or "", 160)
+                            return action, why, None, None
 
                         reason = r.reason or ""
                         reason = reason.replace("Manual BMS adjustment needed.", "").strip()
@@ -2387,14 +2497,14 @@ class BackgroundSchedulerService:
                             if point and val is not None:
                                 action_text, why_text, effect_text, saving_text = _human_action(r)
                                 lines.append(f"*{idx}. {equip}*")
-                                lines.append(f"Change: {action_text}{manual_marker}")
+                                lines.append(f"Change: {_md_safe(action_text)}{manual_marker}")
                                 previous_status = _previous_action_status(r)
                                 if previous_status:
-                                    lines.append(f"Status: {previous_status}")
+                                    lines.append(f"Status: {_md_safe(previous_status)}")
                                 if why_text:
-                                    lines.append(f"Why: {why_text}")
+                                    lines.append(f"Why: {_md_safe(why_text)}")
                                 if effect_text:
-                                    lines.append(f"Effect: {effect_text}")
+                                    lines.append(f"Effect: {_md_safe(effect_text)}")
                                 if saving_text:
                                     lines.append(f"Savings: {saving_text}")
                                 if str(r.id) in control_not_ready_ids:
@@ -2413,11 +2523,11 @@ class BackgroundSchedulerService:
                             elif action_data.get("execution_blocked") or r.status == RecommendationStatus.ADVISORY_INFO:
                                 action_text, why_text, effect_text, saving_text = _manual_action_line(r)
                                 lines.append(f"*{idx}. {equip}*")
-                                lines.append(f"Change: {action_text}")
+                                lines.append(f"Change: {_md_safe(action_text)}")
                                 if why_text:
-                                    lines.append(f"Why: {why_text}")
+                                    lines.append(f"Why: {_md_safe(why_text)}")
                                 if effect_text:
-                                    lines.append(f"Effect: {effect_text}")
+                                    lines.append(f"Effect: {_md_safe(effect_text)}")
                                 if saving_text:
                                     lines.append(f"Savings: {saving_text}")
                             else:
