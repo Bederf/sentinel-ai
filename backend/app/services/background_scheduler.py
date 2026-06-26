@@ -1343,6 +1343,12 @@ class BackgroundSchedulerService:
 
                     recs_len = len(optimization_result.recommendations)
                     logger.info("[AI-OPT DEBUG] recs count=%d, recs=%s", recs_len, optimization_result.recommendations)
+                    # Per-recommendation proportional savings — total ÷ N so each card shows its own share
+                    _per_rec_cost_zar: float | None = (
+                        round((optimization_result.projected_savings.get("cost_zar_per_hour") or 0.0) / recs_len, 2)
+                        if recs_len > 0
+                        else None
+                    )
 
                     if not optimization_result.recommendations:
                         logger.info(f"[AI-OPT] {site_id}: 0 recommendations (building at optimal)")
@@ -1443,7 +1449,7 @@ class BackgroundSchedulerService:
                                 "recommended_value": rec_dict.get("recommended_value"),
                                 "unit": rec_dict.get("unit", ""),
                                 "energy_savings_percent": rec_dict.get("savings_kwh", 5),
-                                "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
+                                "cost_zar": _per_rec_cost_zar,
                             },
                             confidence="0.7",
                             confidence_score=0.7,
@@ -1616,7 +1622,10 @@ class BackgroundSchedulerService:
                                     action_value=action_value,
                                     confidence_num=confidence_num,
                                     optimization_profile=optimization_result.profile or "",
-                                    projected_savings=optimization_result.projected_savings,
+                                    projected_savings={
+                                        **optimization_result.projected_savings,
+                                        "cost_zar_per_hour": _per_rec_cost_zar,
+                                    },
                                     current_stage=current_stage,
                                     validation_results=validation_results,
                                 )
@@ -1828,9 +1837,7 @@ class BackgroundSchedulerService:
                                         "recommended_value": action_value,
                                         "unit": unit_value,
                                         "energy_savings_percent": rec_dict.get("savings_kwh", 5),
-                                        "cost_zar": None
-                                        if is_fault_advisory
-                                        else optimization_result.projected_savings.get("cost_zar_per_hour"),
+                                        "cost_zar": None if is_fault_advisory else _per_rec_cost_zar,
                                     },
                                     confidence=str(confidence_num),
                                     confidence_score=confidence_num,
@@ -2067,7 +2074,7 @@ class BackgroundSchedulerService:
                                 "recommended_value": action_value,
                                 "unit": unit_value,
                                 "energy_savings_percent": rec_dict.get("savings_kwh", 5),
-                                "cost_zar": optimization_result.projected_savings.get("cost_zar_per_hour"),
+                                "cost_zar": _per_rec_cost_zar,
                             },
                             confidence=str(confidence_num),
                             confidence_score=confidence_num,
