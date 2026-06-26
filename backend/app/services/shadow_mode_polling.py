@@ -622,7 +622,7 @@ class ShadowModePollingService:
             legacy_aliases = {
                 "AHU-001": "AHU-B1-001",
                 "AHU-002": "AHU-202",
-                "AHU-003": "AHU-R01",
+                "AHU-003": "AHU-R-001",
             }
             if c in legacy_aliases:
                 return f"{prefix}{legacy_aliases[c]}"
@@ -631,9 +631,6 @@ class ShadowModePollingService:
             floor = int(m.group(2))
             seq = int(m.group(3))
             return f"{prefix}{m.group(1)}-{floor * 100 + seq:03d}"
-        m = re.match(r"^(.+)-R-\d{3}$", c)
-        if m:
-            return f"{prefix}{m.group(1)}-R01"
         m = re.match(r"^(.+)-L(\d)-([A-Z])$", c)
         if m:
             floor = int(m.group(2))
@@ -942,9 +939,9 @@ class ShadowModePollingService:
             else:
                 # Dict format (site-002 legacy): {"ahu1": {...aggregated readings...}}
                 ahu_map = {
-                    "ahu1": f"{self._site_prefix}-AHU-B01",
-                    "ahu2": f"{self._site_prefix}-AHU-201",
-                    "ahu3": f"{self._site_prefix}-AHU-R01",
+                    "ahu1": f"{self._site_prefix}-AHU-B1-001",
+                    "ahu2": f"{self._site_prefix}-AHU-202",
+                    "ahu3": f"{self._site_prefix}-AHU-R-001",
                 }
                 for ahu_prefix, equip_code in ahu_map.items():
                     ahu_readings = {}

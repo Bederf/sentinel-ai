@@ -5544,7 +5544,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         Examples:
         S002-FCU-L1-001 → S002-FCU-101
         S002-FCU-L2-001 → S002-FCU-201 (Level 2 zone 1)
-        S002-CT-R-001 → S002-CT-R01
+        S002-CT-R-001 → S002-CT-R-001 (already canonical rooftop Tier 2 — no-op)
         S002-FCU-L0-001 → S002-FCU-001
         S002-VAV-L1-B → S002-VAV-102  (B=2 → Level 1 Zone 2)
         S002-VAV-L2-A → S002-VAV-201  (A=1 → Level 2 Zone 1)
@@ -5580,13 +5580,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         if match:
             site, equip_type, seq = match.groups()
             return f"{site}-{equip_type}-{seq.zfill(3)}"
-
-        # Pattern: S002-TYPE-R-{seq} → S002-TYPE-R{seq_basin} (rooftop, 2-digit seq)
-        # e.g. S002-CT-R-001 → S002-CT-R01
-        match = re.match(r"^(S\d+)-(\w+)-R-(\d+)$", code)
-        if match:
-            site, equip_type, seq = match.groups()
-            return f"{site}-{equip_type}-R{int(seq):02d}"
 
         return code
 
