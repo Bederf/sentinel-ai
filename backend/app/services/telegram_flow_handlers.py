@@ -512,7 +512,7 @@ async def handle_technician_report(
             mgr.update_session(session)
             await _send_response(
                 chat_id,
-                "Which equipment are you inspecting? Please provide the equipment code (e.g. S002-AHU-L2-001).",
+                "Which equipment are you inspecting? Please provide the equipment code (e.g. S002-FCU-304).",
                 sender,
             )
             return
@@ -539,7 +539,7 @@ async def handle_technician_report(
         if not m:
             await _send_response(
                 chat_id,
-                "I couldn't find an equipment code in that. Please use the format S002-AHU-L2-001.",
+                "I couldn't find an equipment code in that. Please use the format S002-FCU-304.",
                 sender,
             )
             return

@@ -115,12 +115,65 @@ logger = logging.getLogger("sentinel.shadow_mode")
 DALI_LIGHTING_READING_NAMES = {
     "brightness",
     "power_watts",
+    "power_w",
+    "power",
+    "lamp_wattage_rated",
+    "lamp_wattage",
     "energy_kwh",
     "occupancy",
     "on_off",
     "lamp_status",
+    "lamp_failure",
+    "lamp_failures",
+    "fault_state",
+    "system_status",
+    "status",
     "control_gear_status",
     "lux",
+    "lamp_hours",
+    "lamp_operating_hours",
+    "gear_operating_hours",
+    "lamp_on_time_total",
+    "lamp_on_time",
+    "driver_temp",
+    "color_temp",
+    "color_temp_k",
+    "driver_voltage",
+    "driver_current",
+    "lamp_strikes",
+    "lamp_failure_count",
+    "lamp_strike_count",
+    "emergency_battery",
+    "emergency_battery_hours",
+    "emergency_mode",
+    "input_voltage",
+    "output_current",
+    "motion_count",
+    "standby_level",
+    "firmware_version",
+    "fw_version",
+    "device_type",
+    "luminaire_type",
+    "serial_number",
+    "gtin",
+    "manufacturer_id",
+    "unique_device_id",
+    "device_uid",
+    "power_factor",
+    "max_level",
+    "min_level",
+    "physical_min_level",
+    "last_diagnostic_code",
+    "diag_code",
+    "scene_active",
+    "scene_0_7",
+    "scene_8_15",
+    "group_0_7",
+    "group_8_15",
+    "group_command",
+    "groups_0_7",
+    "groups_8_15",
+    "gear_hours",
 }
 
 SYNTHETIC_ALARM_PATTERNS = [
@@ -181,9 +234,22 @@ def _bridge_zone_id_from_equipment_code(site_prefix: str, equipment_code: str) -
     return f"Zone-{match.group(2)}"
 
 
+def _normalize_dali_parameter_name(raw: str) -> str:
+    name = raw.strip()
+    name = re.sub(r"(?<=[a-z])(?=[A-Z])", "_", name)
+    name = re.sub(r"(?<=[A-Z])(?=[A-Z][a-z])", "_", name)
+    name = name.lower().replace(" ", "_")
+    for prefix in ("a_", "b_", "c_", "d_", "e_", "n_", "s_", "w_"):
+        if name.startswith(prefix):
+            stripped = name[len(prefix) :]
+            if stripped:
+                return stripped
+    return name
+
+
 def _is_dali_lighting_mapping(mapping: dict[str, Any]) -> bool:
     equipment_id = str(mapping.get("extracted_asset_id") or "")
-    parameter_name = str(mapping.get("parameter_name") or "").strip().lower()
+    parameter_name = _normalize_dali_parameter_name(str(mapping.get("parameter_name") or ""))
     return "-DALI-" in equipment_id and parameter_name in DALI_LIGHTING_READING_NAMES
 
 
@@ -544,8 +610,9 @@ class ShadowModePollingService:
     def _normalize_to_db_code(self, code: str) -> str:
         """Normalize a bridge equipment code to the SENTINEL DB format.
 
-        Bridge returns codes like S002-CHILLER-B1-001, but the DB stores
-        S002-CHILLER-B01. Applies the same normalization as _sync_equipment_status.
+        Tier 1 (occupied zone): {site}-{type}-{3digit} e.g. S002-FCU-101
+        Tier 2 (plant room):    {site}-{type}-{location}-{seq} e.g. S002-CHILLER-B1-001
+        Bridge codes in B{n}-{seq} format are already canonical — no transformation.
         """
         c = code.replace("_", "-")
         prefix = f"{self._site_prefix}-"
@@ -553,15 +620,12 @@ class ShadowModePollingService:
             c = c[len(prefix) :]
         if self._site_prefix == "S002":
             legacy_aliases = {
-                "AHU-001": "AHU-B01",
-                "AHU-002": "AHU-201",
+                "AHU-001": "AHU-B1-001",
+                "AHU-002": "AHU-202",
                 "AHU-003": "AHU-R01",
             }
             if c in legacy_aliases:
                 return f"{prefix}{legacy_aliases[c]}"
-        m = re.match(r"^(.+)-B1-", c)
-        if m:
-            return f"{prefix}{m.group(1)}-B01"
         m = re.match(r"^(.+)-L(\d)-(\d+)$", c)
         if m:
             floor = int(m.group(2))
@@ -658,12 +722,38 @@ class ShadowModePollingService:
         # ── 2. Fetch zone readings ────────────────────────────────────────────
         zone_states: dict[str, dict[str, Any]] = {}
         try:
+            # Get site-level fused occupancy verdict once for this poll cycle
+            fused_site_verdict = None
+            try:
+                from app.services.occupancy_fusion_service import get_occupancy_fusion_service
+
+                fused_site_verdict = await get_occupancy_fusion_service().get_fused_occupancy(
+                    self.site_id, force_refresh=False
+                )
+            except Exception as e:
+                logger.debug("[SHADOW] Occupancy fusion unavailable for %s: %s", self.site_id, e)
+
             data = await _fetch_with_retry(f"/api/sites/{self.site_id}/zones")
             if data is None:
                 raise httpx.ConnectError("retry exhausted")
 
             zones = data.get("zones", [])
             logger.debug(f"[SHADOW] Got {len(zones)} zone readings")
+
+            # Pre-fetch DALI zone occupancy for all zones (in-memory, fast)
+            dali_occupancy_by_zone: dict[str, float] = {}
+            try:
+                from app.services.lighting_service import get_lighting_service
+
+                ls = get_lighting_service()
+                for z in zones:
+                    zid = z.get("zone_id", "")
+                    if zid:
+                        occ = ls.get_zone_occupancy(zid)
+                        if occ is not None:
+                            dali_occupancy_by_zone[zid] = occ.occupancy_percent
+            except Exception:
+                pass
 
             for z in zones:
                 zone_id: str = z.get("zone_id", "")
@@ -691,10 +781,16 @@ class ShadowModePollingService:
                         "sensor_readings": readings,
                     }
 
+                # Determine zone occupancy: use DALI PIR (in-memory) if available,
+                # otherwise fall back to fused site-level verdict, then schedule.
+                zone_occ_pct = dali_occupancy_by_zone.get(zone_id)
+                if zone_occ_pct is None and fused_site_verdict is not None:
+                    zone_occ_pct = fused_site_verdict.occupancy_percent
+
                 # Phase 1a: feed zone poll to FCU state tracker
                 self.fcu_state_tracker.record_poll(
                     zone_id=zone_id,
-                    occupancy_pct=0.0,  # occupancy not available per-zone from bridge
+                    occupancy_pct=zone_occ_pct if zone_occ_pct is not None else 0.0,
                     room_temp_c=z.get("temperature_c"),
                     setpoint_c=z.get("cooling_setpoint"),
                     timestamp=now,
@@ -1281,8 +1377,8 @@ class ShadowModePollingService:
             else:
                 equipment_states[code] = state
 
-        # Normalize equipment codes: bridge codes like S002-CHILLER-B1-001
-        # become S002-CHILLER-B01 so they match the DB equipment table codes.
+        # Normalize equipment codes: bridge codes to DB canonical form.
+        # Tier 2 plant room codes (B{n}-{seq}) are already canonical — no-op.
         normalized = {}
         for code, state in equipment_states.items():
             db_code = self._normalize_to_db_code(code)
@@ -1456,28 +1552,17 @@ class ShadowModePollingService:
             logger.debug("[SHADOW] Bridge point mapping load failed: %s", exc)
             return {}
 
-        hvac_tokens = ("-AHU-", "-CHILLER-", "-CT-", "-VAV-", "-PUMP-")
         candidate_mappings = []
         for mapping in mappings:
             equipment_id = str(mapping.get("extracted_asset_id") or "")
             point_id = str(mapping.get("bms_point_id") or "")
             parameter_name = str(mapping.get("parameter_name") or "")
-            parameter_type = str(mapping.get("parameter_type") or "")
             if not equipment_id or not point_id:
                 continue
             if any(skip in point_id.lower() for skip in ("health_score", "updated_at")):
                 continue
-            if _is_dali_lighting_mapping(mapping):
-                candidate_mappings.append(mapping)
-                continue
-            if not any(token in equipment_id for token in hvac_tokens):
-                continue
-            if not (
-                parameter_name
-                or parameter_type.startswith(("sensor", "status", "cooling_tower"))
-                or any(
-                    token in point_id.upper() for token in ("ROOMTEMP", "DAMPER", "RUN_STATE", "FAN_SPEED", "FILTER_DP")
-                )
+            if not parameter_name and not any(
+                token in point_id.upper() for token in ("ROOMTEMP", "DAMPER", "RUN_STATE", "FAN_SPEED", "FILTER_DP")
             ):
                 continue
             candidate_mappings.append(mapping)
@@ -1503,9 +1588,6 @@ class ShadowModePollingService:
                 return "supply_air_temp"
             if "RETURN_AIR_TEMP" in upper_point:
                 return "return_air_temp"
-
-            if _is_dali_lighting_mapping(mapping):
-                return parameter_name.lower()
 
             if parameter_name and parameter_name not in {"unknown", "unknown_sensor"} and len(parameter_name) > 1:
                 aliases = {
@@ -1780,7 +1862,7 @@ class ShadowModePollingService:
 
             # Try to parse equipment code from various fields
             if not equip_code and obj_id:
-                # Parse from object_id like "S002-AHU-B01-001-supply_air_temp"
+                # Parse from object_id like "S002-AHU-B1-001-supply_air_temp"
                 parts = obj_id.split("-")
                 if len(parts) >= 4 and parts[0].startswith("S"):
                     equip_code = "-".join(parts[:4])

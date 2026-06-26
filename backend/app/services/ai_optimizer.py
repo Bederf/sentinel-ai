@@ -506,6 +506,11 @@ class AIOptimizerService:
             peak_tariff=peak_tariff,
         )
 
+        # Collect suppressed equipment codes for prompt filtering and post-LLM filtering.
+        _fault_ctx = current_conditions.get("_fault_gate_context") or {}
+        _fault_decisions = _fault_ctx.get("decisions") or {}
+        fault_suppressed_codes: set[str] = {code for code, dec in _fault_decisions.items() if dec.get("suppress")}
+
         # Build optimization prompt for Claude with ALL available equipment
         prompt = await self._build_optimization_prompt(
             site,
@@ -519,6 +524,7 @@ class AIOptimizerService:
             decision_memory_text=decision_memory_text,
             feedback_rates_text=feedback_rates_text,
             precomputed_context=precomputed_context,
+            fault_suppressed_codes=fault_suppressed_codes,
         )
 
         # Determine task_class based on anomaly state
@@ -549,6 +555,25 @@ class AIOptimizerService:
                 f"[ANALYZE] After scoring: rec_count={len(recommendation.recommendations)}, "
                 f"first_rec_keys={[list(r.keys()) if r else 'empty' for r in recommendation.recommendations[:2]]}"
             )
+
+            # Post-LLM safety filter: remove any rec for a fault-suppressed equipment.
+            # This catches cases where the VALID EQUIPMENT CODES filter wasn't sufficient
+            # (e.g., LLM referenced suppressed equipment from prompt context).
+            if fault_suppressed_codes:
+                pre_filter = len(recommendation.recommendations)
+                recommendation.recommendations = [
+                    r
+                    for r in recommendation.recommendations
+                    if str(r.get("target_equipment") or "").upper() not in fault_suppressed_codes
+                ]
+                removed = pre_filter - len(recommendation.recommendations)
+                if removed:
+                    logger.warning(
+                        "[AI-OPT] Post-LLM fault gate removed %d rec(s) for suppressed equipment %s on %s",
+                        removed,
+                        sorted(fault_suppressed_codes),
+                        site_id,
+                    )
 
             # Append fault gate advisories (hard excluded equipment)
             if fault_gate_advisories:
@@ -2824,10 +2849,10 @@ FORMAT each recommendation as:
   "building_assessment": "One sentence describing the dominant building condition",
   "recommendations": [
     {{
-      "target_equipment": "S002-AHU-B01",
+      "target_equipment": "S002-AHU-B1-001",
       "adjustments": [
         {{
-          "equipment_id": "S002-AHU-B01",
+          "equipment_id": "S002-AHU-B1-001",
           "point": "<exact writable control point from the control point list>",
           "current_value": 18.0,
           "recommended_value": 19.0,
@@ -2885,6 +2910,7 @@ only. Never target a meter or sensor as the equipment to adjust.
         decision_memory_text: str | None = None,
         feedback_rates_text: str | None = None,
         precomputed_context=None,  # Phase 1b: PreComputedContext | None
+        fault_suppressed_codes: set[str] | None = None,
     ) -> str:
         """Build optimization prompt for Claude with ALL available equipment.
 
@@ -2921,7 +2947,11 @@ only. Never target a meter or sensor as the equipment to adjust.
         profile_name = "balanced"
         if profile and profile.get("name"):
             active_profile = profile.get("name", "balanced")
-            profile_name = active_profile.lower()
+            # Normalize to the key used in _format_profile_intent's intents dict.
+            # "Cost Saving" → "cost_saving", "Comfort First" → "comfort_first" → alias to "comfort".
+            _key_aliases = {"comfort_first": "comfort", "comfort first": "comfort"}
+            raw_key = active_profile.lower().replace(" ", "_")
+            profile_name = _key_aliases.get(raw_key, raw_key)
 
         # Current time context
         op_hours = site.get("operating_hours", {})
@@ -3157,20 +3187,34 @@ Example: "carbon_saving": "1.2 kgCO2 this evening (Eskom 0.9 kgCO2/kWh)"
 
 Provide ONLY the JSON response, no additional text."""
 
-        # Inject valid equipment codes into prompt so AI never hallucinates
+        # Inject valid equipment codes into prompt so AI never hallucinates.
+        # Equipment suppressed by the fault gate is excluded so the LLM never
+        # generates recommendations for plant groups with an active fault/WO.
         try:
             from app.database.repositories.equipment_repository import EquipmentRepository
 
             eq_repo = EquipmentRepository()
             site_uuid = site.get("id")
             valid_equipment = eq_repo.get_all(site_id=site_uuid) if site_uuid else eq_repo.get_all()
+            suppressed = {c.upper() for c in (fault_suppressed_codes or set())}
             if valid_equipment:
                 equipment_lines = []
+                fault_excluded: list[str] = []
                 for eq in valid_equipment[:50]:  # Limit to 50 to avoid token bloat
                     code = eq.get("code", "UNKNOWN")
+                    if code.upper() in suppressed:
+                        fault_excluded.append(code)
+                        continue
                     eq_type = eq.get("type", "unknown")
                     location = eq.get("location", "unknown location")
                     equipment_lines.append(f"  - {code} ({eq_type}, {location})")
+                if fault_excluded:
+                    logger.warning(
+                        "[AI-OPT] Fault gate excluded %d equipment from VALID EQUIPMENT CODES for %s: %s",
+                        len(fault_excluded),
+                        site.get("id", "unknown"),
+                        fault_excluded,
+                    )
                 valid_equip_block = "\n".join(equipment_lines)
                 prompt += f"""
 
@@ -4011,6 +4055,8 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                     for alert in critical_alerts:
                         eid = str(alert.get("equipment_id") or "")
                         code = eq_id_to_code.get(eid) or eid
+                        if not code:
+                            continue
                         alert["equipment_code"] = code
                         alert_equipment_codes.add(code.upper())
             except Exception as exc:
@@ -4030,7 +4076,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         equipment_plant_group: dict[str, str] = {}
 
         # Collect equipment codes and types from inventory
-        # Device.id carries the equipment code (e.g. "S002-AHU-B01")
+        # Device.id carries the equipment code (e.g. "S002-AHU-B1-001")
         plant_candidate_types = {"ahu", "chiller", "cooling_tower", "pump"}
         all_equipment_codes: set[str] = set()
         device_by_code: dict[str, Device] = {}
@@ -4052,9 +4098,10 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         plant_group_members.setdefault(zone_key.upper(), set()).add(code)
                         equipment_plant_group[code] = zone_key.upper()
 
-        # Supplement plant-group data from Supabase for any equipment not covered
-        # by device metadata (common for bridge-backed equipment).
-        # This is a best-effort supplement; the gate works from device metadata alone.
+        # Supplement equipment codes and plant-group data from Supabase.
+        # For bridge-backed sites the device manager inventory is empty (bridge devices
+        # are intentionally excluded from device_manager), so all_equipment_codes and
+        # plant_group_members must be built from the DB directly.
         try:
             from app.database.supabase_client import get_supabase_client
 
@@ -4063,25 +4110,27 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             if site_resp.data:
                 site_uuid = site_resp.data[0]["id"]
                 try:
-                    eq_rows = (
-                        sb.table("equipment")
-                        .select("code,type,zone_key")
-                        .eq("site_id", site_uuid)
-                        .not_.is_("zone_key", "null")
-                        .execute()
-                    )
+                    # Fetch ALL equipment for the site (no zone_key filter) so that
+                    # bridge-backed equipment is included in all_equipment_codes even
+                    # when device_manager has no entries for this site.
+                    eq_rows = sb.table("equipment").select("code,type,zone_key").eq("site_id", site_uuid).execute()
                     for row in eq_rows.data or []:
                         code = str(row.get("code") or "").upper().strip()
                         zone_key = str(row.get("zone_key") or "").strip()
                         eq_type = str(row.get("type") or "").lower()
-                        if code and zone_key and eq_type in plant_candidate_types:
+                        if not code:
+                            continue
+                        # Always add to all_equipment_codes so the gate evaluates it.
+                        all_equipment_codes.add(code)
+                        # Add to plant groups only for plant-type equipment with zone_key.
+                        if zone_key and eq_type in plant_candidate_types:
                             if code not in equipment_plant_group:
                                 plant_group_members.setdefault(zone_key.upper(), set()).add(code)
                                 equipment_plant_group[code] = zone_key.upper()
                 except Exception:
-                    pass  # Zone_key column may not exist or be accessible
+                    pass  # Column may not exist or be accessible
         except Exception as exc:
-            logger.debug("[AI-OPT] Could not supplement plant group data: %s", exc)
+            logger.debug("[AI-OPT] Could not supplement equipment codes from DB: %s", exc)
 
         # 5. Supplement work orders with a broader query that catches high-priority
         #    WOs too (S002 uses priority="high", not "urgent"/"critical").
@@ -5260,7 +5309,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         Args:
             raw_point_name: The point name as generated by the AI (e.g. "chws_setpoint")
-            equipment_code: The resolved equipment code (e.g. "S002-CHILLER-B01")
+            equipment_code: The resolved equipment code (e.g. "S002-CHILLER-B1-001")
             equipment_points: Mapping of equipment_code → set of valid point names
             raw_value: The value to write (stub for future unit validation)
 
@@ -5298,7 +5347,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             }
             return (None, provenance)
 
-        # Derive equipment type from code (e.g. "S002-CHILLER-B01" → "chiller")
+        # Derive equipment type from code (e.g. "S002-CHILLER-B1-001" → "chiller")
         eq_type = self._extract_equipment_type(equipment_code)
 
         # Strategy 1: Exact match
@@ -5399,8 +5448,8 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
     def _extract_equipment_type(self, equipment_code: str) -> str:
         """Extract equipment type from an equipment code.
 
-        E.g. "S002-CHILLER-B01" → "chiller"
-             "S002-AHU-B01" → "ahu"
+        E.g. "S002-CHILLER-B1-001" → "chiller"
+             "S002-AHU-B1-001" → "ahu"
              "S002-VAV-101" → "vav"
         """
         import re
@@ -5419,7 +5468,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         Resolve an AI-generated equipment code to a valid DB code.
 
         The AI model sometimes generates slightly wrong codes (e.g. S002-AHU-B1-001
-        instead of S002-AHU-B01). This function finds the closest matching valid
+        instead of S002-AHU-B1-001). This function finds the closest matching valid
         equipment code in the database.
 
         Returns:
@@ -5489,15 +5538,17 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         """
         Normalise common AI-generated code format variations.
 
+        Tier 1 (occupied zone): {site}-{type}-{3digit} e.g. S002-FCU-101
+        Tier 2 (plant room):    {site}-{type}-{location}-{seq} e.g. S002-AHU-B1-001
+
         Examples:
-        S002-AHU-B1-001 → S002-AHU-B01
         S002-FCU-L1-001 → S002-FCU-101
-        S002-AHU-L2-001 → S002-AHU-201
-        S002-CHILLER-B1-001 → S002-CHILLER-B01
+        S002-FCU-L2-001 → S002-FCU-201 (Level 2 zone 1)
         S002-CT-R-001 → S002-CT-R01
         S002-FCU-L0-001 → S002-FCU-001
         S002-VAV-L1-B → S002-VAV-102  (B=2 → Level 1 Zone 2)
         S002-VAV-L2-A → S002-VAV-201  (A=1 → Level 2 Zone 1)
+        S002-AHU-B1-001 → S002-AHU-B1-001 (already canonical Tier 2 — no-op)
         """
         import re
 
@@ -5514,7 +5565,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         # Pattern: S002-TYPE-L{floor}-{seq} → S002-TYPE-{floor*100 + seq}
         # e.g. S002-FCU-L1-001 → S002-FCU-101 (1*100 + 1)
-        # e.g. S002-AHU-L2-001 → S002-AHU-201 (2*100 + 1)
+        # e.g. S002-FCU-L2-001 → S002-FCU-201 (2*100 + 1)
         # e.g. S002-FCU-L0-001 → S002-FCU-001 (ground floor, no zone letter)
         match = re.match(r"^(S\d+)-(\w+)-L(\d+)-(\d+)$", code)
         if match:
@@ -5522,13 +5573,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             numeric_floor = int(floor)
             normalized_seq = f"{int(seq):03d}" if numeric_floor == 0 else numeric_floor * 100 + int(seq)
             return f"{site}-{equip_type}-{normalized_seq}"
-
-        # Pattern: S002-TYPE-B{num}-{seq} → S002-TYPE-B{num_basin} (basement with 2-digit pad)
-        # e.g. S002-AHU-B1-001 → S002-AHU-B01
-        match = re.match(r"^(S\d+)-(\w+)-B(\d+)-(\d+)$", code)
-        if match:
-            site, equip_type, basement, seq = match.groups()
-            return f"{site}-{equip_type}-B{basement.zfill(2)}"
 
         # Pattern: S002-TYPE-G-{seq} → S002-TYPE-{seq} (ground floor, no zone letter)
         # e.g. S002-LTG-G-001 → S002-LTG-001
@@ -5556,7 +5600,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         """
         parts = code.split("-")
         if len(parts) >= 3:
-            # e.g. S002-AHU-B01 → S002-AHU-B
+            # e.g. S002-AHU-B1-001 → S002-AHU-B
             # e.g. S002-FCU-101 → S002-FCU-1
             return "-".join(parts[:2]) + "-" + parts[2][0]
         return "-".join(parts[:2]) + "-"

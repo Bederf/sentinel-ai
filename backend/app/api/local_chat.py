@@ -58,7 +58,7 @@ async def local_chat(
     - "Compare S002-CHILLER-B1-001 vs S002-CHILLER-B1-002" (equipment comparison)
     - "Show trends for S002-FCU-L1-A" (trend analysis)
     - "What's the anomaly on S002-PUMP-B1-CHW1?" (anomaly explanation)
-    - "What's the status of S002-AHU-L2-001?" (equipment status)
+    - "What's the status of S002-AHU-202?" (equipment status)
     """
     handler = get_query_handler()
     result = await handler.handle_query(guarded_message or request.message)
@@ -152,7 +152,7 @@ async def list_intents():
                 "examples": [
                     "When is maintenance due for S002-CHILLER-B1-001?",
                     "Does the pump need service?",
-                    "How long will S002-AHU-L2-001 last?",
+                    "How long will S002-AHU-202 last?",
                 ],
             },
             {
@@ -183,7 +183,7 @@ async def list_intents():
                 "intent": "equipment_status",
                 "description": "Check current equipment status and health",
                 "examples": [
-                    "What's the status of S002-AHU-L2-001?",
+                    "What's the status of S002-AHU-202?",
                     "How is the chiller doing?",
                     "Health score for S002-FCU-L1-A",
                 ],

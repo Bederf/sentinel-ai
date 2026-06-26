@@ -237,7 +237,7 @@ def normalize_site_id(site_id: str, to_supabase: bool = True) -> str:
 
     Canonical site format: site-002.
 
-    Equipment identifiers may still use prefixes such as S002-CHILLER-B01,
+    Equipment identifiers may still use prefixes such as S002-CHILLER-B1-001,
     but site_id values in application logic and database tables should use
     site-###. The ``to_supabase`` flag is kept for backwards-compatible
     call sites; both directions now return the canonical site-### format.

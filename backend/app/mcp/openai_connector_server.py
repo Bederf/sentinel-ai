@@ -84,7 +84,7 @@ def _canonical_s002_equipment_code(code: str | None) -> str | None:
         seq = int(match.group(3))
         return f"{match.group(1)}-{floor * 100 + seq:03d}"
     aliases = {
-        "S002-AHU-001": "S002-AHU-B01",
+        "S002-AHU-001": "S002-AHU-B1-001",
         "S002-AHU-002": "S002-AHU-201",
         "S002-AHU-003": "S002-AHU-R01",
     }
@@ -691,7 +691,7 @@ class OpenAIConnectorMCPServer:
                         },
                         "equipment_id": {
                             "type": "string",
-                            "description": "Optional HVAC equipment code to inspect (e.g., S002-CHILLER-B01)",
+                            "description": "Optional HVAC equipment code to inspect (e.g., S002-CHILLER-B1-001)",
                         },
                     },
                     "required": ["site_id"],
@@ -1979,7 +1979,7 @@ class OpenAIConnectorMCPServer:
                     sensor_equip_id = equipment_id
 
                     if equipment_id.endswith("-B01"):
-                        base = equipment_id[:-4]  # S002-CHILLER-B01 → S002-CHILLER or S002-CT-B01 → S002-CT
+                        base = equipment_id[:-4]  # S002-CHILLER-B1-001 → S002-CHILLER or S002-CT-B1-001 → S002-CT
                         for variant in (f"{base}-B1-001", f"{base}-R-001", f"{base}-001", equipment_id):
                             check = (
                                 client.table("equipment_sensor_readings")

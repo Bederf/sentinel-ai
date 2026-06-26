@@ -28,7 +28,7 @@ async def submit_manual_inspection(
     """Submit a manual inspection observation for equipment.
 
     Args:
-        equipment_id: Equipment code (e.g. S002-AHU-B01)
+        equipment_id: Equipment code (e.g. S002-AHU-B1-001)
         condition_rating: 1-5 rating (1=critical, 5=excellent)
         noise_db: Optional decibel reading
         notes: Optional technician notes

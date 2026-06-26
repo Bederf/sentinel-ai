@@ -4,7 +4,6 @@ Endpoint: GET /api/parasite/aegis/dashboard
 """
 
 from datetime import UTC, datetime
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -68,12 +67,51 @@ def _make_non_aegis_decision(*, id: str, site_id: str = "test-site-001") -> dict
     }
 
 
+class _MemoryParasiteDecisionRepository(ParasiteDecisionRepository):
+    """In-memory repo for tests — no Supabase, no JSON file."""
+
+    def __init__(self):
+        super().__init__()
+        self._store: list[dict] = []
+
+    async def record_decision(self, decision: dict) -> dict:
+        self._validate_record(decision)
+        self._normalize_point_name(decision)
+        if "id" not in decision:
+            import uuid
+
+            decision["id"] = str(uuid.uuid4())
+        if "created_at" not in decision:
+            decision["created_at"] = datetime.utcnow().isoformat()
+        if "updated_at" not in decision:
+            decision["updated_at"] = datetime.utcnow().isoformat()
+        self._store.append(decision)
+        return decision
+
+    async def get_decisions_by_site(self, site_id: str, since: str | None = None, limit: int = 1000) -> list[dict]:
+        rows = [d for d in self._store if d.get("site_id") == site_id]
+        if since:
+            rows = [d for d in rows if d.get("created_at", "") > since]
+        return rows[:limit]
+
+    async def get_recent_decisions(self, limit: int = 100) -> list[dict]:
+        return self._store[-limit:]
+
+    async def get_decisions_since(self, since_iso: str, limit: int = 500) -> list[dict]:
+        rows = [d for d in self._store if d.get("created_at", "") > since_iso]
+        return rows[:limit]
+
+    async def count_pending_measurements(self) -> int:
+        return 0
+
+    async def get_decision_by_id(self, decision_id: str) -> dict | None:
+        return next((d for d in self._store if d.get("id") == decision_id), None)
+
+
 @pytest.fixture
-def isolated_repo(tmp_path: Path) -> ParasiteDecisionRepository:
-    """Create an isolated JSON-backed repo."""
-    r = ParasiteDecisionRepository(json_path=tmp_path / "dashboard_test.json")
-    r._use_json = True
-    return r
+def isolated_repo() -> _MemoryParasiteDecisionRepository:
+    """Create an isolated in-memory repo."""
+    return _MemoryParasiteDecisionRepository()
 
 
 @pytest.fixture
