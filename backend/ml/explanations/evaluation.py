@@ -468,11 +468,16 @@ class LLMJudgeService:
 
         results = []
         for rec in recent:
-            if rec.explanation:
+            explanation_text = getattr(rec, "explanation", None) or rec.reason or ""
+            if explanation_text:
+                action = getattr(rec, "action", {}) or {}
+                generated_actions = getattr(rec, "recommended_actions", None) or (
+                    [action.get("value")] if action.get("value") else None
+                )
                 metrics = self._evaluator.evaluate_explanation(
-                    predicted_explanation=rec.explanation,
-                    reference_explanation=None,  # judge against baseline criteria
-                    generated_actions=rec.recommended_actions,
+                    predicted_explanation=explanation_text,
+                    reference_explanation=None,
+                    generated_actions=generated_actions,
                     context_documents=None,
                 )
                 results.append(metrics)
