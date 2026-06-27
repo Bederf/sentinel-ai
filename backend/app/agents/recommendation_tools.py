@@ -152,6 +152,21 @@ async def check_recommendation_action_still_needed(recommendation: dict[str, Any
     target_value = action.get("value")
 
     if action.get("execution_blocked"):
+        # Advisory-type recs (HVAC-SCHEDULE, fault-gate) are intentionally execution-blocked
+        # because they require manual operator action, not a SENTINEL write. The underlying
+        # condition still exists, so the advisory must persist until the condition clears.
+        metadata = recommendation.get("metadata") or {}
+        source_meta = metadata.get("source_metadata") or {}
+        advisory_type = source_meta.get("advisory_type") or metadata.get("advisory_type")
+        if advisory_type in {
+            "site_profile_hvac_state_correction",
+            "fault_safety_gate",
+        }:
+            return {
+                "is_needed": True,
+                "checked": True,
+                "reason": f"Advisory-type rec ({advisory_type}); execution_blocked is expected, condition persists",
+            }
         blocker = action.get("blocker") or "execution_blocked"
         return {
             "is_needed": False,

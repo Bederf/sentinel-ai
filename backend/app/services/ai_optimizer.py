@@ -3529,7 +3529,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 "point_name": "",
                 "current_value": hvac_kw_float,
                 "recommended_value": ("Shut down or setback non-critical HVAC plant according to the site profile"),
-                "unit": "manual_action",
+                "unit": "kW",
                 "system": "hvac",
                 "action_type": "ai_optimization",
                 "action": {
@@ -3975,7 +3975,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             "point_name": "",
             "current_value": None,
             "recommended_value": "Verify whether this HVAC equipment should be running before tuning delivery",
-            "unit": "manual_action",
+            "unit": "",
             "system": "hvac",
             "action_type": "ai_optimization",
             "action": {
@@ -4314,7 +4314,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             "point_name": "",
             "current_value": None,
             "recommended_value": None,
-            "unit": "manual_action",
+            "unit": "",
             "system": "hvac",
             "action_type": "ai_optimization",
             "action": {
@@ -6226,7 +6226,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                     "point_name": "",
                     "current_value": hvac_kw_float,
                     "recommended_value": ("Shut down or setback non-critical HVAC plant according to the site profile"),
-                    "unit": "manual_action",
+                    "unit": "kW",
                     "system": "hvac",
                     "action_type": "ai_optimization",
                     "action": {

@@ -182,8 +182,18 @@ async def validate_relevance_node(state: RecommendationAgentState) -> dict:
     if not rec:
         return {"is_relevant": False, "relevance_reason": "No recommendation"}
 
-    # Check freshness (max 120 minutes old — sites polled ~hourly)
-    freshness = check_recommendation_freshness(rec, max_age_minutes=120)
+    # Advisory-type recs represent persistent operational conditions (e.g., HVAC-SCHEDULE
+    # runs after-hours for 8-12h). Use a 24h freshness window so they don't get cycled
+    # out before the underlying condition resolves.
+    rec_metadata = rec.get("metadata") or {}
+    rec_source_meta = rec_metadata.get("source_metadata") or {}
+    _advisory_type = rec_source_meta.get("advisory_type") or rec_metadata.get("advisory_type")
+    _is_advisory_rec = _advisory_type in {
+        "site_profile_hvac_state_correction",
+        "fault_safety_gate",
+    }
+    freshness_max_minutes = 24 * 60 if _is_advisory_rec else 120
+    freshness = check_recommendation_freshness(rec, max_age_minutes=freshness_max_minutes)
     if not freshness["is_fresh"]:
         logger.info(f"[RecAgent] Recommendation {rec.get('id')} is stale: {freshness['reason']}")
         return {
