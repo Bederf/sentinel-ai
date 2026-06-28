@@ -57,6 +57,42 @@ class TestBackgroundScheduler:
 
         assert _has_pending_source_rule([conflict], {HVAC_OCCUPANCY_CONFLICT_RULE}) is True
 
+    def test_manual_advisory_dedup_key_uses_logical_family_not_live_value(self):
+        from app.services.background_scheduler import _manual_advisory_dedup_key
+
+        metadata = {
+            "rule": "occupancy_conflict_blocks_hvac_shutdown",
+            "logical_family": "site_hvac_after_hours_operating_state",
+        }
+
+        first = _manual_advisory_dedup_key(
+            equipment_id="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            point_name="",
+            action_value="Hold blanket HVAC shutdown",
+            metadata=metadata,
+        )
+        second = _manual_advisory_dedup_key(
+            equipment_id="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            point_name="",
+            action_value="Hold blanket HVAC shutdown with current 1216.32 kW",
+            metadata=metadata,
+        )
+
+        assert first == second == ("logical_family", "site_hvac_after_hours_operating_state", "")
+
+    def test_format_advisory_value_appends_units_only_to_numeric_values(self):
+        from app.services.background_scheduler import _format_advisory_value
+
+        assert _format_advisory_value(774.18, "kW") == "774.18kW"
+        assert _format_advisory_value("22", "°C") == "22°C"
+        assert (
+            _format_advisory_value(
+                "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict",
+                "kW",
+            )
+            == "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict"
+        )
+
     def test_after_hours_hvac_gate_triggers_once_per_cooldown(self):
         """Stable zero-occupancy HVAC load should trigger analysis without waiting 6h."""
         from app.services.background_scheduler import BackgroundSchedulerService

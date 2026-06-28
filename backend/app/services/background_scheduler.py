@@ -558,6 +558,62 @@ def _metadata_rule(metadata: dict[str, Any] | None) -> str:
     return str(metadata.get("rule") or "")
 
 
+def _metadata_logical_family(metadata: dict[str, Any] | None) -> str:
+    if not isinstance(metadata, dict):
+        return ""
+    source_metadata = metadata.get("source_metadata")
+    if isinstance(source_metadata, dict) and source_metadata.get("logical_family"):
+        return str(source_metadata.get("logical_family") or "")
+    if metadata.get("logical_family"):
+        return str(metadata.get("logical_family") or "")
+
+    rule = _metadata_rule(metadata)
+    if rule == HVAC_OCCUPANCY_CONFLICT_RULE or rule in HVAC_CLOSED_EMPTY_RULES:
+        return "site_hvac_after_hours_operating_state"
+    return ""
+
+
+def _manual_advisory_dedup_key(
+    *,
+    equipment_id: str,
+    point_name: str,
+    action_value: Any,
+    metadata: dict[str, Any] | None,
+) -> tuple[str, str, str]:
+    """Stable dedup key for manual advisories.
+
+    No-point logical advisories should not churn only because a live measured
+    value changed between scheduler cycles.
+    """
+    if not point_name:
+        logical_family = _metadata_logical_family(metadata)
+        if logical_family:
+            return ("logical_family", logical_family, "")
+        rule = _metadata_rule(metadata)
+        if rule:
+            return ("rule", rule, "")
+    return (equipment_id, point_name, _normalize_value_for_dedup(action_value))
+
+
+def _format_advisory_value(value: Any, unit: str | None = None, *, fallback: str = "target") -> str:
+    """Format values for operator-facing advisory text.
+
+    Units are only appended to numeric values; textual manual actions should
+    remain plain English.
+    """
+    if value is None:
+        return fallback
+    unit_text = str(unit or "")
+    if not unit_text:
+        return f"{value:g}" if isinstance(value, float) else str(value)
+    try:
+        float(str(value).strip())
+    except (TypeError, ValueError):
+        return str(value)
+    value_text = f"{value:g}" if isinstance(value, float) else str(value)
+    return f"{value_text}{unit_text}"
+
+
 def _has_pending_source_rule(recommendations: list[Any], source_rules: set[str]) -> bool:
     for rec in recommendations:
         if getattr(rec, "action_type", None) != "ai_optimization":
@@ -1584,7 +1640,14 @@ class BackgroundSchedulerService:
                                 existing_value = ""
                                 if isinstance(existing.action, dict):
                                     existing_value = _normalize_value_for_dedup(existing.action.get("value", ""))
-                                unresolved_keys.add((existing.target_equipment, "", existing_value))
+                                unresolved_keys.add(
+                                    _manual_advisory_dedup_key(
+                                        equipment_id=existing.target_equipment,
+                                        point_name="",
+                                        action_value=existing_value,
+                                        metadata=existing.metadata or {},
+                                    )
+                                )
 
                             # Site-level dedup for HVAC-SCHEDULE advisories (Bug 4)
                             existing_hvac_advisory = any(
@@ -1594,10 +1657,6 @@ class BackgroundSchedulerService:
                                 )
                                 for e in existing_pending
                                 if e.action_type == "ai_optimization"
-                            )
-                            existing_hvac_conflict_advisory = _has_pending_source_rule(
-                                existing_pending,
-                                {HVAC_OCCUPANCY_CONFLICT_RULE},
                             )
                             existing_hvac_conflict_advisory = _has_pending_source_rule(
                                 existing_pending,
@@ -1669,7 +1728,12 @@ class BackgroundSchedulerService:
                                     skipped_count += 1
                                     continue
 
-                                dedup_key = (equipment_id, "", _normalize_value_for_dedup(action_value))
+                                dedup_key = _manual_advisory_dedup_key(
+                                    equipment_id=equipment_id,
+                                    point_name="",
+                                    action_value=action_value,
+                                    metadata=_rd_meta,
+                                )
                                 if dedup_key in unresolved_keys:
                                     skipped_count += 1
                                     continue
@@ -1745,7 +1809,14 @@ class BackgroundSchedulerService:
                                 if isinstance(existing.action, dict):
                                     existing_point = existing.action.get("point") or ""
                                     existing_value = _normalize_value_for_dedup(existing.action.get("value", ""))
-                                unresolved_keys.add((existing.target_equipment, existing_point, existing_value))
+                                unresolved_keys.add(
+                                    _manual_advisory_dedup_key(
+                                        equipment_id=existing.target_equipment,
+                                        point_name=existing_point,
+                                        action_value=existing_value,
+                                        metadata=existing.metadata or {},
+                                    )
+                                )
 
                             # Site-level dedup for HVAC-SCHEDULE advisories (Bug 4)
                             existing_hvac_advisory = any(
@@ -1855,7 +1926,12 @@ class BackgroundSchedulerService:
                                     )
                                     skipped_count += 1
                                     continue
-                                dedup_key = (equipment_id, "", _normalize_value_for_dedup(action_value))
+                                dedup_key = _manual_advisory_dedup_key(
+                                    equipment_id=equipment_id,
+                                    point_name="",
+                                    action_value=action_value,
+                                    metadata=_rd_meta,
+                                )
                                 if dedup_key in unresolved_keys:
                                     skipped_count += 1
                                     continue
@@ -2355,7 +2431,8 @@ class BackgroundSchedulerService:
                         current = impact.get("current_value")
                         recommended = impact.get("recommended_value")
                         target = recommended if recommended is not None else val
-                        target_text = f"{target}{unit}" if target is not None else "recommended setting"
+
+                        target_text = _format_advisory_value(target, unit, fallback="recommended setting")
 
                         if source_metadata.get("advisory_type") == "fault_safety_gate":
                             action = str(val or "Resolve fault condition before optimization resumes")
@@ -2380,7 +2457,7 @@ class BackgroundSchedulerService:
                             action = "manual BMS review/action required"
 
                         if current is not None and target is not None:
-                            action = f"{action} (current {current}{unit})"
+                            action = f"{action} (current {_format_advisory_value(current, unit)})"
 
                         context = _extract_context(reason)
                         if source_metadata.get("rule") in {
@@ -2398,13 +2475,7 @@ class BackgroundSchedulerService:
                         return action, why, _manual_effect(r), saving
 
                     def _format_value(value, unit: str | None = None) -> str:
-                        if value is None:
-                            return "target"
-                        if isinstance(value, float):
-                            value_text = f"{value:g}"
-                        else:
-                            value_text = str(value)
-                        return f"{value_text}{unit or ''}"
+                        return _format_advisory_value(value, unit)
 
                     def _human_point(point: str | None) -> str:
                         labels = {
