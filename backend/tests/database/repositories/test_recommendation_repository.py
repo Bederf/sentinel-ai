@@ -2,6 +2,7 @@
 
 import pytest
 
+from app.models.recommendation import Recommendation, RecommendationStatus
 from app.database.repositories.recommendation_repository import RecommendationRepository
 
 
@@ -159,3 +160,60 @@ async def test_control_dedupe_does_not_query_executed_recommendations():
 
     assert duplicate is None
     assert queried_statuses == ["pending", "approved"]
+
+
+@pytest.mark.asyncio
+async def test_expire_pending_by_source_rules_supersedes_different_target_family():
+    """Logical safety gates must expire stale recs even when target_equipment changes."""
+    repo = RecommendationRepository()
+    stale = Recommendation(
+        id="11111111-1111-1111-1111-111111111111",
+        site_id="site-002",
+        action_type="ai_optimization",
+        target_equipment="SITE-002-HVAC-SCHEDULE",
+        status=RecommendationStatus.PENDING,
+        reason="Shut down HVAC",
+        metadata={"source_metadata": {"rule": "closed_empty_building_hvac_running"}},
+    )
+    unrelated = Recommendation(
+        id="22222222-2222-2222-2222-222222222222",
+        site_id="site-002",
+        action_type="ai_optimization",
+        target_equipment="SITE-002-LIGHTING-SCHEDULE",
+        status=RecommendationStatus.PENDING,
+        metadata={"source_metadata": {"rule": "closed_empty_building_hvac_running"}},
+    )
+    updated = []
+    audit_events = []
+
+    async def _get_by_status(site_id, status, limit=10):
+        assert site_id == "site-002"
+        assert status == RecommendationStatus.PENDING
+        return [stale, unrelated]
+
+    async def _update(_rec_id, rec):
+        updated.append(rec)
+        return rec
+
+    async def _record_audit_event(**kwargs):
+        audit_events.append(kwargs)
+
+    repo.get_by_status = _get_by_status
+    repo.update = _update
+    repo._record_audit_event = _record_audit_event
+
+    count = await repo.expire_pending_by_source_rules(
+        "site-002",
+        {"closed_empty_building_hvac_running"},
+        superseded_by_rule="occupancy_conflict_blocks_hvac_shutdown",
+        superseded_reason="conflict supersedes shutdown",
+        target_prefixes=("SITE-002-HVAC",),
+    )
+
+    assert count == 1
+    assert updated == [stale]
+    assert stale.status == RecommendationStatus.EXPIRED
+    assert stale.approval_status == "superseded"
+    assert stale.metadata["superseded_by_rule"] == "occupancy_conflict_blocks_hvac_shutdown"
+    assert unrelated.status == RecommendationStatus.PENDING
+    assert len(audit_events) == 1

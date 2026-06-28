@@ -43,6 +43,20 @@ class TestBackgroundScheduler:
         assert _is_protected_pending_recommendation("ai_optimization") is False
         assert _is_protected_pending_recommendation(None) is False
 
+    def test_pending_hvac_conflict_detected_by_source_rule_not_target(self):
+        """Conflict advisories supersede HVAC shutdown rows even with a different target ID."""
+        from app.models.recommendation import Recommendation
+        from app.services.background_scheduler import HVAC_OCCUPANCY_CONFLICT_RULE, _has_pending_source_rule
+
+        conflict = Recommendation(
+            site_id="site-002",
+            action_type="ai_optimization",
+            target_equipment="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            metadata={"source_metadata": {"rule": HVAC_OCCUPANCY_CONFLICT_RULE}},
+        )
+
+        assert _has_pending_source_rule([conflict], {HVAC_OCCUPANCY_CONFLICT_RULE}) is True
+
     def test_after_hours_hvac_gate_triggers_once_per_cooldown(self):
         """Stable zero-occupancy HVAC load should trigger analysis without waiting 6h."""
         from app.services.background_scheduler import BackgroundSchedulerService
@@ -72,7 +86,7 @@ class TestBackgroundScheduler:
         now = datetime(2026, 6, 18, 22, 0)
 
         assert service._should_trigger_after_hours_hvac_analysis("site-002", 1, 21.0, False, now) is False
-        assert service._should_trigger_after_hours_hvac_analysis("site-002", 0, 10.0, False, now) is False
+        assert service._should_trigger_after_hours_hvac_analysis("site-002", 0, 1.0, False, now) is False
         assert service._should_trigger_after_hours_hvac_analysis("site-002", 0, 21.0, True, now) is False
 
     def test_noop_recommendation_is_suppressed_when_current_equals_target(self):
@@ -238,6 +252,42 @@ class TestBackgroundScheduler:
         assert rec.metadata["source_metadata"]["rule"] == "after_hours_zero_occupancy_hvac_load"
         assert rec.expected_impact["cost_zar"] == 14.86
         assert "After-hours HVAC plant operation requires operator review." in rec.reason
+
+    def test_occupancy_conflict_manual_advisory_is_medium_risk_and_explicitly_blocked(self):
+        from app.models.recommendation import ActionRiskLevel, RecommendationStatus
+        from app.services.background_scheduler import _build_manual_advisory_recommendation
+
+        rec = _build_manual_advisory_recommendation(
+            site_id="site-002",
+            rec_dict={
+                "target_equipment": "SITE-002-HVAC-OCCUPANCY-VERIFY",
+                "recommended_value": "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict",
+                "reason": "Aggregate reports zero occupancy while CO2 indicates people may be present.",
+                "confidence": 0.42,
+                "risk_level": "medium",
+                "metadata": {
+                    "rule": "occupancy_conflict_blocks_hvac_shutdown",
+                    "blocked_rule": "closed_empty_building_hvac_running",
+                    "advisory_type": "occupancy_conflict_control_gate",
+                },
+            },
+            equipment_id="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            action_value="Hold blanket HVAC shutdown; verify occupancy/IAQ conflict",
+            confidence_num=0.42,
+            optimization_profile="cost",
+            projected_savings={"cost_zar_per_hour": 0.0},
+            current_stage="supervised",
+            validation_results=[],
+        )
+
+        assert rec.status == RecommendationStatus.PENDING
+        assert rec.risk_level == ActionRiskLevel.MEDIUM
+        assert rec.requires_approval is True
+        assert rec.action["execution_blocked"] is True
+        assert rec.action["blocker"] == "occupancy_signal_conflict"
+        assert rec.metadata["operator_label"] == "Occupancy conflict — verify before HVAC shutdown"
+        assert rec.metadata["source_metadata"]["rule"] == "occupancy_conflict_blocks_hvac_shutdown"
+        assert "Occupancy and IAQ signals conflict" in rec.reason
 
     def test_bridge_object_catalog_maps_to_point_asset_rows(self):
         """Bridge /objects rows should persist enough BACnet metadata for meter kWh lookup."""

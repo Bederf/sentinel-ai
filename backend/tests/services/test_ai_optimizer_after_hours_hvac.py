@@ -246,6 +246,63 @@ def test_after_hours_hvac_rule_does_not_fire_when_occupied():
     assert _after_hours_recs(result) == []
 
 
+def test_aggregate_zero_with_fused_occupancy_conflict_emits_conflict_advisory_not_shutdown():
+    optimizer = _optimizer()
+
+    class _Conflict:
+        signals = ("simbiot_aggregate", "co2_elevation")
+        delta_pct = 100.0
+        description = "simbiot_aggregate (0%) vs co2_elevation (100%) — Δ100pp"
+
+    class _Signal:
+        def __init__(self, source, pct, confidence, raw_value):
+            self.source = source
+            self.normalized_pct = pct
+            self.confidence = confidence
+            self.freshness_minutes = 2.0
+            self.is_available = True
+            self.raw_value = raw_value
+
+    class _Fused:
+        occupancy_percent = 100.0
+        occupancy_count = 0
+        confidence = 0.6
+        is_occupied = True
+        is_uncertain = True
+        may_suppress = False
+        gate_override = "conflict_uncertain"
+        conflicts = (_Conflict(),)
+        signals = {
+            "simbiot_aggregate": _Signal("simbiot_aggregate", 0.0, 0.95, {"total_occupancy": 0}),
+            "co2_elevation": _Signal("co2_elevation", 100.0, 0.6, {"avg_co2": 1100.0}),
+        }
+
+    recommendations = optimizer._append_after_hours_zero_occupancy_advisory(
+        "site-002",
+        {
+            **_conditions("2026-06-18T22:00:00", occupancy=0, hvac_kw=24.0),
+            "_fused_occupancy": _Fused(),
+        },
+        {"hvac": [_chiller()], "power": [], "lighting": [], "meter": []},
+        [],
+    )
+
+    assert _after_hours_recs(type("Result", (), {"recommendations": recommendations})()) == []
+    conflict_recs = [
+        rec
+        for rec in recommendations
+        if rec.get("metadata", {}).get("rule") == "occupancy_conflict_blocks_hvac_shutdown"
+    ]
+    assert len(conflict_recs) == 1
+    rec = conflict_recs[0]
+    assert rec["risk_level"] == "medium"
+    assert rec["confidence"] == 0.42
+    assert rec["action"]["execution_blocked"] is True
+    assert rec["action"]["blocker"] == "occupancy_signal_conflict"
+    assert "Hold blanket HVAC shutdown" in rec["recommended_value"]
+    assert rec["metadata"]["blocked_rule"] == "closed_empty_building_hvac_running"
+
+
 def test_closed_empty_hvac_context_uses_site_specific_peak_threshold():
     optimizer = _optimizer()
 
@@ -691,7 +748,11 @@ async def test_open_occupied_building_uses_normal_llm_optimization_path(monkeypa
     monkeypatch.setattr(optimizer, "_gather_decision_memory", _noop_decision_memory)
     monkeypatch.setattr(optimizer, "_gather_feedback_success_rates", lambda *_args, **_kwargs: "")
     monkeypatch.setattr(optimizer.context_precompute_service, "compute", _noop_precompute)
-    monkeypatch.setattr(optimizer, "_build_optimization_prompt", lambda *_args, **_kwargs: "prompt")
+
+    async def _build_prompt(*_args, **_kwargs):
+        return "prompt"
+
+    monkeypatch.setattr(optimizer, "_build_optimization_prompt", _build_prompt)
     monkeypatch.setattr(optimizer, "_analyze_with_claude", _llm_recommendation)
     monkeypatch.setattr(optimizer, "_apply_quality_gate", _noop_quality_gate)
     monkeypatch.setattr(optimizer, "_enrich_with_health_features", _noop_health_features)

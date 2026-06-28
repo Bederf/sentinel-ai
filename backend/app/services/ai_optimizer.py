@@ -54,6 +54,8 @@ SERVED_ZONE_EMPTY_OCCUPANCY_PCT = 5.0
 SERVED_ZONE_STATE_FRESHNESS_MINUTES = 45
 SERVED_ZONE_PRE_OCCUPANCY_WINDOW_MINUTES = 60
 SERVED_ZONE_GATE_RULE = "closed_empty_served_zones_hvac_running"
+OCCUPANCY_CONFLICT_HVAC_RULE = "occupancy_conflict_blocks_hvac_shutdown"
+OCCUPANCY_CONFLICT_HVAC_CONFIDENCE = 0.42
 
 
 async def load_equipment_from_supabase() -> list[dict]:
@@ -414,6 +416,15 @@ class AIOptimizerService:
                 logger.warning(f"No optimization profile found for site {site_id}, using defaults")
         except Exception as e:
             logger.warning(f"Failed to load profile for site {site_id}: {e}")
+
+        # Pre-load plant_enable mappings so both the early gate and post-LLM gate
+        # can generate per-AHU executable recs without an async DB call inside a sync method.
+        current_conditions["_plant_enable_mappings"] = await self._fetch_plant_enable_mappings(site_id)
+
+        # The early operating-state gate must see the same fused occupancy
+        # verdict as the LLM prompt. Otherwise it can derive "closed/empty"
+        # from S002-SITE-AGG alone and miss zone/CO2 contradictions.
+        await self._format_live_occupancy_context(current_conditions, site_id)
 
         # Operating-state gate: if the site profile and live telemetry already
         # indicate a deterministic operational mismatch, return that category
@@ -918,14 +929,35 @@ class AIOptimizerService:
                     "compressor_current_1",
                     "compressor_current_2",
                     "fan_speed_pct",
+                    "fan_speed",
                     "chw_supply_temp",
                     "chw_return_temp",
+                    "supply_air_temp",
+                    "return_air_temp",
+                    "sat_setpoint",
+                    "filter_dp",
+                    "fault_state",
+                    "fault_code",
+                    "damper_position",
                     "room_temp",
                     "zone_temp",
                     "temperature",
                     "co2_ppm",
                     "humidity",
                     "anomaly_score",
+                    "autoencoder_anomaly_score",
+                    "lstm_anomaly_score",
+                    "battery_soc_percent",
+                    "soc_percent",
+                    "soc_pct",
+                    "grid_consumption_power_kw",
+                    "grid_feed_power_kw",
+                    # DALI PIR occupancy signals
+                    "A_Occupancy",
+                    "B_Occupancy",
+                    "Occupancy",
+                    # active_occupants from ACS
+                    "active_occupants",
                 ]
                 reading_resp = (
                     sb_telemetry.table("equipment_sensor_readings")
@@ -946,8 +978,8 @@ class AIOptimizerService:
                 site_prefix = site_id.replace("site-", "S").upper()
                 site_agg_equipment = f"{site_prefix}-SITE-AGG"
                 chiller_agg_equipment = f"{site_prefix}-CHILLER-AGG"
-                chiller_equipment = f"{site_prefix}-CHILLER-B01"
-                cooling_tower_equipment = f"{site_prefix}-CT-R01"
+                chiller_equipment = f"{site_prefix}-CHILLER-B1-001"
+                cooling_tower_equipment = f"{site_prefix}-CT-R-001"
 
                 site_agg: dict[str, Any] = {}
                 for sensor in ("total_occupancy", "occupied_zones", "zone_count", "peak_zone_density"):
@@ -1023,10 +1055,49 @@ class AIOptimizerService:
                     conditions["hvac_runtime"] = hvac_runtime
                     conditions["_data_sources"]["hvac_runtime"] = "equipment_sensor_readings"
 
+                # BESS state — SOC affects load-shift recommendations.
+                # Try all known equipment codes: naming varies by site/commission.
+                bess_candidates = [
+                    f"{site_prefix}-BESS-B01",
+                    f"{site_prefix}-BESS-B1-001",
+                    f"{site_prefix}-BESS-001",
+                ]
+                bess_state: dict[str, Any] = {}
+                for bess_equipment in bess_candidates:
+                    for sensor, output in (
+                        ("battery_soc_percent", "soc_percent"),
+                        ("soc_percent", "soc_percent"),
+                        ("soc_pct", "soc_percent"),
+                        ("grid_consumption_power_kw", "grid_import_kw"),
+                        ("grid_feed_power_kw", "grid_export_kw"),
+                    ):
+                        row = latest.get((bess_equipment, sensor))
+                        if row and row.get("value") is not None and output not in bess_state:
+                            bess_state[output] = float(row["value"])
+                            bess_state["_equipment"] = bess_equipment
+                if bess_state:
+                    conditions["bess"] = bess_state
+                    conditions["_data_sources"]["bess"] = "equipment_sensor_readings"
+
+                # Weather station — use on-site sensor when OpenWeather API unavailable.
+                weather_equipment = f"{site_prefix}-WEATHER-001"
+                if conditions["_data_sources"].get("outdoor_temp") == "default":
+                    row = latest.get((weather_equipment, "temperature"))
+                    if row and row.get("value") is not None:
+                        conditions["outdoor_temp"] = float(row["value"])
+                        conditions["_data_sources"]["outdoor_temp"] = "weather_station"
+                if conditions["_data_sources"].get("humidity") == "default":
+                    row = latest.get((weather_equipment, "humidity"))
+                    if row and row.get("value") is not None:
+                        conditions["humidity"] = float(row["value"])
+                        conditions["_data_sources"]["humidity"] = "weather_station"
+
                 zone_telemetry: dict[str, dict[str, Any]] = {}
                 zone_equipment_prefixes = (
                     f"{site_prefix}-FCU-",
                     f"{site_prefix}-VAV-",
+                    f"{site_prefix}-AHU-",
+                    f"{site_prefix}-DALI-",
                 )
                 zone_sensor_names = {
                     "room_temp",
@@ -1035,6 +1106,20 @@ class AIOptimizerService:
                     "co2_ppm",
                     "humidity",
                     "anomaly_score",
+                    "autoencoder_anomaly_score",
+                    "lstm_anomaly_score",
+                    "fault_state",
+                    "fault_code",
+                    "supply_air_temp",
+                    "return_air_temp",
+                    "sat_setpoint",
+                    "filter_dp",
+                    "fan_speed",
+                    "damper_position",
+                    # DALI PIR occupancy
+                    "A_Occupancy",
+                    "B_Occupancy",
+                    "Occupancy",
                 }
                 for (equipment_id, sensor), row in latest.items():
                     if not equipment_id.startswith(zone_equipment_prefixes) or sensor not in zone_sensor_names:
@@ -1433,6 +1518,28 @@ class AIOptimizerService:
             except Exception as e:
                 logger.warning(f"[IAQ] Service error: {e}", exc_info=True)
                 conditions["iaq"] = {}
+
+            # Inject learned occupancy patterns so the AI model knows typical
+            # arrival/departure times and can reason about pre-conditioning.
+            try:
+                from app.services.occupancy_pattern_service import get_occupancy_pattern_service
+
+                now_local = datetime.now(timezone(timedelta(hours=2)))
+                dow = now_local.weekday() + 1  # Python Mon=0 → PostgreSQL Mon=1; Sun wraps to 0
+                if now_local.weekday() == 6:
+                    dow = 0
+                pattern_svc = get_occupancy_pattern_service()
+                patterns = pattern_svc.get_patterns(site_id)
+                if patterns:
+                    today_pattern = patterns.get(dow)
+                    conditions["occupancy_patterns"] = {
+                        "today_dow": dow,
+                        "today": today_pattern,
+                        "all_days": patterns,
+                    }
+                    conditions["_data_sources"]["occupancy_patterns"] = "site_occupancy_patterns"
+            except Exception as e:
+                logger.warning("[AI-OPT] Could not load occupancy patterns for %s: %s", site_id, e)
 
             return conditions
 
@@ -3473,8 +3580,15 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
     ) -> list[dict[str, Any]]:
         """Apply the site-profile operating-state policy to HVAC recommendations.
 
-        This is intentionally driven by site schedule, live occupancy, HVAC load,
-        and safety constraints. It is not a Sunday/evening special case.
+        When verified plant_enable mappings exist for AHUs, generates per-AHU
+        executable recs (supervised approval required). Falls back to a single
+        site-level advisory when no mappings exist.
+
+        Gate fires only when multi-signal fused occupancy confirms zero occupancy
+        AND the building is outside its scheduled operating hours. If any occupancy
+        signal detects people (DALI PIR, CO2 elevation, badge entries, AHU heat
+        load), the fused verdict sets may_suppress=False and this function returns
+        without generating any recs.
         """
         if any(self._is_closed_empty_hvac_policy_rec(rec) for rec in recommendations):
             return recommendations
@@ -3483,6 +3597,12 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
 
         context = self._closed_empty_hvac_context(site_id, current_conditions)
         if not context:
+            conflict_context = self._closed_empty_hvac_conflict_context(site_id, current_conditions)
+            if conflict_context:
+                return [
+                    *recommendations,
+                    self._closed_empty_hvac_conflict_advisory(site_id, conflict_context),
+                ]
             return recommendations
 
         recommendations = [rec for rec in recommendations if not self._is_hvac_runtime_tuning_recommendation(rec)]
@@ -3492,8 +3612,74 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             for wo in current_conditions.get("active_urgent_work_orders", [])
             if wo.get("equipment_code")
         }
-        chillers = self._find_devices_by_type(hvac_devices, "chiller")
         ahus = self._find_devices_by_type(hvac_devices, "ahu")
+
+        hvac_kw_float = context["hvac_kw"]
+        total_kw_float = context["total_kw"]
+        threshold_kw = context["threshold_kw"]
+        load_share = (hvac_kw_float / total_kw_float * 100.0) if total_kw_float > 0 else None
+        share_text = f", {load_share:.1f}% of site load" if load_share is not None else ""
+
+        # Plant enable path: generate per-AHU executable recs when verified write
+        # points exist. Pre-loaded into current_conditions by analyze_building.
+        plant_enable_mappings: dict[str, str] = current_conditions.get("_plant_enable_mappings") or {}
+        eligible_ahus = [d for d in ahus if d.id in plant_enable_mappings and d.id not in urgent_equipment]
+
+        if eligible_ahus:
+            excess_kwh = max(0.0, hvac_kw_float - threshold_kw)
+            per_ahu_savings = round(excess_kwh / len(eligible_ahus), 1)
+            for ahu in eligible_ahus:
+                bms_point = plant_enable_mappings[ahu.id]
+                recommendations.append(
+                    {
+                        "equipment_id": ahu.id,
+                        "equipment_name": getattr(ahu, "name", None) or ahu.id,
+                        "target_equipment": ahu.id,
+                        "point_name": "plant_enable",
+                        "current_value": 1,
+                        "recommended_value": 0,
+                        "unit": "",
+                        "system": "hvac",
+                        "action_type": "ai_optimization",
+                        "action": {
+                            "point": "plant_enable",
+                            "value": 0,
+                            "execution_blocked": False,
+                        },
+                        "confidence": 0.85,
+                        "savings_kwh": per_ahu_savings,
+                        "reason": (
+                            f"Building is closed with zero occupancy but {ahu.id} is still running: "
+                            f"site HVAC total {hvac_kw_float:.1f} kW exceeds threshold {threshold_kw:.1f} kW"
+                            f"{share_text}. Shut down plant to eliminate after-hours energy waste."
+                        ),
+                        "metadata": {
+                            "rule": "closed_empty_building_hvac_running",
+                            "logical_family": "site_hvac_after_hours_operating_state",
+                            "legacy_rule": "after_hours_zero_occupancy_hvac_load",
+                            "advisory_type": "site_profile_hvac_state_correction",
+                            "outside_operating_hours": True,
+                            "total_occupancy": context["total_occupancy"],
+                            "occupied_zones": context["occupied_zones"],
+                            "hvac_kw": hvac_kw_float,
+                            "threshold_kw": round(threshold_kw, 2),
+                            "enforced_after_llm": True,
+                            "suppressed_runtime_tuning": True,
+                            "plant_enable_bms_point": bms_point,
+                        },
+                    }
+                )
+            logger.warning(
+                "[AI-OPT] Closed/empty HVAC: generated plant_enable recs for %d AHU(s) at %s (%.1f kW > %.1f kW)",
+                len(eligible_ahus),
+                site_id,
+                hvac_kw_float,
+                threshold_kw,
+            )
+            return recommendations
+
+        # Advisory fallback: no verified plant_enable mappings for eligible AHUs.
+        chillers = self._find_devices_by_type(hvac_devices, "chiller")
         target = next((d for d in chillers if d.id not in urgent_equipment), None)
         if target is None:
             target = next((d for d in ahus if d.id not in urgent_equipment), None)
@@ -3516,11 +3702,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             target_id = f"{site_id.upper()}-HVAC-SCHEDULE"
             target_name = "HVAC schedule"
 
-        hvac_kw_float = context["hvac_kw"]
-        total_kw_float = context["total_kw"]
-        threshold_kw = context["threshold_kw"]
-        load_share = (hvac_kw_float / total_kw_float * 100.0) if total_kw_float > 0 else None
-        share_text = f", {load_share:.1f}% of site load" if load_share is not None else ""
         recommendations.append(
             {
                 "equipment_id": target_id,
@@ -3548,6 +3729,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 ),
                 "metadata": {
                     "rule": "closed_empty_building_hvac_running",
+                    "logical_family": "site_hvac_after_hours_operating_state",
                     "legacy_rule": "after_hours_zero_occupancy_hvac_load",
                     "advisory_type": "site_profile_hvac_state_correction",
                     "outside_operating_hours": True,
@@ -3567,6 +3749,173 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             threshold_kw,
         )
         return recommendations
+
+    def _closed_empty_hvac_conflict_context(
+        self,
+        site_id: str,
+        current_conditions: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        """Return context when aggregate empty/HVAC-high is contradicted.
+
+        This is intentionally separate from `_closed_empty_hvac_context`: the
+        presence of a fused occupied/uncertain verdict should not merely remove
+        the shutdown recommendation. It is itself an operator-visible condition
+        because the aggregate trigger is unsafe to act on.
+        """
+        fused = current_conditions.get("_fused_occupancy")
+        if fused is None or getattr(fused, "may_suppress", False):
+            return None
+
+        electrical = current_conditions.get("electrical") or {}
+        site_aggregate = current_conditions.get("site_aggregate") or {}
+
+        def _as_float(value, default: float = 0.0) -> float:
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return default
+
+        total_occupancy = site_aggregate.get("total_occupancy")
+        occupied_zones = site_aggregate.get("occupied_zones")
+        zone_count = site_aggregate.get("zone_count")
+        aggregate_zero = (isinstance(total_occupancy, (int, float)) and float(total_occupancy) == 0) or (
+            isinstance(occupied_zones, (int, float))
+            and float(occupied_zones) == 0
+            and isinstance(zone_count, (int, float))
+            and float(zone_count) > 0
+        )
+        if not aggregate_zero:
+            return None
+
+        current_time = self._current_conditions_time(current_conditions)
+        if not self._is_outside_site_operating_hours(site_id, current_time):
+            return None
+
+        active_safety_constraints = current_conditions.get("active_safety_constraints") or current_conditions.get(
+            "safety_constraints"
+        )
+        if active_safety_constraints:
+            return None
+
+        hvac_kw_float = _as_float(electrical.get("hvac_kw"))
+        total_kw_float = _as_float(electrical.get("total_kw"))
+        threshold_kw = self._after_hours_hvac_threshold_kw(site_id, current_conditions)
+        if hvac_kw_float <= threshold_kw:
+            return None
+
+        conflicts = []
+        for conflict in getattr(fused, "conflicts", ()) or ():
+            conflicts.append(
+                {
+                    "signals": list(getattr(conflict, "signals", ())),
+                    "delta_pct": getattr(conflict, "delta_pct", None),
+                    "description": getattr(conflict, "description", ""),
+                }
+            )
+
+        signals = {}
+        for source, verdict in (getattr(fused, "signals", {}) or {}).items():
+            if getattr(verdict, "is_available", False):
+                signals[source] = {
+                    "normalized_pct": getattr(verdict, "normalized_pct", None),
+                    "confidence": getattr(verdict, "confidence", None),
+                    "freshness_minutes": getattr(verdict, "freshness_minutes", None),
+                    "raw_value": getattr(verdict, "raw_value", None),
+                }
+
+        return {
+            "hvac_kw": hvac_kw_float,
+            "total_kw": total_kw_float,
+            "threshold_kw": threshold_kw,
+            "total_occupancy": total_occupancy,
+            "occupied_zones": occupied_zones,
+            "zone_count": zone_count,
+            "fused_occupancy_percent": getattr(fused, "occupancy_percent", None),
+            "fused_confidence": getattr(fused, "confidence", None),
+            "fused_is_occupied": getattr(fused, "is_occupied", None),
+            "fused_is_uncertain": getattr(fused, "is_uncertain", None),
+            "fused_gate_override": getattr(fused, "gate_override", None),
+            "conflicts": conflicts,
+            "signals": signals,
+            "current_time": current_time.isoformat(),
+        }
+
+    def _closed_empty_hvac_conflict_advisory(self, site_id: str, context: dict[str, Any]) -> dict[str, Any]:
+        load_share = (
+            context["hvac_kw"] / context["total_kw"] * 100.0
+            if context.get("total_kw") and context["total_kw"] > 0
+            else None
+        )
+        share_text = f", {load_share:.1f}% of site load" if load_share is not None else ""
+        conflict_text = "; ".join(
+            str(item.get("description") or item.get("signals") or "") for item in context.get("conflicts", []) if item
+        )
+        if not conflict_text:
+            conflict_text = (
+                f"fused occupancy={context.get('fused_occupancy_percent')}%, "
+                f"occupied={context.get('fused_is_occupied')}, uncertain={context.get('fused_is_uncertain')}"
+            )
+
+        return {
+            "equipment_id": f"{site_id.upper()}-HVAC-OCCUPANCY-VERIFY",
+            "equipment_name": "HVAC occupancy verification",
+            "target_equipment": f"{site_id.upper()}-HVAC-OCCUPANCY-VERIFY",
+            "point_name": "",
+            "current_value": context["hvac_kw"],
+            "recommended_value": (
+                "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict and apply zone-scoped setback only "
+                "where occupancy and CO2 confirm empty conditions"
+            ),
+            "unit": "kW",
+            "system": "hvac",
+            "action_type": "ai_optimization",
+            "risk_level": "medium",
+            "action": {
+                "point": None,
+                "value": (
+                    "Verify occupancy and IAQ before any site-wide HVAC shutdown; do not suppress zones with "
+                    "occupied or high-CO2 evidence"
+                ),
+                "execution_blocked": True,
+                "blocker": "occupancy_signal_conflict",
+            },
+            "confidence": OCCUPANCY_CONFLICT_HVAC_CONFIDENCE,
+            "savings_kwh": 0.0,
+            "reason": (
+                "Do not apply the closed/zero-occupancy HVAC shutdown rule yet. The aggregate signal reports zero "
+                f"occupancy while fused zone/IAQ evidence contradicts that trigger ({conflict_text}). HVAC load is "
+                f"{context['hvac_kw']:.1f} kW versus threshold {context['threshold_kw']:.1f} kW{share_text}, "
+                "so this is a real operating-state concern, but the safe recommendation is operator verification "
+                "and zone-scoped action rather than a blanket site shutdown."
+            ),
+            "metadata": {
+                "rule": OCCUPANCY_CONFLICT_HVAC_RULE,
+                "logical_family": "site_hvac_after_hours_operating_state",
+                "blocked_rule": "closed_empty_building_hvac_running",
+                "supersedes_rules": [
+                    "closed_empty_building_hvac_running",
+                    "after_hours_zero_occupancy_hvac_load",
+                ],
+                "legacy_rule": "after_hours_zero_occupancy_hvac_load",
+                "advisory_type": "occupancy_conflict_control_gate",
+                "outside_operating_hours": True,
+                "total_occupancy": context["total_occupancy"],
+                "occupied_zones": context["occupied_zones"],
+                "zone_count": context["zone_count"],
+                "hvac_kw": context["hvac_kw"],
+                "threshold_kw": round(context["threshold_kw"], 2),
+                "fused_occupancy_percent": context.get("fused_occupancy_percent"),
+                "fused_confidence": context.get("fused_confidence"),
+                "fused_is_occupied": context.get("fused_is_occupied"),
+                "fused_is_uncertain": context.get("fused_is_uncertain"),
+                "fused_gate_override": context.get("fused_gate_override"),
+                "conflicts": context.get("conflicts", []),
+                "signals": context.get("signals", {}),
+                "suppressed_runtime_tuning": True,
+                "execution_should_remain_blocked": True,
+                "risk_basis": "IAQ/comfort risk if aggregate-zero shutdown is wrong",
+            },
+        }
 
     async def _load_served_zone_gate_context(
         self,
@@ -4461,6 +4810,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         return metadata.get("rule") in {
             "closed_empty_building_hvac_running",
             "after_hours_zero_occupancy_hvac_load",
+            OCCUPANCY_CONFLICT_HVAC_RULE,
         }
 
     @staticmethod
@@ -6218,43 +6568,96 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             closed_empty_hvac_running = True
             load_share = (hvac_kw_float / total_kw_float * 100.0) if total_kw_float > 0 else None
             share_text = f", {load_share:.1f}% of site load" if load_share is not None else ""
-            recommendations.append(
-                {
-                    "equipment_id": after_hours_target.id,
-                    "equipment_name": after_hours_target.name,
-                    "target_equipment": after_hours_target.id,
-                    "point_name": "",
-                    "current_value": hvac_kw_float,
-                    "recommended_value": ("Shut down or setback non-critical HVAC plant according to the site profile"),
-                    "unit": "kW",
-                    "system": "hvac",
-                    "action_type": "ai_optimization",
-                    "action": {
-                        "point": None,
-                        "value": "Shut down or setback non-critical HVAC plant according to the site profile",
-                        "execution_blocked": True,
-                        "blocker": "unresolved_bms_point",
-                    },
-                    "confidence": 0.72,
-                    "savings_kwh": round(max(0.0, hvac_kw_float - after_hours_threshold_kw), 1),
-                    "reason": (
-                        "Site profile indicates the building is closed and live occupancy is zero, but HVAC is still running: "
-                        f"HVAC {hvac_kw_float:.1f} kW exceeds threshold {after_hours_threshold_kw:.1f} kW"
-                        f"{share_text}. The correct operational response is shutdown or setback of non-critical HVAC, "
-                        "unless a safety, preservation, or tenant requirement says otherwise."
-                    ),
-                    "metadata": {
-                        "rule": "closed_empty_building_hvac_running",
-                        "legacy_rule": "after_hours_zero_occupancy_hvac_load",
-                        "outside_operating_hours": True,
-                        "total_occupancy": total_occupancy,
-                        "occupied_zones": occupied_zones,
-                        "hvac_kw": hvac_kw_float,
-                        "threshold_kw": round(after_hours_threshold_kw, 2),
-                        "suppressed_runtime_tuning": True,
-                    },
-                }
-            )
+
+            # Plant enable path: per-AHU executable recs when write points are confirmed.
+            # Mappings are pre-loaded by analyze_building into current_conditions.
+            plant_enable_mappings: dict[str, str] = current_conditions.get("_plant_enable_mappings") or {}
+            eligible_ahus = [d for d in ahus if d.id in plant_enable_mappings and d.id not in urgent_equipment]
+
+            if eligible_ahus:
+                excess_kwh = max(0.0, hvac_kw_float - after_hours_threshold_kw)
+                per_ahu_savings = round(excess_kwh / len(eligible_ahus), 1)
+                for ahu in eligible_ahus:
+                    bms_point = plant_enable_mappings[ahu.id]
+                    recommendations.append(
+                        {
+                            "equipment_id": ahu.id,
+                            "equipment_name": getattr(ahu, "name", None) or ahu.id,
+                            "target_equipment": ahu.id,
+                            "point_name": "plant_enable",
+                            "current_value": 1,
+                            "recommended_value": 0,
+                            "unit": "",
+                            "system": "hvac",
+                            "action_type": "ai_optimization",
+                            "action": {
+                                "point": "plant_enable",
+                                "value": 0,
+                                "execution_blocked": False,
+                            },
+                            "confidence": 0.85,
+                            "savings_kwh": per_ahu_savings,
+                            "reason": (
+                                f"Building is closed with zero occupancy but {ahu.id} is still running: "
+                                f"site HVAC total {hvac_kw_float:.1f} kW exceeds threshold {after_hours_threshold_kw:.1f} kW"
+                                f"{share_text}. Shut down plant to eliminate after-hours energy waste."
+                            ),
+                            "metadata": {
+                                "rule": "closed_empty_building_hvac_running",
+                                "legacy_rule": "after_hours_zero_occupancy_hvac_load",
+                                "advisory_type": "site_profile_hvac_state_correction",
+                                "outside_operating_hours": True,
+                                "total_occupancy": total_occupancy,
+                                "occupied_zones": occupied_zones,
+                                "hvac_kw": hvac_kw_float,
+                                "threshold_kw": round(after_hours_threshold_kw, 2),
+                                "suppressed_runtime_tuning": True,
+                                "plant_enable_bms_point": bms_point,
+                            },
+                        }
+                    )
+            else:
+                # Advisory fallback: no plant_enable mappings for eligible AHUs.
+                recommendations.append(
+                    {
+                        "equipment_id": after_hours_target.id,
+                        "equipment_name": after_hours_target.name,
+                        "target_equipment": after_hours_target.id,
+                        "point_name": "",
+                        "current_value": hvac_kw_float,
+                        "recommended_value": (
+                            "Shut down or setback non-critical HVAC plant according to the site profile"
+                        ),
+                        "unit": "kW",
+                        "system": "hvac",
+                        "action_type": "ai_optimization",
+                        "action": {
+                            "point": None,
+                            "value": "Shut down or setback non-critical HVAC plant according to the site profile",
+                            "execution_blocked": True,
+                            "blocker": "missing_verified_plant_enable_or_schedule_point",
+                        },
+                        "confidence": 0.72,
+                        "savings_kwh": round(max(0.0, hvac_kw_float - after_hours_threshold_kw), 1),
+                        "reason": (
+                            "Site profile indicates the building is closed and live occupancy is zero, but HVAC is still running: "
+                            f"HVAC {hvac_kw_float:.1f} kW exceeds threshold {after_hours_threshold_kw:.1f} kW"
+                            f"{share_text}. The correct operational response is shutdown or setback of non-critical HVAC, "
+                            "unless a safety, preservation, or tenant requirement says otherwise."
+                        ),
+                        "metadata": {
+                            "rule": "closed_empty_building_hvac_running",
+                            "legacy_rule": "after_hours_zero_occupancy_hvac_load",
+                            "advisory_type": "site_profile_hvac_state_correction",
+                            "outside_operating_hours": True,
+                            "total_occupancy": total_occupancy,
+                            "occupied_zones": occupied_zones,
+                            "hvac_kw": hvac_kw_float,
+                            "threshold_kw": round(after_hours_threshold_kw, 2),
+                            "suppressed_runtime_tuning": True,
+                        },
+                    }
+                )
         else:
             closed_empty_hvac_running = False
 
@@ -6907,6 +7310,40 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 f"{recommendation.reasoning}"
             ),
         )
+
+    async def _fetch_plant_enable_mappings(self, site_id: str) -> dict[str, str]:
+        """Return {extracted_asset_id: bms_point_id} for verified plant_enable points.
+
+        Pre-loaded at the start of analyze_building so both the early gate and
+        post-LLM gate can generate executable recs without blocking async I/O
+        inside synchronous helper methods.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            sb = get_supabase_client()
+            site_resp = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if not site_resp.data:
+                return {}
+            site_uuid = site_resp.data[0]["id"]
+            resp = (
+                sb.table("point_asset_mappings")
+                .select("bms_point_id,extracted_asset_id,parameter_type")
+                .eq("site_id", site_uuid)
+                .eq("parameter_name", "plant_enable")
+                .eq("is_verified", True)
+                .execute()
+            )
+            return {
+                row["extracted_asset_id"]: row["bms_point_id"]
+                for row in (resp.data or [])
+                if row.get("extracted_asset_id")
+                and row.get("bms_point_id")
+                and self._mapping_type_is_writable(row.get("parameter_type"))
+            }
+        except Exception as e:
+            logger.warning("[AI-OPT] Could not load plant_enable mappings for %s: %s", site_id, e)
+            return {}
 
     def _get_device_zone_priority(self, device_id: str) -> int:
         """Get zone priority for a device by ID (synchronous helper)."""

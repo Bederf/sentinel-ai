@@ -166,6 +166,15 @@ class RecommendationRepository(SupabaseRepository):
             logger.warning("Control recommendation dedupe check failed: %s", exc)
         result = await self._supabase_insert(rec_dict)
         if result:
+            await self._record_audit_event(
+                recommendation_id=str(result.get("id") or rec.id),
+                site_id=str(result.get("site_id") or rec.site_id),
+                event_type="created",
+                previous_state={},
+                new_state=result,
+                source="recommendation_repository.create",
+                metadata={"action_type": result.get("action_type")},
+            )
             return Recommendation.from_dict(result)
         logger.error("Error creating recommendation %s: canonical DB write failed", rec.id)
         raise RuntimeError("Failed to persist recommendation to canonical DB store")
@@ -383,6 +392,22 @@ class RecommendationRepository(SupabaseRepository):
             count = len(result.data or [])
             if count:
                 cache.delete_pattern("recommendations:*")
+                for row in result.data or []:
+                    previous_state = {
+                        "status": "pending",
+                        "risk_level": row.get("risk_level"),
+                        "target_equipment": row.get("target_equipment"),
+                        "action_type": row.get("action_type"),
+                    }
+                    await self._record_audit_event(
+                        recommendation_id=str(row.get("id") or ""),
+                        site_id=str(row.get("site_id") or site_id),
+                        event_type="expired",
+                        previous_state=previous_state,
+                        new_state=row,
+                        source="recommendation_repository.expire_superseded_setpoints",
+                        metadata={"point_name": point_name},
+                    )
                 logger.info(
                     "[REC-SUPERSEDE] Expired %d stale pending recs for %s/%s",
                     count,
@@ -392,6 +417,101 @@ class RecommendationRepository(SupabaseRepository):
             return count
         except Exception as e:
             logger.warning("expire_superseded_setpoints failed for %s/%s: %s", target_equipment, point_name, e)
+            return 0
+
+    @staticmethod
+    def _metadata_rule(metadata: dict[str, Any] | None) -> str:
+        if not isinstance(metadata, dict):
+            return ""
+        source_metadata = metadata.get("source_metadata")
+        if isinstance(source_metadata, dict) and source_metadata.get("rule"):
+            return str(source_metadata.get("rule") or "")
+        return str(metadata.get("rule") or "")
+
+    async def expire_pending_by_source_rules(
+        self,
+        site_id: str,
+        source_rules: list[str] | tuple[str, ...] | set[str],
+        *,
+        superseded_by_rule: str,
+        superseded_reason: str,
+        target_prefixes: list[str] | tuple[str, ...] | set[str] | None = None,
+        limit: int = 500,
+    ) -> int:
+        """Expire active recommendations by logical rule, not target/point key.
+
+        This covers safety gates where the corrective recommendation intentionally
+        uses a different target than the stale recommendation it invalidates.
+        """
+        rules = {str(rule) for rule in source_rules if rule}
+        if not rules:
+            return 0
+        prefixes = tuple(str(prefix).upper() for prefix in (target_prefixes or ()) if prefix)
+        expired = 0
+        now_iso = datetime.now(UTC).isoformat()
+        try:
+            active = await self.get_by_status(site_id, RecommendationStatus.PENDING, limit=limit)
+            for rec in active:
+                status_value = rec.status.value if isinstance(rec.status, RecommendationStatus) else str(rec.status)
+                if status_value not in {
+                    RecommendationStatus.PENDING.value,
+                    RecommendationStatus.ADVISORY_INFO.value,
+                }:
+                    continue
+                if rec.action_type != "ai_optimization":
+                    continue
+                target = str(rec.target_equipment or "").upper()
+                if prefixes and not any(target.startswith(prefix) for prefix in prefixes):
+                    continue
+                rule = self._metadata_rule(rec.metadata)
+                if rule not in rules:
+                    continue
+
+                previous_state = rec.to_dict()
+                metadata = dict(rec.metadata or {})
+                metadata.update(
+                    {
+                        "superseded_by_rule": superseded_by_rule,
+                        "superseded_reason": superseded_reason,
+                        "superseded_at": now_iso,
+                    }
+                )
+                rec.metadata = metadata
+                rec.status = RecommendationStatus.EXPIRED
+                rec.approval_status = "superseded"
+                if superseded_reason and "[SUPERSEDED" not in str(rec.reason or ""):
+                    rec.reason = f"{rec.reason}\n\n[SUPERSEDED {now_iso}: {superseded_reason}]".strip()
+                updated = await self.update(rec.id, rec)
+                if updated:
+                    expired += 1
+                    await self._record_audit_event(
+                        recommendation_id=str(rec.id or ""),
+                        site_id=site_id,
+                        event_type="expired",
+                        previous_state=previous_state,
+                        new_state=updated.to_dict() if hasattr(updated, "to_dict") else metadata,
+                        source="recommendation_repository.expire_pending_by_source_rules",
+                        metadata={
+                            "source_rules": sorted(rules),
+                            "superseded_by_rule": superseded_by_rule,
+                        },
+                    )
+            if expired:
+                cache.delete_pattern("recommendations:*")
+                logger.warning(
+                    "[REC-SUPERSEDE] Expired %d pending recs for %s by source rules %s",
+                    expired,
+                    site_id,
+                    sorted(rules),
+                )
+            return expired
+        except Exception as e:
+            logger.warning(
+                "expire_pending_by_source_rules failed for %s/%s: %s",
+                site_id,
+                sorted(rules),
+                e,
+            )
             return 0
 
     async def expire_all_pending_for_equipment(self, site_id: str, target_equipment: str) -> int:
@@ -412,6 +532,22 @@ class RecommendationRepository(SupabaseRepository):
             count = len(result.data or [])
             if count:
                 cache.delete_pattern("recommendations:*")
+                for row in result.data or []:
+                    previous_state = {
+                        "status": "pending",
+                        "risk_level": row.get("risk_level"),
+                        "target_equipment": row.get("target_equipment"),
+                        "action_type": row.get("action_type"),
+                    }
+                    await self._record_audit_event(
+                        recommendation_id=str(row.get("id") or ""),
+                        site_id=str(row.get("site_id") or site_id),
+                        event_type="expired",
+                        previous_state=previous_state,
+                        new_state=row,
+                        source="recommendation_repository.expire_all_pending_for_equipment",
+                        metadata={"target_equipment": target_equipment},
+                    )
                 logger.info(
                     "[REC-FAULT-GATE] Expired %d stale pending recs for fault-gated equipment %s",
                     count,
@@ -428,10 +564,15 @@ class RecommendationRepository(SupabaseRepository):
         if not client:
             return None
         try:
+            previous_query = client.table("recommendations").select(self._COLUMNS).eq("id", rec_id).limit(1)
+            previous_result = await previous_query.execute()
+            previous = previous_result.data[0] if previous_result.data else {}
             payload = self._filter_supabase_payload(rec_dict)
             result = await client.table("recommendations").update(payload).eq("id", rec_id).execute()
             if result.data and len(result.data) > 0:
                 cache.delete_pattern("recommendations:*")
+                updated = result.data[0]
+                await self._record_status_update_event(previous, updated)
                 return result.data[0]
             return None
         except Exception as e:
@@ -510,6 +651,65 @@ class RecommendationRepository(SupabaseRepository):
         except Exception as e:
             logger.error("Supabase history aggregates query failed: %s", e)
             return {"total": 0, "actioned": 0, "verified": 0, "saving_kwh": 0.0, "saving_zar": 0.0}
+
+    async def _record_audit_event(
+        self,
+        *,
+        recommendation_id: str,
+        site_id: str,
+        event_type: str,
+        previous_state: dict[str, Any],
+        new_state: dict[str, Any],
+        source: str,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Best-effort append-only audit write. Recommendation writes must not fail on audit outage."""
+        if not recommendation_id or not site_id:
+            return
+        try:
+            from app.database.repositories.recommendation_audit_repository import (
+                get_recommendation_audit_repository,
+                recommendation_state,
+            )
+
+            audit_repo = get_recommendation_audit_repository()
+            await audit_repo.record_event(
+                recommendation_id=recommendation_id,
+                site_id=site_id,
+                event_type=event_type,
+                previous_state=previous_state,
+                new_state=recommendation_state(new_state),
+                actor_type="system",
+                source=source,
+                metadata=metadata or {},
+            )
+        except Exception as exc:
+            logger.warning("Recommendation audit event skipped: %s", exc)
+
+    async def _record_status_update_event(self, previous: dict[str, Any], updated: dict[str, Any]) -> None:
+        """Append an audit event for materialized recommendation updates."""
+        try:
+            from app.database.repositories.recommendation_audit_repository import (
+                infer_lifecycle_event_type,
+                recommendation_state,
+            )
+
+            previous_state = recommendation_state(previous)
+            new_state = recommendation_state(updated)
+            if previous_state == new_state:
+                return
+            event_type = infer_lifecycle_event_type(previous_state, new_state)
+            await self._record_audit_event(
+                recommendation_id=str(updated.get("id") or ""),
+                site_id=str(updated.get("site_id") or previous.get("site_id") or ""),
+                event_type=event_type,
+                previous_state=previous_state,
+                new_state=new_state,
+                source="recommendation_repository.update",
+                metadata={"action_type": updated.get("action_type")},
+            )
+        except Exception as exc:
+            logger.warning("Recommendation status audit event skipped: %s", exc)
 
 
 _repository: RecommendationRepository | None = None

@@ -30,6 +30,11 @@ from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
 EXPIRY_HOURS = 24  # Expire pending recommendations older than 24 hours
 PROTECTED_PENDING_RECOMMENDATION_ACTION_TYPES = {"coordinated_optimization"}
 PROTECTED_PENDING_AI_ACTION_TYPES = {"ai_optimization", "coordinated_optimization"}
+HVAC_OCCUPANCY_CONFLICT_RULE = "occupancy_conflict_blocks_hvac_shutdown"
+HVAC_CLOSED_EMPTY_RULES = {
+    "after_hours_zero_occupancy_hvac_load",
+    "closed_empty_building_hvac_running",
+}
 
 logger = logging.getLogger(__name__)
 
@@ -525,6 +530,43 @@ def _is_protected_pending_recommendation(action_type: str | None) -> bool:
     return bool(action_type in PROTECTED_PENDING_RECOMMENDATION_ACTION_TYPES)
 
 
+def _manual_advisory_risk_level(rec_dict: dict[str, Any], metadata: dict[str, Any]) -> Any:
+    """Resolve risk for non-writable advisories without flattening all to low."""
+    from app.models.recommendation import ActionRiskLevel
+
+    explicit = rec_dict.get("risk_level") or metadata.get("risk_level")
+    if isinstance(explicit, ActionRiskLevel):
+        return explicit
+    if isinstance(explicit, str):
+        try:
+            return ActionRiskLevel(explicit.lower())
+        except ValueError:
+            pass
+
+    if metadata.get("rule") == HVAC_OCCUPANCY_CONFLICT_RULE:
+        return ActionRiskLevel.MEDIUM
+
+    return ActionRiskLevel.LOW
+
+
+def _metadata_rule(metadata: dict[str, Any] | None) -> str:
+    if not isinstance(metadata, dict):
+        return ""
+    source_metadata = metadata.get("source_metadata")
+    if isinstance(source_metadata, dict) and source_metadata.get("rule"):
+        return str(source_metadata.get("rule") or "")
+    return str(metadata.get("rule") or "")
+
+
+def _has_pending_source_rule(recommendations: list[Any], source_rules: set[str]) -> bool:
+    for rec in recommendations:
+        if getattr(rec, "action_type", None) != "ai_optimization":
+            continue
+        if _metadata_rule(getattr(rec, "metadata", None)) in source_rules:
+            return True
+    return False
+
+
 def _build_manual_advisory_recommendation(
     *,
     site_id: str,
@@ -538,7 +580,7 @@ def _build_manual_advisory_recommendation(
     validation_results: list[dict[str, Any]] | None,
 ) -> Any:
     """Create the persisted manual advisory row for non-writable operational findings."""
-    from app.models.recommendation import ActionRiskLevel, Recommendation, RecommendationStatus
+    from app.models.recommendation import Recommendation, RecommendationStatus
 
     action = rec_dict.get("action") or {}
     adjustments = rec_dict.get("adjustments") or []
@@ -546,12 +588,17 @@ def _build_manual_advisory_recommendation(
     metadata = rec_dict.get("metadata", {}) or {}
     rule = metadata.get("rule")
     is_fault_advisory = metadata.get("advisory_type") == "fault_safety_gate"
+    risk_level = _manual_advisory_risk_level(rec_dict, metadata)
 
     if is_fault_advisory:
         manual_prefix = ""
         blocker = "active_fault_on_equipment_or_plant_group_mate"
         operator_label = "Fault condition — resolve before optimization resumes"
-    elif rule in {"after_hours_zero_occupancy_hvac_load", "closed_empty_building_hvac_running"}:
+    elif rule == HVAC_OCCUPANCY_CONFLICT_RULE:
+        manual_prefix = "Occupancy and IAQ signals conflict with the zero-occupancy HVAC shutdown trigger."
+        blocker = "occupancy_signal_conflict"
+        operator_label = "Occupancy conflict — verify before HVAC shutdown"
+    elif rule in HVAC_CLOSED_EMPTY_RULES:
         manual_prefix = "After-hours HVAC plant operation requires operator review."
         blocker = "missing_verified_plant_enable_or_schedule_point"
         operator_label = "Correct BMS closed-hours HVAC schedule"
@@ -583,11 +630,13 @@ def _build_manual_advisory_recommendation(
     }
     projected_savings = projected_savings or {}
 
+    _resolved_action_type = rec_dict.get("action_type") or "ai_optimization"
+
     return Recommendation(
         site_id=site_id,
         timestamp=datetime.utcnow(),
-        action_type=rec_dict.get("action_type") or "ai_optimization",
-        risk_level=ActionRiskLevel.LOW,
+        action_type=_resolved_action_type,
+        risk_level=risk_level,
         target_equipment=equipment_id,
         action={
             "point": None,
@@ -917,6 +966,7 @@ class BackgroundSchedulerService:
                 return False
         elif occupancy != 0:
             return False
+
         site_peak_kw = None
         try:
             client = get_supabase_client()
@@ -1545,6 +1595,14 @@ class BackgroundSchedulerService:
                                 for e in existing_pending
                                 if e.action_type == "ai_optimization"
                             )
+                            existing_hvac_conflict_advisory = _has_pending_source_rule(
+                                existing_pending,
+                                {HVAC_OCCUPANCY_CONFLICT_RULE},
+                            )
+                            existing_hvac_conflict_advisory = _has_pending_source_rule(
+                                existing_pending,
+                                {HVAC_OCCUPANCY_CONFLICT_RULE},
+                            )
 
                             validation_results = validation.get("validation_results", [])
                             for rec_dict in control_recs:
@@ -1555,11 +1613,32 @@ class BackgroundSchedulerService:
 
                                 # HVAC-SCHEDULE site-level dedup — skip if one already pending
                                 _rd_meta = rec_dict.get("metadata", {}) or {}
-                                if _rd_meta.get("rule") in {
-                                    "closed_empty_building_hvac_running",
-                                    "after_hours_zero_occupancy_hvac_load",
-                                }:
-                                    if existing_hvac_advisory:
+                                _rd_rule = _rd_meta.get("rule")
+                                if _rd_rule == HVAC_OCCUPANCY_CONFLICT_RULE:
+                                    try:
+                                        expired_count = asyncio.run_coroutine_threadsafe(
+                                            recommendation_repo.expire_pending_by_source_rules(
+                                                site_id,
+                                                HVAC_CLOSED_EMPTY_RULES,
+                                                superseded_by_rule=HVAC_OCCUPANCY_CONFLICT_RULE,
+                                                superseded_reason=(
+                                                    "Occupancy/IAQ conflict supersedes closed-empty HVAC shutdown; "
+                                                    "blanket site shutdown is unsafe until verified"
+                                                ),
+                                                target_prefixes=(site_id.upper(),),
+                                            ),
+                                            self._main_loop,
+                                        ).result(timeout=30)
+                                        if expired_count:
+                                            existing_hvac_advisory = False
+                                    except Exception as _exp_err:
+                                        logger.warning(
+                                            "[AI-OPT] Could not expire stale closed-empty HVAC recs for %s: %s",
+                                            site_id,
+                                            _exp_err,
+                                        )
+                                if _rd_rule in HVAC_CLOSED_EMPTY_RULES:
+                                    if existing_hvac_conflict_advisory or existing_hvac_advisory:
                                         skipped_count += 1
                                         continue
                                     existing_hvac_advisory = True
@@ -1709,11 +1788,32 @@ class BackgroundSchedulerService:
                             for rec_dict in advisory_recs:
                                 # HVAC-SCHEDULE site-level dedup — skip if one already pending
                                 _rd_meta = rec_dict.get("metadata", {}) or {}
-                                if _rd_meta.get("rule") in {
-                                    "closed_empty_building_hvac_running",
-                                    "after_hours_zero_occupancy_hvac_load",
-                                }:
-                                    if existing_hvac_advisory:
+                                _rd_rule = _rd_meta.get("rule")
+                                if _rd_rule == HVAC_OCCUPANCY_CONFLICT_RULE:
+                                    try:
+                                        expired_count = asyncio.run_coroutine_threadsafe(
+                                            recommendation_repo.expire_pending_by_source_rules(
+                                                site_id,
+                                                HVAC_CLOSED_EMPTY_RULES,
+                                                superseded_by_rule=HVAC_OCCUPANCY_CONFLICT_RULE,
+                                                superseded_reason=(
+                                                    "Occupancy/IAQ conflict supersedes closed-empty HVAC shutdown; "
+                                                    "blanket site shutdown is unsafe until verified"
+                                                ),
+                                                target_prefixes=(site_id.upper(),),
+                                            ),
+                                            self._main_loop,
+                                        ).result(timeout=30)
+                                        if expired_count:
+                                            existing_hvac_advisory = False
+                                    except Exception as _exp_err:
+                                        logger.warning(
+                                            "[AI-OPT] Could not expire stale closed-empty HVAC recs for %s: %s",
+                                            site_id,
+                                            _exp_err,
+                                        )
+                                if _rd_rule in HVAC_CLOSED_EMPTY_RULES:
+                                    if existing_hvac_conflict_advisory or existing_hvac_advisory:
                                         skipped_count += 1
                                         continue
                                     existing_hvac_advisory = True
@@ -1789,12 +1889,22 @@ class BackgroundSchedulerService:
                                     "confidence": "dropped",
                                     "note": "unresolved or unlicensed BMS point",
                                 }
+                                rec_metadata = rec_dict.get("metadata", {}) or {}
+                                rec_rule = rec_metadata.get("rule")
+                                rec_risk_level = _manual_advisory_risk_level(rec_dict, rec_metadata)
 
                                 if is_fault_advisory:
                                     manual_reason = rec_dict.get("reason", "")
                                     manual_prefix = ""
                                     rec_blocker = "active_fault_on_equipment_or_plant_group_mate"
                                     rec_operator_label = "Fault condition — resolve before optimization resumes"
+                                elif rec_rule == "occupancy_conflict_blocks_hvac_shutdown":
+                                    manual_reason = rec_dict.get("reason", "")
+                                    manual_prefix = "Occupancy and IAQ signals conflict with the zero-occupancy HVAC shutdown trigger."
+                                    if manual_prefix not in manual_reason:
+                                        manual_reason = f"{manual_prefix} {manual_reason}".strip()
+                                    rec_blocker = "occupancy_signal_conflict"
+                                    rec_operator_label = "Occupancy conflict — verify before HVAC shutdown"
                                 else:
                                     manual_reason = rec_dict.get("reason", "")
                                     manual_prefix = (
@@ -1823,7 +1933,7 @@ class BackgroundSchedulerService:
                                     site_id=site_id,
                                     timestamp=datetime.utcnow(),
                                     action_type=rec_dict.get("action_type") or "ai_optimization",
-                                    risk_level=ActionRiskLevel.LOW,
+                                    risk_level=rec_risk_level,
                                     target_equipment=equipment_id,
                                     action={
                                         "point": None,
@@ -1856,8 +1966,8 @@ class BackgroundSchedulerService:
                                         "point_resolution": point_resolution,
                                         "validation_results": validation_results,
                                         "equipment_name": rec_dict.get("equipment_name")
-                                        or rec_dict.get("metadata", {}).get("equipment_name"),
-                                        "source_metadata": rec_dict.get("metadata", {}),
+                                        or rec_metadata.get("equipment_name"),
+                                        "source_metadata": rec_metadata,
                                     },
                                 )
                                 asyncio.run_coroutine_threadsafe(
@@ -4372,6 +4482,28 @@ class BackgroundSchedulerService:
         )
         logger.info("recommendation_digest job registered — 07:00 SAST Mon-Fri")
 
+    def add_overnight_advisory_email_fallback_job(self):
+        """Every 30 min, check for unacknowledged high/critical overnight advisories.
+
+        If an advisory has been PENDING for longer than OVERNIGHT_ADVISORY_FALLBACK_HOURS
+        (default 2h) without a Telegram acknowledgement, send one email to the FM.
+        Skips during occupied hours (06:00-20:00 SAST) — overnight context only.
+        """
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        if self.scheduler.get_job("overnight_advisory_email_fallback"):
+            self.scheduler.remove_job("overnight_advisory_email_fallback")
+
+        self.scheduler.add_job(
+            func=_run_overnight_advisory_email_fallback_sync,
+            trigger=IntervalTrigger(minutes=30),
+            id="overnight_advisory_email_fallback",
+            name="Overnight Advisory Email Fallback (30 min)",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
+        logger.info("overnight_advisory_email_fallback job registered — every 30 min")
+
     def add_daily_health_sweep_job(self):
         """Run a full equipment health sweep every weekday at 08:00 SAST.
 
@@ -4675,6 +4807,25 @@ class BackgroundSchedulerService:
             logger.info("Running scheduled ML model staleness check...")
 
             scheduler = get_retraining_scheduler()
+
+            # Refresh per-site ML feature lists before checking/retraining.
+            # Runs at most once per week — no-op if already ran recently.
+            scheduler.refresh_features_for_active_sites()
+
+            # Refresh occupancy arrival/departure patterns for all active sites.
+            # Same weekly cadence — patterns accumulate over time, zero config per site.
+            try:
+                from app.core.site_resolver import get_registered_site_ids
+                from app.services.occupancy_pattern_service import get_occupancy_pattern_service
+
+                pattern_svc = get_occupancy_pattern_service()
+                for _site_id in get_registered_site_ids():
+                    try:
+                        pattern_svc.extract_patterns(_site_id, lookback_days=60)
+                    except Exception as _e:
+                        logger.warning("[OccupancyPattern] Extract failed for %s: %s", _site_id, _e)
+            except Exception as _e:
+                logger.warning("[OccupancyPattern] Weekly refresh skipped: %s", _e)
 
             # Check all models for staleness/performance issues
             checks = scheduler.check_all_models()
@@ -8596,6 +8747,16 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             schedule_defects = []
             advisory_total = 0
             optimization_total = 0
+            manager_exceptions = {
+                "stale_unactioned": [],
+                "approved_without_wo": [],
+                "system_quality_exceptions": [],
+                "counts": {
+                    "stale_unactioned": 0,
+                    "approved_without_wo": 0,
+                    "system_quality_exceptions": 0,
+                },
+            }
             try:
                 schedule_defects_resp = (
                     sb.table("recommendations")
@@ -8673,7 +8834,75 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             except Exception as e:
                 logger.warning(f"[DIGEST] Could not fetch recommendations: {e}")
 
-            # --- 5. ROI savings (verified vs estimated) ---
+            # --- 4b. Manager accountability exceptions ---
+            try:
+                from app.database.repositories.recommendation_audit_repository import (
+                    get_recommendation_audit_repository,
+                )
+
+                audit_repo = get_recommendation_audit_repository()
+                manager_exceptions = await audit_repo.get_manager_exceptions(site_id=site_id, stale_hours=24, limit=25)
+                for rec in manager_exceptions.get("stale_unactioned", [])[:10]:
+                    await audit_repo.record_event(
+                        recommendation_id=rec.get("id"),
+                        site_id=rec.get("site_id") or site_id,
+                        event_type="surfaced",
+                        previous_state=rec,
+                        new_state=rec,
+                        actor_type="system",
+                        source="morning_digest.manager_exceptions",
+                        metadata={"surface": "manager_morning_digest", "exception_type": "stale_unactioned"},
+                    )
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch manager exceptions: {e}")
+
+            # --- 5. Overnight advisories (after-hours conditions flagged since yesterday 18:00) ---
+            overnight_advisories: list[dict] = []
+            try:
+                from datetime import timedelta, timezone as tz
+
+                sast = tz(timedelta(hours=2))
+                now_sast = datetime.now(sast)
+                yesterday_1800 = now_sast.replace(hour=18, minute=0, second=0, microsecond=0) - timedelta(days=1)
+                window_start = yesterday_1800.astimezone(tz.utc).isoformat()
+
+                OVERNIGHT_ACTION_TYPES = [
+                    "after_hours_zero_occupancy_hvac_load",
+                    "closed_empty_building_hvac_running",
+                    "fault_safety_gate",
+                ]
+                # New rows have the correct action_type; historical rows were
+                # written as ai_optimization with reason starting with the prefix.
+                overnight_resp = (
+                    sb.table("recommendations")
+                    .select("id,target_equipment,action_type,risk_level,reason,timestamp,status")
+                    .eq("site_id", site_id)
+                    .in_("action_type", OVERNIGHT_ACTION_TYPES)
+                    .gte("timestamp", window_start)
+                    .order("timestamp", desc=True)
+                    .limit(10)
+                    .execute()
+                )
+                overnight_advisories = overnight_resp.data or []
+
+                # Fallback: catch historical rows stored as ai_optimization
+                if not overnight_advisories:
+                    overnight_fallback = (
+                        sb.table("recommendations")
+                        .select("id,target_equipment,action_type,risk_level,reason,timestamp,status")
+                        .eq("site_id", site_id)
+                        .eq("action_type", "ai_optimization")
+                        .gte("timestamp", window_start)
+                        .like("reason", "After-hours HVAC plant operation%")
+                        .order("timestamp", desc=True)
+                        .limit(10)
+                        .execute()
+                    )
+                    overnight_advisories = overnight_fallback.data or []
+            except Exception as e:
+                logger.warning(f"[DIGEST] Could not fetch overnight advisories: {e}")
+
+            # --- 6. ROI savings (verified vs estimated) ---
             verified_savings = 0
             estimated_savings = 0
             verified_count = 0
@@ -8753,6 +8982,30 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 priority = (wo.get("priority") or "medium").upper()
                 lines.append(f"  `{code}` — {priority} — {assigned} — {title}")
 
+            # Manager exceptions section
+            exception_counts = manager_exceptions.get("counts", {}) if isinstance(manager_exceptions, dict) else {}
+            stale_count = int(exception_counts.get("stale_unactioned") or 0)
+            approved_no_wo_count = int(exception_counts.get("approved_without_wo") or 0)
+            quality_count = int(exception_counts.get("system_quality_exceptions") or 0)
+            if stale_count or approved_no_wo_count or quality_count:
+                lines.append("")
+                lines.append("*Manager Exceptions:*")
+                if stale_count:
+                    lines.append(f"  Stale/unactioned >24h: {stale_count}")
+                    for rec in manager_exceptions.get("stale_unactioned", [])[:3]:
+                        eq = rec.get("target_equipment") or "site"
+                        sev = str(rec.get("risk_level") or "info").upper()
+                        reason = _trim_digest_text(rec.get("reason"), 82)
+                        lines.append(f"    `{eq}` — {sev}: {reason}")
+                if approved_no_wo_count:
+                    lines.append(f"  Approved with no WO link: {approved_no_wo_count}")
+                if quality_count:
+                    lines.append(f"  System-quality exceptions: {quality_count}")
+                    for event in manager_exceptions.get("system_quality_exceptions", [])[:2]:
+                        qtype = str(event.get("quality_exception_type") or "quality").replace("_", " ")
+                        detected_by = event.get("detected_by") or "unknown"
+                        lines.append(f"    {qtype} — detected by {detected_by}")
+
             # Savings section
             if verified_savings > 0 or estimated_savings > 0:
                 lines.append(f"*Savings this month:* R{verified_savings:,.0f} verified")
@@ -8762,6 +9015,33 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     )
             else:
                 lines.append("*Savings this month:* No verified savings yet")
+
+            # Overnight advisories section
+            lines.append("")
+            if overnight_advisories:
+                lines.append(f"*Overnight Advisories:* {len(overnight_advisories)} flagged while building was closed")
+                _overnight_labels = {
+                    "after_hours_zero_occupancy_hvac_load": "HVAC running in empty building",
+                    "closed_empty_building_hvac_running": "HVAC running in empty building",
+                    "fault_safety_gate": "Fault safety gate triggered",
+                }
+                for adv in overnight_advisories[:5]:
+                    eq = adv.get("target_equipment") or "site"
+                    label = _overnight_labels.get(adv.get("action_type", ""), adv.get("action_type", "advisory"))
+                    reason = _trim_digest_text(adv.get("reason"), 100)
+                    ts_raw = adv.get("timestamp") or ""
+                    try:
+                        from datetime import timedelta, timezone as tz
+
+                        ts_dt = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
+                        ts_sast = ts_dt.astimezone(tz(timedelta(hours=2)))
+                        ts_str = ts_sast.strftime("%H:%M SAST")
+                    except Exception:
+                        ts_str = ts_raw[:16]
+                    lines.append(f"  [{ts_str}] `{eq}` — {label}: {reason}")
+                lines.append("  > BMS owns emergency response. Review in Cockpit.")
+            else:
+                lines.append("*Overnight Advisories:* None")
 
             # AI recommendations section
             # Digest is read-only: per-rec messages carry no inline keyboard.
@@ -8816,6 +9096,132 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             loop.close()
     except Exception as e:
         logger.warning(f"Recommendation digest failed: {e}")
+
+
+def _run_overnight_advisory_email_fallback_sync():
+    """Check for unacknowledged overnight advisories and send email fallback if needed."""
+    import asyncio
+    from datetime import timedelta, timezone as tz
+
+    logger = logging.getLogger(__name__)
+
+    # Skip entirely during occupied hours (06:00-20:00 SAST) — advisory context only
+    sast = tz(timedelta(hours=2))
+    now_sast = datetime.now(sast)
+    if 6 <= now_sast.hour < 20:
+        return
+
+    try:
+        from app.config.settings import settings
+        from app.database.supabase_client import get_supabase_client
+        from app.services.alert_email_service import is_configured, send_overnight_advisory_email
+
+        if not is_configured():
+            logger.debug("[AlertEmail] SMTP not configured — skipping fallback check")
+            return
+
+        sb = get_supabase_client()
+        fallback_hours = float(getattr(settings, "overnight_advisory_fallback_hours", 2.0) or 2.0)
+        cutoff = (datetime.now(tz.utc) - timedelta(hours=fallback_hours)).isoformat()
+
+        OVERNIGHT_ACTION_TYPES = [
+            "after_hours_zero_occupancy_hvac_load",
+            "closed_empty_building_hvac_running",
+            "fault_safety_gate",
+        ]
+
+        # Get all active sites
+        try:
+            from app.core.site_resolver import get_registered_site_ids
+
+            site_ids = get_registered_site_ids()
+        except Exception:
+            site_ids = ["site-002"]
+
+        for site_id in site_ids:
+            try:
+                # Find unacknowledged high/critical overnight advisories older than fallback_hours
+                recs_resp = (
+                    sb.table("recommendations")
+                    .select("id,target_equipment,action_type,risk_level,reason,timestamp,status")
+                    .eq("site_id", site_id)
+                    .in_("action_type", OVERNIGHT_ACTION_TYPES)
+                    .eq("status", "PENDING")
+                    .eq("shadow_mode", False)
+                    .in_("risk_level", ["high", "critical"])
+                    .lte("timestamp", cutoff)
+                    .order("timestamp", desc=True)
+                    .limit(5)
+                    .execute()
+                )
+                recs = recs_resp.data or []
+
+                if not recs:
+                    continue
+
+                for rec in recs:
+                    rec_id = str(rec.get("id") or "")
+
+                    # Dedup: skip if email already sent for this rec today
+                    already_sent = False
+                    try:
+                        today_start = now_sast.replace(hour=0, minute=0, second=0, microsecond=0)
+                        today_start_utc = today_start.astimezone(tz.utc).isoformat()
+                        log_resp = (
+                            sb.table("notification_delivery_log")
+                            .select("id")
+                            .eq("notification_type", "overnight_advisory_email")
+                            .eq("reference_type", rec_id)
+                            .gte("sent_at", today_start_utc)
+                            .limit(1)
+                            .execute()
+                        )
+                        already_sent = bool(log_resp.data)
+                    except Exception as dedup_err:
+                        logger.debug("[AlertEmail] Dedup check failed for %s: %s", rec_id, dedup_err)
+
+                    if already_sent:
+                        continue
+
+                    # Send email
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        sent = loop.run_until_complete(send_overnight_advisory_email(rec, site_id))
+                    finally:
+                        loop.close()
+
+                    # Log delivery attempt
+                    try:
+                        from app.config.settings import settings as cfg
+
+                        recipient = (
+                            cfg.overnight_advisory_email_recipient or cfg.ai_alert_email or "info@sentinel-ai.co.za"
+                        )
+                        sb.table("notification_delivery_log").insert(
+                            {
+                                "notification_type": "overnight_advisory_email",
+                                "id": str(__import__("uuid").uuid4()),
+                                "channel_type": "email",
+                                "recipient_identifier": recipient,
+                                "status": "sent" if sent else "failed",
+                                "provider": "smtp",
+                                "sent_at": datetime.utcnow().isoformat() if sent else None,
+                                "site_id": site_id,
+                                "message_text": f"Overnight advisory fallback: {rec.get('action_type')} on {rec.get('target_equipment')}",
+                                "delivery_status": "sent" if sent else "failed",
+                                "reference_type": rec_id,
+                                "severity": rec.get("risk_level") or "high",
+                            }
+                        ).execute()
+                    except Exception as log_err:
+                        logger.debug("[AlertEmail] Could not write delivery log: %s", log_err)
+
+            except Exception as site_err:
+                logger.warning("[AlertEmail] Fallback check failed for %s: %s", site_id, site_err)
+
+    except Exception as exc:
+        logger.warning("[AlertEmail] Overnight advisory email fallback error: %s", exc)
 
 
 # Global scheduler instance
