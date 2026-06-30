@@ -28,6 +28,54 @@ class _NoopZoneResolver:
         return SimpleNamespace(canonical_zone_id=zone_id)
 
 
+class _Result:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeQuery:
+    def __init__(self, rows):
+        self._rows = rows
+        self._eq = {}
+        self._in = {}
+        self._limit = None
+
+    def select(self, *_args, **_kwargs):
+        return self
+
+    def eq(self, key, value):
+        self._eq[key] = value
+        return self
+
+    def in_(self, key, values):
+        self._in[key] = set(values)
+        return self
+
+    def limit(self, value):
+        self._limit = value
+        return self
+
+    def execute(self):
+        rows = []
+        for row in self._rows:
+            if any(row.get(key) != value for key, value in self._eq.items()):
+                continue
+            if any(row.get(key) not in values for key, values in self._in.items()):
+                continue
+            rows.append(row)
+        if self._limit is not None:
+            rows = rows[: self._limit]
+        return _Result(rows)
+
+
+class _FakeSupabase:
+    def __init__(self, tables):
+        self.tables = tables
+
+    def table(self, name):
+        return _FakeQuery(self.tables.get(name, []))
+
+
 def _verdict(pct=0.0, count=0, occupied=False, uncertain=False, co2=None):
     signals = {}
     if co2 is not None:
@@ -338,3 +386,41 @@ async def test_all_zones_uncertain_keeps_parent_manual_advisory():
     assert result.recommendations == []
     assert result.parent_retained is True
     assert {item.classification for item in result.zone_classifications.values()} == {"conflicted_uncertain"}
+
+
+def test_direct_zone_co2_sensor_map_requires_authoritative_zone_equipment():
+    decomposer = ZoneScopeDecomposer(
+        fusion_service=_FakeFusion({}),
+        zone_resolver=_NoopZoneResolver(),
+        whitelist=_AllowAllWhitelist(),
+        supabase_client=_FakeSupabase(
+            {
+                "bridge_discovered_equipment": [
+                    {
+                        "site_id": "site-002",
+                        "canonical_code": "S002-ZONE-L1-002",
+                        "bridge_code": "S002-ZONE-L1-002",
+                        "status": "pending",
+                    }
+                ],
+                "sites": [],
+                "equipment": [],
+            }
+        ),
+    )
+
+    mapping = decomposer._authoritative_zone_co2_sensor_map("site-002", {"Zone-102"})
+
+    assert mapping == {"S002-ZONE-L1-002": "Zone-102"}
+    assert "S002-ZONE-102" not in mapping
+
+
+def test_direct_zone_co2_sensor_map_ignores_unregistered_numeric_alias():
+    decomposer = ZoneScopeDecomposer(
+        fusion_service=_FakeFusion({}),
+        zone_resolver=_NoopZoneResolver(),
+        whitelist=_AllowAllWhitelist(),
+        supabase_client=_FakeSupabase({"bridge_discovered_equipment": [], "sites": [], "equipment": []}),
+    )
+
+    assert decomposer._authoritative_zone_co2_sensor_map("site-002", {"Zone-102"}) == {}

@@ -6,6 +6,7 @@ Tests scheduled jobs, job management, and cron triggers.
 
 import logging
 from datetime import datetime, timedelta
+from types import SimpleNamespace
 
 import pytest
 
@@ -101,6 +102,22 @@ class TestBackgroundScheduler:
             )
             == "Block blanket site HVAC shutdown; setback empty zones"
         )
+
+    def test_zone_scope_children_are_split_into_individual_telegram_groups(self):
+        from app.services.background_scheduler import (
+            HVAC_ZONE_SCOPE_DECOMPOSITION_RULE,
+            _telegram_advisory_notification_groups,
+        )
+
+        child_1 = SimpleNamespace(metadata={"rule": HVAC_ZONE_SCOPE_DECOMPOSITION_RULE}, action={})
+        child_2 = SimpleNamespace(metadata={"advisory_type": "zone_scope_concrete_hvac_action"}, action={})
+        ordinary = SimpleNamespace(metadata={"rule": "ordinary_rule"}, action={})
+
+        assert _telegram_advisory_notification_groups([child_1, ordinary, child_2]) == [
+            [child_1],
+            [child_2],
+            [ordinary],
+        ]
 
     def test_morning_digest_alerts_use_canonical_equipment_names(self):
         from app.services.background_scheduler import _canonical_digest_alert

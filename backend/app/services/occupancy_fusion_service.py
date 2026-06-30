@@ -336,15 +336,18 @@ class OccupancyFusionService:
 
     async def _get_direct_zone_co2_elevation(self, site_id: str, zone_id: str) -> OccupancySignalVerdict | None:
         try:
-            equipment_id = self._zone_co2_equipment_id(site_id, zone_id)
+            equipment_ids = self._authoritative_zone_co2_equipment_ids(site_id, zone_id)
+            if not equipment_ids:
+                logger.debug("No authoritative direct zone CO2 equipment for %s/%s", site_id, zone_id)
+                return None
             resp = (
                 self._sb.table("equipment_sensor_readings")
                 .select("equipment_id,sensor_type,value,recorded_at")
                 .eq("site_id", site_id)
                 .eq("sensor_type", "co2_ppm")
-                .eq("equipment_id", equipment_id)
+                .in_("equipment_id", equipment_ids)
                 .order("recorded_at", desc=True)
-                .limit(2)
+                .limit(20)
                 .execute()
             )
         except Exception as e:
@@ -354,7 +357,17 @@ class OccupancyFusionService:
         readings = resp.data or []
         if not readings:
             return None
-        return self._co2_signal_from_device_readings({equipment_id: readings}, source_scope="direct_zone_sensor")
+        per_device: dict[str, list[dict[str, Any]]] = {}
+        for row in readings:
+            equipment_id = str(row.get("equipment_id") or "").upper()
+            if row.get("value") is None:
+                continue
+            per_device.setdefault(equipment_id, [])
+            if len(per_device[equipment_id]) < 2:
+                per_device[equipment_id].append(row)
+        if not per_device:
+            return None
+        return self._co2_signal_from_device_readings(per_device, source_scope="direct_zone_sensor")
 
     async def _get_site_aggregate_co2_elevation(self, site_id: str) -> OccupancySignalVerdict | None:
         try:
@@ -814,15 +827,69 @@ class OccupancyFusionService:
     def _site_eq_prefix(site_id: str) -> str:
         return site_id.replace("site-", "S").upper()
 
+    def _authoritative_zone_co2_equipment_ids(self, site_id: str, zone_id: str) -> list[str]:
+        candidates = self._zone_co2_candidate_equipment_ids(site_id, zone_id)
+        if not candidates:
+            return []
+        registered = self._registered_equipment_codes(site_id, candidates)
+        return [candidate for candidate in candidates if candidate in registered]
+
+    def _registered_equipment_codes(self, site_id: str, candidates: list[str]) -> set[str]:
+        registered: set[str] = set()
+        try:
+            rows = (
+                self._sb.table("bridge_discovered_equipment")
+                .select("canonical_code,bridge_code,status")
+                .eq("site_id", site_id)
+                .in_("canonical_code", candidates)
+                .execute()
+            )
+            for row in rows.data or []:
+                if row.get("canonical_code"):
+                    registered.add(str(row["canonical_code"]).upper())
+                if row.get("bridge_code"):
+                    registered.add(str(row["bridge_code"]).upper())
+        except Exception as exc:
+            logger.debug("Bridge zone CO2 authority lookup failed for %s/%s: %s", site_id, candidates, exc)
+
+        try:
+            site_row = self._sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if site_row.data:
+                rows = (
+                    self._sb.table("equipment")
+                    .select("code,canonical_code")
+                    .eq("site_id", site_row.data[0]["id"])
+                    .in_("code", candidates)
+                    .execute()
+                )
+                for row in rows.data or []:
+                    if row.get("code"):
+                        registered.add(str(row["code"]).upper())
+                    if row.get("canonical_code"):
+                        registered.add(str(row["canonical_code"]).upper())
+        except Exception as exc:
+            logger.debug("Equipment zone CO2 authority lookup failed for %s/%s: %s", site_id, candidates, exc)
+        return registered
+
     @classmethod
-    def _zone_co2_equipment_id(cls, site_id: str, zone_id: str) -> str:
+    def _zone_co2_candidate_equipment_ids(cls, site_id: str, zone_id: str) -> list[str]:
         prefix = cls._site_eq_prefix(site_id)
         raw = str(zone_id or "").strip().upper()
         if raw.startswith(f"{prefix}-ZONE-"):
-            return raw
+            return [raw]
         if raw.startswith("ZONE-"):
-            return f"{prefix}-ZONE-{raw.rsplit('-', 1)[-1]}"
-        return f"{prefix}-ZONE-{raw}"
+            suffix = raw.rsplit("-", 1)[-1]
+        else:
+            suffix = raw
+        if not suffix:
+            return []
+        candidates: list[str] = []
+        if suffix.isdigit() and len(suffix) >= 3:
+            floor = int(suffix[0])
+            room = suffix[1:].zfill(3)
+            candidates.append(f"{prefix}-ZONE-L{floor}-{room}")
+        candidates.append(f"{prefix}-ZONE-{suffix}")
+        return list(dict.fromkeys(candidates))
 
     @staticmethod
     def _canonical_site_id(site_id: str) -> str:

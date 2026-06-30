@@ -65,12 +65,11 @@ class _FakeQuery:
 
 
 class _FakeSupabase:
-    def __init__(self, rows):
-        self.rows = rows
+    def __init__(self, rows=None, tables=None):
+        self.tables = tables or {"equipment_sensor_readings": rows or []}
 
     def table(self, name):
-        assert name == "equipment_sensor_readings"
-        return _FakeQuery(self.rows)
+        return _FakeQuery(self.tables.get(name, []))
 
 
 def _co2_row(equipment_id, value, recorded_at):
@@ -84,15 +83,25 @@ def _co2_row(equipment_id, value, recorded_at):
 
 
 @pytest.mark.asyncio
-async def test_zone_fusion_uses_direct_zone_co2_before_site_aggregate():
+async def test_zone_fusion_uses_authoritative_direct_zone_co2_before_site_aggregate():
     svc = OccupancyFusionService(
         supabase_client=_FakeSupabase(
-            [
-                _co2_row("S002-ZONE-102", 450, "2026-06-30T12:46:25+00:00"),
-                _co2_row("S002-ZONE-102", 448, "2026-06-30T12:31:25+00:00"),
-                _co2_row("S002-FCU-102", 1099, "2026-06-30T12:46:25+00:00"),
-                _co2_row("S002-FCU-103", 1101, "2026-06-30T12:46:25+00:00"),
-            ]
+            tables={
+                "bridge_discovered_equipment": [
+                    {
+                        "site_id": "site-002",
+                        "canonical_code": "S002-ZONE-L1-002",
+                        "bridge_code": "S002-ZONE-L1-002",
+                        "status": "pending",
+                    }
+                ],
+                "equipment_sensor_readings": [
+                    _co2_row("S002-ZONE-L1-002", 450, "2026-06-30T12:46:25+00:00"),
+                    _co2_row("S002-ZONE-L1-002", 448, "2026-06-30T12:31:25+00:00"),
+                    _co2_row("S002-FCU-102", 1099, "2026-06-30T12:46:25+00:00"),
+                    _co2_row("S002-FCU-103", 1101, "2026-06-30T12:46:25+00:00"),
+                ],
+            }
         )
     )
 
@@ -102,6 +111,32 @@ async def test_zone_fusion_uses_direct_zone_co2_before_site_aggregate():
     assert signal.normalized_pct == 0.0
     assert signal.raw_value["avg_co2"] == 450
     assert signal.raw_value["source_scope"] == "direct_zone_sensor"
+
+
+@pytest.mark.asyncio
+async def test_zone_fusion_ignores_unregistered_numeric_zone_co2_alias():
+    svc = OccupancyFusionService(
+        supabase_client=_FakeSupabase(
+            tables={
+                "bridge_discovered_equipment": [],
+                "sites": [],
+                "equipment": [],
+                "equipment_sensor_readings": [
+                    _co2_row("S002-ZONE-102", 450, "2026-06-30T12:46:25+00:00"),
+                    _co2_row("S002-ZONE-102", 448, "2026-06-30T12:31:25+00:00"),
+                    _co2_row("S002-FCU-102", 1099, "2026-06-30T12:46:25+00:00"),
+                    _co2_row("S002-FCU-103", 1101, "2026-06-30T12:46:25+00:00"),
+                ],
+            }
+        )
+    )
+
+    signal = await svc._get_co2_elevation("site-002", "Zone-102")
+
+    assert signal is not None
+    assert signal.normalized_pct == 100.0
+    assert signal.raw_value["avg_co2"] == 1100
+    assert signal.raw_value["source_scope"] == "site_fcu_aggregate"
 
 
 @pytest.mark.asyncio

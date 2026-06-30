@@ -159,6 +159,35 @@ def _recommendation_has_verified_write_path(
     return False
 
 
+def _is_zone_scope_decomposition_rec(rec: Any) -> bool:
+    """Return True for concrete child actions produced by ZoneScopeDecomposer."""
+    action = getattr(rec, "action", None) or {}
+    metadata = getattr(rec, "metadata", None) or {}
+    if not isinstance(action, dict):
+        action = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    source_metadata = metadata.get("source_metadata") or {}
+    if not isinstance(source_metadata, dict):
+        source_metadata = {}
+
+    rule = str(action.get("rule") or metadata.get("rule") or source_metadata.get("rule") or "")
+    advisory_type = str(
+        action.get("advisory_type") or metadata.get("advisory_type") or source_metadata.get("advisory_type") or ""
+    )
+    return rule == HVAC_ZONE_SCOPE_DECOMPOSITION_RULE or advisory_type == "zone_scope_concrete_hvac_action"
+
+
+def _telegram_advisory_notification_groups(recommendations: list[Any]) -> list[list[Any]]:
+    """Split decomposed zone-scope children into individually approvable Telegram cards."""
+    zone_scope_recs = [rec for rec in recommendations if _is_zone_scope_decomposition_rec(rec)]
+    other_recs = [rec for rec in recommendations if not _is_zone_scope_decomposition_rec(rec)]
+    groups: list[list[Any]] = [[rec] for rec in zone_scope_recs]
+    if other_recs:
+        groups.append(other_recs)
+    return groups
+
+
 def _parse_hhmm_minutes(value: str, fallback: str = "07:00") -> int:
     raw = str(value or fallback).strip()
     try:
@@ -2873,219 +2902,231 @@ class BackgroundSchedulerService:
                         if not active_recs:
                             continue
 
-                        control_not_ready_ids = {
-                            str(r.id)
-                            for r in active_recs[:5]
-                            if (r.action or {}).get("point")
-                            and (r.action or {}).get("value") is not None
-                            and not (r.action or {}).get("execution_blocked")
-                            and not _recommendation_has_verified_write_path(
-                                site_id=_site_id,
-                                equipment_id=r.target_equipment,
-                                point_name=(r.action or {}).get("point"),
-                            )
-                        }
-                        has_manual_action = any(
-                            getattr(r, "status", None) == RecommendationStatus.ADVISORY_INFO
-                            or (
-                                (r.action or {}).get("execution_blocked")
-                                and (r.metadata or {}).get("manual_action_required")
-                            )
-                            or str(r.id) in control_not_ready_ids
-                            for r in active_recs
-                        )
-                        has_occupancy_control_gate = any(
-                            _is_occupancy_conflict_control_gate_rec(r) for r in active_recs
-                        )
-                        has_executable_actions = any(
-                            (r.action or {}).get("point")
-                            and (r.action or {}).get("value") is not None
-                            and not (r.action or {}).get("execution_blocked")
-                            and str(r.id) not in control_not_ready_ids
-                            for r in active_recs
-                        )
-                        if phase == "supervised" and has_executable_actions:
-                            lines = ["*SENTINEL AI — Supervised Actions Pending*"]
-                        else:
-                            lines = ["*SENTINEL AI — Operational Advisory*"]
-                        if has_manual_action:
-                            if has_occupancy_control_gate:
-                                lines.append("*Supervised decision required — no safe blanket write target*")
-                            else:
-                                lines.append("*Manual action recommended — no BACnet write available*")
-                        lines.append(f"*Site:* {_site_id}  |  *Mode:* {phase}")
-                        lines.append(f"*Actions pending:* {len(active_recs)}")
-                        lines.append("")
                         preflight_quality = (
                             await collect_quality_gate_preflight(_site_id) if phase == "supervised" else None
                         )
-                        for idx, r in enumerate(active_recs[:5], start=1):
-                            equip = r.target_equipment or "Unknown"
-                            action_data = r.action or {}
-                            point = action_data.get("point")
-                            val = action_data.get("value")
-                            impact = r.expected_impact or {}
-                            savings = impact.get("cost_zar")
-                            savings_str = f" — R{savings:.2f}/h" if savings else ""
-                            manual_marker = (
-                                " [manual]"
-                                if action_data.get("execution_blocked")
-                                or r.status == RecommendationStatus.ADVISORY_INFO
-                                or str(r.id) in control_not_ready_ids
-                                else ""
-                            )
-                            if point and val is not None:
-                                action_text, why_text, effect_text, saving_text = _human_action(r)
-                                lines.append(f"*{idx}. {equip}*")
-                                lines.append(f"Change: {_md_safe(action_text)}{manual_marker}")
-                                previous_status = _previous_action_status(r)
-                                if previous_status:
-                                    lines.append(f"Status: {_md_safe(previous_status)}")
-                                if why_text:
-                                    lines.append(f"Why: {_md_safe(why_text)}")
-                                if effect_text:
-                                    lines.append(f"Effect: {_md_safe(effect_text)}")
-                                if saving_text:
-                                    lines.append(f"Savings: {saving_text}")
-                                if str(r.id) in control_not_ready_ids:
-                                    lines.append(
-                                        "Note: Supervised control readiness is incomplete; use manual BMS action or create a work order."
-                                    )
-                                elif (
-                                    not action_data.get("execution_blocked")
-                                    and r.status != RecommendationStatus.ADVISORY_INFO
-                                ):
-                                    for preflight_line in await build_recommendation_preflight_lines(
-                                        r,
-                                        quality_gate=preflight_quality,
-                                    ):
-                                        lines.append(preflight_line)
-                            elif action_data.get("execution_blocked") or r.status == RecommendationStatus.ADVISORY_INFO:
-                                action_text, why_text, effect_text, saving_text = _manual_action_line(r)
-                                lines.append(f"*{idx}. {equip}*")
-                                lines.append(f"Change: {_md_safe(action_text)}")
-                                if why_text:
-                                    lines.append(f"Why: {_md_safe(why_text)}")
-                                if effect_text:
-                                    lines.append(f"Effect: {_md_safe(effect_text)}")
-                                if saving_text:
-                                    lines.append(f"Savings: {saving_text}")
-                            else:
-                                action = val or action_data.get("type") or r.action_type or "review"
-                                lines.append(f"*{idx}. {equip}*")
-                                lines.append(f"Change: {str(action).replace('_', ' ')}{savings_str}{manual_marker}")
-                            lines.append("")
-                        if len(active_recs) > 5:
-                            lines.append(f"+{len(active_recs) - 5} more")
-                        if has_manual_action:
-                            if has_occupancy_control_gate:
-                                lines.append(
-                                    "\n_Sentinel is withholding automatic writes because occupancy/IAQ signals do not prove a safe blanket shutdown target. Use scoped zone/floor control only where empty conditions are verified._"
-                                )
-                            else:
-                                lines.append(
-                                    "\n_Sentinel cannot apply one or more actions automatically until the site's write path is enabled and verified._"
-                                )
+                        notification_groups = _telegram_advisory_notification_groups(active_recs)
 
-                        keyboard = None
-                        manual_recs = [
-                            r
-                            for r in active_recs[:5]
-                            if r.status == RecommendationStatus.ADVISORY_INFO
-                            or (r.action or {}).get("execution_blocked")
-                            or str(r.id) in control_not_ready_ids
-                        ]
-                        if phase == "supervised":
-                            executable_recs = [
-                                r
-                                for r in active_recs[:5]
+                        for notification_recs in notification_groups:
+                            control_not_ready_ids = {
+                                str(r.id)
+                                for r in notification_recs[:5]
                                 if (r.action or {}).get("point")
                                 and (r.action or {}).get("value") is not None
                                 and not (r.action or {}).get("execution_blocked")
-                                and str(r.id) not in control_not_ready_ids
-                            ]
-                            if manual_recs:
-                                keyboard = InlineKeyboard(
-                                    rows=[
-                                        [
-                                            InlineButton(
-                                                label="Approve",
-                                                callback_data=f"approve:rec_id:{r.id}",
-                                            ),
-                                            InlineButton(
-                                                label="Reject",
-                                                callback_data=f"reject:rec_id:{r.id}",
-                                            ),
-                                        ]
-                                        for r in manual_recs
-                                    ]
+                                and not _recommendation_has_verified_write_path(
+                                    site_id=_site_id,
+                                    equipment_id=r.target_equipment,
+                                    point_name=(r.action or {}).get("point"),
                                 )
+                            }
+                            has_manual_action = any(
+                                getattr(r, "status", None) == RecommendationStatus.ADVISORY_INFO
+                                or (
+                                    (r.action or {}).get("execution_blocked")
+                                    and (r.metadata or {}).get("manual_action_required")
+                                )
+                                or str(r.id) in control_not_ready_ids
+                                for r in notification_recs
+                            )
+                            has_occupancy_control_gate = any(
+                                _is_occupancy_conflict_control_gate_rec(r) for r in notification_recs
+                            )
+                            has_executable_actions = any(
+                                (r.action or {}).get("point")
+                                and (r.action or {}).get("value") is not None
+                                and not (r.action or {}).get("execution_blocked")
+                                and str(r.id) not in control_not_ready_ids
+                                for r in notification_recs
+                            )
+                            if phase == "supervised" and has_executable_actions:
+                                lines = ["*SENTINEL AI — Supervised Action Pending*"]
                             else:
-                                if len(executable_recs) > 1:
+                                lines = ["*SENTINEL AI — Operational Advisory*"]
+                            if has_manual_action:
+                                if has_occupancy_control_gate:
+                                    lines.append("*Supervised decision required — no safe blanket write target*")
+                                else:
+                                    lines.append("*Manual action recommended — no BACnet write available*")
+                            lines.append(f"*Site:* {_site_id}  |  *Mode:* {phase}")
+                            lines.append(f"*Actions pending:* {len(notification_recs)}")
+                            lines.append("")
+
+                            for idx, r in enumerate(notification_recs[:5], start=1):
+                                equip = r.target_equipment or "Unknown"
+                                action_data = r.action or {}
+                                point = action_data.get("point")
+                                val = action_data.get("value")
+                                impact = r.expected_impact or {}
+                                savings = impact.get("cost_zar")
+                                savings_str = f" — R{savings:.2f}/h" if savings else ""
+                                manual_marker = (
+                                    " [manual]"
+                                    if action_data.get("execution_blocked")
+                                    or r.status == RecommendationStatus.ADVISORY_INFO
+                                    or str(r.id) in control_not_ready_ids
+                                    else ""
+                                )
+                                if point and val is not None:
+                                    action_text, why_text, effect_text, saving_text = _human_action(r)
+                                    lines.append(f"*{idx}. {equip}*")
+                                    lines.append(f"Change: {_md_safe(action_text)}{manual_marker}")
+                                    previous_status = _previous_action_status(r)
+                                    if previous_status:
+                                        lines.append(f"Status: {_md_safe(previous_status)}")
+                                    if why_text:
+                                        lines.append(f"Why: {_md_safe(why_text)}")
+                                    if effect_text:
+                                        lines.append(f"Effect: {_md_safe(effect_text)}")
+                                    if saving_text:
+                                        lines.append(f"Savings: {saving_text}")
+                                    if str(r.id) in control_not_ready_ids:
+                                        lines.append(
+                                            "Note: Supervised control readiness is incomplete; use manual BMS action or create a work order."
+                                        )
+                                    elif (
+                                        not action_data.get("execution_blocked")
+                                        and r.status != RecommendationStatus.ADVISORY_INFO
+                                    ):
+                                        for preflight_line in await build_recommendation_preflight_lines(
+                                            r,
+                                            quality_gate=preflight_quality,
+                                        ):
+                                            lines.append(preflight_line)
+                                elif (
+                                    action_data.get("execution_blocked")
+                                    or r.status == RecommendationStatus.ADVISORY_INFO
+                                ):
+                                    action_text, why_text, effect_text, saving_text = _manual_action_line(r)
+                                    lines.append(f"*{idx}. {equip}*")
+                                    lines.append(f"Change: {_md_safe(action_text)}")
+                                    if why_text:
+                                        lines.append(f"Why: {_md_safe(why_text)}")
+                                    if effect_text:
+                                        lines.append(f"Effect: {_md_safe(effect_text)}")
+                                    if saving_text:
+                                        lines.append(f"Savings: {saving_text}")
+                                else:
+                                    action = val or action_data.get("type") or r.action_type or "review"
+                                    lines.append(f"*{idx}. {equip}*")
+                                    lines.append(f"Change: {str(action).replace('_', ' ')}{savings_str}{manual_marker}")
+                                lines.append("")
+                            if len(notification_recs) > 5:
+                                lines.append(f"+{len(notification_recs) - 5} more")
+                            if has_manual_action:
+                                if has_occupancy_control_gate:
+                                    lines.append(
+                                        "\n_Sentinel is withholding automatic writes because occupancy/IAQ signals do not prove a safe blanket shutdown target. Use scoped zone/floor control only where empty conditions are verified._"
+                                    )
+                                else:
+                                    lines.append(
+                                        "\n_Sentinel cannot apply one or more actions automatically until the site's write path is enabled and verified._"
+                                    )
+
+                            keyboard = None
+                            manual_recs = [
+                                r
+                                for r in notification_recs[:5]
+                                if r.status == RecommendationStatus.ADVISORY_INFO
+                                or (r.action or {}).get("execution_blocked")
+                                or str(r.id) in control_not_ready_ids
+                            ]
+                            if phase == "supervised":
+                                executable_recs = [
+                                    r
+                                    for r in notification_recs[:5]
+                                    if (r.action or {}).get("point")
+                                    and (r.action or {}).get("value") is not None
+                                    and not (r.action or {}).get("execution_blocked")
+                                    and str(r.id) not in control_not_ready_ids
+                                ]
+                                if manual_recs:
                                     keyboard = InlineKeyboard(
                                         rows=[
                                             [
                                                 InlineButton(
-                                                    label="Approve package",
-                                                    callback_data=f"approvepkg:{_site_id}",
-                                                )
-                                            ],
-                                            *[
-                                                [
-                                                    InlineButton(
-                                                        label="Approve",
-                                                        callback_data=f"approve:rec_id:{r.id}",
-                                                    ),
-                                                    InlineButton(
-                                                        label="Reject",
-                                                        callback_data=f"reject:rec_id:{r.id}",
-                                                    ),
-                                                ]
-                                                for r in executable_recs
-                                            ],
+                                                    label="Approve",
+                                                    callback_data=f"approve:rec_id:{r.id}",
+                                                ),
+                                                InlineButton(
+                                                    label="Reject",
+                                                    callback_data=f"reject:rec_id:{r.id}",
+                                                ),
+                                            ]
+                                            for r in manual_recs
                                         ]
                                     )
                                 else:
-                                    keyboard = (
-                                        InlineKeyboard(
+                                    if len(executable_recs) > 1:
+                                        keyboard = InlineKeyboard(
                                             rows=[
                                                 [
                                                     InlineButton(
-                                                        label="Approve",
-                                                        callback_data=f"approve:rec_id:{r.id}",
-                                                    ),
-                                                    InlineButton(
-                                                        label="Reject",
-                                                        callback_data=f"reject:rec_id:{r.id}",
-                                                    ),
-                                                ]
-                                                for r in executable_recs
+                                                        label="Approve package",
+                                                        callback_data=f"approvepkg:{_site_id}",
+                                                    )
+                                                ],
+                                                *[
+                                                    [
+                                                        InlineButton(
+                                                            label="Approve",
+                                                            callback_data=f"approve:rec_id:{r.id}",
+                                                        ),
+                                                        InlineButton(
+                                                            label="Reject",
+                                                            callback_data=f"reject:rec_id:{r.id}",
+                                                        ),
+                                                    ]
+                                                    for r in executable_recs
+                                                ],
                                             ]
                                         )
-                                        if executable_recs
-                                        else None
-                                    )
-                        elif phase == "advisory":
-                            keyboard = InlineKeyboard(
-                                rows=[
-                                    [
-                                        InlineButton(
-                                            label=(
-                                                f"🛠 Create WO — {r.target_equipment or 'Action'}"
-                                                if _manual_advisory_requires_work_order(r)
-                                                else f"✅ Acknowledge — {r.target_equipment or 'Action'}"
-                                            ),
-                                            callback_data=(
-                                                f"wo:rec_id:{r.id}"
-                                                if _manual_advisory_requires_work_order(r)
-                                                else f"rec:review:{r.id}"
-                                            ),
+                                    else:
+                                        keyboard = (
+                                            InlineKeyboard(
+                                                rows=[
+                                                    [
+                                                        InlineButton(
+                                                            label="Approve",
+                                                            callback_data=f"approve:rec_id:{r.id}",
+                                                        ),
+                                                        InlineButton(
+                                                            label="Reject",
+                                                            callback_data=f"reject:rec_id:{r.id}",
+                                                        ),
+                                                    ]
+                                                    for r in executable_recs
+                                                ]
+                                            )
+                                            if executable_recs
+                                            else None
                                         )
+                            elif phase == "advisory":
+                                keyboard = InlineKeyboard(
+                                    rows=[
+                                        [
+                                            InlineButton(
+                                                label=(
+                                                    f"🛠 Create WO — {r.target_equipment or 'Action'}"
+                                                    if _manual_advisory_requires_work_order(r)
+                                                    else f"✅ Acknowledge — {r.target_equipment or 'Action'}"
+                                                ),
+                                                callback_data=(
+                                                    f"wo:rec_id:{r.id}"
+                                                    if _manual_advisory_requires_work_order(r)
+                                                    else f"rec:review:{r.id}"
+                                                ),
+                                            )
+                                        ]
+                                        for r in notification_recs[:5]
                                     ]
-                                    for r in active_recs[:5]
-                                ]
+                                )
+                            await sender.send_text(
+                                str(chat_id),
+                                "\n".join(lines),
+                                parse_mode="Markdown",
+                                keyboard=keyboard,
                             )
-                        await sender.send_text(str(chat_id), "\n".join(lines), parse_mode="Markdown", keyboard=keyboard)
 
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)

@@ -459,12 +459,10 @@ class ZoneScopeDecomposer:
         equipment_to_zones: dict[str, set[str]] = {}
         for binding in bindings:
             equipment_to_zones.setdefault(binding.equipment_id, set()).add(binding.zone_id)
-        prefix = site_id.upper().replace("SITE-", "S")
-        zone_sensor_to_zone: dict[str, str] = {
-            f"{prefix}-ZONE-{zone_id.rsplit('-', 1)[-1]}": zone_id
-            for zone_id in {binding.zone_id for binding in bindings}
-            if zone_id.upper().startswith("ZONE-")
-        }
+        zone_sensor_to_zone = self._authoritative_zone_co2_sensor_map(
+            site_id,
+            {binding.zone_id for binding in bindings},
+        )
         if zone_sensor_to_zone:
             direct_rows = (
                 sb.table("equipment_sensor_readings")
@@ -518,6 +516,79 @@ class ZoneScopeDecomposer:
                     states[zone_id]["co2_recorded_at"] = row.get("recorded_at")
                     states[zone_id]["co2_source"] = "served_equipment_sensor"
         return states
+
+    def _authoritative_zone_co2_sensor_map(self, site_id: str, zone_ids: set[str]) -> dict[str, str]:
+        candidates_by_sensor: dict[str, str] = {}
+        for zone_id in zone_ids:
+            for candidate in self._zone_co2_candidate_equipment_ids(site_id, zone_id):
+                candidates_by_sensor[candidate] = zone_id
+        if not candidates_by_sensor:
+            return {}
+
+        registered = self._registered_zone_equipment_codes(site_id, sorted(candidates_by_sensor))
+        return {sensor_id: zone_id for sensor_id, zone_id in candidates_by_sensor.items() if sensor_id in registered}
+
+    def _registered_zone_equipment_codes(self, site_id: str, candidates: list[str]) -> set[str]:
+        sb = self._client()
+        registered: set[str] = set()
+        try:
+            rows = (
+                sb.table("bridge_discovered_equipment")
+                .select("canonical_code,bridge_code,status")
+                .eq("site_id", site_id)
+                .in_("canonical_code", candidates)
+                .execute()
+                .data
+                or []
+            )
+            for row in rows:
+                if row.get("canonical_code"):
+                    registered.add(str(row["canonical_code"]).upper())
+                if row.get("bridge_code"):
+                    registered.add(str(row["bridge_code"]).upper())
+        except Exception as exc:
+            logger.debug("Bridge zone CO2 authority lookup failed for %s/%s: %s", site_id, candidates, exc)
+
+        try:
+            site_uuid = None
+            site_row = sb.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if site_row.data:
+                site_uuid = site_row.data[0]["id"]
+            if site_uuid:
+                rows = (
+                    sb.table("equipment")
+                    .select("code,canonical_code")
+                    .eq("site_id", site_uuid)
+                    .in_("code", candidates)
+                    .execute()
+                    .data
+                    or []
+                )
+                for row in rows:
+                    if row.get("code"):
+                        registered.add(str(row["code"]).upper())
+                    if row.get("canonical_code"):
+                        registered.add(str(row["canonical_code"]).upper())
+        except Exception as exc:
+            logger.debug("Equipment zone CO2 authority lookup failed for %s/%s: %s", site_id, candidates, exc)
+        return registered
+
+    @staticmethod
+    def _zone_co2_candidate_equipment_ids(site_id: str, zone_id: str) -> list[str]:
+        prefix = site_id.upper().replace("SITE-", "S")
+        raw = str(zone_id or "").strip().upper()
+        if raw.startswith(f"{prefix}-ZONE-"):
+            return [raw]
+        suffix = raw.rsplit("-", 1)[-1] if raw.startswith("ZONE-") else raw
+        if not suffix:
+            return []
+        candidates: list[str] = []
+        if suffix.isdigit() and len(suffix) >= 3:
+            floor = int(suffix[0])
+            room = suffix[1:].zfill(3)
+            candidates.append(f"{prefix}-ZONE-L{floor}-{room}")
+        candidates.append(f"{prefix}-ZONE-{suffix}")
+        return list(dict.fromkeys(candidates))
 
     def _load_supplied_context(
         self,
