@@ -116,6 +116,13 @@ ML_TRAINING_SCHEDULES: list[RetentionSchedule] = [
         date_column="recorded_at",
         description="ML drift monitoring — delete after 10-day window (aggregated signals preserved elsewhere)",
     ),
+    RetentionSchedule(
+        table_name="predictions",
+        retention_days=365,
+        tier="ML_TRAINING",
+        date_column="created_at",
+        description="SENTINEL ML predictions — keep 1 year (telemetry-retention-partitioning.md)",
+    ),
 ]
 
 SNAPSHOT_SCHEDULES: list[RetentionSchedule] = [
@@ -142,10 +149,10 @@ SNAPSHOT_SCHEDULES: list[RetentionSchedule] = [
     ),
     RetentionSchedule(
         table_name="telemetry_daily",
-        retention_days=365 * 10,
+        retention_days=365 * 2,
         tier="SNAPSHOT",
         date_column="day_bucket",
-        description="Daily telemetry aggregates — delete after 10 years (capex/compliance)",
+        description="Daily telemetry aggregates — delete after 2 years (telemetry-retention-partitioning.md)",
     ),
 ]
 
