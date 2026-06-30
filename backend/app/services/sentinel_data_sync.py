@@ -111,7 +111,7 @@ def _check_sensor_quality(point_name: str, value: float) -> str:
     if math.isnan(value):
         return "rejected"
     name_lower = point_name.lower()
-    if "temp" in name_lower and (value < -50.0 or value > 100.0):
+    if "temp" in name_lower and "color_temp" not in name_lower and (value < -50.0 or value > 100.0):
         return "rejected"
     if "pressure" in name_lower and (value < 0.0 or value > 5000.0):
         return "rejected"
