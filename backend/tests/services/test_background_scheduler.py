@@ -43,6 +43,15 @@ class TestBackgroundScheduler:
         assert _is_protected_pending_recommendation("ai_optimization") is False
         assert _is_protected_pending_recommendation(None) is False
 
+    def test_ai_optimization_is_protected_from_direct_execution_blocked_expiry(self):
+        """Manual/no-write AI recommendations must stay pending for operator decision."""
+        from app.services.background_scheduler import _is_protected_execution_blocked_expiry_action
+
+        assert _is_protected_execution_blocked_expiry_action("ai_optimization") is True
+        assert _is_protected_execution_blocked_expiry_action("coordinated_optimization") is True
+        assert _is_protected_execution_blocked_expiry_action("maintenance") is False
+        assert _is_protected_execution_blocked_expiry_action(None) is False
+
     def test_pending_hvac_conflict_detected_by_source_rule_not_target(self):
         """Conflict advisories supersede HVAC shutdown rows even with a different target ID."""
         from app.models.recommendation import Recommendation
@@ -51,7 +60,7 @@ class TestBackgroundScheduler:
         conflict = Recommendation(
             site_id="site-002",
             action_type="ai_optimization",
-            target_equipment="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            target_equipment="SITE-002-HVAC-ZONE-SCOPE",
             metadata={"source_metadata": {"rule": HVAC_OCCUPANCY_CONFLICT_RULE}},
         )
 
@@ -66,15 +75,15 @@ class TestBackgroundScheduler:
         }
 
         first = _manual_advisory_dedup_key(
-            equipment_id="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            equipment_id="SITE-002-HVAC-ZONE-SCOPE",
             point_name="",
-            action_value="Hold blanket HVAC shutdown",
+            action_value="Block blanket site HVAC shutdown; setback empty zones",
             metadata=metadata,
         )
         second = _manual_advisory_dedup_key(
-            equipment_id="SITE-002-HVAC-OCCUPANCY-VERIFY",
+            equipment_id="SITE-002-HVAC-ZONE-SCOPE",
             point_name="",
-            action_value="Hold blanket HVAC shutdown with current 1216.32 kW",
+            action_value="Block blanket site HVAC shutdown; setback empty zones with current 1216.32 kW",
             metadata=metadata,
         )
 
@@ -87,11 +96,125 @@ class TestBackgroundScheduler:
         assert _format_advisory_value("22", "°C") == "22°C"
         assert (
             _format_advisory_value(
-                "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict",
+                "Block blanket site HVAC shutdown; setback empty zones",
                 "kW",
             )
-            == "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict"
+            == "Block blanket site HVAC shutdown; setback empty zones"
         )
+
+    def test_morning_digest_alerts_use_canonical_equipment_names(self):
+        from app.services.background_scheduler import _canonical_digest_alert
+
+        ahu = _canonical_digest_alert(
+            {"message": ("AHU1.FAULT_STATE (AHU1.FAULT_STATE): Equipment operating outside normal parameters.")}
+        )
+        chiller = _canonical_digest_alert(
+            {
+                "message": (
+                    "CHILLER1.COMP_CURRENT (CHILLER1.COMP_CURRENT): Equipment operating outside normal parameters."
+                )
+            }
+        )
+        fcu = _canonical_digest_alert(
+            {"message": ("FCU07.FAULT_STATE (FCU07.FAULT_STATE): Equipment operating outside normal parameters.")}
+        )
+
+        assert ahu == {
+            "equipment_code": "S002-AHU-B1-001",
+            "point_name": "FAULT_STATE",
+            "message": "Equipment operating outside normal parameters.",
+            "raw_point": "AHU1.FAULT_STATE",
+        }
+        assert chiller["equipment_code"] == "S002-CHILLER-B1-001"
+        assert chiller["point_name"] == "COMP_CURRENT"
+        assert fcu["equipment_code"] == "S002-FCU-102"
+        assert fcu["point_name"] == "FAULT_STATE"
+
+    def test_occupancy_conflict_manual_advisory_does_not_require_work_order(self):
+        from app.models.recommendation import Recommendation
+        from app.services.background_scheduler import (
+            _has_recent_approved_occupancy_control_gate,
+            _is_occupancy_conflict_control_gate_rec,
+            _manual_advisory_requires_work_order,
+        )
+
+        rec = Recommendation(
+            action_type="ai_optimization",
+            target_equipment="SITE-002-HVAC-ZONE-SCOPE",
+            action={"execution_blocked": True, "blocker": "occupancy_signal_conflict"},
+            metadata={
+                "manual_action_required": True,
+                "source_metadata": {
+                    "rule": "occupancy_conflict_blocks_hvac_shutdown",
+                    "advisory_type": "occupancy_conflict_control_gate",
+                },
+            },
+        )
+
+        assert _manual_advisory_requires_work_order(rec) is False
+        assert _is_occupancy_conflict_control_gate_rec(rec) is True
+        assert _has_recent_approved_occupancy_control_gate([rec]) is False
+
+    def test_recent_approved_no_write_occupancy_gate_suppresses_duplicate(self):
+        from app.models.recommendation import Recommendation, RecommendationStatus
+        from app.services.background_scheduler import _has_recent_approved_occupancy_control_gate
+
+        now = datetime(2026, 6, 30, 9, 0, 0)
+        recent_gate = Recommendation(
+            action_type="ai_optimization",
+            status=RecommendationStatus.APPROVED,
+            approval_status="approved",
+            approved_at=now - timedelta(minutes=8),
+            target_equipment="SITE-002-HVAC-ZONE-SCOPE",
+            action={
+                "point": None,
+                "execution_blocked": True,
+                "blocker": "occupancy_signal_conflict",
+            },
+            metadata={
+                "source_metadata": {
+                    "rule": "occupancy_conflict_blocks_hvac_shutdown",
+                    "advisory_type": "occupancy_conflict_control_gate",
+                },
+            },
+        )
+        old_gate = Recommendation(
+            action_type="ai_optimization",
+            status=RecommendationStatus.APPROVED,
+            approval_status="approved",
+            approved_at=now - timedelta(hours=25),
+            target_equipment="SITE-002-HVAC-ZONE-SCOPE",
+            action={
+                "point": None,
+                "execution_blocked": True,
+                "blocker": "occupancy_signal_conflict",
+            },
+            metadata={
+                "source_metadata": {
+                    "rule": "occupancy_conflict_blocks_hvac_shutdown",
+                    "advisory_type": "occupancy_conflict_control_gate",
+                },
+            },
+        )
+
+        assert _has_recent_approved_occupancy_control_gate([recent_gate], now=now) is True
+        assert _has_recent_approved_occupancy_control_gate([old_gate], now=now) is False
+
+    def test_missing_write_path_manual_advisory_can_require_work_order(self):
+        from app.models.recommendation import Recommendation
+        from app.services.background_scheduler import _manual_advisory_requires_work_order
+
+        rec = Recommendation(
+            action_type="ai_optimization",
+            target_equipment="SITE-002-HVAC-SCHEDULE",
+            action={"execution_blocked": True, "blocker": "missing_verified_plant_enable_or_schedule_point"},
+            metadata={
+                "manual_action_required": True,
+                "source_metadata": {"rule": "closed_empty_building_hvac_running"},
+            },
+        )
+
+        assert _manual_advisory_requires_work_order(rec) is True
 
     def test_after_hours_hvac_gate_triggers_once_per_cooldown(self):
         """Stable zero-occupancy HVAC load should trigger analysis without waiting 6h."""
@@ -296,8 +419,8 @@ class TestBackgroundScheduler:
         rec = _build_manual_advisory_recommendation(
             site_id="site-002",
             rec_dict={
-                "target_equipment": "SITE-002-HVAC-OCCUPANCY-VERIFY",
-                "recommended_value": "Hold blanket HVAC shutdown; verify occupancy/IAQ conflict",
+                "target_equipment": "SITE-002-HVAC-ZONE-SCOPE",
+                "recommended_value": "Block blanket site HVAC shutdown; setback empty zones/floor AHUs",
                 "reason": "Aggregate reports zero occupancy while CO2 indicates people may be present.",
                 "confidence": 0.42,
                 "risk_level": "medium",
@@ -307,8 +430,8 @@ class TestBackgroundScheduler:
                     "advisory_type": "occupancy_conflict_control_gate",
                 },
             },
-            equipment_id="SITE-002-HVAC-OCCUPANCY-VERIFY",
-            action_value="Hold blanket HVAC shutdown; verify occupancy/IAQ conflict",
+            equipment_id="SITE-002-HVAC-ZONE-SCOPE",
+            action_value="Block blanket site HVAC shutdown; setback empty zones/floor AHUs",
             confidence_num=0.42,
             optimization_profile="cost",
             projected_savings={"cost_zar_per_hour": 0.0},

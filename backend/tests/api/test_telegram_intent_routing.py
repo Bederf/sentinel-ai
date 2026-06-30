@@ -298,6 +298,209 @@ class TestTelegramCallbackEndpoint:
             mock_sender.send_text.assert_awaited_once()
 
     @pytest.mark.asyncio
+    async def test_recommendation_review_callback_acknowledges_without_work_order_flow(self):
+        from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
+
+        mock_sender = _make_mock_sender()
+        mock_recommendation_service = MagicMock()
+        mock_recommendation_service.acknowledge_recommendation = AsyncMock()
+
+        with (
+            patch("app.services.telegram_message_sender.TelegramMessageSender", return_value=mock_sender),
+            patch("app.services.telegram_message_sender.get_telegram_sender", return_value=mock_sender),
+            patch(
+                "app.services.recommendation_service.get_recommendation_service",
+                return_value=mock_recommendation_service,
+            ),
+            patch("app.services.telegram_flow_handlers.route_to_handler") as mock_route,
+        ):
+            result = await handle_telegram_callback(
+                TelegramCallbackPayload(
+                    callback_query_id="cbq-review",
+                    chat_id="123",
+                    user_id="456",
+                    message_id=789,
+                    data="rec:review:495f9b0a-fe44-485b-a2bf-d1fb8002cd96",
+                ),
+                x_sentry_secret=_TEST_WEBHOOK_SECRET,
+            )
+
+            assert result["success"] is True
+            assert result["intent"] == "rec_ack"
+            assert result["confirmed"] is True
+            mock_recommendation_service.acknowledge_recommendation.assert_awaited_once_with(
+                "495f9b0a-fe44-485b-a2bf-d1fb8002cd96",
+                "reviewed",
+            )
+            mock_route.assert_not_called()
+            mock_sender.send_text.assert_awaited_once()
+            assert "Acknowledged" in mock_sender.send_text.await_args.kwargs["text"]
+
+    @pytest.mark.asyncio
+    async def test_supervised_no_write_control_gate_approval_records_approval(self):
+        from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
+
+        mock_sender = _make_mock_sender()
+        mock_repo = MagicMock()
+        mock_repo.get_by_id = AsyncMock(
+            return_value=MagicMock(
+                site_id="site-002",
+                status=RecommendationStatus.PENDING,
+                target_equipment="SITE-002-HVAC-ZONE-SCOPE",
+                action={
+                    "execution_blocked": True,
+                    "advisory_type": "occupancy_conflict_control_gate",
+                    "blockers": ["occupancy_signal_conflict"],
+                },
+                metadata={},
+            )
+        )
+        mock_recommendation_service = MagicMock()
+        mock_recommendation_service.approve_no_write_recommendation = AsyncMock()
+
+        with (
+            patch("app.services.telegram_message_sender.TelegramMessageSender", return_value=mock_sender),
+            patch("app.services.telegram_message_sender.get_telegram_sender", return_value=mock_sender),
+            patch(
+                "app.database.repositories.recommendation_repository.RecommendationRepository",
+                return_value=mock_repo,
+            ),
+            patch(
+                "app.services.recommendation_service.get_recommendation_service",
+                return_value=mock_recommendation_service,
+            ),
+            patch("app.services.telegram_flow_handlers.route_to_handler") as mock_route,
+        ):
+            result = await handle_telegram_callback(
+                TelegramCallbackPayload(
+                    callback_query_id="cbq-approve-no-write",
+                    chat_id="123",
+                    user_id="456",
+                    message_id=789,
+                    data="approve:rec_id:495f9b0a-fe44-485b-a2bf-d1fb8002cd96",
+                ),
+                x_sentry_secret=_TEST_WEBHOOK_SECRET,
+            )
+
+            assert result["success"] is True
+            assert result["intent"] == "approve_recommendation"
+            assert result["confirmed"] is True
+            assert result["status"] == "approved_no_write_control_gate"
+            mock_recommendation_service.approve_no_write_recommendation.assert_awaited_once_with(
+                "495f9b0a-fe44-485b-a2bf-d1fb8002cd96",
+                "telegram:456",
+                reason="Approved via SENTRY Telegram supervised no-write control-gate notification",
+            )
+            mock_route.assert_not_called()
+            mock_sender.send_text.assert_awaited_once()
+            assert "No BMS point was changed" in mock_sender.send_text.await_args.kwargs["text"]
+
+    @pytest.mark.asyncio
+    async def test_supervised_no_write_control_gate_approval_recognizes_live_metadata_shape(self):
+        from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
+
+        mock_sender = _make_mock_sender()
+        mock_repo = MagicMock()
+        mock_repo.get_by_id = AsyncMock(
+            return_value=MagicMock(
+                site_id="site-002",
+                status=RecommendationStatus.PENDING,
+                target_equipment="SITE-002-HVAC-ZONE-SCOPE",
+                action={
+                    "point": None,
+                    "value": "Block blanket site HVAC shutdown",
+                    "blocker": "occupancy_signal_conflict",
+                    "execution_blocked": True,
+                },
+                metadata={
+                    "blocker": "occupancy_signal_conflict",
+                    "manual_action_required": True,
+                    "source_metadata": {
+                        "rule": "occupancy_conflict_blocks_hvac_shutdown",
+                        "advisory_type": "occupancy_conflict_control_gate",
+                        "logical_family": "site_hvac_after_hours_operating_state",
+                    },
+                },
+            )
+        )
+        mock_recommendation_service = MagicMock()
+        mock_recommendation_service.approve_no_write_recommendation = AsyncMock()
+
+        with (
+            patch("app.services.telegram_message_sender.TelegramMessageSender", return_value=mock_sender),
+            patch("app.services.telegram_message_sender.get_telegram_sender", return_value=mock_sender),
+            patch(
+                "app.database.repositories.recommendation_repository.RecommendationRepository",
+                return_value=mock_repo,
+            ),
+            patch(
+                "app.services.recommendation_service.get_recommendation_service",
+                return_value=mock_recommendation_service,
+            ),
+            patch("app.services.telegram_flow_handlers.route_to_handler") as mock_route,
+        ):
+            result = await handle_telegram_callback(
+                TelegramCallbackPayload(
+                    callback_query_id="cbq-approve-live-shape",
+                    chat_id="123",
+                    user_id="456",
+                    message_id=789,
+                    data="approve:rec_id:2e0bc93a-24e2-4d85-8f6b-497fb1a31c6e",
+                ),
+                x_sentry_secret=_TEST_WEBHOOK_SECRET,
+            )
+
+            assert result["success"] is True
+            assert result["confirmed"] is True
+            assert result["status"] == "approved_no_write_control_gate"
+            mock_recommendation_service.approve_no_write_recommendation.assert_awaited_once_with(
+                "2e0bc93a-24e2-4d85-8f6b-497fb1a31c6e",
+                "telegram:456",
+                reason="Approved via SENTRY Telegram supervised no-write control-gate notification",
+            )
+            mock_route.assert_not_called()
+            mock_sender.send_text.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_supervised_recommendation_reject_callback_uses_recommendation_service(self):
+        from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
+
+        mock_sender = _make_mock_sender()
+        mock_recommendation_service = MagicMock()
+        mock_recommendation_service.reject_recommendation = AsyncMock()
+
+        with (
+            patch("app.services.telegram_message_sender.TelegramMessageSender", return_value=mock_sender),
+            patch("app.services.telegram_message_sender.get_telegram_sender", return_value=mock_sender),
+            patch(
+                "app.services.recommendation_service.get_recommendation_service",
+                return_value=mock_recommendation_service,
+            ),
+            patch("app.services.telegram_flow_handlers.route_to_handler") as mock_route,
+        ):
+            result = await handle_telegram_callback(
+                TelegramCallbackPayload(
+                    callback_query_id="cbq-reject",
+                    chat_id="123",
+                    user_id="456",
+                    message_id=789,
+                    data="reject:rec_id:495f9b0a-fe44-485b-a2bf-d1fb8002cd96",
+                ),
+                x_sentry_secret=_TEST_WEBHOOK_SECRET,
+            )
+
+            assert result["success"] is True
+            assert result["intent"] == "reject_recommendation"
+            assert result["confirmed"] is True
+            mock_recommendation_service.reject_recommendation.assert_awaited_once_with(
+                "495f9b0a-fe44-485b-a2bf-d1fb8002cd96",
+                "telegram:456",
+                "Rejected via SENTRY Telegram supervised recommendation notification",
+            )
+            mock_route.assert_not_called()
+            mock_sender.send_text.assert_awaited_once()
+
+    @pytest.mark.asyncio
     async def test_supervised_recommendation_approve_callback_reports_already_executed(self):
         from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
 

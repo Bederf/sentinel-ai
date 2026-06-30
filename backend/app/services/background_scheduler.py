@@ -13,6 +13,7 @@ import functools
 import json
 import logging
 import os
+import re
 import time
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -31,19 +32,56 @@ EXPIRY_HOURS = 24  # Expire pending recommendations older than 24 hours
 PROTECTED_PENDING_RECOMMENDATION_ACTION_TYPES = {"coordinated_optimization"}
 PROTECTED_PENDING_AI_ACTION_TYPES = {"ai_optimization", "coordinated_optimization"}
 HVAC_OCCUPANCY_CONFLICT_RULE = "occupancy_conflict_blocks_hvac_shutdown"
+HVAC_ZONE_SCOPE_DECOMPOSITION_RULE = "zone_scope_verified_empty_hvac_shutdown"
 HVAC_CLOSED_EMPTY_RULES = {
     "after_hours_zero_occupancy_hvac_load",
     "closed_empty_building_hvac_running",
 }
+APPROVED_NO_WRITE_CONTROL_GATE_SUPPRESSION_HOURS = 24
 
 logger = logging.getLogger(__name__)
 
 SAST = timezone(timedelta(hours=2))
 WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
+_DIGEST_ALERT_POINT_RE = re.compile(
+    r"^\s*(?P<point>[A-Z0-9_.-]+)(?:\s*\(\s*[A-Z0-9_.-]+\s*\))?\s*:\s*(?P<detail>.*)$",
+    re.IGNORECASE,
+)
+
 
 def _clean_equipment_code(value: str | None) -> str:
     return str(value or "").strip().strip("*`").upper()
+
+
+def _canonical_digest_alert(alert: dict[str, Any]) -> dict[str, str]:
+    """Return canonical equipment/point display fields for morning digest alerts."""
+    message = " ".join(str(alert.get("message") or "Alert").split())
+    match = _DIGEST_ALERT_POINT_RE.match(message)
+    raw_point = match.group("point").upper() if match else ""
+    detail = (match.group("detail").strip() if match else message) or "Alert"
+
+    equipment_code = ""
+    point_name = ""
+    if raw_point:
+        try:
+            from app.services.point_matcher import PointMatcherService
+
+            equipment_code, _ = PointMatcherService().extract_asset_id(raw_point)
+        except Exception:
+            equipment_code = ""
+        if "." in raw_point:
+            point_name = raw_point.split(".", 1)[1]
+
+    if not equipment_code:
+        equipment_code = _clean_equipment_code(str(alert.get("equipment_code") or alert.get("equipment_id") or ""))
+
+    return {
+        "equipment_code": equipment_code,
+        "point_name": point_name,
+        "message": detail,
+        "raw_point": raw_point,
+    }
 
 
 def _parameter_type_is_writable(parameter_type: str | None) -> bool:
@@ -530,6 +568,12 @@ def _is_protected_pending_recommendation(action_type: str | None) -> bool:
     return bool(action_type in PROTECTED_PENDING_RECOMMENDATION_ACTION_TYPES)
 
 
+def _is_protected_execution_blocked_expiry_action(action_type: str | None) -> bool:
+    """Return True when blocked cleanup must not directly expire the row."""
+    action = str(action_type or "")
+    return _is_protected_pending_recommendation(action) or action in PROTECTED_PENDING_AI_ACTION_TYPES
+
+
 def _manual_advisory_risk_level(rec_dict: dict[str, Any], metadata: dict[str, Any]) -> Any:
     """Resolve risk for non-writable advisories without flattening all to low."""
     from app.models.recommendation import ActionRiskLevel
@@ -614,12 +658,132 @@ def _format_advisory_value(value: Any, unit: str | None = None, *, fallback: str
     return f"{value_text}{unit_text}"
 
 
+def _manual_advisory_requires_work_order(rec: Any) -> bool:
+    """Return True when a manual advisory naturally requires technician follow-up."""
+    action = getattr(rec, "action", None) or {}
+    metadata = getattr(rec, "metadata", None) or {}
+    source_metadata = metadata.get("source_metadata") if isinstance(metadata, dict) else {}
+    if not isinstance(source_metadata, dict):
+        source_metadata = {}
+
+    advisory_type = str(source_metadata.get("advisory_type") or "")
+    rule = str(source_metadata.get("rule") or "")
+    blocker = str(action.get("blocker") or metadata.get("blocker") or "")
+
+    if advisory_type == "occupancy_conflict_control_gate" or rule == HVAC_OCCUPANCY_CONFLICT_RULE:
+        return False
+    if blocker == "occupancy_signal_conflict":
+        return False
+    if advisory_type == "fault_safety_gate":
+        return True
+    return blocker in {
+        "missing_verified_plant_enable_or_schedule_point",
+        "unresolved_bms_point",
+        "active_fault_on_equipment_or_plant_group_mate",
+    }
+
+
+def _is_occupancy_conflict_control_gate_rec(rec: Any) -> bool:
+    """Return True for the no-blanket-shutdown occupancy/IAQ control gate."""
+    action = getattr(rec, "action", None) or {}
+    metadata = getattr(rec, "metadata", None) or {}
+    source_metadata = metadata.get("source_metadata") if isinstance(metadata, dict) else {}
+    if not isinstance(source_metadata, dict):
+        source_metadata = {}
+
+    advisory_type = str(
+        action.get("advisory_type") or metadata.get("advisory_type") or source_metadata.get("advisory_type") or ""
+    )
+    rule = str(
+        action.get("rule")
+        or action.get("source_rule")
+        or metadata.get("rule")
+        or source_metadata.get("rule")
+        or metadata.get("logical_family")
+        or source_metadata.get("logical_family")
+        or ""
+    )
+    blocker = str(action.get("blocker") or metadata.get("blocker") or source_metadata.get("blocker") or "")
+    return (
+        advisory_type == "occupancy_conflict_control_gate"
+        or rule == HVAC_OCCUPANCY_CONFLICT_RULE
+        or blocker == "occupancy_signal_conflict"
+    )
+
+
 def _has_pending_source_rule(recommendations: list[Any], source_rules: set[str]) -> bool:
     for rec in recommendations:
         if getattr(rec, "action_type", None) != "ai_optimization":
             continue
         if _metadata_rule(getattr(rec, "metadata", None)) in source_rules:
             return True
+    return False
+
+
+def _normalise_datetime_utc_naive(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(UTC).replace(tzinfo=None)
+    return parsed
+
+
+def _has_recent_approved_occupancy_control_gate(
+    recommendations: list[Any],
+    *,
+    now: datetime | None = None,
+    within_hours: int = APPROVED_NO_WRITE_CONTROL_GATE_SUPPRESSION_HOURS,
+) -> bool:
+    """Return True when a no-write occupancy gate was recently actioned.
+
+    Operator approval of this logical gate means "keep blocking blanket
+    shutdown until conditions materially clear", not "create the same Telegram
+    card again on the next scheduler pass".
+    """
+    now_value = _normalise_datetime_utc_naive(now or datetime.utcnow())
+    if now_value is None:
+        return False
+    cutoff = now_value - timedelta(hours=within_hours)
+
+    for rec in recommendations:
+        if getattr(rec, "action_type", None) != "ai_optimization":
+            continue
+
+        status = getattr(rec, "status", None)
+        status_value = getattr(status, "value", status)
+        if str(status_value or "") != "approved":
+            continue
+
+        approval_status = str(getattr(rec, "approval_status", "") or "")
+        if approval_status and approval_status != "approved":
+            continue
+
+        action = getattr(rec, "action", None) or {}
+        if not isinstance(action, dict):
+            continue
+        if action.get("point"):
+            continue
+        if not action.get("execution_blocked"):
+            continue
+        if not _is_occupancy_conflict_control_gate_rec(rec):
+            continue
+
+        actioned_at = _normalise_datetime_utc_naive(
+            getattr(rec, "approved_at", None) or getattr(rec, "timestamp", None)
+        )
+        if actioned_at and actioned_at >= cutoff:
+            return True
+
     return False
 
 
@@ -1241,8 +1405,9 @@ class BackgroundSchedulerService:
                     # Condition-change gate: skip if nothing material changed since last cycle
                     try:
                         import httpx
+                        from app.services.shadow_mode_polling import resolve_site_bridge_token
 
-                        token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+                        token = resolve_site_bridge_token(site_id)
                         resp = httpx.get(
                             f"http://10.99.0.1:8080/api/sites/{site_id}/telemetry",
                             headers={"Authorization": f"Bearer {token}"},
@@ -1662,6 +1827,25 @@ class BackgroundSchedulerService:
                                 existing_pending,
                                 {HVAC_OCCUPANCY_CONFLICT_RULE},
                             )
+                            recent_approved_hvac_conflict_gate = False
+                            try:
+                                approved_history = asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.get_history(
+                                        site_id,
+                                        status_filter=RecommendationStatus.APPROVED.value,
+                                        limit=100,
+                                    ),
+                                    self._main_loop,
+                                ).result(timeout=30)
+                                recent_approved_hvac_conflict_gate = _has_recent_approved_occupancy_control_gate(
+                                    approved_history
+                                )
+                            except Exception as _approved_gate_err:
+                                logger.warning(
+                                    "[AI-OPT] Could not load approved HVAC occupancy gates for %s: %s",
+                                    site_id,
+                                    _approved_gate_err,
+                                )
 
                             validation_results = validation.get("validation_results", [])
                             for rec_dict in control_recs:
@@ -1673,6 +1857,9 @@ class BackgroundSchedulerService:
                                 # HVAC-SCHEDULE site-level dedup — skip if one already pending
                                 _rd_meta = rec_dict.get("metadata", {}) or {}
                                 _rd_rule = _rd_meta.get("rule")
+                                if _rd_rule == HVAC_OCCUPANCY_CONFLICT_RULE and recent_approved_hvac_conflict_gate:
+                                    skipped_count += 1
+                                    continue
                                 if _rd_rule == HVAC_OCCUPANCY_CONFLICT_RULE:
                                     try:
                                         expired_count = asyncio.run_coroutine_threadsafe(
@@ -1860,6 +2047,9 @@ class BackgroundSchedulerService:
                                 # HVAC-SCHEDULE site-level dedup — skip if one already pending
                                 _rd_meta = rec_dict.get("metadata", {}) or {}
                                 _rd_rule = _rd_meta.get("rule")
+                                if _rd_rule == HVAC_OCCUPANCY_CONFLICT_RULE and recent_approved_hvac_conflict_gate:
+                                    skipped_count += 1
+                                    continue
                                 if _rd_rule == HVAC_OCCUPANCY_CONFLICT_RULE:
                                     try:
                                         expired_count = asyncio.run_coroutine_threadsafe(
@@ -2235,6 +2425,34 @@ class BackgroundSchedulerService:
                             point_name=point_name,
                             action_value=action_value,
                         )
+                        rec_source_metadata = rec_dict.get("metadata", {}) or {}
+                        if rec_source_metadata.get("rule") == HVAC_ZONE_SCOPE_DECOMPOSITION_RULE:
+                            try:
+                                expired_count = asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.expire_pending_by_source_rules(
+                                        site_id,
+                                        {HVAC_OCCUPANCY_CONFLICT_RULE},
+                                        superseded_by_rule=HVAC_ZONE_SCOPE_DECOMPOSITION_RULE,
+                                        superseded_reason=(
+                                            "Concrete zone-scope HVAC recommendations supersede the logical "
+                                            "occupancy-conflict advisory"
+                                        ),
+                                        target_prefixes=(site_id.upper(),),
+                                    ),
+                                    self._main_loop,
+                                ).result(timeout=30)
+                                if expired_count:
+                                    logger.info(
+                                        "[AI-OPT] Expired %d logical HVAC zone-scope advisory row(s) for %s",
+                                        expired_count,
+                                        site_id,
+                                    )
+                            except Exception as _exp_err:
+                                logger.warning(
+                                    "[AI-OPT] Could not expire logical HVAC zone-scope advisory for %s: %s",
+                                    site_id,
+                                    _exp_err,
+                                )
 
                         # Gate: skip recommendations for equipment with active urgent/critical WO
                         if urgent_equipment and equipment_id in urgent_equipment:
@@ -2243,6 +2461,42 @@ class BackgroundSchedulerService:
                                 f"active urgent/critical work order exists"
                             )
                             continue
+
+                        metadata_passthrough_keys = {
+                            "rule",
+                            "logical_family",
+                            "advisory_type",
+                            "parent_rule",
+                            "parent_target_equipment",
+                            "supersedes_rules",
+                            "served_zones",
+                            "zone_classifications",
+                            "outside_operating_hours",
+                        }
+                        persisted_metadata = {
+                            "point_resolution": rec_dict.get("point_resolution"),
+                            "previous_action_context": previous_action_context,
+                            "source_metadata": rec_source_metadata,
+                            **{
+                                key: value
+                                for key, value in rec_source_metadata.items()
+                                if key in metadata_passthrough_keys
+                            },
+                        }
+                        if is_grouped:
+                            persisted_metadata.update(
+                                {
+                                    "group_recommendation": True,
+                                    "affected_equipment": affected,
+                                    "equipment_name": (
+                                        affected[0].get("name")
+                                        if (isinstance(affected, list) and affected and isinstance(affected[0], dict))
+                                        else None
+                                    ),
+                                }
+                            )
+                        else:
+                            persisted_metadata["equipment_name"] = rec_source_metadata.get("equipment_name")
 
                         rec = Recommendation(
                             site_id=site_id,
@@ -2271,31 +2525,7 @@ class BackgroundSchedulerService:
                             requires_approval=True,
                             shadow_mode=(current_stage == "shadow_live"),
                             point_resolution=rec_dict.get("point_resolution"),
-                            metadata={
-                                "group_recommendation": is_grouped,
-                                "affected_equipment": affected,
-                                "point_resolution": rec_dict.get("point_resolution"),
-                                "previous_action_context": previous_action_context,
-                                # Best-effort name for grouped recommendations; pick first affected item with a name
-                                "equipment_name": (
-                                    affected[0].get("name")
-                                    if (
-                                        is_grouped
-                                        and isinstance(affected, list)
-                                        and affected
-                                        and isinstance(affected[0], dict)
-                                    )
-                                    else None
-                                )
-                                if is_grouped
-                                else rec_dict.get("metadata", {}).get("equipment_name"),
-                            }
-                            if is_grouped
-                            else {
-                                "equipment_name": rec_dict.get("metadata", {}).get("equipment_name"),
-                                "point_resolution": rec_dict.get("point_resolution"),
-                                "previous_action_context": previous_action_context,
-                            },
+                            metadata=persisted_metadata,
                         )
                         rec = asyncio.run_coroutine_threadsafe(recommendation_repo.create(rec), self._main_loop).result(
                             timeout=30
@@ -2442,7 +2672,18 @@ class BackgroundSchedulerService:
                         reason = r.reason or ""
                         reason = reason.replace("Manual BMS adjustment needed.", "").strip()
                         reason_lower = reason.lower()
-                        if source_metadata.get("rule") in {
+                        source_rule = source_metadata.get("rule")
+                        advisory_type = source_metadata.get("advisory_type")
+                        if (
+                            advisory_type == "occupancy_conflict_control_gate"
+                            or source_rule == HVAC_OCCUPANCY_CONFLICT_RULE
+                        ):
+                            action = str(
+                                target
+                                or val
+                                or "Block blanket HVAC shutdown; apply only zone/floor scoped setback where verified empty"
+                            )
+                        elif source_rule in {
                             "after_hours_zero_occupancy_hvac_load",
                             "closed_empty_building_hvac_running",
                         }:
@@ -2460,7 +2701,12 @@ class BackgroundSchedulerService:
                             action = f"{action} (current {_format_advisory_value(current, unit)})"
 
                         context = _extract_context(reason)
-                        if source_metadata.get("rule") in {
+                        if (
+                            advisory_type == "occupancy_conflict_control_gate"
+                            or source_rule == HVAC_OCCUPANCY_CONFLICT_RULE
+                        ):
+                            why = _trim_text(reason, 500)
+                        elif source_rule in {
                             "after_hours_zero_occupancy_hvac_load",
                             "closed_empty_building_hvac_running",
                         }:
@@ -2648,6 +2894,9 @@ class BackgroundSchedulerService:
                             or str(r.id) in control_not_ready_ids
                             for r in active_recs
                         )
+                        has_occupancy_control_gate = any(
+                            _is_occupancy_conflict_control_gate_rec(r) for r in active_recs
+                        )
                         has_executable_actions = any(
                             (r.action or {}).get("point")
                             and (r.action or {}).get("value") is not None
@@ -2660,7 +2909,10 @@ class BackgroundSchedulerService:
                         else:
                             lines = ["*SENTINEL AI — Operational Advisory*"]
                         if has_manual_action:
-                            lines.append("*Manual action recommended — no BACnet write available*")
+                            if has_occupancy_control_gate:
+                                lines.append("*Supervised decision required — no safe blanket write target*")
+                            else:
+                                lines.append("*Manual action recommended — no BACnet write available*")
                         lines.append(f"*Site:* {_site_id}  |  *Mode:* {phase}")
                         lines.append(f"*Actions pending:* {len(active_recs)}")
                         lines.append("")
@@ -2726,9 +2978,14 @@ class BackgroundSchedulerService:
                         if len(active_recs) > 5:
                             lines.append(f"+{len(active_recs) - 5} more")
                         if has_manual_action:
-                            lines.append(
-                                "\n_Sentinel cannot apply one or more actions automatically until the site's write path is enabled and verified._"
-                            )
+                            if has_occupancy_control_gate:
+                                lines.append(
+                                    "\n_Sentinel is withholding automatic writes because occupancy/IAQ signals do not prove a safe blanket shutdown target. Use scoped zone/floor control only where empty conditions are verified._"
+                                )
+                            else:
+                                lines.append(
+                                    "\n_Sentinel cannot apply one or more actions automatically until the site's write path is enabled and verified._"
+                                )
 
                         keyboard = None
                         manual_recs = [
@@ -2752,9 +3009,13 @@ class BackgroundSchedulerService:
                                     rows=[
                                         [
                                             InlineButton(
-                                                label=f"Create WO — {r.target_equipment or 'Action'}",
-                                                callback_data=f"wo:rec_id:{r.id}",
-                                            )
+                                                label="Approve",
+                                                callback_data=f"approve:rec_id:{r.id}",
+                                            ),
+                                            InlineButton(
+                                                label="Reject",
+                                                callback_data=f"reject:rec_id:{r.id}",
+                                            ),
                                         ]
                                         for r in manual_recs
                                     ]
@@ -2765,16 +3026,20 @@ class BackgroundSchedulerService:
                                         rows=[
                                             [
                                                 InlineButton(
-                                                    label="✅ Approve package",
+                                                    label="Approve package",
                                                     callback_data=f"approvepkg:{_site_id}",
                                                 )
                                             ],
                                             *[
                                                 [
                                                     InlineButton(
-                                                        label=f"Approve only — {r.target_equipment or 'Action'}",
+                                                        label="Approve",
                                                         callback_data=f"approve:rec_id:{r.id}",
-                                                    )
+                                                    ),
+                                                    InlineButton(
+                                                        label="Reject",
+                                                        callback_data=f"reject:rec_id:{r.id}",
+                                                    ),
                                                 ]
                                                 for r in executable_recs
                                             ],
@@ -2786,9 +3051,13 @@ class BackgroundSchedulerService:
                                             rows=[
                                                 [
                                                     InlineButton(
-                                                        label=f"✅ Approve — {r.target_equipment or 'Action'}",
+                                                        label="Approve",
                                                         callback_data=f"approve:rec_id:{r.id}",
-                                                    )
+                                                    ),
+                                                    InlineButton(
+                                                        label="Reject",
+                                                        callback_data=f"reject:rec_id:{r.id}",
+                                                    ),
                                                 ]
                                                 for r in executable_recs
                                             ]
@@ -2801,8 +3070,16 @@ class BackgroundSchedulerService:
                                 rows=[
                                     [
                                         InlineButton(
-                                            label=f"🛠 Create WO — {r.target_equipment or 'Action'}",
-                                            callback_data=f"wo:rec_id:{r.id}",
+                                            label=(
+                                                f"🛠 Create WO — {r.target_equipment or 'Action'}"
+                                                if _manual_advisory_requires_work_order(r)
+                                                else f"✅ Acknowledge — {r.target_equipment or 'Action'}"
+                                            ),
+                                            callback_data=(
+                                                f"wo:rec_id:{r.id}"
+                                                if _manual_advisory_requires_work_order(r)
+                                                else f"rec:review:{r.id}"
+                                            ),
                                         )
                                     ]
                                     for r in active_recs[:5]
@@ -3677,7 +3954,7 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("Orphan alert cleanup job failed: %s", e)
 
-    async def _run_orphan_alert_cleanup_async() -> int:
+    async def _run_orphan_alert_cleanup_async(self) -> int:
         """Delete orphaned fault alerts and stale active alerts with no site/equipment FK.
 
         Removes:
@@ -3753,20 +4030,43 @@ class BackgroundSchedulerService:
         dedup_total = 0
 
         try:
+            blocked_cutoff = datetime.now(UTC) - timedelta(hours=EXPIRY_HOURS)
             blocked_result = await asyncio.to_thread(
                 lambda: (
                     sb.table("recommendations")
-                    .update({"status": "expired"})
+                    .select("id, action_type, timestamp")
                     .eq("status", "pending")
-                    .not_.in_("action_type", list(PROTECTED_PENDING_AI_ACTION_TYPES))
                     .filter("action->>execution_blocked", "eq", "true")
+                    .lt("timestamp", blocked_cutoff.isoformat())
+                    .limit(1000)
                     .execute()
                 )
             )
-            blocked_count = len(blocked_result.data or [])
+            blocked_ids = [
+                row["id"]
+                for row in (blocked_result.data or [])
+                if not _is_protected_execution_blocked_expiry_action(row.get("action_type"))
+            ]
+
+            def _expire_blocked_chunk(chunk_ids: list[str]) -> Any:
+                return (
+                    sb.table("recommendations")
+                    .update({"status": RecommendationStatus.EXPIRED.value})
+                    .in_("id", chunk_ids)
+                    .execute()
+                )
+
+            for i in range(0, len(blocked_ids), 100):
+                chunk = blocked_ids[i : i + 100]
+                await asyncio.to_thread(_expire_blocked_chunk, chunk)
+            blocked_count = len(blocked_ids)
             if blocked_count:
                 expired_total += blocked_count
-                logger.info("[REC-EXPIRY] Expired %d execution-blocked recommendations", blocked_count)
+                logger.info(
+                    "[REC-EXPIRY] Expired %d execution-blocked recommendations older than %dh",
+                    blocked_count,
+                    EXPIRY_HOURS,
+                )
         except Exception as e:
             logger.warning("[REC-EXPIRY] Execution-blocked cleanup failed: %s", e)
 
@@ -5522,13 +5822,12 @@ class BackgroundSchedulerService:
             cursor = conn.cursor()
             for table, col, days in [
                 ("equipment_fault_events", "recorded_at", 7),
-                ("recommendations", "created_at", 7),
                 ("predictions", "created_at", 14),
                 ("adapter_health", "timestamp", 7),
                 ("adapter_health_current", "updated_at", 7),
                 ("adapter_health_alerts", "created_at", 7),
                 ("space_occupancy_events", "timestamp", 7),
-                ("equipment_sensor_readings", "recorded_at", 90),
+                ("equipment_sensor_readings", "recorded_at", 10),
                 ("asset_health_snapshots", "created_at", 30),
                 ("system_health_snapshots", "created_at", 30),
             ]:
@@ -8316,7 +8615,9 @@ class BackgroundSchedulerService:
 
             config = rows.data[0]["connection_config"]
             base_url = config.get("base_url")
-            token = config.get("token")
+            from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+            token = resolve_site_bridge_token(site_id, config)
 
             if not base_url or not token:
                 logger.warning(
@@ -8747,10 +9048,15 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     static_alert_groups: dict[tuple[str, str, str], dict[str, Any]] = {}
                     for alert in alerts_resp.data or []:
                         message = str(alert.get("message") or "").strip()
+                        canonical = _canonical_digest_alert(alert)
+                        display_equipment = canonical.get("equipment_code") or "site"
+                        display_point = canonical.get("point_name") or canonical.get("raw_point") or ""
+                        display_message = canonical.get("message") or message
                         key = (
-                            str(alert.get("source_dedupe_key") or alert.get("equipment_id") or "site"),
+                            display_equipment,
                             str(alert.get("severity") or "unknown"),
-                            message,
+                            display_point,
+                            display_message,
                         )
                         is_static_alert = message.lower().startswith(("sensor.", "zone."))
                         target = static_alert_groups if is_static_alert else alert_groups
@@ -8758,7 +9064,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                             key,
                             {
                                 "severity": alert.get("severity"),
-                                "message": message,
+                                "equipment_code": display_equipment,
+                                "point_name": display_point,
+                                "message": display_message,
                                 "occurrences": 0,
                                 "latest_seen_at": alert.get("created_at"),
                             },
@@ -9033,9 +9341,14 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     lines.append(f"  Static endpoint groups excluded: {static_alert_groups_excluded}")
                 for a in critical_alerts[:3]:
                     msg = _trim_digest_text(a.get("message", "Alert"), 72)
+                    equipment_code = a.get("equipment_code") or "site"
+                    point_name = a.get("point_name")
+                    subject = f"`{equipment_code}`"
+                    if point_name:
+                        subject = f"{subject} — {point_name}"
                     occ = a.get("occurrences") or 1
                     suffix = f" ({occ} rows)" if occ > 1 else ""
-                    lines.append(f"  [{str(a.get('severity', '?')).upper()}] {msg}{suffix}")
+                    lines.append(f"  [{str(a.get('severity', '?')).upper()}] {subject}: {msg}{suffix}")
             else:
                 if static_alert_groups_excluded:
                     lines.append(

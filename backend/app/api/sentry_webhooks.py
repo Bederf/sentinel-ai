@@ -327,6 +327,44 @@ def _closed_recommendation_approval_message(rec: Any) -> tuple[str, bool]:
     )
 
 
+def _is_no_write_control_gate_recommendation(rec: Any) -> bool:
+    """Return True when approval records a safe no-write control-gate decision."""
+    action = rec.action or {}
+    metadata = rec.metadata or {}
+    raw_source_metadata = metadata.get("source_metadata")
+    source_metadata: dict[str, Any] = raw_source_metadata if isinstance(raw_source_metadata, dict) else {}
+    advisory_type = action.get("advisory_type") or metadata.get("advisory_type")
+    advisory_type = advisory_type or source_metadata.get("advisory_type")
+    source_rule = (
+        action.get("rule")
+        or action.get("source_rule")
+        or metadata.get("source_rule")
+        or metadata.get("logical_family")
+        or source_metadata.get("rule")
+        or source_metadata.get("source_rule")
+        or source_metadata.get("logical_family")
+    )
+    blocker_values = [
+        action.get("blocker"),
+        metadata.get("blocker"),
+        source_metadata.get("blocker"),
+        action.get("blockers") or action.get("blocking_reasons"),
+        metadata.get("blockers") or metadata.get("blocking_reasons"),
+        source_metadata.get("blockers") or source_metadata.get("blocking_reasons"),
+    ]
+    blockers = {
+        str(blocker)
+        for value in blocker_values
+        for blocker in (value if isinstance(value, (list, tuple, set)) else [value])
+        if blocker
+    }
+    return (
+        advisory_type == "occupancy_conflict_control_gate"
+        or source_rule == "occupancy_conflict_blocks_hvac_shutdown"
+        or "occupancy_signal_conflict" in blockers
+    )
+
+
 async def _handle_supervised_recommendation_approval(
     *,
     chat_id: str,
@@ -377,6 +415,52 @@ async def _handle_supervised_recommendation_approval(
 
     action = rec.action or {}
     if action.get("execution_blocked") or not action.get("point") or action.get("value") is None:
+        if _is_no_write_control_gate_recommendation(rec):
+            from app.services.recommendation_service import get_recommendation_service
+
+            try:
+                await get_recommendation_service().approve_no_write_recommendation(
+                    rec_uuid,
+                    f"telegram:{user_id}",
+                    reason="Approved via SENTRY Telegram supervised no-write control-gate notification",
+                )
+            except Exception as exc:
+                logger.exception(
+                    "Telegram no-write recommendation approval failed: rec_id=%s user_id=%s",
+                    rec_uuid,
+                    user_id,
+                )
+                keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{rec_uuid}")]])
+                await _safe_send(
+                    text=_approval_failed_message(rec.target_equipment or "Recommendation", type(exc).__name__),
+                    keyboard=keyboard,
+                    parse_mode="HTML",
+                )
+                return {
+                    "success": True,
+                    "intent": "approve_recommendation",
+                    "confirmed": False,
+                    "recommendation_id": rec_uuid,
+                    "status": "error",
+                    "error": type(exc).__name__,
+                }
+
+            await _safe_send(
+                text=(
+                    f"✅ <b>Approved — {html.escape(str(rec.target_equipment or 'Recommendation'))}</b>\n"
+                    "Approved as a no-write control-gate action.\n"
+                    "No BMS point was changed from Telegram."
+                ),
+                parse_mode="HTML",
+            )
+            return {
+                "success": True,
+                "intent": "approve_recommendation",
+                "confirmed": True,
+                "recommendation_id": rec_uuid,
+                "status": "approved_no_write_control_gate",
+            }
+
         keyboard = InlineKeyboard(
             rows=[
                 [InlineButton("Create work order", f"wo:rec_id:{rec_uuid}")],
@@ -528,6 +612,54 @@ async def _handle_supervised_recommendation_approval(
         "recommendation_id": rec_uuid,
         "status": result.status,
     }
+
+
+async def _handle_supervised_recommendation_rejection(
+    *,
+    chat_id: str,
+    user_id: str,
+    rec_uuid: str,
+    sender: Any,
+) -> dict[str, Any]:
+    from app.services.recommendation_service import get_recommendation_service
+
+    try:
+        await get_recommendation_service().reject_recommendation(
+            rec_uuid,
+            f"telegram:{user_id}",
+            "Rejected via SENTRY Telegram supervised recommendation notification",
+        )
+        if sender:
+            await sender.send_text(
+                chat_id=chat_id,
+                text="❌ Recommendation rejected. No control action was taken.",
+            )
+        return {
+            "success": True,
+            "intent": "reject_recommendation",
+            "confirmed": True,
+            "recommendation_id": rec_uuid,
+            "status": "rejected",
+        }
+    except Exception as exc:
+        logger.exception(
+            "Telegram supervised recommendation rejection failed: rec_id=%s user_id=%s",
+            rec_uuid,
+            user_id,
+        )
+        if sender:
+            await sender.send_text(
+                chat_id=chat_id,
+                text=f"Could not reject recommendation: {type(exc).__name__}",
+            )
+        return {
+            "success": True,
+            "intent": "reject_recommendation",
+            "confirmed": False,
+            "recommendation_id": rec_uuid,
+            "status": "error",
+            "error": type(exc).__name__,
+        }
 
 
 async def _handle_supervised_package_approval(
@@ -2726,7 +2858,7 @@ async def sentry_call_log(
         try:
             notify_response = await work_order_notifier.notify_technician(wo_notify_data)
             is_success = notify_response.get("success") if isinstance(notify_response, dict) else bool(notify_response)
-            notify_sent = is_success and bool(notify_response)
+            notify_sent = bool(is_success and notify_response)
         except Exception as e:
             logger.warning(f"Notification failed for call-log WO: {e}")
 
@@ -3972,6 +4104,14 @@ async def handle_telegram_callback(
             sender=sender,
         )
 
+    if payload.data.startswith("reject:rec_id:"):
+        return await _handle_supervised_recommendation_rejection(
+            chat_id=payload.chat_id,
+            user_id=payload.user_id,
+            rec_uuid=payload.data.split(":")[-1],
+            sender=sender,
+        )
+
     if payload.data.startswith("approvepkg:"):
         return await _handle_supervised_package_approval(
             chat_id=payload.chat_id,
@@ -4003,7 +4143,8 @@ async def handle_telegram_callback(
         supabase = get_supabase_client()
         result = supabase.table("recommendations").select("*").eq("id", rec_uuid).limit(1).execute()
         if not result.data:
-            await sender.send_text(chat_id=payload.chat_id, text="Coordinated AI recommendation not found.")
+            if sender:
+                await sender.send_text(chat_id=payload.chat_id, text="Coordinated AI recommendation not found.")
             return {"success": True, "intent": "coordinated_optimization", "confirmed": False}
 
         record = result.data[0]
@@ -4018,10 +4159,11 @@ async def handle_telegram_callback(
             )
             update_result = supabase.table("recommendations").update(updates).eq("id", rec_uuid).execute()
             if not update_result.data:
-                await sender.send_text(
-                    chat_id=payload.chat_id,
-                    text="Could not update coordinated AI recommendation.",
-                )
+                if sender:
+                    await sender.send_text(
+                        chat_id=payload.chat_id,
+                        text="Could not update coordinated AI recommendation.",
+                    )
                 return {"success": True, "intent": "coordinated_optimization", "confirmed": False}
 
             updated = update_result.data[0]
@@ -4098,7 +4240,8 @@ async def handle_telegram_callback(
                     "No control action was taken.\n"
                     f"Device writes: {execution.get('device_writes', 0)}"
                 )
-            await sender.send_text(chat_id=payload.chat_id, text=text, parse_mode="HTML")
+            if sender:
+                await sender.send_text(chat_id=payload.chat_id, text=text, parse_mode="HTML")
             return {
                 "success": True,
                 "intent": "coordinated_optimization",
@@ -4111,12 +4254,13 @@ async def handle_telegram_callback(
 
             logger.exception("SENTRY coordinated AI recommendation decision failed for %s", rec_uuid)
             keyboard = InlineKeyboard(rows=[[InlineButton("Log issue", f"devissue:approval:{rec_uuid}")]])
-            await sender.send_text(
-                chat_id=payload.chat_id,
-                text=_approval_failed_message("Coordinated AI recommendation"),
-                keyboard=keyboard,
-                parse_mode="HTML",
-            )
+            if sender:
+                await sender.send_text(
+                    chat_id=payload.chat_id,
+                    text=_approval_failed_message("Coordinated AI recommendation"),
+                    keyboard=keyboard,
+                    parse_mode="HTML",
+                )
             return {"success": True, "intent": "coordinated_optimization", "confirmed": False}
 
     if payload.data.startswith("docintake:"):
@@ -4156,19 +4300,25 @@ async def handle_telegram_callback(
         )
         return {"success": True, "intent": "residential_onboarding", "confidence": 1.0}
 
-    # Recommendation acknowledgement from morning digest inline buttons
-    if payload.data.startswith("rec:accept:") or payload.data.startswith("rec:dismiss:"):
+    # Recommendation acknowledgement from morning digest/advisory inline buttons
+    if (
+        payload.data.startswith("rec:accept:")
+        or payload.data.startswith("rec:dismiss:")
+        or payload.data.startswith("rec:review:")
+    ):
         from app.services.recommendation_service import get_recommendation_service
 
         parts = payload.data.split(":")
         if len(parts) >= 3:
             rec_id = parts[2]
-            acknowledgement_type = "accepted" if parts[1] == "accept" else "dismissed"
+            acknowledgement_type = (
+                "accepted" if parts[1] == "accept" else "reviewed" if parts[1] == "review" else "dismissed"
+            )
             svc = get_recommendation_service()
             await svc.acknowledge_recommendation(rec_id, acknowledgement_type)
-            sender = get_telegram_sender()
-            action = "Accepted" if parts[1] == "accept" else "Dismissed"
-            await sender.send_text(chat_id=payload.chat_id, text=f"✅ Recommendation {action}.")
+            action = "Accepted" if parts[1] == "accept" else "Acknowledged" if parts[1] == "review" else "Dismissed"
+            if sender:
+                await sender.send_text(chat_id=payload.chat_id, text=f"✅ Recommendation {action}.")
             return {"success": True, "intent": "rec_ack", "confirmed": True}
         return {"success": False, "error": "invalid_rec_callback"}
 
@@ -4178,7 +4328,8 @@ async def handle_telegram_callback(
         try:
             parts = payload.data.replace("#", "").split(" ", 1)
             wo_ref = parts[1] if len(parts) > 1 else payload.data
-            await sender.send_text(chat_id=payload.chat_id, text=f"▶closeout {wo_ref}")
+            if sender:
+                await sender.send_text(chat_id=payload.chat_id, text=f"▶closeout {wo_ref}")
         except Exception as e:
             logger.error("Failed to dispatch closeout via Done button: %s", e)
         return {"success": True, "intent": "closeout", "method": "button_done"}

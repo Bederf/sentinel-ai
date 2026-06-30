@@ -1,6 +1,7 @@
 """Regression tests for deterministic after-hours HVAC advisories."""
 
 from datetime import datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -218,6 +219,35 @@ def test_after_hours_zero_occupancy_hvac_load_generates_manual_advisory():
     assert rec["metadata"]["rule"] == "closed_empty_building_hvac_running"
 
 
+def test_after_hours_plant_enable_path_matches_ahu_by_code_when_hvac_type_missing():
+    optimizer = _optimizer()
+    ahu = SimpleNamespace(
+        id="S002-AHU-202",
+        name="AHU 202",
+        device_type=DeviceType.HVAC,
+        protocol=ProtocolType.MOCK,
+        site_id="site-002",
+    )
+    conditions = {
+        **_conditions("2026-06-18T22:00:00", occupancy=0, hvac_kw=24.0),
+        "_plant_enable_mappings": {"S002-AHU-202": "AHU-2_Enable"},
+    }
+
+    recommendations = optimizer._append_after_hours_zero_occupancy_advisory(
+        "site-002",
+        conditions,
+        {"hvac": [ahu], "power": [], "lighting": [], "meter": []},
+        [],
+    )
+
+    recs = _after_hours_recs(type("Result", (), {"recommendations": recommendations})())
+    assert len(recs) == 1
+    rec = recs[0]
+    assert rec["target_equipment"] == "S002-AHU-202"
+    assert rec["action"] == {"point": "plant_enable", "value": 0, "execution_blocked": False}
+    assert rec["metadata"]["plant_enable_bms_point"] == "AHU-2_Enable"
+
+
 def test_after_hours_hvac_rule_does_not_fire_during_operating_hours():
     optimizer = _optimizer()
 
@@ -246,7 +276,7 @@ def test_after_hours_hvac_rule_does_not_fire_when_occupied():
     assert _after_hours_recs(result) == []
 
 
-def test_aggregate_zero_with_fused_occupancy_conflict_emits_conflict_advisory_not_shutdown():
+def test_after_hours_incidental_occupancy_conflict_still_emits_shutdown_policy():
     optimizer = _optimizer()
 
     class _Conflict:
@@ -287,6 +317,61 @@ def test_aggregate_zero_with_fused_occupancy_conflict_emits_conflict_advisory_no
         [],
     )
 
+    after_hours_recs = _after_hours_recs(type("Result", (), {"recommendations": recommendations})())
+    assert len(after_hours_recs) == 1
+    rec = after_hours_recs[0]
+    assert rec["metadata"]["rule"] == "closed_empty_building_hvac_running"
+    assert rec["metadata"]["incidental_occupancy_override"] is True
+    assert rec["action"]["execution_blocked"] is True
+    assert "After-hours cleaner/security presence does not justify full-building HVAC" in rec["reason"]
+    assert not [
+        rec
+        for rec in recommendations
+        if rec.get("metadata", {}).get("rule") == "occupancy_conflict_blocks_hvac_shutdown"
+    ]
+
+
+def test_operating_hours_occupancy_conflict_emits_zone_scope_advisory_not_shutdown():
+    optimizer = _optimizer()
+
+    class _Conflict:
+        signals = ("simbiot_aggregate", "co2_elevation")
+        delta_pct = 100.0
+        description = "simbiot_aggregate (0%) vs co2_elevation (100%) — Δ100pp"
+
+    class _Signal:
+        def __init__(self, source, pct, confidence, raw_value):
+            self.source = source
+            self.normalized_pct = pct
+            self.confidence = confidence
+            self.freshness_minutes = 2.0
+            self.is_available = True
+            self.raw_value = raw_value
+
+    class _Fused:
+        occupancy_percent = 100.0
+        occupancy_count = 0
+        confidence = 0.6
+        is_occupied = True
+        is_uncertain = True
+        may_suppress = False
+        gate_override = "conflict_uncertain"
+        conflicts = (_Conflict(),)
+        signals = {
+            "simbiot_aggregate": _Signal("simbiot_aggregate", 0.0, 0.95, {"total_occupancy": 0}),
+            "co2_elevation": _Signal("co2_elevation", 100.0, 0.6, {"avg_co2": 1100.0}),
+        }
+
+    recommendations = optimizer._append_after_hours_zero_occupancy_advisory(
+        "site-002",
+        {
+            **_conditions("2026-06-18T10:00:00", occupancy=0, hvac_kw=24.0),
+            "_fused_occupancy": _Fused(),
+        },
+        {"hvac": [_chiller()], "power": [], "lighting": [], "meter": []},
+        [],
+    )
+
     assert _after_hours_recs(type("Result", (), {"recommendations": recommendations})()) == []
     conflict_recs = [
         rec
@@ -299,8 +384,10 @@ def test_aggregate_zero_with_fused_occupancy_conflict_emits_conflict_advisory_no
     assert rec["confidence"] == 0.42
     assert rec["action"]["execution_blocked"] is True
     assert rec["action"]["blocker"] == "occupancy_signal_conflict"
-    assert "Hold blanket HVAC shutdown" in rec["recommended_value"]
+    assert "Block blanket site HVAC shutdown" in rec["recommended_value"]
+    assert "zones/floor AHUs" in rec["recommended_value"]
     assert rec["metadata"]["blocked_rule"] == "closed_empty_building_hvac_running"
+    assert rec["metadata"]["outside_operating_hours"] is False
 
 
 def test_closed_empty_hvac_context_uses_site_specific_peak_threshold():
