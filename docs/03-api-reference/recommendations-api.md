@@ -567,6 +567,99 @@ The AI receives context including:
 
 ---
 
+## Accountability Audit Layer
+
+Recommendation lifecycle and quality review events are stored in
+`recommendation_audit_events`, an append-only event log. The mutable
+`recommendations.status` field remains a queue/performance shortcut; dispute
+history is reconstructed from audit events.
+
+Lifecycle events include:
+`created`, `surfaced`, `viewed`, `acknowledged`, `approved`, `rejected`,
+`deferred`, `wo_linked`, `resolved`, `expired`, `escalated`, `executed`,
+`failed`, and `updated`.
+
+System-quality exceptions are separate from operator accountability. Use them
+when SENTINEL under-classified, missed, or incorrectly generated a
+recommendation. Each quality event requires:
+
+- `linked_recommendation_id`
+- `quality_exception_type`
+- `detected_by`
+- previous/new state snapshots
+
+### GET `/api/recommendations/{site_id}/manager-exceptions`
+
+Returns manager-facing exceptions for stale/unactioned items and system-quality
+issues. This is the dashboard/Cockpit contract and also feeds the manager
+morning digest.
+
+Query parameters:
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `stale_hours` | integer | `24` | Age threshold for un-actioned pending/advisory/approved recommendations |
+| `limit` | integer | `50` | Max rows per exception bucket |
+
+Response:
+
+```json
+{
+  "success": true,
+  "site_id": "site-002",
+  "stale_hours": 24,
+  "stale_unactioned": [],
+  "approved_without_wo": [],
+  "system_quality_exceptions": [],
+  "counts": {
+    "stale_unactioned": 0,
+    "approved_without_wo": 0,
+    "system_quality_exceptions": 0
+  },
+  "surfaces": [
+    "GET /api/recommendations/{site_id}/manager-exceptions",
+    "SENTINEL Morning Digest manager Telegram section",
+    "Recommendation detail audit_events"
+  ]
+}
+```
+
+### POST `/api/recommendations/{rec_id}/quality-exception`
+
+Records a system-quality exception linked to the original recommendation chain.
+
+Request:
+
+```json
+{
+  "quality_exception_type": "severity_reclassified",
+  "detected_by": "human_review:Shad",
+  "reason": "Saturday chiller case was low severity but should have been high",
+  "previous_state": {
+    "risk_level": "low"
+  },
+  "new_state": {
+    "risk_level": "high"
+  },
+  "source": "human_review",
+  "metadata": {
+    "case": "saturday_chiller"
+  }
+}
+```
+
+Supported `quality_exception_type` values:
+`severity_reclassified`, `missed_escalation`, `confidence_gate_failed`,
+`false_positive_marked`, `false_negative_identified`,
+`recommendation_withdrawn`, `model_logic_corrected`, `other`.
+
+### GET `/api/recommendations/detail/{rec_id}`
+
+The detail response now includes `audit_events`, ordered by `occurred_at`, and
+records a `viewed` event for the detail surface.
+
+---
+
 ## Rate Limiting
 
 API endpoints are rate-limited per user:

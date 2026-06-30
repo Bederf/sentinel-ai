@@ -112,7 +112,8 @@
 
 | Secret | Location | Encrypted? |
 |--------|----------|------------|
-| `BRIDGE_API_TOKEN` | `backend/.env`, `/etc/sentinel/secrets.env` | ❌ Plaintext in `.env`, ✅ 0600 in secrets |
+| `BRIDGE_API_TOKEN` | Legacy fallback in `/etc/sentinel/secrets.env` | ✅ 0600 in secrets |
+| `BRIDGE_API_TOKEN_SITE_###` | Site-scoped bridge token in `/etc/sentinel/secrets.env` | ✅ 0600 in secrets |
 | `METRICS_BEARER_TOKEN` | `backend/.env`, `/etc/sentinel/backend.env` | ❌ Plaintext |
 | `INTERNAL_SERVICE_KEY` | `backend/.env` | ❌ Plaintext |
 | `ESKOMSEPUSH_API_TOKEN` | `backend/.env` | ❌ Plaintext |
@@ -330,7 +331,9 @@ Secrets currently ONLY in `backend/.env` that need to be added to `secrets.env`:
 | `ROOMS_SMTP_PASSWORD` | `secrets.env` |
 | `JWT_SECRET_KEY` | `secrets.env` |
 | `ENCRYPTION_KEY` | `secrets.env` |
-| `BRIDGE_API_TOKEN` | Already in `secrets.env` ✅ |
+| `BRIDGE_API_TOKEN` | Legacy fallback in `secrets.env` ✅ |
+| `BRIDGE_API_TOKEN_SITE_002` | Site 002 bridge token in `secrets.env` ✅ |
+| `BRIDGE_API_TOKEN_SITE_005` | Site 005 bridge token in `secrets.env` ✅ |
 | `METRICS_BEARER_TOKEN` | `secrets.env` (or `backend.env` as non-secret) |
 | `INTERNAL_SERVICE_KEY` | `secrets.env` |
 | `ESKOMSEPUSH_API_TOKEN` | `secrets.env` |

@@ -196,9 +196,14 @@ async def save_adapter_config(
     Body (example for bridge):
         {
             "base_url": "http://10.99.0.1:8080",
-            "token": "<site-bridge-token>",
+            "token_env": "BRIDGE_API_TOKEN_SITE_003",
             "poll_interval_seconds": 300
         }
+
+    If token_env is omitted, SENTINEL looks for the conventional site-scoped
+    secret names BRIDGE_API_TOKEN_SITE_003, SIMBIOT_API_KEY_SITE_003,
+    BRIDGE_API_TOKEN_SITE003, then SIMBIOT_API_KEY_SITE003. A literal "token"
+    is retained only as a legacy fallback.
 
     Body (example for BACnet):
         {
@@ -223,7 +228,11 @@ async def save_adapter_config(
     if not success:
         raise HTTPException(500, detail=f"Failed to save {protocol} config for {site_id}")
 
-    return {"status": "success", "message": f"Saved {protocol} config for {site_id}"}
+    return {
+        "status": "success",
+        "message": f"Saved {protocol} config for {site_id}",
+        "secret_hint": f"Use site-scoped env secret BRIDGE_API_TOKEN_{site_id.upper().replace('-', '_')}",
+    }
 
 
 @router.get("/sites/{site_id}/adapters")

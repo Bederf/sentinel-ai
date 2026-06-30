@@ -189,9 +189,13 @@ class AdapterHealthMonitor:
 
         start = time.perf_counter()
         try:
-            # Extract base_url + token from connection_config if available
+            # Extract base_url + site-scoped token from connection_config/env if available.
             base_url = (bridge_config or {}).get("base_url", "")
-            token = (bridge_config or {}).get("token", "")
+            token = ""
+            if base_url:
+                from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+                token = resolve_site_bridge_token(site_id, bridge_config or {})
 
             if base_url and token:
                 resp = httpx.get(

@@ -44,9 +44,9 @@ EQUIPMENT_DIR = Path(__file__).resolve().parent.parent / "app" / "data" / "sites
 # Example values below are placeholders — MUST be replaced with real operator input.
 # ---------------------------------------------------------------------------
 BACNET_DEVICE_MAP: dict[str, int] = {
-    "nc:18": 180001,  # B1 plant JACE (operator to confirm)
-    "nc:10": 100001,  # L1 floor JACE (operator to confirm)
-    "nc:15": 150001,  # L2 floor JACE (operator to confirm)
+    "nc:18": 3741,  # B1 plant field controller — confirmed by operator 2026-06-27
+    "nc:10": 3745,  # L1 floor field controller — confirmed by operator 2026-06-27
+    "nc:15": 3748,  # L2 floor field controller — confirmed by operator 2026-06-27
 }
 
 # Heuristic nc:X -> equipment filename prefix (case-insensitive substring match).

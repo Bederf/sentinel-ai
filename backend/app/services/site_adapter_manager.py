@@ -2,12 +2,13 @@
 Site Adapter Manager — instantiates BMS adapters per site from database config.
 
 Replaces the hardcoded site-002 + global BRIDGE_API_TOKEN pattern.
-Every site polls using its own stored credentials.
+Every site polls using its own site-scoped credential.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 from typing import Any
 
 from app.services.simbiot.adapter_registry import create_bms_adapter
@@ -174,6 +175,8 @@ class SiteAdapterManager:
         Returns:
             True if save succeeded
         """
+        connection_config = self._normalize_connection_config(site_id, protocol, connection_config)
+
         payload = {
             "site_id": site_id,
             "protocol": protocol,
@@ -197,6 +200,48 @@ class SiteAdapterManager:
 
         logger.info("[SAM] Saved %s adapter config for %s", protocol, site_id)
         return True
+
+    def _normalize_connection_config(
+        self,
+        site_id: str,
+        protocol: str,
+        connection_config: dict[str, Any],
+    ) -> dict[str, Any]:
+        """Normalize wizard-saved adapter config without exposing secrets."""
+        config = dict(connection_config or {})
+        if protocol != "bridge":
+            return config
+
+        from app.services.shadow_mode_polling import site_bridge_token_env_candidates
+
+        explicit_env = str(
+            config.get("token_env")
+            or config.get("token_secret_env")
+            or config.get("api_token_env")
+            or config.get("secret_env")
+            or ""
+        ).strip()
+
+        env_name = explicit_env
+        if not env_name:
+            env_name = next(
+                (candidate for candidate in site_bridge_token_env_candidates(site_id) if os.getenv(candidate)), ""
+            )
+
+        if env_name:
+            config["token_env"] = env_name
+            if os.getenv(env_name):
+                config.pop("token", None)
+            else:
+                logger.warning("[SAM] Bridge token env %s is not set for %s", env_name, site_id)
+        elif config.get("token"):
+            logger.warning(
+                "[SAM] Bridge config for %s saved with legacy DB token fallback; prefer %s",
+                site_id,
+                site_bridge_token_env_candidates(site_id)[0],
+            )
+
+        return config
 
     def get_active_sites(self) -> list[dict[str, Any]]:
         """

@@ -20,6 +20,7 @@ from typing import Any
 
 from app.api.metrics import sentinel_data_freshness_violations_total
 from app.config.settings import settings
+from app.core.site_scope import is_site_002_out_of_scope_l3
 from app.core.site_resolver import get_primary_site_code
 from app.services.audit_logger import audit_structured_logger
 from app.services.ml_config import (
@@ -866,8 +867,12 @@ class SentinelDataSync:
 
         rows = []
         rejected_count = 0
+        skipped_scope_count = 0
         ts = simulated_time
         for code, state in equipment_states.items():
+            if is_site_002_out_of_scope_l3(self.site_id, code):
+                skipped_scope_count += 1
+                continue
             readings = state.get("sensor_readings", {})
             if not readings:
                 continue
@@ -896,6 +901,11 @@ class SentinelDataSync:
 
         if rejected_count > 0:
             logger.info("[SENTINEL SYNC] Quality gate rejected %d sensor readings", rejected_count)
+        if skipped_scope_count > 0:
+            logger.warning(
+                "[SENTINEL SYNC] Ignored %d Site 002 L3 equipment states outside tenant scope",
+                skipped_scope_count,
+            )
 
         try:
             conn = psycopg2.connect(database_url)
@@ -950,6 +960,8 @@ class SentinelDataSync:
         zone_data: dict[str, dict[str, Any]] = {}  # zone_id -> {temp, co2_ppm, humidity_pct}
 
         for code, state in equipment_states.items():
+            if is_site_002_out_of_scope_l3(self.site_id, code):
+                continue
             equip_type = state.get("type", "").lower()
             readings = state.get("sensor_readings", {})
 

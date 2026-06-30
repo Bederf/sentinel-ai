@@ -94,12 +94,6 @@ class ZoneMappingService:
         Note: Older mappings used L10, L11, L12 which are migrated to L0, L1, L2
         """
         default_mappings = [
-            # Level 3
-            ZoneMapping("Zone-L3-A", "Zone-L3-A", "L3", "Level 3 Zone A", "open_office", 3),
-            ZoneMapping("Zone-L3-B", "Zone-L3-B", "L3", "Level 3 Zone B", "open_office", 3),
-            ZoneMapping("Zone-L3-C", "Zone-L3-C", "L3", "Level 3 Zone C", "open_office", 3),
-            ZoneMapping("Zone-L3-D", "Zone-L3-D", "L3", "Level 3 Zone D", "open_office", 3),
-            ZoneMapping("Zone-L3-E", "Zone-L3-E", "L3", "Level 3 Zone E", "open_office", 3),
             # Level 2 (formerly L12)
             ZoneMapping("Zone-L2-A", "Zone-L2-A", "L2", "Level 2 Zone A", "open_office", 3),
             ZoneMapping("Zone-L2-B", "Zone-L2-B", "L2", "Level 2 Zone B", "open_office", 3),
@@ -378,7 +372,6 @@ class ZoneMappingService:
             "L0": "Ground Floor",
             "L1": "Level 1",
             "L2": "Level 2",
-            "L3": "Level 3",
             "R": "Roof",
         }
         zones = self._load_zones_data()

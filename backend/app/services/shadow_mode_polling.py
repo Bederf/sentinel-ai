@@ -20,12 +20,14 @@ When 500+ events are buffered → train Fault Classifier.
 import asyncio
 import contextlib
 import logging
+import os
 import re
 from datetime import UTC, datetime
 from typing import Any
 
 import httpx
 
+from app.core.site_scope import contains_site_002_out_of_scope_l3_reference, is_site_002_out_of_scope_l3
 from app.core.site_resolver import normalize_site_id  # noqa: F401
 
 # ─── Equipment display name formatters ──────────────────────────────────────────
@@ -89,9 +91,9 @@ def _format_display_name(eq_type: str, eq_code: str) -> str:
     # Numeric: 001, 105, 203
     if code.isdigit():
         level = int(code[0])  # first digit = floor number
-        zone = int(code[1:])  # remaining digits = zone within floor
+        zone_num = int(code[1:])  # remaining digits = zone within floor
         floor_name = "Ground" if level == 0 else f"Level {level}"
-        return f"{eq_type} {floor_name} Zone {zone}"
+        return f"{eq_type} {floor_name} Zone {zone_num}"
 
     # Fallback: just title-case the code
     return f"{eq_type} {code}"
@@ -111,6 +113,69 @@ def _parse_eq_code_parts(code: str) -> tuple[str, str]:
 
 
 logger = logging.getLogger("sentinel.shadow_mode")
+
+
+def _site_secret_suffix(site_id: str) -> str:
+    """Return a stable env-var suffix for site-specific secrets."""
+    return re.sub(r"[^A-Z0-9]+", "_", str(site_id or "").upper()).strip("_")
+
+
+def site_bridge_token_env_candidates(site_id: str) -> list[str]:
+    """Return conventional env secret names for a site's bridge token."""
+    suffix = _site_secret_suffix(site_id)
+    compact_suffix = suffix.replace("_", "")
+    return [
+        f"BRIDGE_API_TOKEN_{suffix}",
+        f"SIMBIOT_API_KEY_{suffix}",
+        f"BRIDGE_API_TOKEN_{compact_suffix}",
+        f"SIMBIOT_API_KEY_{compact_suffix}",
+    ]
+
+
+def resolve_site_bridge_token(
+    site_id: str,
+    connection_config: dict[str, Any] | None = None,
+    *,
+    allow_config_token: bool = True,
+    allow_global_fallback: bool = True,
+) -> str:
+    """Resolve a bridge token with site-scoped env secrets taking priority.
+
+    Stored adapter tokens are retained only as a compatibility fallback. Live
+    sites should use env-managed secrets such as BRIDGE_API_TOKEN_SITE_002 so a
+    stale database token cannot mask the correct credential.
+    """
+    config = connection_config or {}
+    explicit_env_names = [
+        str(config.get(key) or "").strip() for key in ("token_env", "token_secret_env", "api_token_env", "secret_env")
+    ]
+    explicit_env_names = [name for name in explicit_env_names if name]
+
+    candidates = [
+        *explicit_env_names,
+        *site_bridge_token_env_candidates(site_id),
+    ]
+    for env_name in candidates:
+        token = os.getenv(env_name)
+        if token:
+            return token
+
+    if allow_config_token and config.get("token"):
+        return str(config["token"])
+
+    if allow_global_fallback:
+        from app.config.settings import settings
+
+        return str(
+            getattr(settings, "simbiot_api_key", None)
+            or getattr(settings, "bridge_api_token", None)
+            or os.getenv("SIMBIOT_API_KEY")
+            or os.getenv("BRIDGE_API_TOKEN")
+            or ""
+        )
+
+    return ""
+
 
 DALI_LIGHTING_READING_NAMES = {
     "brightness",
@@ -413,7 +478,7 @@ class ShadowModePollingService:
             if result.data:
                 config = result.data[0].get("connection_config") or {}
                 base = config.get("base_url")
-                token = config.get("token")
+                token = resolve_site_bridge_token(self.site_id, config)
                 if base and token:
                     return str(base).rstrip("/"), str(token)
         except Exception as exc:
@@ -429,8 +494,46 @@ class ShadowModePollingService:
             raise RuntimeError("Bridge API token not configured — set SIMBIOT_API_KEY or BRIDGE_API_TOKEN")
         return base.rstrip("/"), token
 
+    @staticmethod
+    def _extract_bridge_point_value(data: dict[str, Any]) -> Any | None:
+        """Return a numeric point value from supported bridge payload shapes."""
+        for key in ("value", "present_value", "presentValue", "point_value"):
+            if data.get(key) is not None:
+                return data.get(key)
+        return None
+
+    @staticmethod
+    def _extract_bridge_sample_value(sample: dict[str, Any]) -> Any | None:
+        """Return a trend sample value from supported bridge payload shapes."""
+        for key in ("value", "present_value", "presentValue", "point_value"):
+            if sample.get(key) is not None:
+                return sample.get(key)
+        return None
+
+    def _fetch_point_asset_mapping_pages(self, client: Any, site_uuid: str, *, page_size: int = 1000) -> list[dict]:
+        """Fetch mapping rows using explicit pages to avoid PostgREST's 1000-row cap."""
+        rows: list[dict] = []
+        start = 0
+        while True:
+            result = (
+                client.table("point_asset_mappings")
+                .select("bms_point_id, extracted_asset_id, parameter_name, parameter_type, mapping_source, is_verified")
+                .eq("site_id", site_uuid)
+                .order("bms_point_id")
+                .range(start, start + page_size - 1)
+                .execute()
+            )
+            batch = result.data or []
+            rows.extend(batch)
+            if len(batch) < page_size:
+                break
+            start += page_size
+        return rows
+
     def _equipment_zone_inventory_blocker(self, equipment_code: str) -> tuple[str, str] | None:
         """Return (zone_id, reason) when bridge terminal equipment is outside Supabase inventory."""
+        if is_site_002_out_of_scope_l3(self.site_id, equipment_code):
+            return None
         zone_id = _bridge_zone_id_from_equipment_code(self._site_prefix, equipment_code)
         if not zone_id:
             return None
@@ -467,6 +570,18 @@ class ShadowModePollingService:
         pending discovery row; it never creates zones or active equipment.
         """
         try:
+            if is_site_002_out_of_scope_l3(self.site_id, canonical_code) or is_site_002_out_of_scope_l3(
+                self.site_id,
+                bridge_code,
+            ):
+                logger.warning(
+                    "[SHADOW] Ignoring bridge equipment %s/%s for %s: Site 002 L3 is outside tenant scope",
+                    bridge_code,
+                    canonical_code,
+                    self.site_id,
+                )
+                return
+
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
@@ -662,29 +777,17 @@ class ShadowModePollingService:
         result["faults_polled"] = fault_count
 
         # ── Ingestion quality gate — tied to onboarding phase ─────────────────
-        # commissioning → 10% sampling (protect baselines from startup noise)
-        # shadow_live  → 50% sampling (building baselines, monitoring quality)
-        # advisory+    → 100% sampling (policies passed, full trust)
-        # Alarm polling (above) is always exempt from this gate.
+        # Raw bridge telemetry must poll every cycle for data-freshness SLOs.
+        # Sampling belongs downstream in model/baseline consumers, not here;
+        # otherwise enabled sites can look stale simply because the poller
+        # intentionally skipped source telemetry.
         try:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
             phase_rows = client.table("sites").select("onboarding_phase").eq("code", self.site_id).limit(1).execute()
             phase = (phase_rows.data[0]["onboarding_phase"] if phase_rows.data else "commissioning") or "commissioning"
-            skip_pct = {
-                "commissioning": 0.9,
-                "shadow": 0.9,
-                "shadow_live": 0.5,
-                "advisory": 0.0,
-                "supervised": 0.0,
-                "automatic": 0.0,
-            }.get(phase, 0.5)
-            if skip_pct > 0 and (hash(f"{self.site_id}:{self._poll_count}") % 100) / 100 < skip_pct:
-                logger.debug("[SHADOW] Phase %s — skipping telemetry poll %d", phase, self._poll_count)
-                result["gate"] = phase
-                result["skipped"] = True
-                return result
+            result["gate"] = phase
         except Exception:
             pass
         # ────────────────────────────────────────────────────────────────────────
@@ -1381,6 +1484,14 @@ class ShadowModePollingService:
             db_code = self._normalize_to_db_code(code)
             if db_code != code:
                 logger.debug("[SHADOW] Normalized equipment code: %s → %s", code, db_code)
+            if is_site_002_out_of_scope_l3(self.site_id, db_code) or is_site_002_out_of_scope_l3(self.site_id, code):
+                logger.warning(
+                    "[SHADOW] Ignoring bridge equipment %s/%s for %s: Site 002 L3 is outside tenant scope",
+                    code,
+                    db_code,
+                    self.site_id,
+                )
+                continue
             blocker = self._equipment_zone_inventory_blocker(db_code)
             if blocker:
                 zone_id, reason = blocker
@@ -1457,16 +1568,13 @@ class ShadowModePollingService:
             if not site_resp.data:
                 return {}
             site_uuid = site_resp.data[0]["id"]
-            mapping_resp = (
-                client.table("point_asset_mappings")
-                .select("bms_point_id, extracted_asset_id, parameter_name, parameter_type")
-                .eq("site_id", site_uuid)
-                .eq("is_verified", True)
-                .eq("mapping_source", "simbiot_manual")
-                .like("parameter_type", "meter:%")
-                .execute()
-            )
-            mappings = mapping_resp.data or []
+            mappings = [
+                row
+                for row in self._fetch_point_asset_mapping_pages(client, site_uuid)
+                if row.get("is_verified") is True
+                and row.get("mapping_source") == "simbiot_manual"
+                and str(row.get("parameter_type") or "").startswith("meter:")
+            ]
         except Exception as exc:
             logger.debug("[SHADOW] SIMBIOT meter mapping load failed: %s", exc)
             return {}
@@ -1483,8 +1591,9 @@ class ShadowModePollingService:
                     resp = await client.get(f"{base}/api/sites/{self.site_id}/points/{point_id}", headers=headers)
                     resp.raise_for_status()
                     data = resp.json()
-                    if data.get("value") is not None:
-                        return mapping, data.get("value")
+                    value = self._extract_bridge_point_value(data)
+                    if value is not None:
+                        return mapping, value
                 except Exception:
                     pass
 
@@ -1497,8 +1606,9 @@ class ShadowModePollingService:
                     resp.raise_for_status()
                     data = resp.json()
                     samples = data.get("samples") or []
-                    if samples and samples[-1].get("value") is not None:
-                        return mapping, samples[-1].get("value")
+                    value = self._extract_bridge_sample_value(samples[-1]) if samples else None
+                    if value is not None:
+                        return mapping, value
                 except Exception:
                     pass
 
@@ -1523,7 +1633,8 @@ class ShadowModePollingService:
                 continue
             if equipment_id not in states:
                 states[equipment_id] = {"type": "meter", "sensor_readings": {}}
-            states[equipment_id]["sensor_readings"][parameter_name] = numeric_value
+            reading_name = "equipment_online" if parameter_name == "run_state" else parameter_name
+            states[equipment_id]["sensor_readings"][reading_name] = numeric_value
 
         return states
 
@@ -1537,14 +1648,11 @@ class ShadowModePollingService:
             if not site_resp.data:
                 return {}
             site_uuid = site_resp.data[0]["id"]
-            mapping_resp = (
-                client.table("point_asset_mappings")
-                .select("bms_point_id, extracted_asset_id, parameter_name, parameter_type")
-                .eq("site_id", site_uuid)
-                .in_("mapping_source", ["bridge_objects", "catalog_resolver"])
-                .execute()
-            )
-            mappings = mapping_resp.data or []
+            mappings = [
+                row
+                for row in self._fetch_point_asset_mapping_pages(client, site_uuid)
+                if row.get("mapping_source") in {"bridge_objects", "catalog_resolver"}
+            ]
         except Exception as exc:
             logger.debug("[SHADOW] Bridge point mapping load failed: %s", exc)
             return {}
@@ -1575,7 +1683,7 @@ class ShadowModePollingService:
                 return "room_temp"
             if "DAMPER" in upper_point:
                 return "damper_position"
-            if "RUN_STATE" in upper_point or upper_point.endswith(".STATUS"):
+            if "RUN_STATE" in upper_point:
                 return "equipment_online"
             if "FAN_SPEED" in upper_point:
                 return "fan_speed"
@@ -1594,6 +1702,7 @@ class ShadowModePollingService:
                     "fan_current": "fan_speed",
                     "outlet_water_temp_c": "outlet_water_temp",
                     "temperature_setpoint": "setpoint_temp",
+                    "comp_current": "compressor_current_1",
                 }
                 return aliases.get(parameter_name, parameter_name)
 
@@ -1611,9 +1720,7 @@ class ShadowModePollingService:
                         resp = await client.get(f"{base}/api/sites/{self.site_id}/points/{point_id}", headers=headers)
                         resp.raise_for_status()
                         data = resp.json()
-                        value = data.get("value")
-                        if value is None:
-                            value = data.get("present_value")
+                        value = self._extract_bridge_point_value(data)
                         if value is not None:
                             return mapping, value
                     except Exception:
@@ -1628,8 +1735,9 @@ class ShadowModePollingService:
                         resp.raise_for_status()
                         data = resp.json()
                         samples = data.get("samples") or []
-                        if samples and samples[-1].get("value") is not None:
-                            return mapping, samples[-1].get("value")
+                        value = self._extract_bridge_sample_value(samples[-1]) if samples else None
+                        if value is not None:
+                            return mapping, value
                     except Exception:
                         pass
 
@@ -1779,6 +1887,34 @@ class ShadowModePollingService:
         except Exception as e:
             logger.warning("[SHADOW] Alarms poll error: %s", e)
 
+        if alarms:
+            scoped_alarms = []
+            scope_skipped = 0
+            for alarm in alarms:
+                reference_text = " ".join(
+                    str(alarm.get(key) or "")
+                    for key in (
+                        "equipment_id",
+                        "equipment_code",
+                        "object_id",
+                        "message_text",
+                        "active_text",
+                        "description",
+                        "message",
+                    )
+                )
+                if contains_site_002_out_of_scope_l3_reference(self.site_id, reference_text):
+                    scope_skipped += 1
+                    continue
+                scoped_alarms.append(alarm)
+            if scope_skipped:
+                logger.warning(
+                    "[SHADOW] Ignored %d alarm(s) for %s: Site 002 L3 is outside tenant scope",
+                    scope_skipped,
+                    self.site_id,
+                )
+            alarms = scoped_alarms
+
         # Feed all alarms into ML feeder regardless of poll outcome
         if alarms:
             try:
@@ -1882,6 +2018,10 @@ class ShadowModePollingService:
             message = alarm.get("active_text") or alarm.get("message_text") or alarm.get("description", "")
             if not message:
                 message = alarm.get("message", "Fault detected")
+
+            reference_text = " ".join([equip_code, obj_id, message])
+            if contains_site_002_out_of_scope_l3_reference(self.site_id, reference_text):
+                continue
 
             bridge_synthetic = _bridge_marks_synthetic_alarm(alarm)
             is_synthetic = bridge_synthetic if bridge_synthetic is not None else _is_synthetic_alarm(message)
@@ -2468,6 +2608,17 @@ class ShadowModePollingService:
                     bcode_norm = _normalise(bcode)
                     conv = _letter_zone_to_numeric(bcode_norm)
                     canonical_code = f"{self._site_prefix}-{conv}" if conv else bcode
+                    if is_site_002_out_of_scope_l3(self.site_id, canonical_code) or is_site_002_out_of_scope_l3(
+                        self.site_id,
+                        bcode,
+                    ):
+                        logger.warning(
+                            "[SHADOW] Ignoring bridge equipment %s/%s for %s: Site 002 L3 is outside tenant scope",
+                            bcode,
+                            canonical_code,
+                            self.site_id,
+                        )
+                        continue
                     blocker = self._equipment_zone_inventory_blocker(canonical_code)
                     derived_zone_id = (
                         blocker[0]

@@ -709,7 +709,7 @@ async def get_historical_state(
 ) -> dict:
     """Return equipment state (health, status, power) at a specific timestamp.
 
-    Uses 3-tier fallback: Supabase time-series -> simulation state -> current.
+    Uses live Supabase telemetry rows only; no simulation or current-state fallback.
     """
     try:
         calculator = get_energy_flow_calculator()

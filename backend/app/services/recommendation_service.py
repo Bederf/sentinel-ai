@@ -317,10 +317,18 @@ class RecommendationService:
                     repo=repo,
                 )
 
+            previous_state = rec.to_dict()
             # Update status and metadata
             rec.status = RecommendationStatus.APPROVED
             rec.approved_by = user_id
             rec.approval_reason = reason
+            await self._record_recommendation_event(
+                rec=rec,
+                event_type="approved",
+                previous_state=previous_state,
+                actor_id=user_id,
+                metadata={"reason": reason},
+            )
 
             # Execute the recommendation
             await self.execute_recommendation(rec_id, rec)
@@ -408,6 +416,7 @@ class RecommendationService:
             ActionRiskLevel.CRITICAL: "urgent",
         }
         priority = priority_map.get(rec.risk_level, "medium")
+        previous_state = rec.to_dict()
 
         from app.database.repositories.work_order_repository import get_work_order_repository
 
@@ -474,6 +483,23 @@ class RecommendationService:
         }
 
         await repo.update(rec_id, rec)
+        await self._record_recommendation_event(
+            rec=rec,
+            event_type="approved",
+            previous_state=previous_state,
+            actor_id=user_id,
+            metadata={"reason": reason, "approval_path": "maintenance_work_order"},
+        )
+        await self._record_recommendation_event(
+            rec=rec,
+            event_type="wo_linked",
+            previous_state=previous_state,
+            actor_id=user_id,
+            metadata={
+                "work_order_id": created_wo.get("id"),
+                "work_order_code": created_wo.get("code"),
+            },
+        )
         logger.info("Approved AI maintenance recommendation %s as work order %s", rec_id, created_wo.get("code"))
         return rec
 
@@ -508,6 +534,7 @@ class RecommendationService:
             if rec.status != RecommendationStatus.PENDING:
                 raise ValueError(f"Can only reject PENDING recommendations, got {rec.status.value}")
 
+            previous_state = rec.to_dict()
             # Update status and metadata
             rec.status = RecommendationStatus.REJECTED
             rec.rejection_reason = reason
@@ -523,6 +550,13 @@ class RecommendationService:
 
             # Save updated recommendation
             await repo.update(rec_id, rec)
+            await self._record_recommendation_event(
+                rec=rec,
+                event_type="rejected",
+                previous_state=previous_state,
+                actor_id=user_id,
+                metadata={"reason": reason},
+            )
 
             logger.info(f"Rejected recommendation {rec_id} by {user_id}: {reason}")
 
@@ -543,17 +577,82 @@ class RecommendationService:
         """
         from app.database.repositories import get_recommendation_repository
 
-        if acknowledgement_type not in ("accepted", "dismissed"):
-            raise ValueError(f"acknowledgement_type must be 'accepted' or 'dismissed', got {acknowledgement_type}")
+        if acknowledgement_type not in ("accepted", "dismissed", "reviewed"):
+            raise ValueError(
+                f"acknowledgement_type must be 'accepted', 'dismissed', or 'reviewed', got {acknowledgement_type}"
+            )
 
         repo = get_recommendation_repository()
         rec = await repo.get(rec_id)
         if not rec:
             raise ValueError(f"Recommendation {rec_id} not found")
 
-        rec.acknowledgement_type = acknowledgement_type
+        previous_state = rec.to_dict()
+        metadata = dict(rec.metadata or {})
+        metadata["telegram_acknowledgement"] = {
+            "type": acknowledgement_type,
+            "acknowledged_at": datetime.utcnow().isoformat(),
+        }
+        rec.metadata = metadata
         await repo.update(rec_id, rec)
+        await self._record_recommendation_event(
+            rec=rec,
+            event_type="acknowledged",
+            previous_state=previous_state,
+            actor_id=None,
+            metadata={"acknowledgement_type": acknowledgement_type},
+        )
         logger.info(f"Recommendation {rec_id} acknowledged as {acknowledgement_type}")
+
+    async def approve_no_write_recommendation(
+        self,
+        rec_id: str,
+        user_id: str,
+        reason: str | None = None,
+    ) -> Recommendation:
+        """Approve a supervised recommendation whose approved action is no-write.
+
+        This is for control-gate recommendations such as occupancy/IAQ conflicts
+        where the operator approval records the safe decision to hold or verify,
+        not permission to write a BMS point.
+        """
+        from app.database.repositories import get_recommendation_repository
+
+        repo = get_recommendation_repository()
+        rec = await repo.get(rec_id)
+        if not rec:
+            raise ValueError(f"Recommendation {rec_id} not found")
+        if rec.status != RecommendationStatus.PENDING:
+            raise ValueError(f"Can only approve PENDING recommendations, got {rec.status.value}")
+
+        previous_state = rec.to_dict()
+        now = datetime.utcnow()
+        metadata = dict(rec.metadata or {})
+        metadata["approval_execution"] = {
+            "type": "no_write_control_gate",
+            "approved_at": now.isoformat(),
+            "reason": reason,
+        }
+        rec.status = RecommendationStatus.APPROVED
+        rec.approval_status = "approved"
+        rec.approved_by = user_id
+        rec.approved_at = now
+        rec.approval_reason = reason
+        rec.execution_result = {
+            "executed": False,
+            "reason": "approved no-write control-gate recommendation",
+        }
+        rec.metadata = metadata
+        await repo.update(rec_id, rec)
+        await self._record_recommendation_event(
+            rec=rec,
+            event_type="approved",
+            previous_state=previous_state,
+            actor_id=user_id,
+            metadata={"reason": reason, "approval_path": "no_write_control_gate"},
+        )
+        logger.info("Approved no-write recommendation %s by %s", rec_id, user_id)
+        return rec
 
     async def execute_recommendation(self, rec_id: str, rec: Recommendation) -> dict[str, Any]:
         """Execute recommendation via device manager.
@@ -644,6 +743,37 @@ class RecommendationService:
             )
         except Exception as e:
             logger.warning("Non-blocking module feedback recording failed for %s: %s", rec.id, e)
+
+    async def _record_recommendation_event(
+        self,
+        *,
+        rec: Recommendation,
+        event_type: str,
+        previous_state: dict[str, Any],
+        actor_id: str | None,
+        metadata: dict[str, Any] | None = None,
+    ) -> None:
+        """Append an operator-attributed recommendation audit event."""
+        try:
+            from app.database.repositories.recommendation_audit_repository import (
+                get_recommendation_audit_repository,
+                recommendation_state,
+            )
+
+            audit_repo = get_recommendation_audit_repository()
+            await audit_repo.record_event(
+                recommendation_id=rec.id,
+                site_id=rec.site_id,
+                event_type=event_type,
+                previous_state=recommendation_state(previous_state),
+                new_state=recommendation_state(rec.to_dict()),
+                actor_type="operator" if actor_id else "system",
+                actor_id=actor_id,
+                source="recommendation_service",
+                metadata=metadata or {},
+            )
+        except Exception as exc:
+            logger.warning("Recommendation service audit event skipped for %s: %s", rec.id, exc)
 
     def _infer_module_type(self, rec: Recommendation) -> str:
         """Infer module type for recommendation outcome attribution."""

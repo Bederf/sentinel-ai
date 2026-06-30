@@ -37,6 +37,18 @@ class RejectRequest(BaseModel):
     reason: str
 
 
+class QualityExceptionRequest(BaseModel):
+    """Request body for recording a system-quality exception."""
+
+    quality_exception_type: str
+    detected_by: str
+    reason: str
+    previous_state: dict[str, Any] | None = None
+    new_state: dict[str, Any] | None = None
+    source: str = "human_review"
+    metadata: dict[str, Any] | None = None
+
+
 class CreateRecommendationRequest(BaseModel):
     """Request body for creating a recommendation."""
 
@@ -88,6 +100,25 @@ async def get_pending_recommendations(
 
         service = get_recommendation_service()
         recs = await service.get_pending_recommendations(site_id, limit)
+        try:
+            from app.database.repositories.recommendation_audit_repository import get_recommendation_audit_repository
+
+            audit_repo = get_recommendation_audit_repository()
+            user_id = getattr(auth, "user_id", None)
+            for rec in recs:
+                await audit_repo.record_event(
+                    recommendation_id=rec.id,
+                    site_id=rec.site_id,
+                    event_type="surfaced",
+                    previous_state=rec.to_dict(),
+                    new_state=rec.to_dict(),
+                    actor_type="system",
+                    actor_id=user_id,
+                    source="recommendations_api.pending_queue",
+                    metadata={"surface": "operator_pending_queue"},
+                )
+        except Exception as audit_err:
+            logger.warning("Pending recommendation surfaced audit skipped: %s", audit_err)
 
         return attach_ai_provenance(
             {
@@ -219,8 +250,38 @@ async def create_recommendation(
         raise HTTPException(status_code=500, detail=f"Error creating recommendation: {e}")
 
 
+@router.get("/{site_id}/manager-exceptions")
+async def get_manager_recommendation_exceptions(
+    site_id: str,
+    stale_hours: int = Query(24, ge=1, le=720),
+    limit: int = Query(50, ge=1, le=200),
+    auth: AuthContext = Depends(require_site_access("site_id")),
+):
+    """Get manager-facing recommendation exceptions for stale/actionability review."""
+    try:
+        from app.database.repositories.recommendation_audit_repository import get_recommendation_audit_repository
+
+        audit_repo = get_recommendation_audit_repository()
+        exceptions = await audit_repo.get_manager_exceptions(site_id=site_id, stale_hours=stale_hours, limit=limit)
+        return attach_ai_provenance(
+            {
+                "success": True,
+                **exceptions,
+                "surfaces": [
+                    "GET /api/recommendations/{site_id}/manager-exceptions",
+                    "SENTINEL Morning Digest manager Telegram section",
+                    "Recommendation detail audit_events",
+                ],
+            },
+            get_ml_provenance("recommendation-accountability-v1"),
+        )
+    except Exception as e:
+        logger.error("Error fetching manager recommendation exceptions for %s: %s", site_id, e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/detail/{rec_id}")
-async def get_recommendation(rec_id: str):
+async def get_recommendation(rec_id: str, request: Request):
     """Get recommendation details.
 
     Args:
@@ -238,10 +299,31 @@ async def get_recommendation(rec_id: str):
         if not rec:
             raise HTTPException(status_code=404, detail=f"Recommendation {rec_id} not found")
 
+        audit_events = []
+        try:
+            from app.database.repositories.recommendation_audit_repository import get_recommendation_audit_repository
+
+            audit_repo = get_recommendation_audit_repository()
+            await audit_repo.record_event(
+                recommendation_id=rec.id,
+                site_id=rec.site_id,
+                event_type="viewed",
+                previous_state=rec.to_dict(),
+                new_state=rec.to_dict(),
+                actor_type="user",
+                actor_id=request.headers.get("X-User-Id"),
+                source="recommendations_api.detail",
+                metadata={"surface": "recommendation_detail"},
+            )
+            audit_events = await audit_repo.get_events_for_recommendation(rec_id)
+        except Exception as audit_err:
+            logger.warning("Recommendation detail audit events skipped for %s: %s", rec_id, audit_err)
+
         return attach_ai_provenance(
             {
                 "success": True,
                 "recommendation": rec.to_dict(),
+                "audit_events": audit_events,
                 "status": rec.status.value,
             },
             get_ml_provenance("recommendation-engine-v1"),
@@ -251,6 +333,70 @@ async def get_recommendation(rec_id: str):
         raise
     except Exception as e:
         logger.error(f"Error fetching recommendation {rec_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{rec_id}/quality-exception")
+async def record_recommendation_quality_exception(
+    rec_id: str,
+    request: Request,
+    body: QualityExceptionRequest,
+    auth: AuthContext = Depends(require_auth(AuthLevel.OPERATOR)),
+):
+    """Record a system-quality exception linked to a recommendation chain.
+
+    This is for cases such as low severity assigned to what should have been high,
+    missed escalation, or manual false-positive/false-negative review.
+    """
+    try:
+        from app.database.repositories import get_recommendation_repository
+        from app.database.repositories.recommendation_audit_repository import (
+            get_recommendation_audit_repository,
+            recommendation_state,
+        )
+
+        rec_repo = get_recommendation_repository()
+        rec = await rec_repo.get(rec_id)
+        if not rec:
+            raise HTTPException(status_code=404, detail=f"Recommendation {rec_id} not found")
+
+        previous_state = body.previous_state or rec.to_dict()
+        new_state = body.new_state or rec.to_dict()
+        metadata = {
+            **(body.metadata or {}),
+            "reason": body.reason,
+            "recorded_from": "recommendations_api.quality_exception",
+        }
+        audit_repo = get_recommendation_audit_repository()
+        event = await audit_repo.record_event(
+            recommendation_id=rec.id,
+            linked_recommendation_id=rec.id,
+            site_id=rec.site_id,
+            event_type="system_quality_exception",
+            quality_exception_type=body.quality_exception_type,
+            detected_by=body.detected_by,
+            previous_state=recommendation_state(previous_state),
+            new_state=recommendation_state(new_state),
+            actor_type="operator",
+            actor_id=getattr(auth, "user_id", None) or request.headers.get("X-User-Id"),
+            source=body.source,
+            metadata=metadata,
+        )
+        return attach_ai_provenance(
+            {
+                "success": True,
+                "recommendation_id": rec.id,
+                "linked_recommendation_id": rec.id,
+                "event": event,
+            },
+            get_ml_provenance("recommendation-accountability-v1"),
+        )
+    except HTTPException:
+        raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error("Error recording quality exception for recommendation %s: %s", rec_id, e)
         raise HTTPException(status_code=500, detail=str(e))
 
 

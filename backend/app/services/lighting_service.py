@@ -3,14 +3,12 @@ Lighting Service
 ================
 Multi-site lighting data access with pluggable data sources (protocol-agnostic).
 
-Supports two source types per site:
-- "json": Reads from static JSON mock data files (e.g. site-002)
-- "niagara": Reads from DeviceManager (Niagara-discovered lighting devices)
+Supports live Supabase reads for telemetry. Legacy JSON fixtures can only be
+loaded when a site explicitly configures a JSON file.
 """
 
 import json
 import logging
-import random
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -45,7 +43,7 @@ class SiteLightingData:
 class LightingService:
     """Service for lighting system data access (protocol-agnostic).
 
-    Supports multiple sites, each with its own data source (JSON or Niagara).
+    Supports multiple sites, each with its own explicitly configured source.
     """
 
     # Floor code to display name mapping
@@ -61,7 +59,7 @@ class LightingService:
     def __init__(self):
         self._sites_data: dict[str, SiteLightingData] = {}
         self._sources_config = self._load_sources_config()
-        # Load JSON-backed sites at startup
+        # Load only explicitly configured JSON-backed sites at startup.
         for site_id, config in self._sources_config.get("sites", {}).items():
             if config.get("source") == "json":
                 self._load_json_site(site_id, config)
@@ -78,7 +76,7 @@ class LightingService:
         if path.exists():
             with open(path) as f:
                 return json.load(f)
-        return {"sites": {}, "default_source": "json"}
+        return {"sites": {}, "default_source": "live"}
 
     def _save_sources_config(self):
         """Persist source configuration to disk."""
@@ -87,11 +85,14 @@ class LightingService:
             json.dump(self._sources_config, f, indent=2)
             f.write("\n")
 
-    # === JSON Data Loading (existing behaviour) ===
+    # === Explicit JSON Fixture Loading ===
 
     def _load_json_site(self, site_id: str, config: dict):
-        """Load DALI data for a site from a JSON file."""
-        json_file = config.get("json_file", "dali_mock_data.json")
+        """Load lighting data for a site from an explicitly configured JSON file."""
+        json_file = config.get("json_file")
+        if not json_file:
+            logger.warning("Skipping JSON lighting source for %s: json_file is required", site_id)
+            return
         data_path = Path(__file__).parent.parent / "data" / json_file
         if not data_path.exists():
             logger.debug("DALI JSON data not found at %s for site %s", data_path, site_id)
@@ -134,7 +135,7 @@ class LightingService:
     # === Niagara / DeviceManager Loading ===
 
     def _load_from_niagara(self, site_id: str) -> SiteLightingData:
-        """Build DALI data from Niagara-discovered devices in DeviceManager.
+        """Build lighting data from Niagara-discovered devices in DeviceManager.
 
         Imports are deferred to avoid circular dependencies and to allow
         the DeviceManager to be optional (not all deployments have it).
@@ -242,7 +243,7 @@ class LightingService:
         except ImportError:
             logger.warning("DeviceManager not available; Niagara DALI loading skipped for %s", site_id)
         except Exception as e:
-            logger.error("Failed to load Niagara DALI data for %s: %s", site_id, e)
+            logger.error("Failed to load Niagara lighting data for %s: %s", site_id, e)
 
         return site_data
 
@@ -257,7 +258,7 @@ class LightingService:
     # === Dynamic Site Registration ===
 
     def register_niagara_site(self, site_id: str, site_name: str):
-        """Register a site that gets DALI data from Niagara/DeviceManager."""
+        """Register a site that gets lighting data from Niagara/DeviceManager."""
         site_data = self._load_from_niagara(site_id)
         site_data.site_name = site_name
         self._sites_data[site_id] = site_data
@@ -716,140 +717,178 @@ class LightingService:
             )
         return results
 
-    # === Seeded occupancy changes ===
-
-    def simulate_occupancy_change(self):
-        """Simulate realistic occupancy changes for local seeded operation."""
-        for site_data in self._sites_data.values():
-            for sensor in site_data.sensors.values():
-                if random.random() < 0.1:
-                    sensor.occupancy = not sensor.occupancy
-                if sensor.has_daylight:
-                    sensor.lux_level = max(0, min(2000, sensor.lux_level + random.uniform(-50, 50)))
-                sensor.last_updated = datetime.now().isoformat()
-
     async def get_live_lighting_data(self, site_id: str) -> dict:
         """
-        Fetch real-time DALI data from Supabase tables.
+        Fetch real-time, protocol-neutral lighting data from Supabase.
 
-        Returns current occupancy, lighting, and energy data for all zones.
-        Used for real-time dashboard vs simulation data.
-
-        Args:
-            site_id: Canonical site identifier (e.g., 'site-002')
-
-        Returns:
-            dict with keys: summary, zones, energy_stats, last_updated
+        Reads generic bridge telemetry from equipment_sensor_readings and
+        lighting_energy. Occupancy is a PIR/zone signal only; it is not a
+        people count.
         """
         try:
             supabase = get_supabase_client()
 
-            # Query live sensor occupancy
-            sensors_response = supabase.table("lighting_sensors").select("*").eq("site_id", site_id).execute()
-            sensors = sensors_response.data or []
+            telemetry_response = (
+                supabase.table("equipment_sensor_readings")
+                .select("equipment_id,sensor_type,value,unit,recorded_at,metadata")
+                .eq("site_id", site_id)
+                .in_(
+                    "sensor_type",
+                    [
+                        "occupancy",
+                        "Occupancy",
+                        "A_Occupancy",
+                        "B_Occupancy",
+                        "brightness",
+                        "lux",
+                        "power_watts",
+                    ],
+                )
+                .order("recorded_at", desc=True)
+                .limit(300)
+                .execute()
+            )
+            telemetry_rows = telemetry_response.data or []
 
-            # Query live luminaire brightness
-            luminaires_response = supabase.table("lighting_luminaires").select("*").eq("site_id", site_id).execute()
-            luminaires = luminaires_response.data or []
-
-            # Query recent energy data (last 1 hour)
             energy_response = (
                 supabase.table("lighting_energy")
                 .select("*")
                 .eq("site_id", site_id)
                 .order("time", desc=True)
-                .limit(24)
+                .limit(100)
                 .execute()
             )
             energy_data = energy_response.data or []
 
-            # Aggregate by zone
-            zones_agg = {}
+            zones_agg: dict[str, dict] = {}
+            seen_points: set[tuple[str, str]] = set()
 
-            # Process sensors
-            for sensor in sensors:
-                zone_id = sensor.get("zone_id", "unknown")
+            def zone_for_row(row: dict) -> str:
+                metadata = row.get("metadata") or {}
+                if isinstance(metadata, dict):
+                    for key in ("zone_id", "zone", "room_code"):
+                        if metadata.get(key):
+                            return str(metadata[key])
+                equipment_id = str(row.get("equipment_id") or "")
+                if "-ZONE-" in equipment_id:
+                    return f"Zone-{equipment_id.rsplit('-ZONE-', 1)[1]}"
+                if "-DALI-" in equipment_id:
+                    return f"Zone-{equipment_id.rsplit('-DALI-', 1)[1]}"
+                if "-LCA-" in equipment_id:
+                    return f"Zone-{equipment_id.rsplit('-LCA-', 1)[1]}"
+                return equipment_id or "unknown"
+
+            def zone_bucket(zone_id: str) -> dict:
                 if zone_id not in zones_agg:
                     zones_agg[zone_id] = {
                         "zone_id": zone_id,
                         "sensors": [],
-                        "luminaires": [],
-                        "energy_total_kwh": 0,
+                        "brightness_levels": [],
+                        "lux_levels": [],
+                        "power_w": 0.0,
+                        "energy_total_kwh": 0.0,
+                        "last_updated": None,
                     }
-                zones_agg[zone_id]["sensors"].append(
-                    {
-                        "sensor_id": sensor.get("sensor_id"),
-                        "occupancy": sensor.get("occupancy", False),
-                        "lux_level": sensor.get("lux_level", 0),
-                        "last_updated": sensor.get("last_updated"),
-                    }
-                )
-            # Process luminaires
-            for lum in luminaires:
-                zone_id = lum.get("zone_id", "unknown")
-                if zone_id not in zones_agg:
-                    zones_agg[zone_id] = {
-                        "zone_id": zone_id,
-                        "sensors": [],
-                        "luminaires": [],
-                        "energy_total_kwh": 0,
-                    }
-                zones_agg[zone_id]["luminaires"].append(
-                    {
-                        "luminaire_id": lum.get("id"),
-                        "name": lum.get("name"),
-                        "brightness_level": lum.get("current_level", 0),
-                        "power_consumption_w": lum.get("power_consumption", 0),
-                        "fault_status": lum.get("fault_status", False),
-                    }
-                )
-            # Process energy data
+                return zones_agg[zone_id]
+
+            for row in telemetry_rows:
+                sensor_type = str(row.get("sensor_type") or "")
+                equipment_id = str(row.get("equipment_id") or "")
+                recorded_at = str(row.get("recorded_at") or "")
+                point_key = (equipment_id, sensor_type.lower())
+                if point_key in seen_points:
+                    continue
+                seen_points.add(point_key)
+
+                value = row.get("value")
+                if value is None:
+                    continue
+                try:
+                    numeric_value = float(value)
+                except (TypeError, ValueError):
+                    continue
+
+                zone = zone_bucket(zone_for_row(row))
+                if not zone["last_updated"] or recorded_at > zone["last_updated"]:
+                    zone["last_updated"] = recorded_at
+
+                st = sensor_type.lower()
+                if "occupancy" in st:
+                    zone["sensors"].append(
+                        {
+                            "sensor_id": equipment_id,
+                            "occupancy": numeric_value > 0,
+                            "raw_value": numeric_value,
+                            "last_updated": recorded_at,
+                        }
+                    )
+                elif st == "brightness":
+                    zone["brightness_levels"].append(numeric_value)
+                elif st == "lux":
+                    zone["lux_levels"].append(numeric_value)
+                elif st == "power_watts":
+                    zone["power_w"] += numeric_value
+
+            latest_energy_by_zone: dict[str, dict] = {}
             for energy in energy_data:
-                zone_id = energy.get("zone_id", "unknown")
-                if zone_id in zones_agg:
-                    zones_agg[zone_id]["energy_total_kwh"] += energy.get("total_watts", 0) / 1000
+                zone_id = str(energy.get("zone_id") or "unknown")
+                if zone_id not in latest_energy_by_zone:
+                    latest_energy_by_zone[zone_id] = energy
+                zone = zone_bucket(zone_id)
+                watts = float(energy.get("total_watts") or 0)
+                dim_level = energy.get("avg_dim_level")
+                zone["energy_total_kwh"] += watts / 1000
+                if zone["power_w"] == 0:
+                    zone["power_w"] = watts
+                if dim_level is not None:
+                    try:
+                        zone["brightness_levels"].append(float(dim_level))
+                    except (TypeError, ValueError):
+                        pass
+                energy_time = str(energy.get("time") or "")
+                if energy_time and (not zone["last_updated"] or energy_time > zone["last_updated"]):
+                    zone["last_updated"] = energy_time
 
-            # Calculate zone statistics
             zones_list = []
             total_occupancy = 0
             total_brightness = 0
             total_power_w = 0
+            total_sensors = 0
+            total_occupied_sensors = 0
 
             for zone_id, zone_data in zones_agg.items():
                 sensors = zone_data["sensors"]
-                luminaires = zone_data["luminaires"]
-
-                # Occupancy percentage
                 occupied_sensors = sum(1 for s in sensors if s["occupancy"])
                 occupancy_pct = round(occupied_sensors / len(sensors) * 100, 1) if sensors else 0
                 total_occupancy += occupancy_pct
+                total_sensors += len(sensors)
+                total_occupied_sensors += occupied_sensors
 
-                # Brightness average
-                brightness_levels = [lum["brightness_level"] for lum in luminaires]
+                brightness_levels = zone_data["brightness_levels"]
                 avg_brightness = round(sum(brightness_levels) / len(brightness_levels), 1) if brightness_levels else 0
                 total_brightness += avg_brightness
 
-                # Power consumption
-                zone_power_w = sum(lum["power_consumption_w"] for lum in luminaires)
+                zone_power_w = zone_data["power_w"]
                 total_power_w += zone_power_w
 
-                # Lux level average
-                lux_levels = [s["lux_level"] for s in sensors if s["lux_level"] > 0]
+                lux_levels = zone_data["lux_levels"]
                 avg_lux = round(sum(lux_levels) / len(lux_levels), 1) if lux_levels else 0
 
                 zones_list.append(
                     {
                         "zone_id": zone_id,
                         "source_type": "lighting_protocol",
+                        "data_source": "equipment_sensor_readings",
                         "occupancy_percent": occupancy_pct,
                         "avg_brightness_level": avg_brightness,
                         "total_sensors": len(sensors),
                         "occupied_sensors": occupied_sensors,
-                        "total_luminaires": len(luminaires),
-                        "faulty_luminaires": sum(1 for lum in luminaires if lum["fault_status"]),
+                        "total_luminaires": None,
+                        "faulty_luminaires": None,
                         "power_w": round(zone_power_w, 1),
                         "avg_lux": avg_lux,
                         "energy_kwh": round(zone_data["energy_total_kwh"], 2),
+                        "last_updated": zone_data["last_updated"],
                     }
                 )
 
@@ -863,10 +902,10 @@ class LightingService:
                     "avg_occupancy_percent": round(total_occupancy / len(zones_list), 1) if zones_list else 0,
                     "avg_brightness_level": round(total_brightness / len(zones_list), 1) if zones_list else 0,
                     "total_power_w": round(total_power_w, 1),
-                    "total_sensors": len(sensors),
-                    "occupied_sensors": sum(1 for s in sensors if s.get("occupancy", False)),
-                    "total_luminaires": len(luminaires),
-                    "faulty_luminaires": sum(1 for lum in luminaires if lum.get("fault_status", False)),
+                    "total_sensors": total_sensors,
+                    "occupied_sensors": total_occupied_sensors,
+                    "total_luminaires": None,
+                    "faulty_luminaires": None,
                 },
                 "zones": zones_list,
                 "energy_stats": {
@@ -875,7 +914,7 @@ class LightingService:
             }
 
         except Exception as e:
-            logger.error(f"Error fetching live DALI data for {site_id}: {e}")
+            logger.error(f"Error fetching live lighting data for {site_id}: {e}")
             # Return empty structure on error
             return {
                 "site_id": site_id,

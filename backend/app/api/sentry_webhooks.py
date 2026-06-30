@@ -2581,7 +2581,10 @@ async def sentry_create_work_order(
                 wo_notify_data["technician_id"] = tech.get("telegram_id")
                 wo_notify_data["technician_name"] = tech.get("name", "Technician")
                 wo_notify_data["technician_email"] = tech.get("email", "")
-            technician_notified = await work_order_notifier.notify_technician(wo_notify_data)
+            notify_response = await work_order_notifier.notify_technician(wo_notify_data)
+            technician_notified = (
+                bool(notify_response.get("success")) if isinstance(notify_response, dict) else bool(notify_response)
+            )
         except Exception as e:
             logger.warning(f"Technician notification failed for WO {created.get('code')}: {e}")
             technician_notified = False

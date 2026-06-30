@@ -370,10 +370,12 @@ def bridge_adapter_from_connection_config(
     Returns None if required fields are missing.
     """
     base_url = connection_config.get("base_url", "")
-    token = connection_config.get("token", "")
+    from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+    token = resolve_site_bridge_token(site_id, connection_config)
     if not base_url or not token:
         logger.error(
-            "[BRIDGE] Cannot create adapter for %s — missing base_url or token in connection_config",
+            "[BRIDGE] Cannot create adapter for %s — missing base_url or bridge token",
             site_id,
         )
         return None

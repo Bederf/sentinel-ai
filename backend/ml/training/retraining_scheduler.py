@@ -3,11 +3,15 @@ Automated Model Retraining Scheduler
 
 Monitors model freshness and performance metrics. Triggers retraining
 when models are stale (>30 days) or underperforming (R² < 0.65).
+
+Feature discovery runs once per week before any retraining cycle, updating
+ml_model_config with the actual sensor types present for each site so that
+training always uses the real BMS points — not hardcoded global defaults.
 """
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -34,11 +38,77 @@ class RetrainResult:
     error: str | None = None
 
 
+DISCOVERY_INTERVAL_DAYS = 7  # Re-discover features at most once per week
+
+
 class RetrainingScheduler:
     """Monitors model staleness and triggers retraining."""
 
     def __init__(self):
         self._history: list[RetrainResult] = []
+        self._last_discovery_at: datetime | None = None
+
+    def refresh_features_for_active_sites(self, force: bool = False) -> dict[str, dict[str, list[str]]]:
+        """Discover and register ML features for all supervised/autonomous sites.
+
+        Runs at most once per week (DISCOVERY_INTERVAL_DAYS) unless force=True.
+        Must be called before retraining so models train on the site's actual
+        BMS sensor types, not hardcoded global defaults.
+
+        Returns:
+            Dict of {site_id: {equipment_type: [sensor_types]}} for what was registered.
+        """
+        now = datetime.now()
+        if (
+            not force
+            and self._last_discovery_at is not None
+            and (now - self._last_discovery_at) < timedelta(days=DISCOVERY_INTERVAL_DAYS)
+        ):
+            logger.info(
+                "[ML DISCOVER] Skipping — last ran %s ago (interval: %dd)",
+                now - self._last_discovery_at,
+                DISCOVERY_INTERVAL_DAYS,
+            )
+            return {}
+
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            resp = (
+                client.table("sites")
+                .select("code,onboarding_phase")
+                .not_.in_("onboarding_phase", ["pending", "blocked"])
+                .execute()
+            )
+            active_sites = [row["code"] for row in (resp.data or []) if row.get("code")]
+        except Exception as e:
+            logger.warning("[ML DISCOVER] Could not load active sites: %s", e)
+            active_sites = []
+
+        if not active_sites:
+            logger.info("[ML DISCOVER] No active sites found — skipping discovery")
+            return {}
+
+        from ml.model_config import discover_site_ml_features
+
+        all_results: dict[str, dict[str, list[str]]] = {}
+        for site_id in active_sites:
+            logger.info("[ML DISCOVER] Running feature discovery for %s", site_id)
+            try:
+                result = discover_site_ml_features(site_id)
+                if result:
+                    all_results[site_id] = result
+                    logger.info(
+                        "[ML DISCOVER] %s: discovered features for %d equipment types",
+                        site_id,
+                        len(result),
+                    )
+            except Exception as e:
+                logger.warning("[ML DISCOVER] Discovery failed for %s: %s", site_id, e)
+
+        self._last_discovery_at = now
+        return all_results
 
     def check_all_models(self) -> list[dict[str, Any]]:
         """Check freshness and performance of all active models.

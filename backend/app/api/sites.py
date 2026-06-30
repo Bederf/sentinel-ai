@@ -115,7 +115,6 @@ def get_json_asset_counts(site_id: str) -> dict:
     - buildings/{site_code}/zones.json (HVAC zones)
     - buildings/{site_code}/generators.json (generators, groups, tanks)
     - buildings/{site_code}/energy_centre.json (EC components)
-    - dali_mock_data.json (DALI controllers by building)
 
     Returns:
         Dict with total_assets and breakdown by category
@@ -179,21 +178,6 @@ def get_json_asset_counts(site_id: str) -> dict:
             ec_count += len(ec_data.get("ups_systems", []))
             ec_count += len(ec_data.get("feeders", []))
             counts["energy_centre"] = ec_count
-
-    # 3. DALI controllers from dali_mock_data.json
-    dali_file = DATA_DIR / "dali_mock_data.json"
-    if dali_file.exists():
-        with open(dali_file) as f:
-            dali_data = json.load(f)
-            # Check if site_id matches (flat structure) or site_id matches (nested)
-            if dali_data.get("site_id") == site_id:
-                counts["dali_controllers"] = len(dali_data.get("controllers", []))
-            else:
-                # Try nested buildings structure
-                for building in dali_data.get("sites", []):
-                    if building.get("site_id", "").lower() == site_code.lower():
-                        counts["dali_controllers"] = len(building.get("controllers", []))
-                        break
 
     # Calculate total
     total = sum(counts.values())
@@ -1596,7 +1580,9 @@ def _sync_bridge_policy_stage(client, site_id: str, phase: str) -> None:
         return
     config = rows.data[0].get("connection_config") or {}
     base_url = str(config.get("base_url") or "").rstrip("/")
-    token = str(config.get("token") or "")
+    from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+    token = resolve_site_bridge_token(site_id, config)
     if not base_url or not token:
         return
 

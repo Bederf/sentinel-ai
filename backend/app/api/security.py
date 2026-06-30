@@ -563,18 +563,51 @@ async def acknowledge_alert(request: Request, alert_id: str, acknowledged_by: st
 @limiter.limit("120/minute")
 @router.get("/occupancy")
 async def get_occupancy(request: Request, site: str = Query(...)):
-    """Get current building occupancy (for HVAC/Lighting occupancy-based control).
-
-    Used by Phase 28+ for occupancy-aware HVAC and lighting control.
-    Returns:
-        - total_occupancy: Total people in building
-        - by_floor: Occupancy breakdown by floor
-        - by_zone: Occupancy breakdown by zone
-    """
+    """Get fused live building occupancy evidence for control decisions."""
     try:
-        repo = SecurityRepository()
-        occupancy = repo.get_occupancy(site)
-        return occupancy
+        from app.services.occupancy_fusion_service import get_occupancy_fusion_service
+
+        verdict = await get_occupancy_fusion_service().get_fused_occupancy(site, force_refresh=True)
+        signal_count = sum(1 for signal in verdict.signals.values() if signal.is_available)
+        is_empty = (
+            not verdict.is_occupied and not verdict.is_uncertain and verdict.confidence >= 0.70 and signal_count >= 2
+        )
+
+        return {
+            "site_id": site,
+            "data_source": "occupancy_fusion",
+            "timestamp": datetime.now().isoformat(),
+            "is_empty": is_empty,
+            "is_occupied": verdict.is_occupied,
+            "is_uncertain": verdict.is_uncertain,
+            "may_suppress": verdict.may_suppress,
+            "occupancy_percent": verdict.occupancy_percent,
+            "occupancy_count": verdict.occupancy_count,
+            "confidence": verdict.confidence,
+            "gate_override": verdict.gate_override,
+            "signals": {
+                name: {
+                    "occupancy_percent": signal.normalized_pct,
+                    "confidence": signal.confidence,
+                    "freshness_minutes": signal.freshness_minutes,
+                    "raw_value": signal.raw_value,
+                }
+                for name, signal in verdict.signals.items()
+                if signal.is_available
+            },
+            "conflicts": [
+                {
+                    "signals": conflict.signals,
+                    "delta_pct": conflict.delta_pct,
+                    "description": conflict.description,
+                }
+                for conflict in verdict.conflicts
+            ],
+            "note": (
+                "Empty requires multiple fresh signals agreeing. On conflict or low confidence, "
+                "SENTINEL treats the building as occupied."
+            ),
+        }
     except Exception as e:
         logger.error(f"Error calculating occupancy for {site}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -592,18 +625,15 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
     - Comfort optimization suggestions
     """
     try:
-        repo = SecurityRepository()
+        from app.services.occupancy_fusion_service import get_occupancy_fusion_service
 
-        # Get current occupancy
-        occupancy = repo.get_occupancy(site)
-        total_occupancy = occupancy.get("total_occupancy", 0)
-        by_floor = occupancy.get("by_floor", {})
-        by_zone = occupancy.get("by_zone", {})
+        verdict = await get_occupancy_fusion_service().get_fused_occupancy(site, force_refresh=True)
+        total_occupancy = verdict.occupancy_count
 
         recommendations = []
 
         # Occupancy-based HVAC recommendations
-        if total_occupancy == 0:
+        if verdict.may_suppress:
             recommendations.append(
                 {
                     "module": "hvac",
@@ -616,7 +646,18 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
                     "estimated_savings": "15-20%",
                 }
             )
-        elif total_occupancy < 10:
+        elif verdict.is_uncertain:
+            recommendations.append(
+                {
+                    "module": "hvac",
+                    "type": "occupancy_uncertain",
+                    "priority": "high",
+                    "action": "hold_current_mode",
+                    "description": "Occupancy signals conflict or confidence is low - do not apply empty-building setbacks",
+                    "confidence": verdict.confidence,
+                }
+            )
+        elif verdict.occupancy_percent < 10:
             recommendations.append(
                 {
                     "module": "hvac",
@@ -629,7 +670,7 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
                     "confidence": 0.85,
                 }
             )
-        elif total_occupancy > 50:
+        elif verdict.occupancy_percent > 50:
             recommendations.append(
                 {
                     "module": "hvac",
@@ -642,7 +683,7 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
             )
 
         # Occupancy-based lighting recommendations
-        if total_occupancy == 0:
+        if verdict.may_suppress:
             recommendations.append(
                 {
                     "module": "lighting",
@@ -653,12 +694,19 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
                     "estimated_savings": "80-90%",
                 }
             )
+        elif verdict.is_uncertain:
+            recommendations.append(
+                {
+                    "module": "lighting",
+                    "type": "occupancy_uncertain",
+                    "priority": "high",
+                    "action": "hold_current_level",
+                    "description": "Occupancy signals conflict or confidence is low - do not switch lights off automatically",
+                }
+            )
         else:
-            # Calculate average occupancy per zone
-            avg_occupancy_per_zone = total_occupancy / max(len(by_zone), 1)
-
             # Recommend dimming if occupancy is low
-            if avg_occupancy_per_zone < 2:
+            if verdict.occupancy_percent < 10:
                 recommendations.append(
                     {
                         "module": "lighting",
@@ -681,29 +729,25 @@ async def get_occupancy_recommendations(request: Request, site: str = Query(...,
                     }
                 )
 
-        # Zone-specific recommendations
-        for zone, count in by_zone.items():
-            if count > 20:
-                recommendations.append(
-                    {
-                        "module": "hvac",
-                        "type": "comfort_optimization",
-                        "priority": "medium",
-                        "zone": zone,
-                        "action": "increase_ventilation",
-                        "description": f"Zone {zone} has {count} people - increase ventilation",
-                        "affected_equipment": ["VAV", "AHU"],
-                    }
-                )
-
         return attach_runtime_metadata(
             {
                 "site": site,
                 "current_occupancy": total_occupancy,
+                "occupancy_percent": verdict.occupancy_percent,
+                "occupancy_confidence": verdict.confidence,
+                "occupancy_uncertain": verdict.is_uncertain,
+                "may_suppress": verdict.may_suppress,
                 "recommendation_count": len(recommendations),
                 "recommendations": recommendations,
-                "by_floor": by_floor,
-                "by_zone": by_zone,
+                "signals": {
+                    name: {
+                        "occupancy_percent": signal.normalized_pct,
+                        "confidence": signal.confidence,
+                        "raw_value": signal.raw_value,
+                    }
+                    for name, signal in verdict.signals.items()
+                    if signal.is_available
+                },
                 "timestamp": datetime.now().isoformat(),
             }
         )

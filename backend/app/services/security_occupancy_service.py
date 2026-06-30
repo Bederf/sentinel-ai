@@ -61,16 +61,21 @@ class SecurityOccupancyService:
 
     def _calculate_zone_occupancy(self, zone_id: str) -> dict[str, Any]:
         """Calculate occupancy for a zone from badge events."""
-        events = self._repo.get_badge_events(zone_id=zone_id, limit=500)
+        try:
+            get_events = getattr(self._repo, "get_badge_events", None)
+            events = get_events(zone_id=zone_id, limit=500) if get_events else []
+        except Exception:
+            events = []
 
         entries = sum(1 for e in events if e.get("direction") == "entry" and e.get("granted", True))
         exits = sum(1 for e in events if e.get("direction") == "exit" and e.get("granted", True))
-
-        # Occupancy = entries - exits (minimum 0)
         occupancy = max(0, entries - exits)
 
-        # Get zone name
-        zone = self._repo.get_zone(zone_id)
+        try:
+            get_zone_fn = getattr(self._repo, "get_zone", None)
+            zone = get_zone_fn(zone_id) if get_zone_fn else None
+        except Exception:
+            zone = None
         zone_name = zone.get("name", zone_id) if zone else zone_id
 
         return {
@@ -79,6 +84,7 @@ class SecurityOccupancyService:
             "occupancy_count": occupancy,
             "badge_entries": entries,
             "badge_exits": exits,
+            "data_available": len(events) > 0,
             "last_updated": datetime.now(UTC).isoformat(),
             "source": "badge",
         }
@@ -96,23 +102,52 @@ class SecurityOccupancyService:
             source=OccupancySource(data["source"]),
         )
 
-    def get_building_occupancy(self) -> dict[str, Any]:
-        """Get total building occupancy from all zones."""
-        zones = self._repo.get_zones()
-        zone_occupancies = []
-        total = 0
+    def get_building_occupancy(self, site_id: str | None = None) -> dict[str, Any]:
+        """Get total building occupancy from active_occupants sensor readings.
 
-        for zone in zones:
-            zone_id = zone.get("zone_id", "")
-            occ_data = self._calculate_zone_occupancy(zone_id)
-            zone_occupancies.append(occ_data)
-            total += occ_data["occupancy_count"]
+        Queries equipment_sensor_readings for sensor_type='active_occupants' —
+        works with any access control system that writes this sensor type,
+        without hardcoding to a specific vendor or adapter.
+        """
+        site_code = site_id or get_primary_site_code() or "site-002"
+        total = 0
+        rows_seen = 0
+        try:
+            resp = (
+                self._repo.client.table("equipment_sensor_readings")
+                .select("equipment_id,value,recorded_at")
+                .eq("site_id", site_code)
+                .eq("sensor_type", "active_occupants")
+                .order("recorded_at", desc=True)
+                .limit(20)
+                .execute()
+            )
+            seen: set[str] = set()
+            for row in resp.data or []:
+                eid = row.get("equipment_id", "")
+                if eid not in seen:
+                    seen.add(eid)
+                    rows_seen += 1
+                    try:
+                        total += int(float(row.get("value") or 0))
+                    except (ValueError, TypeError):
+                        pass
+        except Exception as e:
+            logger.warning("Could not query active_occupants for %s: %s", site_code, e)
+            return {
+                "site_id": site_code,
+                "total_occupancy": None,
+                "source": "active_occupants",
+                "data_available": False,
+                "error": str(e),
+                "last_updated": datetime.now(UTC).isoformat(),
+            }
 
         return {
-            "site_id": get_primary_site_code() or "unknown",
-            "site_name": "Sandton City Office Tower",
+            "site_id": site_code,
             "total_occupancy": total,
-            "zones": zone_occupancies,
+            "source": "active_occupants",
+            "data_available": rows_seen > 0,
             "last_updated": datetime.now(UTC).isoformat(),
         }
 
@@ -269,6 +304,8 @@ class SecurityOccupancyService:
         hvac_setback = thresholds.get("hvac_setback", HVAC_RELAXATION_OFFSET)
 
         occ = self._calculate_zone_occupancy(zone_id)
+        if not occ.get("data_available"):
+            return None
         count = occ["occupancy_count"]
         zone_name = occ["zone_name"]
 
@@ -324,6 +361,8 @@ class SecurityOccupancyService:
         lighting_low = thresholds.get("lighting_low", LIGHTING_LOW_LEVEL)
 
         occ = self._calculate_zone_occupancy(zone_id)
+        if not occ.get("data_available"):
+            return None
         count = occ["occupancy_count"]
         zone_name = occ["zone_name"]
 
@@ -379,28 +418,28 @@ class SecurityOccupancyService:
             if lighting_rec:
                 lighting_recommendations.append(lighting_rec)
 
-        # Try to get DALI sensor data for combined occupancy
-        dali_data = self._get_dali_occupancy_data()
+        # Try to get protocol-neutral lighting occupancy data for combined occupancy
+        lighting_data = self._get_lighting_occupancy_data()
 
         return {
             "hvac": hvac_recommendations,
             "lighting": lighting_recommendations,
             "total_recommendations": len(hvac_recommendations) + len(lighting_recommendations),
-            "dali_data_available": dali_data is not None,
+            "lighting_data_available": lighting_data is not None,
             "last_updated": datetime.now(UTC).isoformat(),
         }
 
-    def _get_dali_occupancy_data(self) -> dict[str, Any] | None:
-        """Try to get DALI PIR sensor data for combined occupancy."""
+    def _get_lighting_occupancy_data(self) -> dict[str, Any] | None:
+        """Try to get protocol-neutral lighting/PIR data for combined occupancy."""
         try:
             from app.services.lighting_service import get_lighting_service
 
-            dali = get_lighting_service()
-            zones = dali.get_zones()
+            lighting = get_lighting_service()
+            zones = lighting.get_all_zones()
             if zones:
                 return {
                     "zone_count": len(zones),
-                    "source": "dali_pir",
+                    "source": "lighting_pir",
                 }
         except Exception:
             pass
@@ -460,9 +499,8 @@ class SecurityOccupancyService:
                 if is_after_hours and event.get("granted", True):
                     zone_id = event.get("zone_id")
 
-                    # Seeded approximation until live HVAC/lighting correlation is wired in
-                    hvac_activation = self._simulate_hvac_activation(zone_id, event_time)
-                    lighting_activation = self._simulate_lighting_activation(zone_id, event_time)
+                    hvac_activation = self._get_live_hvac_activation(zone_id, event_time)
+                    lighting_activation = self._get_live_lighting_activation(zone_id, event_time)
 
                     if hvac_activation or lighting_activation:
                         anomaly = {
@@ -481,36 +519,18 @@ class SecurityOccupancyService:
 
         return after_hours_events
 
-    def _simulate_hvac_activation(self, zone_id: str, event_time: datetime) -> dict | None:
-        """Approximate HVAC zone activation from seeded heuristics."""
-        # Convert CCURE zone to HVAC zone ID
-        hvac_zone_id = zone_id.replace("CCURE-ZN", "HVAC-ZN")
+    def _get_live_hvac_activation(self, zone_id: str, event_time: datetime) -> dict | None:
+        """Return live HVAC correlation when telemetry is wired; otherwise unknown."""
+        return None
 
-        # Return mock activation (replace with actual HVAC service query in production)
-        return {
-            "zone_id": hvac_zone_id,
-            "activated_at": (event_time + timedelta(minutes=5)).isoformat(),
-            "setpoint_before": 28,  # Unoccupied setpoint
-            "setpoint_after": 22,  # Occupied setpoint
-            "mode": "cooling",
-        }
-
-    def _simulate_lighting_activation(self, zone_id: str, event_time: datetime) -> dict | None:
-        """Approximate lighting zone activation from seeded heuristics."""
-        # Convert CCURE zone to DALI zone ID
-        lighting_zone_id = zone_id.replace("CCURE-ZN", "DALI-ZN")
-
-        # Return mock activation (replace with actual lighting service query in production)
-        return {
-            "zone_id": lighting_zone_id,
-            "activated_at": (event_time + timedelta(minutes=2)).isoformat(),
-            "brightness_before": 0,  # Off
-            "brightness_after": 100,  # Full brightness
-            "occupancy_detected": True,
-        }
+    def _get_live_lighting_activation(self, zone_id: str, event_time: datetime) -> dict | None:
+        """Return live lighting correlation when telemetry is wired; otherwise unknown."""
+        return None
 
     def _estimate_energy_impact(self, hvac_activation: dict | None, lighting_activation: dict | None) -> str:
         """Estimate energy impact of after-hours activation."""
+        if not hvac_activation and not lighting_activation:
+            return "Unknown - no live HVAC or lighting correlation available"
         total_kwh = 0
 
         if hvac_activation:
@@ -580,11 +600,8 @@ class SecurityOccupancyService:
 
         for controller in controllers:
             if controller.status == "offline":
-                # Correlate with network health
-                network_status = self._simulate_network_health(controller.ip_address)
-
-                # Correlate with UPS status
-                ups_status = self._simulate_ups_health()
+                network_status = self._get_live_network_health(controller.ip_address)
+                ups_status = self._get_live_ups_health()
 
                 issue = {
                     "type": "controller_offline",
@@ -601,32 +618,25 @@ class SecurityOccupancyService:
 
         return health_issues
 
-    def _simulate_network_health(self, ip_address: str) -> dict:
-        """Simulate network switch health for controller IP."""
-        # Placeholder until live network telemetry is wired in
-        return {
-            "switch": "SW-01",
-            "port": "GigabitEthernet1/0/24",
-            "status": "down",
-            "last_seen": "2026-02-10T03:20:00Z",
-            "errors": 0,
-        }
+    def _get_live_network_health(self, ip_address: str) -> dict | None:
+        """Return live network health correlation when telemetry is wired."""
+        return None
 
-    def _simulate_ups_health(self) -> dict:
-        """Simulate UPS battery level and status."""
-        # Placeholder until live network telemetry is wired in
-        return {
-            "ups_id": "UPS-COMMS-01",
-            "battery_level": 95,
-            "status": "online",
-            "estimated_runtime_minutes": 45,
-        }
+    def _get_live_ups_health(self) -> dict | None:
+        """Return live UPS health correlation when telemetry is wired."""
+        return None
 
     def _generate_equipment_health_recommendation(
-        self, controller: dict, network_status: dict, ups_status: dict
+        self, controller: dict, network_status: dict | None, ups_status: dict | None
     ) -> str:
         """Generate recommendation for equipment health issue."""
         controller_name = controller.get("name", "Unknown")
+
+        if not network_status or not ups_status:
+            return (
+                f"Controller {controller_name} offline. "
+                f"No live network or UPS correlation is available; verify controller, switch, and power telemetry."
+            )
 
         if network_status.get("status") == "down":
             return (

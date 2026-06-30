@@ -1,4 +1,4 @@
-"""Command Executor Service for simulated building control commands."""
+"""Command Executor Service for building control commands."""
 
 import json
 import logging
@@ -34,7 +34,7 @@ class CommandResult:
     target: str
     action: str
     message: str
-    simulated: bool = True
+    simulated: bool = False
     timestamp: str = ""
 
     def __post_init__(self):
@@ -188,7 +188,7 @@ class CommandExecutor:
 
     async def execute_command(self, command: dict) -> CommandResult:
         """
-        Execute a parsed command (simulated).
+        Execute a parsed command.
 
         Args:
             command: Parsed command dict from parse_command()
@@ -234,8 +234,13 @@ class CommandExecutor:
         hvac_devices = [d for d in devices if d.device_type.value == "hvac"]
 
         if not hvac_devices:
-            # Fall back to simulated execution
-            return self._execute_temperature_simulated(temp, site)
+            return CommandResult(
+                success=False,
+                command_type="temperature",
+                target=site["name"],
+                action=f"set to {temp}°C",
+                message=f"No live HVAC device found for {site['name']}; simulated control is disabled.",
+            )
 
         # Use the first HVAC device for local fallback execution
         device = hvac_devices[0]
@@ -244,8 +249,13 @@ class CommandExecutor:
         temp_points = [p for p in device.points.values() if "temp" in p.name.lower() and p.writable]
 
         if not temp_points:
-            # Fall back to simulated execution
-            return self._execute_temperature_simulated(temp, site)
+            return CommandResult(
+                success=False,
+                command_type="temperature",
+                target=f"{device.name} at {site['name']}",
+                action=f"set to {temp}°C",
+                message=f"No writable live temperature point found on {device.name}.",
+            )
 
         point_name = temp_points[0].name
 
@@ -298,32 +308,13 @@ class CommandExecutor:
 
         except Exception as e:
             logger.error(f"Error executing temperature command: {e}")
-            # Fall back to simulated execution
-            return self._execute_temperature_simulated(temp, site)
-
-    def _execute_temperature_simulated(self, temp: float, site: dict) -> CommandResult:
-        """Fallback simulated temperature execution."""
-        # Validate temperature range (legacy validation)
-        if temp < 16 or temp > 28:
             return CommandResult(
                 success=False,
                 command_type="temperature",
                 target=site["name"],
                 action=f"set to {temp}°C",
-                message=(
-                    f"Temperature {temp}°C is outside the safe range "
-                    f"(16-28°C). Please specify a temperature within range."
-                ),
+                message=f"Live HVAC write failed: {e}",
             )
-
-        return CommandResult(
-            success=True,
-            command_type="temperature",
-            target=site["name"],
-            action=f"set to {temp}°C",
-            message=f"[SIMULATED] HVAC temperature at {site['name']} [{site['id']}] set to {temp}°C. "
-            f"Estimated time to reach target: 15-20 minutes.",
-        )
 
     def _execute_lighting(self, command: dict) -> CommandResult:
         """Execute lighting control command."""
@@ -343,12 +334,11 @@ class CommandExecutor:
 
         action_verb = "turned on" if action == "on" else "turned off"
         return CommandResult(
-            success=True,
+            success=False,
             command_type="lighting",
             target=site["name"],
             action=action,
-            message=f"[SIMULATED] Lights at {site['name']} [{site['id']}] have been {action_verb}. "
-            f"Energy saving mode: {'disabled' if action == 'on' else 'enabled'}.",
+            message=(f"No live lighting control path is configured for {site['name']}; lights were not {action_verb}."),
         )
 
     def _execute_emergency(self, command: dict) -> CommandResult:
@@ -359,23 +349,21 @@ class CommandExecutor:
         eq = self._find_equipment(target)
         if eq:
             return CommandResult(
-                success=True,
+                success=False,
                 command_type="emergency",
                 target=eq["name"],
                 action="isolated",
-                message=f"[SIMULATED] EMERGENCY: {eq['name']} [{eq['id']}] at site {eq['site_id']} has been isolated. "
-                f"All connected systems have been notified. Manual inspection required before restart.",
+                message=f"No live emergency isolation path is configured for {eq['name']} [{eq['id']}].",
             )
 
         site = self._find_site(target)
         if site:
             return CommandResult(
-                success=True,
+                success=False,
                 command_type="emergency",
                 target=site["name"],
                 action="isolated",
-                message=f"[SIMULATED] EMERGENCY: Site {site['name']} [{site['id']}] has been isolated. "
-                f"All building systems set to safe mode. On-site technician dispatch recommended.",
+                message=f"No live emergency isolation path is configured for site {site['name']} [{site['id']}].",
             )
 
         return CommandResult(

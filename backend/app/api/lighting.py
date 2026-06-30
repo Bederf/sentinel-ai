@@ -19,11 +19,37 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Query
 
-from app.core.site_resolver import get_primary_site_code
-from app.database.supabase_client import get_supabase_client
-from app.services.occupancy_profile_service import calculate_zone_occupancy
-
 router = APIRouter()
+
+
+def _normalize_live_site_id(site_id: str | None) -> tuple[str, str]:
+    requested_site_id = site_id or "site-002"
+    if requested_site_id.startswith("site-"):
+        return requested_site_id, f"S{requested_site_id.split('-')[1]}"
+    return requested_site_id, requested_site_id
+
+
+def _no_live_lighting_data(site_id: str | None, reason: str | None = None) -> dict:
+    return {
+        "site_id": site_id,
+        "data_source": "live",
+        "data_available": False,
+        "timestamp": datetime.now().isoformat(),
+        "reason": reason or "No live lighting occupancy rows are available for this site.",
+        "note": (
+            "Static/simulated occupancy has been removed. Lighting PIR data can only report "
+            "occupied sensors/zones, not people count, unless a people-counting source is integrated."
+        ),
+        "summary": {
+            "total_zones": 0,
+            "avg_occupancy_percent": None,
+            "total_sensors": 0,
+            "occupied_sensors": 0,
+            "total_people": None,
+        },
+        "zones": [],
+    }
+
 
 # ============================================================================
 # CONSTANTS
@@ -477,58 +503,10 @@ async def get_live_lighting_data(
     site_id: str = Query(None, description="Site ID"),
 ):
     """
-    Get real-time DALI lighting data from Supabase.
+    Get real-time lighting data from Supabase.
 
-    Returns current occupancy, lighting, and energy data for all zones.
-    Shows live building occupancy and lighting system status, NOT simulation data.
-
-    Args:
-        site_id: Canonical site identifier (e.g., 'site-002')
-
-    Returns:
-        Real-time DALI system metrics including:
-        - Occupancy percentage per zone
-        - Current lighting brightness levels
-        - Power consumption
-        - Energy statistics
-        - Faulty luminaires count
-        - Lux levels (daylight harvesting data)
-
-    Example response:
-    ```json
-    {
-      "site_id": "site-002",
-      "data_source": "live",
-      "timestamp": "2026-02-18T14:30:00.123456",
-      "summary": {
-        "total_zones": 12,
-        "avg_occupancy_percent": 45.2,
-        "avg_brightness_level": 58.5,
-        "total_power_w": 8100.0,
-        "total_sensors": 28,
-        "occupied_sensors": 13,
-        "total_luminaires": 135,
-        "faulty_luminaires": 0
-      },
-      "zones": [
-        {
-          "zone_id": "Z-G-01",
-          "occupancy_percent": 95.0,
-          "avg_brightness_level": 75.5,
-          "total_sensors": 3,
-          "occupied_sensors": 3,
-          "total_luminaires": 12,
-          "faulty_luminaires": 0,
-          "power_w": 480.0,
-          "avg_lux": 450.0,
-          "energy_kwh": 12.4
-        }
-      ],
-      "energy_stats": {
-        "total_kwh_24h": 168.5
-      }
-    }
-    ```
+    This endpoint returns only rows read from live lighting tables. PIR values
+    represent occupied sensors or zones, not people counts.
     """
     from app.services.lighting_service import get_lighting_service
 
@@ -548,7 +526,7 @@ async def get_live_lighting_data(
         import logging
 
         logger = logging.getLogger(__name__)
-        logger.error(f"Error fetching live DALI data for {site_id}: {e}")
+        logger.error(f"Error fetching live lighting data for {site_id}: {e}")
 
         from datetime import datetime
 
@@ -574,584 +552,113 @@ async def get_live_lighting_data(
 
 
 # ============================================================================
-# ZONE-LEVEL ENDPOINTS FOR GRANT DEMO
+# LIVE ZONE-LEVEL ENDPOINTS
 # ============================================================================
 
 
 @router.get("/building/occupancy")
 async def get_building_occupancy(site_id: str = Query(None, description="Site ID")):
-    """
-    Get building-wide occupancy overview with floor and zone breakdown.
+    """Return live lighting occupancy only; never synthesize people counts."""
+    from app.services.lighting_service import get_lighting_service
 
-    Returns realistic weekday occupancy patterns for Johannesburg office:
-    - Ground Floor: Reception, conference areas (high occupancy)
-    - Level 1: Meeting rooms (low occupancy - mostly empty during meetings held elsewhere)
-    - Level 2: Open office (medium occupancy - mixed use throughout day)
+    requested_site_id, live_site_id = _normalize_live_site_id(site_id)
+    live_data = await get_lighting_service().get_live_lighting_data(live_site_id)
+    zones = live_data.get("zones") or []
+    if not zones:
+        return _no_live_lighting_data(requested_site_id, live_data.get("error"))
 
-    This endpoint highlights zones that are being lit despite low occupancy,
-    demonstrating where SENTINEL saves energy through occupancy-based control.
-    """
-    from datetime import datetime
-
-    from app.models.lighting import BuildingOccupancy, FloorSummary, ZoneOccupancy
-
-    now = datetime.now()
-    timestamp = now.isoformat()
-
-    # Demo story: Realistic weekday afternoon pattern (2 PM)
-    # Ground floor: high occupancy (meetings, reception)
-    ground_floor_zones = [
-        ZoneOccupancy(
-            zone_id="Z-G-01",
-            zone_name="Reception",
-            total_sensors=3,
-            occupied_sensors=3,
-            occupancy_percent=95.0,
-            avg_lux_level=450.0,
-            max_lux_level=750.0,
-            floor="Ground",
-            status="occupied",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-G-02",
-            zone_name="Conference Room A",
-            total_sensors=2,
-            occupied_sensors=2,
-            occupancy_percent=100.0,
-            avg_lux_level=350.0,
-            max_lux_level=600.0,
-            floor="Ground",
-            status="occupied",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-G-03",
-            zone_name="Lobby",
-            total_sensors=4,
-            occupied_sensors=2,
-            occupancy_percent=50.0,
-            avg_lux_level=520.0,
-            max_lux_level=800.0,
-            floor="Ground",
-            status="partial",
-            last_updated=timestamp,
-        ),
-    ]
-
-    # Level 1: LOW occupancy (meeting rooms, mostly empty - THIS IS WHERE SENTINEL SAVES MONEY)
-    level1_zones = [
-        ZoneOccupancy(
-            zone_id="Z-L1-01",
-            zone_name="Meeting Room 101",
-            total_sensors=2,
-            occupied_sensors=0,
-            occupancy_percent=0.0,
-            avg_lux_level=650.0,  # High daylight but empty!
-            max_lux_level=850.0,
-            floor="Level 1",
-            status="empty",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-L1-02",
-            zone_name="Meeting Room 102",
-            total_sensors=2,
-            occupied_sensors=1,
-            occupancy_percent=50.0,
-            avg_lux_level=480.0,
-            max_lux_level=700.0,
-            floor="Level 1",
-            status="partial",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-L1-03",
-            zone_name="Meeting Room 103",
-            total_sensors=2,
-            occupied_sensors=0,
-            occupancy_percent=0.0,
-            avg_lux_level=620.0,  # High daylight but empty
-            max_lux_level=820.0,
-            floor="Level 1",
-            status="empty",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-L1-04",
-            zone_name="Breakout Space",
-            total_sensors=3,
-            occupied_sensors=1,
-            occupancy_percent=33.0,
-            avg_lux_level=550.0,
-            max_lux_level=780.0,
-            floor="Level 1",
-            status="partial",
-            last_updated=timestamp,
-        ),
-    ]
-
-    # Level 2: Medium occupancy (open office, mixed use)
-    level2_zones = [
-        ZoneOccupancy(
-            zone_id="Z-L2-01",
-            zone_name="Open Office - West",
-            total_sensors=5,
-            occupied_sensors=3,
-            occupancy_percent=60.0,
-            avg_lux_level=400.0,
-            max_lux_level=650.0,
-            floor="Level 2",
-            status="occupied",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-L2-02",
-            zone_name="Open Office - East",
-            total_sensors=5,
-            occupied_sensors=2,
-            occupancy_percent=40.0,
-            avg_lux_level=580.0,  # High daylight near windows
-            max_lux_level=800.0,
-            floor="Level 2",
-            status="partial",
-            last_updated=timestamp,
-        ),
-        ZoneOccupancy(
-            zone_id="Z-L2-03",
-            zone_name="Focus Pods",
-            total_sensors=3,
-            occupied_sensors=1,
-            occupancy_percent=33.0,
-            avg_lux_level=320.0,
-            max_lux_level=480.0,
-            floor="Level 2",
-            status="partial",
-            last_updated=timestamp,
-        ),
-    ]
-
-    ground_summary = FloorSummary(
-        floor="Ground",
-        floor_name="Ground Floor (Public Spaces)",
-        zones=ground_floor_zones,
-        total_zones=len(ground_floor_zones),
-        total_sensors=sum(z.total_sensors for z in ground_floor_zones),
-        occupied_sensors=sum(z.occupied_sensors for z in ground_floor_zones),
-        occupancy_percent=round(sum(z.occupancy_percent for z in ground_floor_zones) / len(ground_floor_zones), 1),
-        total_luminaires=45,
-        faulty_luminaires=0,
-        total_power_watts=3200.0,
-    )
-
-    level1_summary = FloorSummary(
-        floor="Level 1",
-        floor_name="Level 1 (Meeting Rooms)",
-        zones=level1_zones,
-        total_zones=len(level1_zones),
-        total_sensors=sum(z.total_sensors for z in level1_zones),
-        occupied_sensors=sum(z.occupied_sensors for z in level1_zones),
-        occupancy_percent=round(sum(z.occupancy_percent for z in level1_zones) / len(level1_zones), 1),
-        total_luminaires=40,
-        faulty_luminaires=0,
-        total_power_watts=2100.0,
-    )
-
-    level2_summary = FloorSummary(
-        floor="Level 2",
-        floor_name="Level 2 (Open Office)",
-        zones=level2_zones,
-        total_zones=len(level2_zones),
-        total_sensors=sum(z.total_sensors for z in level2_zones),
-        occupied_sensors=sum(z.occupied_sensors for z in level2_zones),
-        occupancy_percent=round(sum(z.occupancy_percent for z in level2_zones) / len(level2_zones), 1),
-        total_luminaires=50,
-        faulty_luminaires=0,
-        total_power_watts=2800.0,
-    )
-
-    all_floors = [ground_summary, level1_summary, level2_summary]
-    all_zones = ground_floor_zones + level1_zones + level2_zones
-
-    building_occupancy = BuildingOccupancy(
-        site_id=site_id,
-        site_name="Sandton Office Complex",
-        timestamp=timestamp,
-        total_occupancy_percent=round(sum(z.occupancy_percent for z in all_zones) / len(all_zones), 1),
-        total_zones=len(all_zones),
-        floors=all_floors,
-        total_floors=len(all_floors),
-        total_sensors=sum(f.total_sensors for f in all_floors),
-        occupied_sensors=sum(f.occupied_sensors for f in all_floors),
-        total_luminaires=sum(f.total_luminaires for f in all_floors),
-        faulty_luminaires=sum(f.faulty_luminaires for f in all_floors),
-        total_power_watts=sum(f.total_power_watts for f in all_floors),
-        energy_waste_zones=2,  # Z-L1-01 and Z-L1-03 (empty with lights on)
-    )
-
-    return building_occupancy.to_dict()
+    summary = live_data.get("summary") or {}
+    return {
+        "site_id": requested_site_id,
+        "data_source": "live",
+        "data_available": True,
+        "timestamp": live_data.get("timestamp") or datetime.now().isoformat(),
+        "total_occupancy_percent": summary.get("avg_occupancy_percent"),
+        "total_zones": len(zones),
+        "total_sensors": summary.get("total_sensors", 0),
+        "occupied_sensors": summary.get("occupied_sensors", 0),
+        "total_people": None,
+        "note": "Lighting PIR sensors report occupied sensors/zones, not number of people.",
+        "zones": zones,
+    }
 
 
 @router.get("/zones/{zone_id}/lighting")
 async def get_zone_lighting(zone_id: str):
-    """
-    Get lighting data for a specific zone.
+    """Return live zone lighting only; static zone examples are removed."""
+    from app.services.lighting_service import get_lighting_service
 
-    Returns current brightness, lux readings, daylight harvesting status, and energy waste.
-    Provides realistic data showing:
-    - How daylight harvesting works (high lux = dimmed brightness)
-    - Energy waste detection (low occupancy + high brightness)
-    - Zone-specific optimization
-    """
-    from datetime import datetime
-
-    from app.models.lighting import ZoneLighting
-
-    now = datetime.now()
-    timestamp = now.isoformat()
-
-    # Define zone-specific lighting behavior
-    zone_data = {
-        # EMPTY ZONES WITH HIGH DAYLIGHT - ENERGY WASTE
-        "Z-L1-01": {
-            "name": "Meeting Room 101",
-            "luminaires": 8,
-            "active": 8,
-            "brightness": 100,  # PROBLEM: Lights at 100% despite 0% occupancy!
-            "lux": 680,
-            "waste_detected": True,
-            "waste_reason": "Lights at 100% brightness with 0% occupancy and 680 lux (high daylight)",
-            "power": 320.0,
-            "daylight_harvesting": False,
-        },
-        # PERIMETER ZONE WITH DAYLIGHT HARVESTING WORKING
-        "Z-L1-02": {
-            "name": "Meeting Room 102",
-            "luminaires": 8,
-            "active": 6,
-            "brightness": 45,  # GOOD: Dimmed due to daylight
-            "lux": 620,
-            "waste_detected": False,
-            "waste_reason": None,
-            "power": 144.0,
-            "daylight_harvesting": True,
-        },
-        # ANOTHER EMPTY ZONE - DAYLIGHT HARVESTING COULD SAVE ENERGY
-        "Z-L1-03": {
-            "name": "Meeting Room 103",
-            "luminaires": 8,
-            "active": 8,
-            "brightness": 100,
-            "lux": 640,
-            "waste_detected": True,
-            "waste_reason": "Lights at 100% brightness with 0% occupancy and 640 lux (high daylight)",
-            "power": 320.0,
-            "daylight_harvesting": False,
-        },
-        # BREAKOUT SPACE - PARTIAL OCCUPANCY, PARTIAL HARVESTING
-        "Z-L1-04": {
-            "name": "Breakout Space",
-            "luminaires": 6,
-            "active": 4,
-            "brightness": 60,
-            "lux": 520,
-            "waste_detected": False,
-            "waste_reason": None,
-            "power": 144.0,
-            "daylight_harvesting": True,
-        },
-        # OPEN OFFICE WEST - OCCUPIED, NORMAL OPERATION
-        "Z-L2-01": {
-            "name": "Open Office - West",
-            "luminaires": 12,
-            "active": 10,
-            "brightness": 75,
-            "lux": 380,
-            "waste_detected": False,
-            "waste_reason": None,
-            "power": 300.0,
-            "daylight_harvesting": True,
-        },
-        # OPEN OFFICE EAST - DAYLIGHT HARVESTING ACTIVE (PERIMETER)
-        "Z-L2-02": {
-            "name": "Open Office - East",
-            "luminaires": 12,
-            "active": 8,
-            "brightness": 40,  # GOOD: Dimmed due to high daylight
-            "lux": 680,  # High daylight near windows
-            "waste_detected": False,
-            "waste_reason": None,
-            "power": 192.0,
-            "daylight_harvesting": True,
-        },
-        # FOCUS PODS - LOW OCCUPANCY, LOW BRIGHTNESS
-        "Z-L2-03": {
-            "name": "Focus Pods",
-            "luminaires": 5,
-            "active": 3,
-            "brightness": 50,
-            "lux": 300,
-            "waste_detected": False,
-            "waste_reason": None,
-            "power": 90.0,
-            "daylight_harvesting": False,
-        },
-        # DEFAULT for other zones
-        "default": {
-            "name": "Unknown Zone",
-            "luminaires": 8,
-            "active": 6,
-            "brightness": 70,
-            "lux": 450,
-            "waste_detected": False,
-            "waste_reason": None,
-            "power": 240.0,
-            "daylight_harvesting": True,
-        },
+    _, live_site_id = _normalize_live_site_id("site-002")
+    live_data = await get_lighting_service().get_live_lighting_data(live_site_id)
+    for zone in live_data.get("zones") or []:
+        if zone.get("zone_id") == zone_id:
+            return {
+                "data_source": "live",
+                "data_available": True,
+                "timestamp": live_data.get("timestamp") or datetime.now().isoformat(),
+                **zone,
+            }
+    return {
+        "zone_id": zone_id,
+        "data_source": "live",
+        "data_available": False,
+        "timestamp": datetime.now().isoformat(),
+        "reason": "No live lighting data found for this zone. Static zone examples have been removed.",
     }
-
-    data = zone_data.get(zone_id, zone_data["default"])
-
-    zone_lighting = ZoneLighting(
-        zone_id=zone_id,
-        zone_name=data["name"],
-        total_luminaires=data["luminaires"],
-        active_luminaires=data["active"],
-        avg_dim_level=data["brightness"],
-        total_power_w=data["power"],
-        faulty_count=0,
-        floor=zone_id.split("-")[1] if "-" in zone_id else "Unknown",
-        energy_waste_detected=data["waste_detected"],
-        energy_waste_reason=data["waste_reason"],
-        active_scene=None,
-        active_scene_name=None,
-    )
-
-    response = zone_lighting.to_dict()
-    # Add extra fields for local visualization
-    response["lux_reading"] = data["lux"]
-    response["daylight_harvesting_active"] = data["daylight_harvesting"]
-    response["timestamp"] = timestamp
-
-    return response
 
 
 @router.get("/stats")
 async def get_lighting_stats(site_id: str = Query(None, description="Site ID")):
-    """
-    Get system-wide DALI statistics.
+    """Return aggregate live lighting stats only."""
+    from app.services.lighting_service import get_lighting_service
 
-    Returns aggregate metrics showing the impact of intelligent lighting:
-    - How much daylight is being utilized
-    - Energy waste detected across the building
-    - ML effectiveness in optimizing lighting
-
-    Shows real savings happening right now.
-    """
-    from datetime import datetime
-
-    from app.models.lighting import LightingStats
-
-    now = datetime.now()
-    timestamp = now.isoformat()
-
-    # Realistic local stats for current time (afternoon with daylight)
-    # This shows the intelligent lighting system working
-    stats = LightingStats(
-        site_id=site_id,
-        timestamp=timestamp,
-        avg_occupancy_percent=45.0,
-        avg_brightness_percent=58.0,  # Good: Reduced from 75% baseline due to daylight harvesting
-        total_zones=12,
-        total_sensors=28,
-        total_luminaires=135,
-        daylight_hours_utilized=4.2,  # How many hours of high daylight today
-        kwh_saved_today=12.4,  # Real energy saved by occupancy + daylight harvesting
-        energy_waste_zones=2,  # Z-L1-01 and Z-L1-03 (empty with lights at 100%)
-        daylight_harvesting_active=True,
-        ml_effectiveness_percent=84.0,  # SENTINEL is learning and improving
-        total_controllers=8,  # 8 DALI-2 controllers across 3 floors
-        online_controllers=8,  # All online
-        online_sensors=26,  # 26 of 28 sensors online
-        faulty_luminaires=0,  # No faulty luminaires currently
-        current_power_watts=8100.0,  # Total lighting power: 3200+2100+2800 W
-    )
-
-    return stats.to_dict()
+    requested_site_id, live_site_id = _normalize_live_site_id(site_id)
+    live_data = await get_lighting_service().get_live_lighting_data(live_site_id)
+    if not live_data.get("zones"):
+        return _no_live_lighting_data(requested_site_id, live_data.get("error"))
+    return {
+        "site_id": requested_site_id,
+        "data_source": "live",
+        "data_available": True,
+        "timestamp": live_data.get("timestamp") or datetime.now().isoformat(),
+        "summary": live_data.get("summary") or {},
+        "energy_stats": live_data.get("energy_stats") or {},
+    }
 
 
 # ============================================================================
-# OCCUPANCY ENDPOINTS (Phase 4: Synchronization with Occupancy Simulation)
+# LIVE OCCUPANCY ENDPOINTS
 # ============================================================================
 
 
 @router.get("/building/{site_id}/occupancy/detailed")
-async def get_detailed_occupancy(
-    site_id: str, time: str | None = Query(None, description="ISO timestamp for simulation time")
-):
-    """
-    Get per-zone occupancy with display coordinates and persona breakdown.
+async def get_detailed_occupancy(site_id: str):
+    """Return live per-zone lighting occupancy; no simulated personas or counts."""
+    from app.services.lighting_service import get_lighting_service
 
-    Provides real-time occupancy targets for the frontend occupancy simulation.
-    Integrates with Grant scenario time-based patterns:
-    - Workers: 9-5pm peak occupancy
-    - Security: 24/7 patrols
-    - Cleaners: After hours (6pm-11pm)
-    - Visitors: 10am-4pm variable
+    requested_site_id, live_site_id = _normalize_live_site_id(site_id)
+    live_data = await get_lighting_service().get_live_lighting_data(live_site_id)
+    zones = live_data.get("zones") or []
+    if not zones:
+        return _no_live_lighting_data(requested_site_id, live_data.get("error"))
 
-    Returns per-zone targets that the client-side simulation will use to spawn/despawn people.
-    """
-    import json
-    import logging
-    import os
-
-    logger = logging.getLogger(__name__)
-
-    try:
-        # Get simulation time (or current time if not provided)
-        sim_time = datetime.fromisoformat(time) if time else datetime.now()
-
-        hour = sim_time.hour
-        day_of_week = sim_time.weekday()
-        is_weekend = day_of_week >= 5
-
-        # Get zone mappings from database or fallback to JSON
-        zones_data = []
-
-        # Try Supabase first
-        try:
-            supabase = get_supabase_client()
-            zone_mappings = supabase.table("zone_display_mappings").select("*").eq("site_id", site_id).execute()
-            zones_data = zone_mappings.data if zone_mappings.data else []
-        except Exception as db_error:
-            logger.debug(f"Supabase zone lookup failed: {db_error}, using JSON fallback")
-
-        # If zones still empty, try JSON fallback
-        if not zones_data:
-            try:
-                # Map site_id to site_id for file path
-                site_id = site_id.replace("-", "_")
-                if site_id == "gateway-centre":  # Legacy mapping
-                    site_id = get_primary_site_code() or "unknown"
-
-                zones_json_path = f"/opt/bms-intelligence/backend/app/data/buildings/{site_id}/zones.json"
-                logger.debug(f"Trying to load zones from: {zones_json_path}")
-
-                if os.path.exists(zones_json_path):
-                    with open(zones_json_path) as f:
-                        zones_file = json.load(f)
-
-                    # Convert file format to zone_mappings format
-                    for zone in zones_file.get("zones", []):
-                        zones_data.append(
-                            {
-                                "display_zone_id": zone.get("zone_id"),
-                                "display_zone_name": f"Zone {zone.get('floor')}-{zone.get('zone_letter', 'A')}",
-                                "floor": int(zone.get("floor", "0").replace("B", "-").replace("L", "")),
-                                "coordinates": {"x": 0, "y": 0, "w": 100, "h": 100},  # Mock coordinates
-                                "max_occupancy": 20,  # Default max occupancy per zone
-                                "zone_type": zone.get("zone_type", "office"),
-                            }
-                        )
-                    logger.debug(f"Loaded {len(zones_data)} zones from JSON")
-                else:
-                    logger.warning(f"Zones JSON not found: {zones_json_path}")
-            except Exception as file_error:
-                logger.error(f"Error loading zones from JSON: {file_error}")
-
-        occupancy_data = []
-        total_occupancy = 0
-
-        for zone in zones_data:
-            zone_type = zone.get("zone_type", "office")
-            max_occ = zone.get("max_occupancy", 10)
-
-            # Calculate occupancy percentage based on time and zone type
-            occupancy_percent = calculate_zone_occupancy(
-                hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone_type
-            )
-
-            current_occupancy = max(0, int(max_occ * occupancy_percent / 100))
-            total_occupancy += current_occupancy
-
-            # Get persona distribution for this time/zone
-            personas = get_persona_distribution(
-                hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone_type
-            )
-
-            occupancy_data.append(
-                {
-                    "zone_id": zone.get("display_zone_id"),
-                    "zone_name": zone.get("display_zone_name"),
-                    "floor": zone.get("floor", 0),
-                    "coordinates": zone.get("coordinates"),
-                    "max_occupancy": max_occ,
-                    "current_occupancy": current_occupancy,
-                    "occupancy_percent": occupancy_percent,
-                    "zone_type": zone_type,
-                    "personas": personas,
-                }
-            )
-
-        return {
-            "site_id": site_id,
-            "timestamp": sim_time.isoformat(),
-            "day_type": "weekend" if is_weekend else "weekday",
-            "zones": occupancy_data,
-            "total_occupancy": total_occupancy,
-            "occupancy_trend": "peak" if 9 <= hour < 17 else "offpeak",
-        }
-
-    except Exception as e:
-        # Return empty response on error
-        logger.error(f"Error in get_detailed_occupancy: {e}")
-        return {
-            "site_id": site_id,
-            "timestamp": datetime.now().isoformat(),
-            "zones": [],
-            "total_occupancy": 0,
-            "error": str(e),
-        }
-
-
-def get_persona_distribution(hour: int, day_of_week: int, is_weekend: bool, zone_type: str) -> dict:
-    """
-    Get persona type distribution for a zone at a given time.
-
-    Returns: {'worker': 0.75, 'security': 0.15, 'cleaner': 0.05, 'visitor': 0.05}
-    """
-    personas = {"worker": 0.0, "security": 0.0, "cleaner": 0.0, "visitor": 0.0}
-
-    if is_weekend:
-        personas["security"] = 0.7
-        personas["cleaner"] = 0.3
-        return personas
-
-    # Weekday distributions
-    # Workers (9am-5pm peak)
-    if 9 <= hour < 17:
-        personas["worker"] = 0.75
-    elif 7 <= hour < 9 or 17 <= hour < 19:
-        personas["worker"] = 0.6  # Arrival/departure
-    else:
-        personas["worker"] = 0.0
-
-    # Security (24/7, more at night)
-    personas["security"] = 0.1 if 9 <= hour < 18 else 0.3
-
-    # Cleaners (6pm-11pm)
-    if 18 <= hour < 23:
-        personas["cleaner"] = 0.4
-        personas["worker"] = max(0.0, personas["worker"] - 0.3)  # Overlap
-
-    # Visitors (10am-4pm in meetings/common areas)
-    if 10 <= hour < 16 and zone_type in ["meeting", "common", "entry"]:
-        personas["visitor"] = 0.15
-        personas["worker"] = max(0.0, personas["worker"] - 0.1)
-
-    # Normalize to sum to 1.0
-    total = sum(personas.values())
-    if total > 0:
-        personas = {k: v / total for k, v in personas.items()}
-
-    return personas
+    return {
+        "site_id": requested_site_id,
+        "data_source": "live",
+        "data_available": True,
+        "timestamp": live_data.get("timestamp") or datetime.now().isoformat(),
+        "zones": [
+            {
+                "zone_id": zone.get("zone_id"),
+                "occupancy_percent": zone.get("occupancy_percent"),
+                "total_sensors": zone.get("total_sensors"),
+                "occupied_sensors": zone.get("occupied_sensors"),
+                "current_occupancy": None,
+                "personas": None,
+            }
+            for zone in zones
+        ],
+        "total_occupancy": None,
+        "total_occupied_sensors": (live_data.get("summary") or {}).get("occupied_sensors", 0),
+        "note": "People counts/personas are not inferred from lighting PIR sensors.",
+    }

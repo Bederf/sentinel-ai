@@ -177,7 +177,9 @@ class ZoneOccupancyTriggerService:
         return await self.process_payload(site_id, payload, source=payload.get("_source", "bridge"))
 
     async def _fetch_site_zone_payload(self, site_id: str) -> dict[str, Any]:
-        token = os.getenv("BRIDGE_API_TOKEN_SITE002") or os.getenv("BRIDGE_API_TOKEN", "")
+        from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+        token = resolve_site_bridge_token(site_id)
         headers = {"Authorization": f"Bearer {token}"} if token else {}
         base_url = os.getenv("BRIDGE_BASE_URL", "http://10.99.0.1:8080").rstrip("/")
 

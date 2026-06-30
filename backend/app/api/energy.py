@@ -605,10 +605,7 @@ async def get_energy(
         - total_kwh: Sum of all categories
 
     Note:
-        Uses Supabase as the authoritative source. Mock fallback is disabled by default
-        and can be explicitly enabled with ENERGY_ALLOW_MOCK_FALLBACK=true.
-        Fallback can be used when Supabase query fails, or when it succeeds but returns
-        no rows for the requested site/time window.
+        Uses Supabase as the authoritative source. No synthetic fallback is used.
     """
     # Try Supabase first
     supabase_data, success = get_energy_from_supabase(site_id, days)
@@ -633,153 +630,17 @@ async def get_energy(
         data=[],
     )
 
-    # Fall back to synthetic data generation using Supabase buildings
-    logger.warning("Supabase energy query failed; using synthetic fallback (ENERGY_ALLOW_MOCK_FALLBACK=true)")
-
-    from app.database.supabase_client import get_supabase_client
-
-    try:
-        client = get_supabase_client()
-        result = client.table("sites").select("code, name, sqm").execute()
-        sites = []
-        for b in result.data or []:
-            sites.append(
-                {
-                    "id": b.get("code"),
-                    "name": b.get("name"),
-                    "sqm": b.get("sqm") or 1000,
-                }
-            )
-    except Exception as e:
-        logger.warning(f"Failed to load buildings from Supabase: {e}")
-        sites = []
-
-    # If still no sites, use site_loader
-    if not sites:
-        site_loader = get_site_loader()
-        buildings = site_loader.get_all_sites()
-
-        for b in buildings:
-            if hasattr(b, "to_dict"):
-                b_dict = b.to_dict()
-            elif isinstance(b, dict):
-                b_dict = b
-            else:
-                b_dict = {"id": getattr(b, "id", "unknown"), "name": getattr(b, "name", "Unknown")}
-
-            metadata = b_dict.get("metadata", {})
-            if not isinstance(metadata, dict):
-                metadata = {}
-
-            sites.append(
-                {
-                    "id": b_dict.get("id"),
-                    "name": b_dict.get("display_name") or b_dict.get("name") or b_dict.get("id"),
-                    "sqm": metadata.get("sqm", 1000),
-                }
-            )
-
-    equipment = load_equipment()
-
-    data = generate_energy_data(sites, equipment, days=days, site_id=site_id)
-
-    return EnergyResponse(
-        days=days,
-        site_id=site_id,
-        data=data,
-    )
-
 
 @router.post("/energy/seed")
 async def seed_energy_data(
     site_id: str | None = Query(None, description="Building code to seed (default: all)"),
     days: int = Query(90, ge=1, le=365, description="Number of days to seed"),
 ) -> dict:
-    """
-    Seed synthetic energy consumption data for non-production use.
-
-    Uses the mock data generator and stores results in Supabase.
-
-    Args:
-        site_id: Optional building code (default: all buildings)
-        days: Number of days to seed (default 90)
-
-    Returns:
-        Dictionary with seeding results
-    """
-    from app.database.supabase_client import get_supabase_client
-
-    try:
-        repo = get_energy_consumption_repository()
-        client = get_supabase_client()
-
-        # Get buildings from Supabase (has all 10 sites)
-        if site_id:
-            result = client.table("sites").select("id, code, name, sqm").eq("code", site_id).execute()
-        else:
-            result = client.table("sites").select("id, code, name, sqm").execute()
-
-        if not result.data:
-            raise HTTPException(status_code=404, detail=f"Building {site_id} not found")
-
-        buildings = result.data
-
-        # Load equipment from Supabase with building codes
-        equipment = load_equipment()
-
-        # Generate data for each building
-        records_created = 0
-        end_date = datetime.now().date()
-        start_date = end_date - timedelta(days=days - 1)
-        site_codes = []
-
-        for building in buildings:
-            site_code = building.get("code", building.get("id"))
-            site_codes.append(site_code)
-
-            # Prepare site data for energy generator
-            sites = [
-                {
-                    "id": site_code,  # Use building code as site_id
-                    "name": building.get("name", site_code),
-                    "sqm": building.get("sqm") or 1000,
-                }
-            ]
-
-            # Generate mock data for this building
-            mock_data = generate_energy_data(sites, equipment, days=days, site_id=site_code)
-
-            # Batch upsert for efficiency
-            batch_records = []
-            for point in mock_data:
-                batch_records.append(
-                    {
-                        "site_id": point.site_id,
-                        "building_id": point.site_id,
-                        "date": point.date,
-                        "hvac_kwh": point.hvac_kwh,
-                        "lighting_kwh": point.lighting_kwh,
-                        "other_kwh": point.other_kwh,
-                    }
-                )
-
-            if batch_records:
-                repo.batch_upsert(batch_records)
-                records_created += len(batch_records)
-
-        return {
-            "success": True,
-            "message": f"Seeded {records_created} energy consumption records",
-            "sites": site_codes,
-            "days": days,
-            "date_range": f"{start_date} to {end_date}",
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to seed energy data: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    """Synthetic energy seeding is disabled for live telemetry integrity."""
+    raise HTTPException(
+        status_code=410,
+        detail="Synthetic energy seeding is disabled; operational data must come from live site telemetry.",
+    )
 
 
 @router.get("/energy/actual", response_model=EnergyActual)

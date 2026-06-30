@@ -407,8 +407,8 @@ class SolarIngestionService:
         """Factory method — create the appropriate connector for a manufacturer.
 
         Respects settings.solar_connector_mode:
-          - "simulation" (default): always returns simulated connectors
-          - "live": attempts real Modbus TCP connector, falls back to simulated on failure
+          - "live" (default): attempts real Modbus TCP connector and fails closed
+          - "simulation": explicit non-live mode for offline simulation work only
         """
         from app.config.settings import settings
 
@@ -426,13 +426,17 @@ class SolarIngestionService:
                         meters=[m for m in meters if m.get("manufacturer", "").lower() != "schneider"],
                     )
                 except Exception as e:
-                    logger.warning("Real Huawei connector failed, falling back to simulated: %s", e)
+                    logger.error("Real Huawei connector unavailable in live mode: %s", e)
+                    return None
             return SimulatedHuaweiConnector(
                 inverters=inverters,
                 bess=bess or config.get("bess"),
                 meters=[m for m in meters if m.get("manufacturer", "").lower() != "schneider"],
             )
         elif manufacturer == "schneider":
+            if mode == "live":
+                logger.error("No live Schneider connector configured; refusing simulated Schneider data")
+                return None
             return SimulatedSchneiderConnector(
                 inverters=inverters,
                 meters=[m for m in meters if m.get("manufacturer", "").lower() == "schneider"],

@@ -220,6 +220,10 @@ Guided inspection generation is intentionally scoped to major plant first. This 
 
 - Database and API `site_id` values must use canonical `site-###` format, for
   example `site-002` or `site-005`.
+- Bridge adapter configs must reference a site-scoped env secret via
+  `site_adapter_config.connection_config.token_env`, for example
+  `BRIDGE_API_TOKEN_SITE_005`. Do not persist new literal bridge tokens in
+  `connection_config.token`; DB token storage is legacy fallback only.
 - Equipment codes may keep the physical prefix, for example `S002-AHU-B01`.
 - Bridge discovery may report equipment codes with `S###-...`; onboarding must
   bind those records to the canonical site row before persistence.

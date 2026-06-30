@@ -142,7 +142,9 @@ NOTIFICATION_SMTP_PASSWORD=<app-password>
 ENABLE_SITE002_SOURCE=false
 SENTINEL_ISLAND_MODE=true
 BRIDGE_BASE_URL=http://10.99.0.1:8080
-BRIDGE_API_TOKEN=<shared-bridge-token>
+BRIDGE_API_TOKEN=<legacy-shared-bridge-token>
+BRIDGE_API_TOKEN_SITE_002=<site-002-bridge-token>
+BRIDGE_API_TOKEN_SITE_005=<site-005-bridge-token>
 ```
 
 ### Remote VM + WireGuard Checklist
@@ -229,8 +231,8 @@ sudo wg show
 # Route to the remote site subnet
 ip route | grep 10.99.0.0
 
-# Site endpoint health over the chosen path
-curl -H "Authorization: Bearer <BRIDGE_API_TOKEN>" http://10.99.0.1:8080/health
+# Site endpoint health over the chosen path. Use that site's token.
+curl -H "Authorization: Bearer <BRIDGE_API_TOKEN_SITE_005>" http://10.99.0.1:8080/api/sites/site-005/health
 
 # Sentinel should log SIMBIOT remote ingestion mode, not local simulation fallback
 journalctl -u sentinel-backend -n 100 | grep -E "SIMBIOT|remote site bridge|data source"

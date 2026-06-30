@@ -28,6 +28,10 @@ from app.database.repositories.recommendation_repository import (
     RecommendationRepository,
     get_recommendation_repository,
 )
+from app.database.repositories.recommendation_audit_repository import (
+    RecommendationAuditRepository,
+    get_recommendation_audit_repository,
+)
 from app.database.repositories.reporter_location_repository import (
     ReporterLocationRepository,
     get_reporter_location_repository,
@@ -55,6 +59,7 @@ __all__ = [
     "LightingLuminaireRepository",
     "LightingSensorRepository",
     "PredictionRepository",
+    "RecommendationAuditRepository",
     "RecommendationRepository",
     "ReporterLocationRepository",
     "SLARepository",
@@ -64,6 +69,7 @@ __all__ = [
     "SiteRepository",
     "get_agent_memory_repository",
     "get_email_intake_repository",
+    "get_recommendation_audit_repository",
     "get_recommendation_repository",
     "get_reporter_location_repository",
     "get_sla_repository",

@@ -450,7 +450,7 @@ Create maintenance work order. **Important:** Claude is instructed to follow the
 When called, the tool routes through `POST /api/sentry/create-work-order` (same endpoint as the `/WO-` slash command) to persist to Supabase and auto-assign a technician. Falls back to in-memory storage if the Sentry API is unreachable.
 
 **Parameters:**
-- `equipment_code` (string, required): Equipment code (e.g., `S002-FCU-301`)
+- `equipment_code` (string, required): Equipment code (e.g., `S002-FCU-201`)
 - `title` (string, required): Work order title
 - `description` (string, required): Detailed description
 - `priority` (string, required): "critical", "high", "medium", "low"
@@ -460,7 +460,7 @@ When called, the tool routes through `POST /api/sentry/create-work-order` (same 
 {
   "success": true,
   "code": "WO-20260302-A1B2C3D4",
-  "equipment_code": "S002-FCU-301",
+  "equipment_code": "S002-FCU-201",
   "assigned_to": "Mike Johnson",
   "technician_email": "mike@example.com",
   "priority": "medium",

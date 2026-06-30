@@ -70,12 +70,14 @@ Analog Value, Binary Value, and Multi-State Value points are not assumed writabl
 
 ## Authentication: Per-Site Tokens
 
-The bridge supports **global** and **per-site** tokens via environment variables:
+The bridge supports **global** and **per-site** tokens via environment variables. SENTINEL must use site-scoped tokens for site-specific bridge endpoints.
 
 | Env Var | Purpose |
 |---------|---------|
-| `BRIDGE_API_TOKEN` | Global token — used for bridge-level auth |
-| `BRIDGE_API_TOKEN_SITE002` | Site-002 specific token (per-site override) |
+| `BRIDGE_API_TOKEN` | Legacy/global fallback only |
+| `BRIDGE_API_TOKEN_SITE_002` | Site-002 bridge token |
+| `BRIDGE_API_TOKEN_SITE_005` | Site-005 bridge token |
+| `SIMBIOT_API_KEY_SITE_###` | Accepted site-scoped alias |
 
 The bridge validates site-specific endpoints against the per-site token.
 Global `BRIDGE_API_TOKEN` alone will **not** authenticate site-specific requests.
@@ -89,7 +91,10 @@ Do not store literal bridge tokens in documentation. Check the configured secret
 Tokens live in two places:
 
 1. **Bridge VPS**: `/etc/sentinel-bridge/env` — bridge's own environment
-2. **Supabase**: `site_adapter_config.connection_config.token` — SENTINEL's source of truth
+2. **SENTINEL backend**: `/etc/sentinel/secrets.env` — `BRIDGE_API_TOKEN_SITE_###`
+3. **Supabase**: `site_adapter_config.connection_config.token_env` — name of the env secret, not the token value
+
+Do not store new literal bridge tokens in `site_adapter_config.connection_config.token`. Existing DB tokens are legacy fallback only and should be migrated to `token_env`.
 
 ### Updating Token in Database
 

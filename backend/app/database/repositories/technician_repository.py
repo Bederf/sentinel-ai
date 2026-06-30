@@ -169,21 +169,30 @@ class TechnicianRepository:
             logger.debug(f"Parsed equipment {equipment_code} → specialty={specialty}")
 
             # Get technician for this building and specialty
-            result = (
-                self.client.table("site_technicians")
-                .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                .eq("site_id", site_id)
-                .eq("specialty", specialty)
-                .eq("is_primary", True)
-                .execute()
-            )
+            result = None
+            try:
+                result = (
+                    self.client.table("site_technicians")
+                    .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                    .eq("site_id", site_id)
+                    .eq("specialty", specialty)
+                    .eq("is_primary", True)
+                    .execute()
+                )
+            except Exception as exc:
+                logger.warning(
+                    "site_technicians lookup failed for %s (%s); falling back to technicians.site_id: %s",
+                    equipment_code,
+                    specialty,
+                    exc,
+                )
 
             logger.debug(
                 "Site_technicians query for specialty="
-                f"{specialty}: found {len(result.data) if result.data else 0} results"
+                f"{specialty}: found {len(result.data) if result and result.data else 0} results"
             )
 
-            if result.data and len(result.data) > 0:
+            if result and result.data and len(result.data) > 0:
                 assignment = result.data[0]
                 tech = assignment.get("technicians", {})
                 logger.debug(
@@ -203,16 +212,19 @@ class TechnicianRepository:
 
             # Fallback to 'general' specialty
             if specialty != "general":
-                result = (
-                    self.client.table("site_technicians")
-                    .select("specialty, technicians(id, name, email, phone, telegram_id)")
-                    .eq("site_id", site_id)
-                    .eq("specialty", "general")
-                    .eq("is_primary", True)
-                    .execute()
-                )
+                try:
+                    result = (
+                        self.client.table("site_technicians")
+                        .select("specialty, technicians(id, name, email, phone, telegram_id)")
+                        .eq("site_id", site_id)
+                        .eq("specialty", "general")
+                        .eq("is_primary", True)
+                        .execute()
+                    )
+                except Exception:
+                    result = None
 
-                if result.data and len(result.data) > 0:
+                if result and result.data and len(result.data) > 0:
                     assignment = result.data[0]
                     tech = assignment.get("technicians", {})
                     return {
@@ -224,11 +236,53 @@ class TechnicianRepository:
                         "specialty": assignment.get("specialty"),
                     }
 
-            return None
+            return self._get_direct_site_technician(site_id, specialty)
 
         except Exception as e:
             logger.error(f"Error getting technician for equipment code {equipment_code}: {e}")
             return None
+
+    def _resolve_site_code(self, site_id: str) -> str:
+        """Resolve a site UUID to its code for schemas that store technician.site_id as text."""
+        import re
+
+        uuid_pattern = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.I)
+        if not uuid_pattern.match(str(site_id or "")):
+            return site_id
+        result = self.client.table("sites").select("code").eq("id", site_id).limit(1).execute()
+        if result.data:
+            return result.data[0]["code"]
+        return site_id
+
+    def _get_direct_site_technician(self, site_id: str, specialty: str) -> dict[str, Any] | None:
+        """Fallback for live schemas that store assignment on technicians.site_id."""
+        site_code = self._resolve_site_code(site_id)
+        result = (
+            self.client.table("technicians")
+            .select("id, name, email, phone, telegram_id, specialty, site_id")
+            .eq("site_id", site_code)
+            .eq("active", True)
+            .order("name")
+            .execute()
+        )
+        rows = result.data or []
+        if not rows:
+            return None
+
+        selected = next((row for row in rows if row.get("specialty") == specialty), None)
+        if selected is None and specialty != "general":
+            selected = next((row for row in rows if row.get("specialty") == "general"), None)
+        if selected is None:
+            selected = rows[0]
+
+        return {
+            "id": selected.get("id"),
+            "name": selected.get("name"),
+            "email": selected.get("email"),
+            "phone": selected.get("phone"),
+            "telegram_id": selected.get("telegram_id"),
+            "specialty": selected.get("specialty") or specialty,
+        }
 
     async def get_all_technicians(self, active_only: bool = True) -> list[dict[str, Any]]:
         """Get all technicians."""

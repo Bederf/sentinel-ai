@@ -224,7 +224,7 @@ Load shedding events corrupt energy baseline data (genset running ≠ normal ope
 
 **Sync pipeline:** `Site002DataFetcher.run_full_sync()` fetches all IPMVP endpoints from the bridge and upserts into dedicated `ipmvp_*` Supabase tables. Runs hourly via APScheduler. Rolling 7-day retention — older data auto-purged on each sync.
 
-Bridge auth: `BRIDGE_API_TOKEN` env var (falls back to `BRIDGE_API_TOKEN_SITE002`); base URL from `BRIDGE_BASE_URL`.
+Bridge auth uses site-scoped bridge secrets. Prefer `BRIDGE_API_TOKEN_SITE_002` for Site 002; `BRIDGE_API_TOKEN` is legacy fallback only. Base URL comes from `BRIDGE_BASE_URL`.
 
 ---
 

@@ -97,7 +97,7 @@ X-Sentry-Secret: sentry-bms-phase-41
 
 ```json
 {
-  "equipment_code": "S002-FCU-301",
+  "equipment_code": "S002-FCU-201",
   "work_order_code": "WO-2026-0030",
   "technician_name": "John Smith",
   "telegram_user_id": "8359288792",
@@ -128,7 +128,7 @@ X-Sentry-Secret: sentry-bms-phase-41
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `equipment_code` | string | Yes | Equipment code (e.g., `S002-FCU-301`) |
+| `equipment_code` | string | Yes | Equipment code (e.g., `S002-FCU-201`) |
 | `work_order_code` | string | Yes | Work order code (e.g., `WO-2026-0030`) |
 | `technician_name` | string | Yes | Technician who performed inspection |
 | `telegram_user_id` | string | No | Telegram user ID for audit provenance |
@@ -152,7 +152,7 @@ X-Sentry-Secret: sentry-bms-phase-41
   "success": true,
   "inspection_id": "a1b2c3d4-...",
   "task_id": "e5f6g7h8-...",
-  "equipment_code": "S002-FCU-301",
+  "equipment_code": "S002-FCU-201",
   "work_order_code": "WO-2026-0030",
   "overall_status": "fail",
   "deficiencies_found": 2,

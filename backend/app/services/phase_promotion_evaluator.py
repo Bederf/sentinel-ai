@@ -467,7 +467,9 @@ class PhasePromotionEvaluator:
                 if cfg_rows.data:
                     cc = cfg_rows.data[0]["connection_config"]
                     base_url = cc.get("base_url", "")
-                    token = cc.get("token", "")
+                    from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+                    token = resolve_site_bridge_token(site_id, cc)
                     resp = httpx.get(
                         f"{base_url}/api/sites/{site_id}/health",
                         headers={"Authorization": f"Bearer {token}"},
@@ -614,7 +616,9 @@ class PhasePromotionEvaluator:
                     if not base_url:
                         continue
                     checked.append("bridge")
-                    token = str(config.get("token") or "")
+                    from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+                    token = resolve_site_bridge_token(site_id, config)
                     headers = {"Authorization": f"Bearer {token}"} if token else {}
                     resp = httpx.options(
                         f"{base_url}/api/sites/{site_id}/write",

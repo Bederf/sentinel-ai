@@ -13,15 +13,32 @@ Endpoints:
 - GET  /api/occupancy/control/history       — audit trail from Supabase
 """
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_query_site_access
-from app.services.occupancy_profile_service import calculate_zone_occupancy
 
 router = APIRouter(prefix="/occupancy/analytics", tags=["occupancy-analytics"])
 control_router = APIRouter(prefix="/occupancy/control", tags=["occupancy-control"])
+
+
+def _empty_live_response(site_id: str, reason: str) -> dict:
+    return {
+        "site_id": site_id,
+        "data_source": "live",
+        "data_available": False,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "reason": reason,
+        "note": "Static/simulated occupancy analytics are disabled. Only live site telemetry is used.",
+    }
+
+
+def _canonical_site_id(site_id: str) -> str:
+    if site_id.upper().startswith("S") and site_id[1:].isdigit():
+        return f"site-{site_id[1:]}"
+    return site_id
 
 
 @router.get("/hourly-trend")
@@ -29,79 +46,65 @@ async def get_hourly_occupancy_trend(
     site_id: str = Query(..., description="Building ID"),
     days: int = Query(1, ge=1, le=30, description="Number of days to return (1-30)"),
 ):
-    """
-    Get hourly occupancy trend for the building.
+    """Get hourly occupancy trend from live site telemetry only."""
+    canonical_site_id = _canonical_site_id(site_id)
+    since = datetime.now(UTC) - timedelta(days=days)
+    client = get_supabase_client()
+    response = (
+        client.table("equipment_sensor_readings")
+        .select("sensor_type,value,recorded_at")
+        .eq("site_id", canonical_site_id)
+        .in_("sensor_type", ["total_occupancy", "occupied_zones", "zone_count"])
+        .gte("recorded_at", since.isoformat())
+        .order("recorded_at", desc=False)
+        .limit(5000)
+        .execute()
+    )
+    rows = response.data or []
+    if not rows:
+        return _empty_live_response(
+            canonical_site_id, "No live occupancy telemetry rows found for the requested period."
+        )
 
-    Returns occupancy percentage per hour for each zone type.
-    Data is generated based on time-of-day heuristics (Phase 4).
+    buckets: dict[str, dict[str, list[float]]] = {}
+    for row in rows:
+        try:
+            recorded = datetime.fromisoformat(str(row["recorded_at"]).replace("Z", "+00:00"))
+            hour_key = recorded.replace(minute=0, second=0, microsecond=0).isoformat()
+            buckets.setdefault(hour_key, {}).setdefault(row["sensor_type"], []).append(float(row["value"]))
+        except (KeyError, TypeError, ValueError):
+            continue
 
-    Args:
-        site_id: Building ID (e.g., 'site-002' or registered building code)
-        days: Number of days of historical data (1, 7, 30)
-
-    Returns:
-        {
-            "site_id": "<building-id>",
-            "days": 7,
-            "hours": [0, 1, 2, ..., 23],
-            "zones": {
-                "office": [occupancy_percent_per_hour],
-                "meeting": [...],
-                "common": [...],
-                "utility": [...],
-                "entry": [...]
-            },
-            "daily_pattern": {
-                "peak_hours": [9, 10, 11, 14, 15, 16],
-                "offpeak_hours": [0-8, 17-23],
-                "peak_avg_occupancy": 75,
-                "offpeak_avg_occupancy": 15
+    trend = []
+    for hour_key, values in sorted(buckets.items()):
+        avg_occupied_zones = sum(values.get("occupied_zones", [])) / len(values.get("occupied_zones", [1]))
+        avg_zone_count = sum(values.get("zone_count", [])) / len(values.get("zone_count", [1]))
+        avg_total_occupancy = sum(values.get("total_occupancy", [])) / len(values.get("total_occupancy", [1]))
+        occupancy_percent = (avg_occupied_zones / avg_zone_count * 100) if avg_zone_count else None
+        trend.append(
+            {
+                "hour": hour_key,
+                "occupancy_percent": round(occupancy_percent, 1) if occupancy_percent is not None else None,
+                "total_occupancy": round(avg_total_occupancy, 1),
+                "occupied_zones": round(avg_occupied_zones, 1),
+                "zone_count": round(avg_zone_count, 1),
             }
-        }
-    """
-    # Generate hourly data (24 hours)
-    hours = list(range(24))
+        )
 
-    # Use same occupancy heuristics as Phase 4
-    # Generate data for each zone type
-    zone_types = ["office", "meeting", "common", "utility", "entry"]
-    zones_data = {}
-
-    for zone_type in zone_types:
-        occupancy_by_hour = []
-        for hour in hours:
-            # Weekday pattern (use Monday as reference)
-            occupancy_percent = calculate_zone_occupancy(
-                hour=hour,
-                day_of_week=0,  # Monday
-                is_weekend=False,
-                zone_type=zone_type,
-            )
-            occupancy_by_hour.append(round(occupancy_percent, 1))
-
-        zones_data[zone_type] = occupancy_by_hour
-
-    # Calculate peak hours (based on office/meeting zones)
-    office_occupancy = zones_data["office"]
-    peak_threshold = 70  # 70% occupancy
-    peak_hours = [h for h, occ in enumerate(office_occupancy) if occ >= peak_threshold]
-    offpeak_hours = [h for h, occ in enumerate(office_occupancy) if occ < peak_threshold]
-
-    peak_avg = sum(office_occupancy[h] for h in peak_hours) / len(peak_hours) if peak_hours else 0
-    offpeak_avg = sum(office_occupancy[h] for h in offpeak_hours) / len(offpeak_hours) if offpeak_hours else 0
-
+    occupancies = [row["occupancy_percent"] for row in trend if row["occupancy_percent"] is not None]
+    peak_threshold = 70.0
+    peak_hours = [row["hour"] for row in trend if float(row["occupancy_percent"] or 0) >= peak_threshold]
     return {
-        "site_id": site_id,
+        "site_id": canonical_site_id,
+        "data_source": "live",
+        "data_available": True,
         "days": days,
-        "timestamp": datetime.now().isoformat(),
-        "hours": hours,
-        "zones": zones_data,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "trend": trend,
         "daily_pattern": {
             "peak_hours": peak_hours,
-            "offpeak_hours": offpeak_hours,
-            "peak_avg_occupancy": round(peak_avg, 1),
-            "offpeak_avg_occupancy": round(offpeak_avg, 1),
-            "peak_hours_text": f"{min(peak_hours)}:00-{max(peak_hours) + 1}:00" if peak_hours else "N/A",
+            "peak_avg_occupancy": round(sum(occupancies) / len(occupancies), 1) if occupancies else None,
+            "offpeak_avg_occupancy": None,
         },
     }
 
@@ -111,143 +114,65 @@ async def get_zone_utilization(
     site_id: str = Query(..., description="Building ID"),
     _auth=Depends(require_query_site_access("site_id")),
 ):
-    """
-    Get current zone utilization metrics.
+    """Get current zone utilization from live lighting/PIR telemetry only."""
+    from app.services.lighting_service import get_lighting_service
 
-    Returns current occupancy as percentage of max capacity for each zone.
+    canonical_site_id = _canonical_site_id(site_id)
+    live_data = await get_lighting_service().get_live_lighting_data(canonical_site_id)
+    zones = live_data.get("zones") or []
+    if not zones:
+        return _empty_live_response(canonical_site_id, live_data.get("error") or "No live zone occupancy rows found.")
 
-    Args:
-        site_id: Building ID
-
-    Returns:
+    zone_rows = [
         {
-            "site_id": "<building-id>",
-            "timestamp": "2026-02-16T14:30:00Z",
-            "zones": [
-                {
-                    "zone_id": "zone-1",
-                    "zone_name": "Reception",
-                    "floor": 0,
-                    "max_occupancy": 6,
-                    "current_occupancy": 3,
-                    "utilization_percent": 50,
-                    "status": "normal"  // "empty" | "normal" | "crowded" | "over_capacity"
-                },
-                ...
-            ]
+            "zone_id": zone.get("zone_id"),
+            "utilization_percent": zone.get("occupancy_percent"),
+            "total_sensors": zone.get("total_sensors"),
+            "occupied_sensors": zone.get("occupied_sensors"),
+            "current_occupancy": None,
+            "status": "occupied" if (zone.get("occupied_sensors") or 0) > 0 else "empty",
+            "last_updated": zone.get("last_updated"),
         }
-    """
-    # Simulate current occupancy (would use database in production)
-    now = datetime.now()
-    hour = now.hour
-    day_of_week = now.weekday()
-    is_weekend = day_of_week >= 5
-
-    # Zone configurations (from zone_display_mappings)
-    zones_config = [
-        {"zone_id": "zone-1", "zone_name": "Reception", "floor": 0, "max_occupancy": 6, "type": "entry"},
-        {"zone_id": "zone-2", "zone_name": "Workspace-A", "floor": 0, "max_occupancy": 20, "type": "office"},
-        {"zone_id": "zone-4", "zone_name": "Common", "floor": 0, "max_occupancy": 8, "type": "common"},
-        {"zone_id": "zone-5", "zone_name": "Utility", "floor": 0, "max_occupancy": 2, "type": "utility"},
-        {"zone_id": "zone-3", "zone_name": "Meeting-1", "floor": 1, "max_occupancy": 10, "type": "meeting"},
-        {"zone_id": "zone-6", "zone_name": "Meeting-2", "floor": 1, "max_occupancy": 8, "type": "meeting"},
-        {"zone_id": "zone-7", "zone_name": "Kitchen", "floor": 1, "max_occupancy": 6, "type": "common"},
+        for zone in zones
     ]
-
-    zones_data = []
-
-    for zone in zones_config:
-        occupancy_percent = calculate_zone_occupancy(
-            hour=hour, day_of_week=day_of_week, is_weekend=is_weekend, zone_type=zone["type"]
-        )
-
-        current_occupancy = max(0, int(zone["max_occupancy"] * occupancy_percent / 100))
-
-        # Determine status
-        if current_occupancy == 0:
-            status = "empty"
-        elif current_occupancy >= zone["max_occupancy"]:
-            status = "over_capacity"
-        elif occupancy_percent >= 80:
-            status = "crowded"
-        else:
-            status = "normal"
-
-        zones_data.append(
-            {
-                "zone_id": zone["zone_id"],
-                "zone_name": zone["zone_name"],
-                "floor": zone["floor"],
-                "max_occupancy": zone["max_occupancy"],
-                "current_occupancy": current_occupancy,
-                "utilization_percent": round(occupancy_percent, 1),
-                "status": status,
-            }
-        )
-
+    percentages = [z["utilization_percent"] for z in zone_rows if z["utilization_percent"] is not None]
     return {
-        "site_id": site_id,
-        "timestamp": now.isoformat(),
-        "zones": zones_data,
-        "total_occupancy": sum(z["current_occupancy"] for z in zones_data),
-        "average_utilization_percent": round(sum(z["utilization_percent"] for z in zones_data) / len(zones_data), 1),
+        "site_id": canonical_site_id,
+        "data_source": "live",
+        "data_available": True,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "zones": zone_rows,
+        "total_occupancy": None,
+        "average_utilization_percent": round(sum(percentages) / len(percentages), 1) if percentages else None,
+        "note": "Zone utilization is PIR/lighting sensor utilization, not people count.",
     }
 
 
 @router.get("/peak-hours")
 async def get_peak_hours(site_id: str = Query(..., description="Building ID")):
-    """
-    Get peak hour analysis for the building.
-
-    Peak hours are identified as times when occupancy exceeds 70%.
-
-    Returns:
-        {
-            "site_id": "<building-id>",
-            "peak_hours": [9, 10, 11, 14, 15, 16],
-            "offpeak_hours": [0-8, 17-23],
-            "peak_occupancy_avg": 82,
-            "offpeak_occupancy_avg": 18,
-            "recommendations": [
-                "Increase HVAC capacity during peak hours (9-5pm)",
-                "Schedule cleaning during offpeak hours (after 6pm)",
-                "Optimize lighting: reduce in low-occupancy hours"
-            ]
-        }
-    """
-    # Get hourly trend to analyze peaks
+    """Get peak-hour analysis from live hourly occupancy telemetry only."""
     trend_response = await get_hourly_occupancy_trend(site_id=site_id, days=1)
+    if not trend_response.get("data_available"):
+        return trend_response
 
-    peak_hours = trend_response["daily_pattern"]["peak_hours"]
-    offpeak_hours = trend_response["daily_pattern"]["offpeak_hours"]
-    peak_avg = trend_response["daily_pattern"]["peak_avg_occupancy"]
-    offpeak_avg = trend_response["daily_pattern"]["offpeak_avg_occupancy"]
-
-    # Generate recommendations based on peak pattern
-    recommendations = []
-
-    if peak_hours:
-        peak_hours_str = f"{min(peak_hours)}:00-{max(peak_hours) + 1}:00"
-        recommendations.append(f"Peak occupancy {peak_hours_str} ({peak_avg}% avg) - optimize HVAC/lighting")
-
-    if offpeak_avg < 20:
-        recommendations.append("Low occupancy during offpeak (turn off lights, reduce HVAC)")
-
-    if peak_avg > 85:
-        recommendations.append("High peak occupancy - consider staggered schedules")
-
-    recommendations.append("Schedule maintenance during lowest occupancy hours (nights/weekends)")
+    trend = trend_response.get("trend") or []
+    occupancies = [row for row in trend if row.get("occupancy_percent") is not None]
+    peak_rows = [row for row in occupancies if row["occupancy_percent"] >= 70]
+    offpeak_rows = [row for row in occupancies if row["occupancy_percent"] < 70]
+    peak_avg = sum(row["occupancy_percent"] for row in peak_rows) / len(peak_rows) if peak_rows else 0
+    offpeak_avg = sum(row["occupancy_percent"] for row in offpeak_rows) / len(offpeak_rows) if offpeak_rows else 0
 
     return {
-        "site_id": site_id,
-        "timestamp": datetime.now().isoformat(),
-        "peak_hours": peak_hours,
-        "offpeak_hours": offpeak_hours,
+        "site_id": trend_response["site_id"],
+        "data_source": "live",
+        "data_available": True,
+        "timestamp": datetime.now(UTC).isoformat(),
+        "peak_hours": [row["hour"] for row in peak_rows],
+        "offpeak_hours": [row["hour"] for row in offpeak_rows],
         "peak_occupancy_avg": round(peak_avg, 1),
         "offpeak_occupancy_avg": round(offpeak_avg, 1),
         "occupancy_differential": round(peak_avg - offpeak_avg, 1),
-        "peak_hours_text": f"{min(peak_hours):02d}:00-{max(peak_hours) + 1:02d}:00" if peak_hours else "N/A",
-        "recommendations": recommendations,
+        "recommendations": [],
     }
 
 
@@ -262,7 +187,7 @@ async def trigger_occupancy_control(
 ):
     """Manually trigger one occupancy control cycle.
 
-    Reads DALI PIR + badge occupancy for every zone, adjusts HVAC setpoints
+    Reads live PIR/lighting and security occupancy for every zone, adjusts HVAC setpoints
     and lighting brightness accordingly, and logs actions to
     ``occupancy_control_actions`` in Supabase.
 

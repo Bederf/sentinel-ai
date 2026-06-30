@@ -86,8 +86,8 @@ Primary creation path used by slash commands and Claude tool.
 **Request:**
 ```json
 {
-  "equipment_code": "S002-FCU-301",
-  "title": "Work order for S002-FCU-301",
+  "equipment_code": "S002-FCU-201",
+  "title": "Work order for S002-FCU-201",
   "description": "Filter replacement needed - high differential pressure",
   "priority": "medium",
   "created_by": "web-chat"
@@ -99,7 +99,7 @@ Primary creation path used by slash commands and Claude tool.
 {
   "success": true,
   "code": "WO-20260302-A1B2C3D4",
-  "equipment_code": "S002-FCU-301",
+  "equipment_code": "S002-FCU-201",
   "assigned_to": "Mike Johnson",
   "technician_email": "mike@example.com",
   "priority": "medium",

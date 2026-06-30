@@ -501,7 +501,9 @@ def _sync_bridge_policy_stage(client, site_id: str, phase: str) -> bool:
         return False
     config = rows.data[0].get("connection_config") or {}
     base_url = str(config.get("base_url") or "").rstrip("/")
-    token = str(config.get("token") or "")
+    from app.services.shadow_mode_polling import resolve_site_bridge_token
+
+    token = resolve_site_bridge_token(site_id, config)
     if not base_url or not token:
         return False
 

@@ -28,7 +28,7 @@ class WasteOpportunity:
     confidence: float
     description: str  # human-readable, injected into prompt
     estimated_saving_kwh: float | None = None
-    occupancy_source: str = "bridge"  # 'bridge' | 'schedule' | 'sensor'
+    occupancy_source: str = "bridge"  # 'bridge' | 'sensor'
 
 
 @dataclass
@@ -47,7 +47,7 @@ class _ZoneState:
     # FCU state
     fcu_inferred_running: bool = False
     # Occupancy source
-    occupancy_source: str = "bridge"  # 'bridge' | 'schedule' | 'sensor'
+    occupancy_source: str = "bridge"  # 'bridge' | 'sensor'
 
 
 class InMemoryBackend:
@@ -116,8 +116,8 @@ class FCUStateTracker:
         - FCU running state (inferred from temp delta vs setpoint)
         - Temperature trend for FCU inference
 
-        When the bridge returns occupancy_pct=0.0 (i.e. no sensor data),
-        falls back to schedule-based occupancy from OccupancyProfileService.
+        Occupancy is taken from the live poll result only. No schedule/profile
+        fallback is applied because that would turn missing data into fake data.
         """
         if timestamp is None:
             timestamp = datetime.now(tz=UTC)
@@ -125,30 +125,10 @@ class FCUStateTracker:
         prev = self._backend.get_state(zone_id)
         prev_temp = prev.room_temp_c if prev else None
 
-        # ── Occupancy resolution ──────────────────────────────────────────
-        # Bridge returns 0.0 when no sensor data — fall back to schedule
         effective_occupancy = occupancy_pct
         occupancy_source = "bridge"
-        if occupancy_pct == 0.0 and self._zone_type_resolver:
-            zone_type = self._zone_type_resolver(zone_id)
-            if zone_type:
-                from app.services.occupancy_profile_service import (
-                    calculate_zone_occupancy,
-                )
 
-                is_weekend = timestamp.weekday() >= 5
-                scheduled = calculate_zone_occupancy(
-                    hour=timestamp.hour,
-                    day_of_week=timestamp.weekday(),
-                    is_weekend=is_weekend,
-                    zone_type=zone_type,
-                )
-                effective_occupancy = scheduled
-                occupancy_source = "schedule"
-                logger.debug(f"[FCU-TRACKER] {zone_id} occupancy={scheduled:.0f}% (schedule, zone_type={zone_type})")
-
-        # Occupancy threshold: schedule floors at 5% for all types.
-        # Treat <= 5% as "empty" and > 5% as "occupied" to match schedule semantics.
+        # Treat <= 5% as "empty" and > 5% as "occupied" for noisy live PIR/zone percentages.
         EMPTY_THRESHOLD = 5.0
 
         # Detect transition: occupied → empty
@@ -219,8 +199,6 @@ class FCUStateTracker:
             else:
                 confidence = 0.65
 
-            # Build occupancy source note for description
-            occ_note = "schedule shows empty" if state.occupancy_source == "schedule" else "empty"
             opportunities.append(
                 WasteOpportunity(
                     equipment_id=equip_id,
@@ -229,7 +207,7 @@ class FCUStateTracker:
                     minutes_elapsed=round(elapsed, 1),
                     confidence=confidence,
                     description=(
-                        f"Zone {zone_id} {occ_note} since {state.occupancy_end_time.strftime('%H:%M')}, "
+                        f"Zone {zone_id} empty since {state.occupancy_end_time.strftime('%H:%M')}, "
                         f"FCU still running {elapsed:.0f} min (threshold: {threshold_min} min, "
                         f"profile: {self._active_profile})"
                     ),

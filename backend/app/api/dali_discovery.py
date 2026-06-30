@@ -5,11 +5,7 @@ import os
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
-from app.services.dali_discovery_service import (
-    DALIDiscoveryService,
-    SimulatedDALIDiscovery,
-)
+from app.services.dali_discovery_service import DALIDiscoveryService
 
 router = APIRouter()
 
@@ -34,15 +30,6 @@ class DiscoverLineRequest(BaseModel):
     dali_line: int = Field(1, ge=1, le=4, description="DALI line number")
     username: str | None = None
     password: str | None = None
-
-
-class SeededDiscoveryRequest(BaseModel):
-    """Request for seeded discovery metadata."""
-
-    equipment_code: str = Field(..., description="Equipment code to update")
-    device_type: str = Field("led_panel", description="Device type: led_panel, led_downlight, emergency")
-    dali_address: int = Field(1, ge=0, le=63, description="Simulated DALI address")
-    save_to_db: bool = Field(True, description="Save to equipment metadata")
 
 
 def _get_gateway_ip(provided_ip: str | None) -> str:
@@ -110,12 +97,7 @@ async def discover_device(request: DiscoverDeviceRequest) -> dict:
     try:
         ip = _get_gateway_ip(request.gateway_ip)
     except HTTPException:
-        return await _simulated_discovery(
-            request.equipment_code,
-            "led_panel",
-            request.dali_address or 1,
-            save_to_db=True,
-        )
+        raise HTTPException(status_code=503, detail="No live DALI gateway configured")
 
     service = DALIDiscoveryService(
         gateway_ip=ip,
@@ -178,63 +160,13 @@ async def discover_line(request: DiscoverLineRequest) -> dict:
     }
 
 
-@router.post("/dali/discover/seeded")
-async def discover_seeded(request: SeededDiscoveryRequest) -> dict:
-    """Generate seeded DALI discovery data for non-production testing.
-
-    Creates realistic device metadata without requiring a physical
-    DALI gateway. Useful for demos and development.
-
-    Args:
-        request: Simulated discovery parameters
-
-    Returns:
-        Generated device info
-    """
-    return await _simulated_discovery(
-        request.equipment_code, request.device_type, request.dali_address, request.save_to_db
-    )
-
-
-async def _simulated_discovery(equipment_code: str, device_type: str, dali_address: int, save_to_db: bool) -> dict:
-    """Internal seeded discovery helper."""
-    data = SimulatedDALIDiscovery.generate_device_info(
-        equipment_code=equipment_code, device_type=device_type, dali_address=dali_address
-    )
-
-    result = {
-        "status": "simulated",
-        "equipment_code": equipment_code,
-        "message": "Using seeded discovery data (no gateway connected)",
-        "network_info": data["network_info"],
-        "device_info": data["device_info"],
-        "operating_data": data["operating_data"],
-        "saved": False,
-    }
-
-    if save_to_db:
-        try:
-            repo = EquipmentMetadataRepository()
-            repo.update_from_discovery(
-                equipment_id=equipment_code,
-                network_info=data["network_info"],
-                device_info=data["device_info"],
-                operating_data=data["operating_data"],
-            )
-            result["saved"] = True
-        except Exception as e:
-            result["save_error"] = str(e)
-
-    return result
-
-
 @router.post("/dali/discover/bulk")
 async def discover_bulk(
     equipment_codes: list[str],
     gateway_ip: str | None = Query(None),
     gateway_type: str = Query("tridonic"),
     dali_line: int = Query(1, ge=1, le=4),
-    use_simulated: bool = Query(False, description="Use simulated data if gateway unavailable"),
+    use_simulated: bool = Query(False, description="Deprecated. Simulated discovery is disabled."),
 ) -> dict:
     """Bulk discover multiple DALI devices.
 
@@ -246,13 +178,15 @@ async def discover_bulk(
         gateway_ip: DALI gateway IP
         gateway_type: Gateway type
         dali_line: DALI line number
-        use_simulated: Fall back to simulated data if gateway unavailable
+        use_simulated: Deprecated. Simulated discovery is disabled.
 
     Returns:
         Results for each equipment code
     """
     results = []
     errors = []
+    if use_simulated:
+        raise HTTPException(status_code=400, detail="Simulated discovery is disabled; live site telemetry only.")
 
     # Check if gateway is available
     gateway_available = False
@@ -272,13 +206,11 @@ async def discover_bulk(
                     dali_line=dali_line,
                     dali_address=i + 1,  # Assign sequential addresses
                 )
-            elif use_simulated:
-                result = await _simulated_discovery(code, "led_panel", i + 1, save_to_db=True)
             else:
                 result = {
                     "equipment_code": code,
                     "status": "skipped",
-                    "reason": "Gateway unavailable and simulated mode disabled",
+                    "reason": "Live gateway unavailable; simulated discovery is disabled",
                 }
 
             results.append(result)

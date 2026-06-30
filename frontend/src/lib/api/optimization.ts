@@ -56,6 +56,39 @@ export interface Outcome {
   accuracy: number
 }
 
+export interface RecommendationAuditEvent {
+  id: string
+  recommendation_id?: string | null
+  linked_recommendation_id?: string | null
+  site_id: string
+  event_track: 'lifecycle' | 'system_quality'
+  event_type: string
+  quality_exception_type?: string | null
+  actor_type: string
+  actor_id?: string | null
+  detected_by?: string | null
+  source: string
+  previous_state: Record<string, unknown>
+  new_state: Record<string, unknown>
+  metadata: Record<string, unknown>
+  occurred_at: string
+}
+
+export interface RecommendationManagerExceptions {
+  success: boolean
+  site_id: string
+  stale_hours: number
+  stale_unactioned: Recommendation[]
+  approved_without_wo: Recommendation[]
+  system_quality_exceptions: RecommendationAuditEvent[]
+  counts: {
+    stale_unactioned: number
+    approved_without_wo: number
+    system_quality_exceptions: number
+  }
+  surfaces?: string[]
+}
+
 export const optimizationApi = {
   // Profiles
   getProfileSettings: (siteId: string) =>
@@ -98,6 +131,19 @@ export const optimizationApi = {
       `/api/recommendations/history/${siteId}`,
       { method: 'POST', body: JSON.stringify(filters) }
     ),
+
+  getManagerExceptions: (
+    siteId: string,
+    options: { staleHours?: number; limit?: number } = {}
+  ) => {
+    const params = new URLSearchParams()
+    if (options.staleHours) params.set('stale_hours', String(options.staleHours))
+    if (options.limit) params.set('limit', String(options.limit))
+    const query = params.toString()
+    return fetchApi<RecommendationManagerExceptions>(
+      `/api/recommendations/${siteId}/manager-exceptions${query ? `?${query}` : ''}`
+    )
+  },
 
   // Use approvalsApi for actual approval workflow (Tier 2)
   // These are deprecated - use approvalsApi.approveRecommendation instead

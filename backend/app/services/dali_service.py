@@ -3,14 +3,12 @@ DALI Lighting Service
 =====================
 Multi-site DALI lighting data access with pluggable data sources.
 
-Supports two source types per site:
-- "json": Reads from static JSON mock data files (e.g. site-002)
-- "niagara": Reads from DeviceManager (Niagara-discovered DALI devices)
+Supports live Supabase reads for telemetry. Legacy JSON fixtures can only be
+loaded when a site explicitly configures a JSON file.
 """
 
 import json
 import logging
-import random
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -38,7 +36,7 @@ class SiteDALIData:
 class DALIService:
     """Service for DALI lighting system data access.
 
-    Supports multiple sites, each with its own data source (JSON or Niagara).
+    Supports multiple sites, each with its own explicitly configured source.
     """
 
     # Floor code to display name mapping
@@ -54,7 +52,7 @@ class DALIService:
     def __init__(self):
         self._sites_data: dict[str, SiteDALIData] = {}
         self._sources_config = self._load_sources_config()
-        # Load JSON-backed sites at startup
+        # Load only explicitly configured JSON-backed sites at startup.
         for site_id, config in self._sources_config.get("sites", {}).items():
             if config.get("source") == "json":
                 self._load_json_site(site_id, config)
@@ -71,7 +69,7 @@ class DALIService:
         if path.exists():
             with open(path) as f:
                 return json.load(f)
-        return {"sites": {}, "default_source": "json"}
+        return {"sites": {}, "default_source": "live"}
 
     def _save_sources_config(self):
         """Persist source configuration to disk."""
@@ -80,11 +78,14 @@ class DALIService:
             json.dump(self._sources_config, f, indent=2)
             f.write("\n")
 
-    # === JSON Data Loading (existing behaviour) ===
+    # === Explicit JSON Fixture Loading ===
 
     def _load_json_site(self, site_id: str, config: dict):
-        """Load DALI data for a site from a JSON file."""
-        json_file = config.get("json_file", "dali_mock_data.json")
+        """Load DALI data for a site from an explicitly configured JSON file."""
+        json_file = config.get("json_file")
+        if not json_file:
+            logger.warning("Skipping JSON DALI source for %s: json_file is required", site_id)
+            return
         data_path = Path(__file__).parent.parent / "data" / json_file
         if not data_path.exists():
             logger.debug("DALI JSON data not found at %s for site %s", data_path, site_id)
@@ -708,18 +709,6 @@ class DALIService:
                 }
             )
         return results
-
-    # === Seeded occupancy changes ===
-
-    def simulate_occupancy_change(self):
-        """Simulate realistic occupancy changes for local seeded operation."""
-        for site_data in self._sites_data.values():
-            for sensor in site_data.sensors.values():
-                if random.random() < 0.1:
-                    sensor.occupancy = not sensor.occupancy
-                if sensor.has_daylight:
-                    sensor.lux_level = max(0, min(2000, sensor.lux_level + random.uniform(-50, 50)))
-                sensor.last_updated = datetime.now().isoformat()
 
     async def get_live_dali_data(self, site_id: str) -> dict:
         """

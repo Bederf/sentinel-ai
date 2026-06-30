@@ -24,6 +24,12 @@ class EnergySnapshot:
     # Optional extensions for multi-inverter and Pylontech battery temp
     pv_powers: list[float] | None = None  # per-inverter PV power list when available
     battery_temp_c: float | None = None  # battery temperature (C) when available
+    # Tuya/residential appliance fields (None for non-appliance platforms)
+    appliance_power_state: str | None = None  # "on" | "off" | None
+    appliance_target_temp_c: float | None = None
+    appliance_current_temp_c: float | None = None
+    appliance_mode: str | None = None
+    appliance_runtime_minutes: int | None = None
 
 
 @dataclass

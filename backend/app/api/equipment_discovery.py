@@ -12,10 +12,9 @@ import os
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from app.database.repositories.equipment_metadata_repository import EquipmentMetadataRepository
-from app.services.bacnet_discovery_service import BACnetDiscoveryService, SimulatedBACnetDiscovery
-from app.services.lighting_discovery_service import LightingDiscoveryService, SimulatedLightingDiscovery
-from app.services.modbus_discovery_service import ModbusDiscoveryService, SimulatedModbusDiscovery
+from app.services.bacnet_discovery_service import BACnetDiscoveryService
+from app.services.lighting_discovery_service import LightingDiscoveryService
+from app.services.modbus_discovery_service import ModbusDiscoveryService
 
 router = APIRouter()
 
@@ -43,14 +42,14 @@ class UnifiedDiscoveryRequest(BaseModel):
     modbus_unit_id: int | None = Field(1, ge=1, le=247, description="Modbus unit/slave ID")
 
     # Options
-    use_simulated: bool = Field(False, description="Use simulated data if real discovery fails")
+    use_simulated: bool = Field(False, description="Deprecated. Simulated discovery is disabled in live mode.")
 
 
 class BulkDiscoveryRequest(BaseModel):
     """Request for bulk discovery of multiple equipment."""
 
     equipment_list: list[dict] = Field(..., description="List of equipment with code and protocol info")
-    use_simulated: bool = Field(True, description="Use simulated data for unreachable devices")
+    use_simulated: bool = Field(False, description="Deprecated. Simulated discovery is disabled in live mode.")
 
 
 @router.post("/equipment/discover")
@@ -58,7 +57,7 @@ async def discover_equipment(request: UnifiedDiscoveryRequest) -> dict:
     """Discover equipment information using appropriate protocol.
 
     Automatically selects the right discovery method based on protocol
-    and equipment type. Falls back to simulated data if requested.
+    and equipment type. Does not fall back to simulated data.
 
     Args:
         request: Discovery request with equipment and protocol details
@@ -77,6 +76,8 @@ async def discover_equipment(request: UnifiedDiscoveryRequest) -> dict:
     }
 
     protocol = request.protocol.lower()
+    if request.use_simulated:
+        raise HTTPException(status_code=400, detail="Simulated discovery is disabled; live site telemetry only.")
 
     # Auto-detect protocol from equipment code
     if protocol == "auto":
@@ -96,25 +97,6 @@ async def discover_equipment(request: UnifiedDiscoveryRequest) -> dict:
         if data:
             result.update(data)
             result["status"] = "success" if data.get("saved") else "discovered"
-        elif request.use_simulated:
-            # Fall back to simulated
-            data = _get_simulated_data(request.equipment_code, protocol, request.equipment_type)
-            result.update(data)
-            result["status"] = "simulated"
-
-            # Save simulated data
-            if data:
-                try:
-                    repo = EquipmentMetadataRepository()
-                    repo.update_from_discovery(
-                        equipment_id=request.equipment_code,
-                        network_info=data.get("network_info"),
-                        device_info=data.get("device_info"),
-                        operating_data=data.get("operating_data"),
-                    )
-                    result["saved"] = True
-                except Exception as e:
-                    result["save_error"] = str(e)
         else:
             result["status"] = "not_found"
 
@@ -180,7 +162,8 @@ async def bulk_discover_equipment(request: BulkDiscoveryRequest) -> dict:
 
 @router.get("/equipment/{equipment_code}/discover")
 async def auto_discover_equipment(
-    equipment_code: str, use_simulated: bool = Query(True, description="Use simulated data if real discovery fails")
+    equipment_code: str,
+    use_simulated: bool = Query(False, description="Deprecated. Simulated discovery is disabled in live mode."),
 ) -> dict:
     """Auto-discover equipment by code.
 
@@ -189,7 +172,7 @@ async def auto_discover_equipment(
 
     Args:
         equipment_code: Equipment code
-        use_simulated: Fall back to simulated data
+        use_simulated: Deprecated. Simulated discovery is disabled.
 
     Returns:
         Discovery result
@@ -350,47 +333,3 @@ async def _discover_modbus(request: UnifiedDiscoveryRequest) -> dict | None:
         }
 
     return None
-
-
-def _get_simulated_data(equipment_code: str, protocol: str, equipment_type: str | None) -> dict:
-    """Get simulated discovery data.
-
-    Args:
-        equipment_code: Equipment code
-        protocol: Protocol type
-        equipment_type: Equipment type
-
-    Returns:
-        Simulated data dict
-    """
-    eq_type = equipment_type or _detect_equipment_type(equipment_code)
-
-    if protocol == "dali":
-        device_type = "led_panel"
-        if "EMERG" in equipment_code.upper():
-            device_type = "emergency"
-        elif "DOWN" in equipment_code.upper():
-            device_type = "led_downlight"
-
-        return SimulatedLightingDiscovery.generate_device_info(
-            equipment_code=equipment_code,
-            device_type=device_type,
-            dali_address=1,
-        )
-
-    elif protocol == "modbus":
-        modbus_type = "generator"
-        if eq_type in ["ups", "ats", "meter"]:
-            modbus_type = eq_type
-
-        return SimulatedModbusDiscovery.generate_device_info(
-            equipment_code=equipment_code,
-            equipment_type=modbus_type,
-            unit_id=1,
-        )
-
-    else:  # bacnet
-        return SimulatedBACnetDiscovery.generate_device_info(
-            equipment_code=equipment_code,
-            equipment_type=eq_type,
-        )

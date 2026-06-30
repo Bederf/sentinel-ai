@@ -47,8 +47,6 @@ class PointMatcherService:
         r"^(FCU1[0-5])\.",
         # Pattern: FCU16–FCU20 bare (maps to L2 FCUs 201–205)
         r"^(FCU(?:1[6-9]|2[0-5]))\.",
-        # Pattern: FCU21–FCU39 bare (maps to L3 FCUs 221–305)
-        r"^(FCU(?:2[1-9]|[3-9]\d))\.",
         # Pattern: Simple AssetID.Parameter
         # CH-001.CHWST → CH-001  (must come AFTER FCU bare patterns to avoid false extraction)
         r"^([A-Z]+-\d+)\.",
@@ -79,12 +77,10 @@ class PointMatcherService:
     # G-zone: FCU01→001, FCU02→002, FCU03→003, FCU04→004, FCU05→005
     # L1-zone: FCU06→101, FCU07→102, ..., FCU15→105
     # L2-zone: FCU16→201, FCU17→202, ..., FCU20→205
-    # L3-zone: FCU21-25 → S002-FCU-301..305 (equipment table has 301-305)
     FCU_NORMALIZATION_RANGES = [
         (1, 5, "G", 0),  # FCU01-05 → S002-FCU-001..005
         (6, 15, "L1", 100),  # FCU06-15 → S002-FCU-101..105
         (16, 20, "L2", 200),  # FCU16-20 → S002-FCU-201..205
-        (21, 25, "L3", 300),  # FCU21-25 → S002-FCU-301..305
     ]
 
     # Parameter name patterns
@@ -186,7 +182,7 @@ class PointMatcherService:
                     # G-zone: 001..005 (padded to 3 digits, no zone letter)
                     return f"S002-FCU-{seq:03d}"
                 else:
-                    # L1→101..105, L2→201..205, L3→301..305
+                    # L1→101..105, L2→201..205. Higher FCU ranges are not tenant-scoped for Site 002.
                     return f"S002-FCU-{offset + seq}"
 
         return asset_id  # Unmapped FCU range

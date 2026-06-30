@@ -349,7 +349,7 @@ async def get_system_status(site_id: str | None = None) -> dict[str, Any]:
                 preds_by_equipment.setdefault(eq_id, []).append(p)
 
         # Build status response
-        status = {
+        status: dict[str, Any] = {
             "success": True,
             "site_id": site_id,
             "site_name": site_name,
@@ -1220,7 +1220,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
         building: Optional building code (defaults to the primary registered building).
 
     Returns:
-        Dictionary with desk info, zone, HVAC status, and DALI sensor data
+        Dictionary with desk info, zone, HVAC status, and lighting sensor data
     """
     try:
         import re
@@ -1304,15 +1304,15 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             zone_resp = client.table("zones").select("*").eq("site_id", site_uuid).eq("zone_id", zone_id).execute()
             zone = zone_resp.data[0] if zone_resp.data else None
 
-        # Get DALI/occupancy context
-        dali_context = {}
+        # Get lighting/occupancy context
+        lighting_context = {}
         try:
             from app.services.cross_system_analyzer import get_cross_system_analyzer
 
             analyzer = get_cross_system_analyzer()
             if zone_id:
                 zone_analysis = analyzer.dali.get_zone_analysis(zone_id)
-                dali_context = {
+                lighting_context = {
                     "occupancy_percent": zone_analysis.get("occupancy_percent", 0),
                     "avg_lux": zone_analysis.get("average_lux", 0),
                     "sensors_active": zone_analysis.get("occupied_count", 0),
@@ -1320,8 +1320,8 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
                     "high_daylight": zone_analysis.get("average_lux", 0) > 800,
                 }
         except Exception as e:
-            logger.warning(f"Could not get DALI context: {e}")
-            dali_context = {"available": False, "reason": calm_error_legacy(e, tool_name="lookup_desk")["error"]}
+            logger.warning(f"Could not get lighting context: {e}")
+            lighting_context = {"available": False, "reason": calm_error_legacy(e, tool_name="lookup_desk")["error"]}
 
         # Build response
         response = {
@@ -1339,7 +1339,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             },
             "zone": None,
             "hvac": None,
-            "dali": dali_context,
+            "lighting": lighting_context,
             "context_flags": [],
         }
 
@@ -1350,7 +1350,7 @@ async def lookup_desk(desk_id: str, building: str | None = None) -> dict[str, An
             response["context_flags"].append("NEAR_DIFFUSER - May experience direct airflow")
         if desk.get("near_printer"):
             response["context_flags"].append("NEAR_PRINTER - Local heat source")
-        if dali_context.get("high_daylight"):
+        if lighting_context.get("high_daylight"):
             response["context_flags"].append("HIGH_DAYLIGHT - Solar gain likely")
 
         # Add zone info with HVAC equipment
@@ -1504,7 +1504,7 @@ async def diagnose_comfort_complaint(
 
         zone = desk_info.get("zone", {}) or {}
         hvac = desk_info.get("hvac", {}) or {}
-        dali = desk_info.get("dali", {}) or {}
+        lighting = desk_info.get("lighting", {}) or {}
         desk = desk_info.get("desk", {}) or {}
 
         # Get ALL equipment status for this zone — use the site resolved from the desk
@@ -1550,7 +1550,7 @@ async def diagnose_comfort_complaint(
             "desk_info": desk,
             "zone_info": zone,
             "hvac_info": hvac,
-            "dali_info": dali,
+            "lighting_info": lighting,
             "readings": {
                 "temperature": current_temp,
                 "setpoint": setpoint,
@@ -1621,11 +1621,11 @@ async def diagnose_comfort_complaint(
                     f"Verify {vav_id} damper is open to increase airflow",
                     "Offer to relocate user to shaded desk",
                 ]
-            elif dali.get("high_daylight"):
-                diagnosis["root_cause"] = "High daylight/solar gain detected by DALI sensors"
+            elif lighting.get("high_daylight"):
+                diagnosis["root_cause"] = "High daylight/solar gain detected by lighting sensors"
                 diagnosis["confidence"] = "high"
                 diagnosis["diagnosis"] = (
-                    f"DALI sensors show {dali.get('avg_lux', 0)} lux at this location."
+                    f"Lighting sensors show {lighting.get('avg_lux', 0)} lux at this location."
                     f" Zone temp: {current_temp}°C. Direct sunlight causing heat gain."
                 )
                 diagnosis["suggested_actions"] = [
@@ -2329,11 +2329,13 @@ async def get_security_status() -> dict[str, Any]:
         Structured security system status report
     """
     try:
+        from app.services.occupancy_fusion_service import get_occupancy_fusion_service
         from app.services.security_occupancy_service import get_security_occupancy_service
         from app.services.security_service import get_security_service
 
         svc = get_security_service()
         occ_svc = get_security_occupancy_service()
+        fused_occupancy = await get_occupancy_fusion_service().get_fused_occupancy("site-002", force_refresh=True)
 
         status = svc.get_system_status()
         zones = svc.get_access_zones()
@@ -2396,6 +2398,25 @@ async def get_security_status() -> dict[str, Any]:
         else:
             sections.append(f"## Occupancy\nTotal: {building_occ.get('total_occupancy', 0)} people")
 
+        signal_lines = []
+        for name, signal in fused_occupancy.signals.items():
+            if signal.is_available:
+                signal_lines.append(
+                    f"  - {name}: {signal.normalized_pct:.0f}% "
+                    f"(confidence {signal.confidence:.2f}, age {signal.freshness_minutes:.1f} min)"
+                )
+        if signal_lines:
+            empty_state = (
+                "empty" if not fused_occupancy.is_occupied and fused_occupancy.may_suppress else "not safely empty"
+            )
+            sections.append(
+                "## Fused Occupancy Evidence\n"
+                f"- Verdict: {empty_state}\n"
+                f"- Occupancy estimate: {fused_occupancy.occupancy_percent:.0f}%\n"
+                f"- Confidence: {fused_occupancy.confidence:.2f}\n"
+                f"- Gate: {fused_occupancy.gate_override}\n" + "\n".join(signal_lines)
+            )
+
         return {
             "success": True,
             "report": "\n\n".join(sections),
@@ -2405,7 +2426,11 @@ async def get_security_status() -> dict[str, Any]:
             "cameras_total": status.cameras_total,
             "alarm_zones_armed": status.alarm_zones_armed,
             "active_alerts": status.active_alerts,
-            "occupancy_total": status.occupancy_total,
+            "occupancy_total": fused_occupancy.occupancy_count,
+            "occupancy_percent": fused_occupancy.occupancy_percent,
+            "occupancy_confidence": fused_occupancy.confidence,
+            "occupancy_uncertain": fused_occupancy.is_uncertain,
+            "may_suppress": fused_occupancy.may_suppress,
             "denied_events": len(denied),
             "after_hours_events": len(after_hours),
         }
@@ -2873,8 +2898,8 @@ CHAT_TOOLS = [
             " temperature, and sensor data. Use this when a"
             " technician reports a comfort complaint from a"
             " user at a specific desk. Returns zone info,"
-            " HVAC equipment IDs, and DALI sensor data"
-            " (Sandton has DALI integration). If the desk"
+            " HVAC equipment IDs, and lighting sensor data."
+            " If the desk"
             " isn't found, ask the technician for"
             " clarification."
         ),
@@ -2888,9 +2913,7 @@ CHAT_TOOLS = [
                 "building": {
                     "type": "string",
                     "description": (
-                        "Optional building name if working"
-                        " across multiple sites. For Sandton"
-                        " (which has DALI), this is automatic."
+                        "Optional building name if working across multiple sites. For Sandton, this is automatic."
                     ),
                 },
             },
@@ -2902,7 +2925,7 @@ CHAT_TOOLS = [
         "description": (
             "Diagnose a comfort complaint (too hot, too cold,"
             " stuffy, drafty) for a specific desk. Analyzes"
-            " desk location, HVAC zone, DALI sensors"
+            " desk location, HVAC zone, lighting sensors"
             " (occupancy, daylight), and context (near"
             " window, diffuser, printer) to determine root"
             " cause and suggest actions. Use this when a"

@@ -160,7 +160,7 @@ class Settings(BaseSettings):
     # Kept for backward compatibility with .env files.
     demo_mode: bool = False
     demo_allowed_origins: list[str] = []
-    ingestion_mode: str = "simulation"  # env: INGESTION_MODE
+    ingestion_mode: str = "shadow_live"  # env: INGESTION_MODE
 
     # Encryption at rest (Phase 1b FSR Compliance - Cryptography)
     encryption_enabled: bool = True
@@ -336,8 +336,8 @@ class Settings(BaseSettings):
     rlm_runner_enabled: bool = False  # Disabled until runner is deployed
     rlm_timeout_seconds: int = 120  # Max time per HTTP request to runner
 
-    # Solar connector mode (v27.0 — simulation | live)
-    solar_connector_mode: str = "simulation"  # simulation = demo data, live = real Modbus TCP
+    # Solar connector mode (v27.0 — live only by default)
+    solar_connector_mode: str = "live"  # live = real Modbus TCP; simulation is explicit only
 
     # Sprint 0 write test gating — requires BOTH this AND aegis_bess_writer_enabled
     allow_write_tests: bool = False  # Second gate: explicitly allow hardware write tests
@@ -357,6 +357,8 @@ class Settings(BaseSettings):
     token_budget_hard_limit: bool = Field(default=True, validation_alias="TOKEN_BUDGET_HARD_LIMIT")
     token_budget_exclude_interactive: bool = Field(default=True, validation_alias="TOKEN_BUDGET_EXCLUDE_INTERACTIVE")
     ai_alert_email: str = Field(default="info@sentinel-ai.co.za", validation_alias="AI_ALERT_EMAIL")
+    overnight_advisory_email_recipient: str = Field(default="", validation_alias="OVERNIGHT_ADVISORY_EMAIL_RECIPIENT")
+    overnight_advisory_fallback_hours: float = Field(default=2.0, validation_alias="OVERNIGHT_ADVISORY_FALLBACK_HOURS")
 
     # Lifecycle simulation optimization mode
     # IMPORTANT: Simulation MUST NOT consume LLM tokens. It uses rule-based

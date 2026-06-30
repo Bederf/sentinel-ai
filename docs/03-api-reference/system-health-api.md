@@ -473,15 +473,15 @@ Returns bridge-discovered equipment that is not yet onboarded into the Supabase 
     {
       "id": "2c148918-0d4e-40b4-87af-2af073b77134",
       "site_id": "site-002",
-      "bridge_code": "S002-FCU-301",
-      "canonical_code": "S002-FCU-301",
+      "bridge_code": "S002-FCU-206",
+      "canonical_code": "S002-FCU-206",
       "equipment_type": "fcu",
-      "derived_zone_id": "Zone-301",
+      "derived_zone_id": "Zone-206",
       "status": "pending",
       "reason": "derived_zone_not_in_supabase_inventory",
       "seen_count": 2,
       "zone_onboardable": false,
-      "zone_message": "Zone-301 is not in the site zone inventory. Create/confirm the zone during site onboarding first."
+      "zone_message": "Zone-206 is not in the site zone inventory. Create/confirm the zone during site onboarding first."
     }
   ]
 }
@@ -509,7 +509,7 @@ Creates active equipment from a reviewed bridge discovery row.
 
 ```json
 {
-  "detail": "Zone-301 is not in the Supabase zone inventory. Zones must be created during site onboarding before equipment can be onboarded."
+  "detail": "Zone-206 is not in the Supabase zone inventory. Zones must be created during site onboarding before equipment can be onboarded."
 }
 ```
 

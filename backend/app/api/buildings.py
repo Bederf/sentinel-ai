@@ -1349,15 +1349,6 @@ async def get_equipment_summary(site_id: str, auth: AuthContext = Depends(requir
             counts["ups_systems"] = len(ec_data.get("ups_systems", []))
             counts["feeders"] = len(ec_data.get("feeders", []))
 
-    # DALI controllers (from main data dir)
-    dali_file = Path(__file__).parent.parent / "data" / "dali_mock_data.json"
-    if dali_file.exists():
-        with open(dali_file) as f:
-            dali_data = json.load(f)
-            # Count controllers for this site
-            controllers = dali_data.get("controllers", [])
-            counts["dali_controllers"] = len([c for c in controllers if c.get("site_id") == site_id])
-
     # Calculate total
     total = sum(counts.values())
 
@@ -2066,39 +2057,7 @@ async def get_site_equipment(site_id: str, auth: AuthContext = Depends(require_s
                     }
                 )
 
-    # 4. DALI Controllers
-    # Map site_id to site_id for DALI data
-    site_id = _building_to_site(site_id)
-
-    dali_file = Path(__file__).parent.parent / "data" / "dali_mock_data.json"
-    if dali_file.exists():
-        with open(dali_file) as f:
-            dali_data = json.load(f)
-            # Check if site matches (using mapped site_id)
-            if dali_data.get("site_id") == site_id:
-                for controller in dali_data.get("controllers", []):
-                    status, health = get_status_health(controller.get("status", "online"))
-                    equipment_list.append(
-                        {
-                            "id": controller.get("controller_id"),
-                            "name": controller.get("name"),
-                            "type": "dali_controller",
-                            "category": "Lighting",
-                            "status": status,
-                            "health_score": health,
-                            "location": controller.get("location", ""),
-                            "site_id": site_code,
-                            "site_name": building.name,
-                            "details": {
-                                "ip_address": controller.get("ip_address"),
-                                "channels": controller.get("channels"),
-                                "firmware": controller.get("firmware_version"),
-                            },
-                            "controllable": True,
-                        }
-                    )
-
-    # 5. Equipment from building equipment directory (Niagara discovery)
+    # 4. Equipment from building equipment directory (Niagara discovery)
     equipment_dir = site_path / "equipment"
     if equipment_dir.exists():
         existing_ids = {eq["id"] for eq in equipment_list}  # Avoid duplicates

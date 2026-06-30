@@ -125,10 +125,9 @@ class FireHVACCoordinator:
             delay_seconds = effect.get("delay_seconds", 0)
             priority = effect.get("priority", 1)
 
-            # Apply delay (simulated for local mode)
+            # Log configured delay; actual sequencing is handled by live controllers.
             if delay_seconds > 0:
                 logger.info(f"Effect delay: {delay_seconds}s for {target_type}/{target_id}")
-                # In local mode, don't actually wait - just log the delay
                 # await asyncio.sleep(delay_seconds)
 
             effect_result = await self._execute_single_effect(target_type, target_id, action, zone_id)
@@ -191,7 +190,7 @@ class FireHVACCoordinator:
     ) -> dict[str, Any]:
         """Execute a single cause-effect action.
 
-        Tries DeviceManager first, falls back to simulation.
+        Tries live DeviceManager control and fails closed when unavailable.
         """
         dm = self._get_device_manager()
 
@@ -223,16 +222,7 @@ class FireHVACCoordinator:
                 except Exception as e:
                     logger.warning(f"DeviceManager write failed for {target_id}: {e}")
 
-            # Simulation fallback
-            self._shutdown_devices.append(
-                {
-                    "device_id": target_id,
-                    "action": "shutdown",
-                    "original_state": "running",
-                    "simulated": True,
-                }
-            )
-            return {"success": True, "detail": f"HVAC {target_id} shutdown (simulated)"}
+            return {"success": False, "detail": f"HVAC {target_id} shutdown not executed; no live control path"}
 
         elif action == "alert_only":
             return {"success": True, "detail": f"Alert generated for HVAC {target_id}"}
@@ -295,7 +285,6 @@ class FireHVACCoordinator:
                 {
                     "fan_status": FanStatus.RUNNING.value,
                     "fan_speed_pct": target_speed,
-                    "current_pressure_pa": target_pa * 0.9,  # Simulated: 90% of target during ramp-up
                 },
             )
             return {
@@ -326,10 +315,16 @@ class FireHVACCoordinator:
                 except Exception as e:
                     logger.warning(f"DeviceManager write failed for exhaust {target_id}: {e}")
 
-            return {"success": True, "detail": f"Exhaust {target_id} activated at 60% (simulated)"}
+            return {"success": False, "detail": f"Exhaust {target_id} activation not executed; no live control path"}
 
         elif action == "deactivate":
-            return {"success": True, "detail": f"Exhaust {target_id} deactivated"}
+            if dm:
+                try:
+                    await dm.write_device_value(target_id, "fan_speed", 0, priority=1, user="fire_system")
+                    return {"success": True, "detail": f"Exhaust {target_id} deactivated"}
+                except Exception as e:
+                    logger.warning(f"DeviceManager write failed for exhaust {target_id}: {e}")
+            return {"success": False, "detail": f"Exhaust {target_id} deactivation not executed; no live control path"}
 
         return {"success": False, "detail": f"Unknown exhaust action: {action}"}
 
@@ -388,32 +383,15 @@ class FireHVACCoordinator:
                         }
                     )
         else:
-            # Simulation: determine what WOULD be shut down
-            simulated_devices = [
-                f"S002-AHU-{floor}-001",
-                f"S002-FCU-{floor}-A",
-                f"S002-FCU-{floor}-B",
-                f"S002-VAV-{floor}-A",
-                f"S002-VAV-{floor}-B",
-            ]
-            for dev_id in simulated_devices:
-                shutdown_results.append(
-                    {
-                        "device_id": dev_id,
-                        "device_name": dev_id,
-                        "action": "shutdown",
-                        "success": True,
-                        "simulated": True,
-                    }
-                )
-                self._shutdown_devices.append(
-                    {
-                        "device_id": dev_id,
-                        "action": "shutdown",
-                        "original_state": "running",
-                        "simulated": True,
-                    }
-                )
+            shutdown_results.append(
+                {
+                    "device_id": None,
+                    "device_name": None,
+                    "action": "shutdown",
+                    "success": False,
+                    "error": "No live DeviceManager available; simulated HVAC shutdown is disabled",
+                }
+            )
 
         # Log shutdown through repository
         self._repo.log_action(
@@ -506,7 +484,6 @@ class FireHVACCoordinator:
                 {
                     "fan_status": FanStatus.RUNNING.value,
                     "fan_speed_pct": 85,
-                    "current_pressure_pa": 45.0,  # Simulated ramp-up
                 },
             )
             results.append(
@@ -516,7 +493,6 @@ class FireHVACCoordinator:
                     "success": True,
                     "fan_speed_pct": 85,
                     "target_pressure_pa": 50.0,
-                    "current_pressure_pa": 45.0,
                     "detail": f"Pressurization fan {stairwell_id} activated at 85% (target 50 Pa)",
                 }
             )
@@ -555,7 +531,7 @@ class FireHVACCoordinator:
             }
         )
 
-        # 2. Simulate exhaust at reduced speed for smoke extraction
+        # 2. Activate exhaust through the live control path if available.
         floor = self._extract_floor(zone_id)
         exhaust_id = f"S002-EXH-{floor}-001" if floor else "S002-EXH-L1-001"
         exhaust_result = await self._execute_exhaust_action(exhaust_id, "activate", self._get_device_manager())
@@ -680,7 +656,7 @@ class FireHVACCoordinator:
             else:
                 other_restarted.append(device_id)
 
-        # FCU/VAV restart after AHUs (simulated delay)
+        # FCU/VAV restart after AHUs.
         for device_id in other_restarted:
             if dm:
                 try:

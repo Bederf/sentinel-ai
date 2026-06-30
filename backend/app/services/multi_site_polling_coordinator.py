@@ -22,7 +22,7 @@ from typing import Any
 
 from app.database.supabase_client import get_supabase_client
 from app.services.bridge_disconnect_notifier import check_and_alert, record_poll_result
-from app.services.shadow_mode_polling import ShadowModePollingService
+from app.services.shadow_mode_polling import ShadowModePollingService, resolve_site_bridge_token
 
 logger = logging.getLogger("sentinel.multi_site_polling")
 
@@ -105,7 +105,7 @@ class MultiSitePollingCoordinator:
 
             svc = get_shadow_mode_polling_service()
             svc._override_bridge_url = connection_config.get("base_url")
-            svc._override_bridge_token = connection_config.get("token")
+            svc._override_bridge_token = resolve_site_bridge_token(site_id, connection_config)
             if svc not in self._services.values():
                 self._services[site_id] = svc
                 logger.info("[COORDINATOR] Using singleton polling service for %s", site_id)
@@ -115,7 +115,7 @@ class MultiSitePollingCoordinator:
             self._services[site_id] = ShadowModePollingService(
                 site_id=site_id,
                 bridge_url=connection_config.get("base_url"),
-                bridge_token=connection_config.get("token"),
+                bridge_token=resolve_site_bridge_token(site_id, connection_config),
             )
             logger.info("[COORDINATOR] Created polling service for %s", site_id)
 
@@ -150,7 +150,8 @@ class MultiSitePollingCoordinator:
             configs = {
                 row["site_id"]: row["connection_config"]
                 for row in (rows.data or [])
-                if row.get("connection_config", {}).get("base_url") and row.get("connection_config", {}).get("token")
+                if row.get("connection_config", {}).get("base_url")
+                and resolve_site_bridge_token(str(row.get("site_id") or ""), row.get("connection_config") or {})
             }
             # Cache human-readable site names for alert messages
             if configs:

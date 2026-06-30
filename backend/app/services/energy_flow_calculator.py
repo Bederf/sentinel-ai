@@ -8,7 +8,10 @@ Used by the Digital Twin 3D visualisation for animated flow paths.
 import logging
 import re
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
+
+from app.database.supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
 
@@ -319,7 +322,8 @@ class EnergyFlowCalculator:
     ) -> list[dict[str, Any]]:
         """Get equipment state at a specific historical timestamp.
 
-        Uses 3-tier fallback: Supabase time-series -> simulation state -> current state.
+        Uses live telemetry rows only. If no rows exist at or before the
+        requested timestamp, returns an empty list.
 
         Args:
             site_id: Site identifier.
@@ -328,22 +332,44 @@ class EnergyFlowCalculator:
         Returns:
             List of equipment dicts with health/status/power at that timestamp.
         """
-        # For now, return current state as the base — historical lookup
-        # will be enhanced when time-series DB is wired in.
-        equipment = await self._load_equipment(site_id)
-        result = []
-        for eq in equipment:
-            result.append(
+        requested_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+        client = get_supabase_client()
+        response = (
+            client.table("equipment_sensor_readings")
+            .select("equipment_id,sensor_type,value,unit,recorded_at,metadata")
+            .eq("site_id", site_id)
+            .lte("recorded_at", requested_at.isoformat())
+            .order("recorded_at", desc=True)
+            .limit(2000)
+            .execute()
+        )
+
+        latest_by_equipment: dict[str, dict[str, Any]] = {}
+        for row in response.data or []:
+            equipment_id = row.get("equipment_id")
+            sensor_type = row.get("sensor_type")
+            if not equipment_id or not sensor_type:
+                continue
+            equipment_state = latest_by_equipment.setdefault(
+                equipment_id,
                 {
-                    "code": eq.get("code") or eq.get("id") or "",
-                    "type": _extract_type(eq),
-                    "health_score": eq.get("health_score") or eq.get("health") or 85,
-                    "status": eq.get("status") or "running",
-                    "power_kw": _get_power_kw(eq),
+                    "code": equipment_id,
+                    "type": (row.get("metadata") or {}).get("equipment_type", "unknown")
+                    if isinstance(row.get("metadata"), dict)
+                    else "unknown",
                     "timestamp": timestamp,
-                }
+                    "data_source": "equipment_sensor_readings",
+                    "points": {},
+                },
             )
-        return result
+            if sensor_type not in equipment_state["points"]:
+                equipment_state["points"][sensor_type] = {
+                    "value": row.get("value"),
+                    "unit": row.get("unit"),
+                    "recorded_at": row.get("recorded_at"),
+                }
+
+        return list(latest_by_equipment.values())
 
 
 # ── Singleton ───────────────────────────────────────────────────────

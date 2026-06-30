@@ -161,6 +161,7 @@ async def check_recommendation_action_still_needed(recommendation: dict[str, Any
         if advisory_type in {
             "site_profile_hvac_state_correction",
             "fault_safety_gate",
+            "occupancy_conflict_control_gate",
         }:
             return {
                 "is_needed": True,

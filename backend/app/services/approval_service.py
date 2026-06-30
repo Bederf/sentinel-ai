@@ -8,6 +8,7 @@ Handles the approval workflow for equipment control recommendations:
 """
 
 import hashlib
+import html
 import json
 import logging
 from dataclasses import dataclass
@@ -1594,6 +1595,14 @@ class ApprovalService:
                 },
             )
 
+            await self._send_auto_execution_notification(
+                recommendation=recommendation,
+                control_point=control_point,
+                target_value=target_value,
+                original_value=exec_result.get("previous_value") or original_value,
+                cov_verified=cov_verified_flag,
+            )
+
             logger.info(f"Tier 3 auto-execute: Successfully completed for {recommendation_id}")
 
             return ApprovalResult(
@@ -1630,6 +1639,63 @@ class ApprovalService:
                 status="failed",
                 error_message=f"Tier 3 auto-execute error: {e!s}",
             )
+
+    async def _send_auto_execution_notification(
+        self,
+        *,
+        recommendation: Recommendation,
+        control_point: str,
+        target_value: Any,
+        original_value: Any,
+        cov_verified: bool,
+    ) -> None:
+        """Notify operators after an autonomous write has actually completed."""
+        try:
+            from app.services.telegram_message_sender import InlineButton, InlineKeyboard, TelegramMessageSender
+
+            bot_token = getattr(settings, "sentry_manager_bot_token", None) or getattr(
+                settings, "telegram_bot_token", None
+            )
+            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
+            if not bot_token or not chat_id:
+                logger.debug("Tier 3 auto-execute notification skipped: Telegram bot token/chat not configured")
+                return
+
+            def _fmt(value: Any) -> str:
+                if value is None:
+                    return "unknown"
+                if isinstance(value, float):
+                    return f"{value:.2f}"
+                return str(value)
+
+            reason = " ".join(str(recommendation.reason or "").split())
+            if len(reason) > 220:
+                reason = f"{reason[:219].rsplit(' ', 1)[0]}…"
+
+            verification = "verified" if cov_verified else "write submitted; verification pending/failed"
+            text = (
+                "SENTINEL AI — Autonomous Action Applied\n"
+                f"Site: {html.escape(str(recommendation.site_id or 'unknown'))} | Mode: automatic\n\n"
+                f"<b>Equipment:</b> {html.escape(str(recommendation.target_equipment or 'unknown'))}\n"
+                f"<b>Change:</b> {html.escape(str(control_point))}: "
+                f"{html.escape(_fmt(original_value))} → {html.escape(_fmt(target_value))}\n"
+                f"<b>Verification:</b> {html.escape(verification)}\n"
+                f"<b>Why:</b> {html.escape(reason or 'Autonomous recommendation met the configured safety and confidence gates.')}"
+            )
+            keyboard = InlineKeyboard(
+                rows=[
+                    [
+                        InlineButton(
+                            "✅ Acknowledge",
+                            f"rec:review:{recommendation.id}",
+                        )
+                    ]
+                ]
+            )
+            sender = TelegramMessageSender(bot_token)
+            await sender.send_text(str(chat_id), text, parse_mode="HTML", keyboard=keyboard)
+        except Exception as exc:
+            logger.warning("Tier 3 auto-execute notification failed for %s: %s", recommendation.id, exc)
 
     async def _auto_rollback(
         self,

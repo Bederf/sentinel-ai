@@ -163,6 +163,30 @@ class TestCheckRecommendationActionStillNeeded:
         assert result["checked"] is True
         assert "unresolved_bms_point" in result["reason"]
 
+    @pytest.mark.asyncio
+    async def test_occupancy_conflict_control_gate_execution_blocked_remains_needed(self):
+        from app.agents.recommendation_tools import check_recommendation_action_still_needed
+
+        rec = make_recommendation()
+        rec["action"] = {
+            "point": None,
+            "value": "Block blanket site HVAC shutdown; use scoped setback only",
+            "execution_blocked": True,
+            "blocker": "occupancy_signal_conflict",
+        }
+        rec["metadata"] = {
+            "source_metadata": {
+                "advisory_type": "occupancy_conflict_control_gate",
+                "rule": "occupancy_conflict_blocks_hvac_shutdown",
+            }
+        }
+
+        result = await check_recommendation_action_still_needed(rec)
+
+        assert result["is_needed"] is True
+        assert result["checked"] is True
+        assert "occupancy_conflict_control_gate" in result["reason"]
+
 
 # ===================================================================
 # Tool: estimate_cost_impact
