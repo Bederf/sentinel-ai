@@ -574,13 +574,35 @@ async def startup_event(_: FastAPI) -> None:
         except Exception as e:
             _logger.warning(f"⚠️ POPIA retention job initialization failed: {e}")
 
-    # Supabase SQL table retention (POPIA S14 — ML data 7d, snapshots 30d, audit 5y)
+    # Supabase SQL table retention (POPIA S14 — ML data 10d, snapshots 30d, audit 5y)
     if settings.popia_retention_enabled:
         try:
             scheduler_service.add_supabase_retention_job(interval_seconds=settings.popia_retention_job_interval_seconds)
-            _logger.info("✅ Supabase SQL retention enforcement job initialized")
+            _logger.info("✅ Supabase SQL retention enforcement job initialized (cron: daily 02:00 UTC)")
         except Exception as e:
             _logger.warning(f"⚠️ Supabase retention job initialization failed: {e}")
+
+        # Catch-up run: if last enforcement log is older than 24h, run immediately on startup.
+        # Prevents data piling up when the process restarts frequently.
+        try:
+            import psycopg2
+            from datetime import UTC, datetime, timedelta
+
+            conn = psycopg2.connect(
+                host="127.0.0.1", port=55322, dbname="postgres", user="postgres", password="postgres"
+            )
+            with conn.cursor() as cur:
+                cur.execute("SELECT MAX(executed_at) FROM retention_enforcement_log WHERE dry_run = false")
+                row = cur.fetchone()
+            conn.close()
+            last_run = row[0] if row and row[0] else None
+            if last_run is None or (datetime.now(UTC) - last_run.replace(tzinfo=UTC)) > timedelta(hours=24):
+                _logger.info("🔄 Retention catch-up: last run >24h ago — running Supabase retention now")
+                scheduler_service._run_supabase_retention_enforcement()
+            else:
+                _logger.info("✅ Retention catch-up: last run recent (%s UTC) — skipping", last_run.isoformat())
+        except Exception as e:
+            _logger.warning(f"⚠️ Retention catch-up check failed: {e}")
 
     # Telemetry tiered aggregation (tier1->tier2 nightly, tier2->tier3 weekly)
     try:

@@ -5779,7 +5779,12 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to run integration sync: {e}")
 
     def add_popia_retention_job(self, interval_seconds: int = 86400):
-        """Add periodic POPIA retention enforcement job."""
+        """Add daily POPIA retention enforcement job (cron at 02:30 UTC).
+
+        Uses CronTrigger so the job fires at a fixed wall-clock time regardless
+        of process restart timing. interval_seconds is accepted for API compat
+        but ignored — cron cadence is always daily.
+        """
         job_id = "popia_retention_enforcement"
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
@@ -5787,12 +5792,12 @@ class BackgroundSchedulerService:
 
         self.scheduler.add_job(
             func=self._run_popia_retention_enforcement,
-            trigger=IntervalTrigger(seconds=interval_seconds),
+            trigger=CronTrigger(hour=2, minute=30),
             id=job_id,
             name="POPIA Retention Enforcement",
             replace_existing=True,
         )
-        logger.info("Added POPIA retention enforcement job with %ss interval", interval_seconds)
+        logger.info("Added POPIA retention enforcement job (cron: daily 02:30 UTC)")
 
     @track_job_metrics("popia_retention_enforcement")
     def _run_popia_retention_enforcement(self):
@@ -5828,7 +5833,12 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to run POPIA retention enforcement: {e}", exc_info=True)
 
     def add_supabase_retention_job(self, interval_seconds: int = 86400):
-        """Add periodic Supabase SQL table retention enforcement (POPIA S14)."""
+        """Add daily Supabase SQL table retention enforcement (POPIA S14, cron at 02:00 UTC).
+
+        Uses CronTrigger so the job fires at a fixed wall-clock time regardless
+        of process restart timing. interval_seconds is accepted for API compat
+        but ignored — cron cadence is always daily.
+        """
         job_id = "supabase_retention_enforcement"
         if self.scheduler.get_job(job_id):
             self.scheduler.remove_job(job_id)
@@ -5836,14 +5846,13 @@ class BackgroundSchedulerService:
 
         self.scheduler.add_job(
             func=self._run_supabase_retention_enforcement,
-            trigger=IntervalTrigger(seconds=interval_seconds),
+            trigger=CronTrigger(hour=2, minute=0),
             id=job_id,
             name="Supabase SQL Retention Enforcement",
             replace_existing=True,
         )
         logger.info(
-            "Added Supabase retention enforcement job with %ss interval (ML: 7d, Snapshots: 30d, Audit: 5y)",
-            interval_seconds,
+            "Added Supabase retention enforcement job (cron: daily 02:00 UTC — ML: 10d, Snapshots: 30d, Audit: 5y)",
         )
 
     @track_job_metrics("supabase_retention_enforcement")
