@@ -7462,6 +7462,35 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("AI cost report email failed: %s", e, exc_info=True)
 
+    def add_ai_usage_flush_job(self, interval_minutes: int = 5):
+        """Add a job to flush buffered AI usage to the DB periodically.
+
+        The usage tracker buffers calls in memory and otherwise only persists
+        on the 23:55 report job or graceful shutdown. A frequent flush bounds
+        data loss on an ungraceful kill (SIGKILL) to at most ``interval_minutes``.
+        """
+        if self.scheduler.get_job("ai_usage_flush"):
+            self.scheduler.remove_job("ai_usage_flush")
+
+        self.scheduler.add_job(
+            func=self._flush_ai_usage,
+            trigger=IntervalTrigger(minutes=interval_minutes),
+            id="ai_usage_flush",
+            name="Flush AI Usage Buffer",
+            replace_existing=True,
+        )
+        logger.info("Added AI usage flush job (%dm interval)", interval_minutes)
+
+    @track_job_metrics("ai_usage_flush")
+    def _flush_ai_usage(self):
+        """Persist buffered AI usage to the DB."""
+        try:
+            from app.services.ai_usage_tracker import usage_tracker
+
+            usage_tracker.flush()
+        except Exception as e:
+            logger.error("AI usage flush failed: %s", e, exc_info=True)
+
     def add_sentry_feedback_digest_job(self):
         """Add weekly Sentry feedback digest email job. Runs Monday 07:00 SAST."""
         from apscheduler.triggers.cron import CronTrigger

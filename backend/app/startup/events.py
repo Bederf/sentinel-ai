@@ -595,6 +595,13 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Tier2->Tier3 aggregation job initialization failed: {e}")
 
+    # Periodic AI usage flush (every 5 min — bounds data loss on ungraceful kill)
+    try:
+        scheduler_service.add_ai_usage_flush_job(interval_minutes=5)
+        _logger.info("✅ AI usage flush job initialized (5min interval)")
+    except Exception as e:
+        _logger.warning(f"⚠️ AI usage flush job initialization failed: {e}")
+
     # Daily AI cost report email (23:55 every day)
     try:
         scheduler_service.add_ai_cost_report_job()
@@ -637,6 +644,13 @@ async def startup_event(_: FastAPI) -> None:
         _logger.info("✅ Recommendation digest job initialized (07:00 SAST Mon-Fri → FM Telegram)")
     except Exception as e:
         _logger.warning(f"⚠️ Recommendation digest job initialization failed: {e}")
+
+    # Overnight advisory email fallback — email FM when high/critical advisory unacknowledged >2h
+    try:
+        scheduler_service.add_overnight_advisory_email_fallback_job()
+        _logger.info("✅ Overnight advisory email fallback initialized (every 30 min, after-hours only)")
+    except Exception as e:
+        _logger.warning(f"⚠️ Overnight advisory email fallback initialization failed: {e}")
 
     # Ensure all sites have the 15 mandatory base modules (Phase 142)
     try:
@@ -1049,6 +1063,16 @@ async def shutdown_event(_: FastAPI) -> None:
     This function is called when the FastAPI application shuts down.
     It stops background services and closes connections.
     """
+    # Persist buffered AI usage before anything else — the tracker holds the
+    # day's calls in an in-memory cache that is otherwise only flushed at 23:55.
+    # Without this, every restart silently discards the day's usage rows.
+    try:
+        from app.services.ai_usage_tracker import usage_tracker
+
+        usage_tracker.flush()
+    except Exception:
+        _logger.warning("Failed to flush AI usage tracker on shutdown", exc_info=True)
+
     # Stop Sentry JWT token refresh
     from app.services.sentry_auth_service import get_sentry_auth_service
 

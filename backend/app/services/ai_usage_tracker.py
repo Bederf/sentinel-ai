@@ -572,14 +572,20 @@ class AiUsageTracker:
             total_tokens = input_tokens + output_tokens
             if total_tokens > 0 and site_key != "unknown":
                 try:
-                    # Run synchronously to ensure budget check completes before record() returns
-                    # (avoid async task race condition in tests and scheduler call sites)
-                    asyncio.get_event_loop().run_until_complete(
-                        self._check_and_enforce_budget(site_key, total_tokens, task_class)
-                    )
-                except RuntimeError:
-                    # No event loop — create one for this call
-                    asyncio.run(self._check_and_enforce_budget(site_key, total_tokens, task_class))
+                    coro = self._check_and_enforce_budget(site_key, total_tokens, task_class)
+                    try:
+                        running_loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        running_loop = None
+
+                    if running_loop is not None:
+                        # Already inside an event loop (gateway/optimizer async path):
+                        # nesting asyncio.run / run_until_complete raises RuntimeError.
+                        # Schedule the check on the running loop instead of blocking.
+                        running_loop.create_task(coro)
+                    else:
+                        # No running loop (sync/thread call site) — run it to completion.
+                        asyncio.run(coro)
                 except Exception:
                     # Budget check failures must never block usage recording
                     pass
