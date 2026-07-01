@@ -60,6 +60,7 @@ class AutoencoderTrainer:
         use_demo_data: bool = True,
         verbose: int = 1,
         site_id: str | None = None,
+        auto_activate: bool = True,
     ) -> dict[str, Any]:
         """
         Train autoencoder for a specific equipment type.
@@ -72,6 +73,7 @@ class AutoencoderTrainer:
             latent_dim: Latent space dimension
             use_demo_data: Use synthetic demo data if real data unavailable
             verbose: Training verbosity
+            auto_activate: Activate the model if real telemetry was used
 
         Returns:
             Training results dictionary
@@ -212,7 +214,7 @@ class AutoencoderTrainer:
             **detection_metrics,
         }
 
-        auto_activate = provenance.get("data_source") == "telemetry_hourly"
+        should_activate = auto_activate and provenance.get("data_source") == "telemetry_hourly"
 
         # Register model
         model_id = self.registry.register_model(
@@ -233,7 +235,7 @@ class AutoencoderTrainer:
                 "threshold_percentile": model.threshold_percentile,
                 **provenance,
             },
-            auto_activate=auto_activate,
+            auto_activate=should_activate,
         )
 
         training_time = (datetime.now() - start_time).total_seconds()
@@ -249,6 +251,7 @@ class AutoencoderTrainer:
             "training_time_seconds": training_time,
             "epochs_trained": len(history["loss"]),
             "threshold": model.threshold,
+            "activated": should_activate,
         }
 
         logger.info(
@@ -461,6 +464,12 @@ def main():
     )
     parser.add_argument("--verbose", "-v", type=int, default=1, help="Verbosity level")
     parser.add_argument("--site-id", type=str, default=None, help="Site ID for site-scoped training (e.g. site-002)")
+    parser.add_argument(
+        "--no-activate",
+        action="store_true",
+        default=False,
+        help="Register the trained model as a candidate only; do not set it active",
+    )
 
     args = parser.parse_args()
 
@@ -492,6 +501,7 @@ def main():
             use_demo_data=use_demo,
             verbose=args.verbose,
             site_id=args.site_id,
+            auto_activate=not args.no_activate,
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")
