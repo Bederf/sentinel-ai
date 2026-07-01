@@ -150,7 +150,8 @@ class LSTMTrainer:
         # Verify data shape
         logger.info(f"Data shape: X={X.shape}, y={y.shape}")
 
-        if len(X) < 1000:
+        min_samples = 100 if provenance.get("data_source") == "telemetry_hourly" else 1000
+        if len(X) < min_samples:
             raise ValueError(f"Insufficient data for {equipment_type}: {len(X)} samples")
 
         # Split data (time-series: no shuffle!)
