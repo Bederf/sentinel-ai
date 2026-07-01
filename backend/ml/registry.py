@@ -87,6 +87,12 @@ class ModelRegistry:
 
         return resolved
 
+    def _active_key(self, model_type: str, equipment_type: str, site_id: str | None = None) -> str:
+        """Build active-model key. Explicit site IDs are isolated from global legacy keys."""
+        if site_id:
+            return f"{site_id}_{model_type}_{equipment_type}"
+        return f"{model_type}_{equipment_type}"
+
     def register_model(
         self,
         model_type: str,  # e.g., "lstm", "autoencoder"
@@ -95,6 +101,7 @@ class ModelRegistry:
         metrics: dict,
         metadata: dict | None = None,
         auto_activate: bool = True,
+        site_id: str | None = None,
     ) -> str:
         """
         Register a new model version.
@@ -111,17 +118,21 @@ class ModelRegistry:
             Model ID
         """
         version = datetime.now().strftime("%Y%m%d_%H%M%S")
-        model_id = f"{model_type}_{equipment_type}_{version}"
+        site_part = f"{site_id}_" if site_id else ""
+        model_id = f"{model_type}_{site_part}{equipment_type}_{version}"
 
         # Convert paths to relative for portability
         stored_metadata = dict(metadata) if metadata else {}
         if "scaler_path" in stored_metadata:
             stored_metadata["scaler_path"] = self._to_relative_path(str(stored_metadata["scaler_path"]))
+        if site_id:
+            stored_metadata["site_id"] = site_id
 
         entry = {
             "model_id": model_id,
             "model_type": model_type,
             "equipment_type": equipment_type,
+            "site_id": site_id,
             "model_path": self._to_relative_path(str(model_path)),
             "metrics": metrics,
             "metadata": stored_metadata,
@@ -135,17 +146,18 @@ class ModelRegistry:
         logger.info(f"Registered model: {model_id}")
 
         if auto_activate:
-            self.set_active(model_id)
+            self.set_active(model_id, site_id=site_id)
 
         return model_id
 
-    def set_active(self, model_id: str):
+    def set_active(self, model_id: str, site_id: str | None = None):
         """Set a model as the active version for inference."""
         if model_id not in self.registry["models"]:
             raise ValueError(f"Model {model_id} not found in registry")
 
         model = self.registry["models"][model_id]
-        key = f"{model['model_type']}_{model['equipment_type']}"
+        model_site_id = site_id or model.get("site_id") or model.get("metadata", {}).get("site_id")
+        key = self._active_key(model["model_type"], model["equipment_type"], model_site_id)
 
         # Deactivate previous active model
         prev_active = self.registry["active"].get(key)
@@ -154,18 +166,21 @@ class ModelRegistry:
 
         # Activate new model
         self.registry["active"][key] = model_id
+        self.registry["models"][model_id]["site_id"] = model_site_id
+        if model_site_id:
+            self.registry["models"][model_id].setdefault("metadata", {})["site_id"] = model_site_id
         self.registry["models"][model_id]["status"] = "active"
         self._generation += 1
         self._save_registry()
 
         logger.info(f"Activated model: {model_id} (registry generation {self._generation})")
 
-    def get_active_model(self, model_type: str, equipment_type: str) -> dict | None:
+    def get_active_model(self, model_type: str, equipment_type: str, site_id: str | None = None) -> dict | None:
         """Get the currently active model for inference.
 
         Returns a copy with paths resolved to absolute.
         """
-        key = f"{model_type}_{equipment_type}"
+        key = self._active_key(model_type, equipment_type, site_id)
         model_id = self.registry["active"].get(key)
 
         if model_id and model_id in self.registry["models"]:
@@ -173,7 +188,11 @@ class ModelRegistry:
         return None
 
     def list_models(
-        self, model_type: str | None = None, equipment_type: str | None = None, status: str | None = None
+        self,
+        model_type: str | None = None,
+        equipment_type: str | None = None,
+        status: str | None = None,
+        site_id: str | None = None,
     ) -> list[dict]:
         """List registered models with optional filters.
 
@@ -185,6 +204,8 @@ class ModelRegistry:
             models = [m for m in models if m["model_type"] == model_type]
         if equipment_type:
             models = [m for m in models if m["equipment_type"] == equipment_type]
+        if site_id is not None:
+            models = [m for m in models if (m.get("site_id") or m.get("metadata", {}).get("site_id")) == site_id]
         if status:
             models = [m for m in models if m["status"] == status]
 
@@ -212,7 +233,11 @@ class ModelRegistry:
         model = self.registry["models"][model_id]
 
         # Can't delete active model
-        key = f"{model['model_type']}_{model['equipment_type']}"
+        key = self._active_key(
+            model["model_type"],
+            model["equipment_type"],
+            model.get("site_id") or model.get("metadata", {}).get("site_id"),
+        )
         if self.registry["active"].get(key) == model_id:
             raise ValueError(f"Cannot delete active model {model_id}")
 
@@ -222,9 +247,9 @@ class ModelRegistry:
         logger.info(f"Deleted model: {model_id}")
         return True
 
-    def get_model_comparison(self, model_type: str, equipment_type: str) -> list[dict]:
+    def get_model_comparison(self, model_type: str, equipment_type: str, site_id: str | None = None) -> list[dict]:
         """Compare all models for a specific type/equipment."""
-        models = self.list_models(model_type, equipment_type)
+        models = self.list_models(model_type, equipment_type, site_id=site_id)
         return [
             {
                 "model_id": m["model_id"],

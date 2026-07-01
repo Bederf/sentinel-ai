@@ -66,6 +66,7 @@ class TrainRequest(BaseModel):
 
     epochs: int = 50
     use_demo_data: bool = False
+    site_id: str | None = None
 
 
 class TrainResponse(BaseModel):
@@ -83,6 +84,7 @@ class ModelInfo(BaseModel):
     model_id: str
     model_type: str
     equipment_type: str
+    site_id: str | None = None
     status: str
     registered_at: str
     metrics: dict
@@ -95,6 +97,7 @@ class ModelInfo(BaseModel):
 async def get_lstm_prediction(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type (chiller, ahu, generator, etc.)"),
+    site_id: str | None = Query(None, description="Site ID for site-scoped model lookup"),
     include_explanation: bool = Query(False, description="Include natural language explanation"),
 ):
     """
@@ -107,7 +110,7 @@ async def get_lstm_prediction(
     from app.services.ml_inference import get_lstm_service
 
     service = get_lstm_service()
-    result = service.predict(equipment_id, equipment_type)
+    result = service.predict(equipment_id, equipment_type, site_id=site_id)
 
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -148,6 +151,7 @@ async def get_prediction_trend(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type"),
     hours_history: int = Query(168, description="Hours of history to include"),
+    site_id: str | None = Query(None, description="Site ID for site-scoped model lookup"),
     include_explanation: bool = Query(False, description="Include trend explanation"),
 ):
     """
@@ -159,7 +163,7 @@ async def get_prediction_trend(
     from app.services.ml_inference import get_lstm_service
 
     service = get_lstm_service()
-    result = service.get_trend(equipment_id, equipment_type, hours_history)
+    result = service.get_trend(equipment_id, equipment_type, hours_history, site_id=site_id)
 
     if result.get("error"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -194,7 +198,7 @@ async def get_batch_predictions(equipment_list: list[dict]):
     results = []
 
     for eq in equipment_list:
-        result = service.predict(eq.get("equipment_id"), eq.get("equipment_type"))
+        result = service.predict(eq.get("equipment_id"), eq.get("equipment_type"), site_id=eq.get("site_id"))
         results.append(result)
 
     return attach_ai_provenance(results, get_ml_provenance("lstm-batch-predictions-v1"))
@@ -207,6 +211,7 @@ async def get_batch_predictions(equipment_list: list[dict]):
 async def check_equipment_anomaly(
     equipment_id: str,
     equipment_type: str = Query(..., description="Equipment type"),
+    site_id: str | None = Query(None, description="Site ID for site-scoped model lookup"),
     include_explanation: bool = Query(False, description="Include anomaly explanation"),
 ):
     """
@@ -220,7 +225,7 @@ async def check_equipment_anomaly(
     from app.services.rag_service import RAGService
 
     service = get_anomaly_service()
-    result = service.check_equipment(equipment_id, equipment_type)
+    result = service.check_equipment(equipment_id, equipment_type, site_id=site_id)
 
     if result.get("error") and not result.get("is_anomaly"):
         raise HTTPException(status_code=400, detail=result["error"])
@@ -337,6 +342,7 @@ async def get_anomaly_history(
 async def list_models(
     model_type: str | None = Query(None, description="Filter by model type (lstm, autoencoder)"),
     equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    site_id: str | None = Query(None, description="Filter by site ID"),
     status: str | None = Query(None, description="Filter by status (active, inactive)"),
 ):
     """
@@ -347,7 +353,7 @@ async def list_models(
     from ml.registry import get_model_registry
 
     registry = get_model_registry()
-    models = registry.list_models(model_type, equipment_type, status)
+    models = registry.list_models(model_type, equipment_type, status, site_id=site_id)
 
     return models
 
@@ -367,21 +373,25 @@ async def get_model(model_id: str):
 
 
 @router.post("/models/{model_id}/activate")
-async def activate_model(model_id: str):
+async def activate_model(model_id: str, site_id: str | None = Query(None, description="Site ID for scoped activation")):
     """Set a model as the active version for inference."""
     from ml.registry import get_model_registry
 
     registry = get_model_registry()
 
     try:
-        registry.set_active(model_id)
+        registry.set_active(model_id, site_id=site_id)
         return {"status": "success", "message": f"Model {model_id} activated"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/models/compare/{model_type}/{equipment_type}")
-async def compare_models(model_type: str, equipment_type: str):
+async def compare_models(
+    model_type: str,
+    equipment_type: str,
+    site_id: str | None = Query(None, description="Filter by site ID"),
+):
     """
     Compare all model versions for a specific type/equipment.
 
@@ -390,7 +400,7 @@ async def compare_models(model_type: str, equipment_type: str):
     from ml.registry import get_model_registry
 
     registry = get_model_registry()
-    return registry.get_model_comparison(model_type, equipment_type)
+    return registry.get_model_comparison(model_type, equipment_type, site_id=site_id)
 
 
 # === Training Endpoints ===
@@ -407,8 +417,13 @@ async def train_lstm_model(equipment_type: str, request: TrainRequest, backgroun
     def train_task():
         from ml.lstm.train import LSTMTrainer
 
-        trainer = LSTMTrainer()
-        return trainer.train_equipment_type(equipment_type, epochs=request.epochs, use_demo_data=request.use_demo_data)
+        trainer = LSTMTrainer(site_id=request.site_id)
+        return trainer.train_equipment_type(
+            equipment_type,
+            epochs=request.epochs,
+            use_demo_data=request.use_demo_data,
+            site_id=request.site_id,
+        )
 
     # Run synchronously in local mode (production should use a background task)
     try:
@@ -464,11 +479,8 @@ async def get_model_readiness(site_id: str):
         )
 
     registry = get_model_registry()
-    active_models = registry.list_models(status="active")
+    active_models = registry.list_models(status="active", site_id=site_id)
 
-    # Filter to models relevant to this site (site-specific equipment)
-    # For now, include all active models — site filtering by equipment type
-    # can be refined once site-specific model scoping is implemented
     covered_types = sorted({m["equipment_type"] for m in active_models if m.get("equipment_type")})
 
     last_training = None
@@ -521,8 +533,13 @@ async def train_autoencoder_model(equipment_type: str, request: TrainRequest, ba
     def train_task():
         from ml.autoencoder.train import AutoencoderTrainer
 
-        trainer = AutoencoderTrainer()
-        return trainer.train_equipment_type(equipment_type, epochs=request.epochs, use_demo_data=request.use_demo_data)
+        trainer = AutoencoderTrainer(site_id=request.site_id)
+        return trainer.train_equipment_type(
+            equipment_type,
+            epochs=request.epochs,
+            use_demo_data=request.use_demo_data,
+            site_id=request.site_id,
+        )
 
     try:
         result = train_task()
@@ -575,7 +592,7 @@ async def train_all_models(request: TrainRequest):
     try:
         from ml.lstm.train import LSTMTrainer
 
-        trainer = LSTMTrainer()
+        trainer = LSTMTrainer(site_id=request.site_id)
         lstm_results = trainer.train_all(epochs=request.epochs, use_demo_data=request.use_demo_data)
         results["lstm"] = lstm_results
     except Exception as e:
@@ -585,7 +602,7 @@ async def train_all_models(request: TrainRequest):
     try:
         from ml.autoencoder.train import AutoencoderTrainer
 
-        trainer = AutoencoderTrainer()
+        trainer = AutoencoderTrainer(site_id=request.site_id)
         ae_results = trainer.train_all(epochs=request.epochs, use_demo_data=request.use_demo_data)
         results["autoencoder"] = ae_results
     except Exception as e:

@@ -5,7 +5,7 @@ baseline seed; the `ml_model_config` Supabase table overrides at runtime.
 
 Per-site feature discovery:
     Call `discover_site_ml_features(site_id)` during onboarding and periodically.
-    It scans `equipment_sensor_readings`, classifies continuous numeric sensors,
+    It scans `telemetry_hourly`, classifies continuous numeric sensors,
     and writes site-specific feature lists into `ml_model_config`.
     Every site has different BMS points — this is the mechanism that makes ML
     features site-agnostic without hardcoding sensor names.
@@ -523,7 +523,7 @@ def discover_site_ml_features(
     lookback_days: int = 30,
     min_readings: int = 10,
 ) -> dict[str, list[str]]:
-    """Scan equipment_sensor_readings for a site and register per-site ML features.
+    """Scan telemetry_hourly for a site and register per-site ML features.
 
     Uses an aggregate SQL query (MIN/MAX/COUNT per sensor_type) to efficiently
     detect continuous numeric sensors with real variance — without fetching raw rows.
@@ -562,16 +562,16 @@ def discover_site_ml_features(
         for equip_type, prefix in _EQUIP_TYPE_PREFIXES.items():
             cur.execute(
                 """
-                SELECT sensor_type,
-                       COUNT(*)            AS n,
-                       MIN(value::numeric) AS min_v,
-                       MAX(value::numeric) AS max_v
-                FROM   equipment_sensor_readings
+                SELECT point_name,
+                       COUNT(*)                  AS n,
+                       MIN(value_avg::numeric)   AS min_v,
+                       MAX(value_avg::numeric)   AS max_v
+                FROM   telemetry_hourly
                 WHERE  site_id      = %s
                   AND  equipment_id LIKE %s
-                  AND  recorded_at  >= %s
-                  AND  value        IS NOT NULL
-                GROUP BY sensor_type
+                  AND  hour_bucket  >= %s
+                  AND  value_avg    IS NOT NULL
+                GROUP BY point_name
                 HAVING COUNT(*) >= %s
                 """,
                 (site_id, f"%{prefix}%", since, min_readings),

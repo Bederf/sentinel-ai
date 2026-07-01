@@ -24,6 +24,7 @@ from sklearn.model_selection import train_test_split
 from ..registry import get_model_registry
 from .data_prep import AUTOENCODER_SENSOR_CONFIGS, AutoencoderDataPrep
 from .model import SensorAutoencoder
+from ml.model_config import get_autoencoder_features, list_ml_trainable_types
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ logger = logging.getLogger(__name__)
 class AutoencoderTrainer:
     """Training pipeline for autoencoder anomaly detection models."""
 
-    def __init__(self, model_dir: str | None = None, window_size: int = 24):
+    def __init__(self, model_dir: str | None = None, window_size: int = 24, site_id: str | None = None):
         """
         Initialize trainer.
 
@@ -45,6 +46,7 @@ class AutoencoderTrainer:
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
 
+        self.site_id = site_id
         self.window_size = window_size
         self.registry = get_model_registry()
 
@@ -57,6 +59,7 @@ class AutoencoderTrainer:
         latent_dim: int = 16,
         use_demo_data: bool = True,
         verbose: int = 1,
+        site_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Train autoencoder for a specific equipment type.
@@ -73,7 +76,8 @@ class AutoencoderTrainer:
         Returns:
             Training results dictionary
         """
-        logger.info(f"Training autoencoder for {equipment_type}...")
+        site_id = site_id or self.site_id
+        logger.info("Training autoencoder for %s (site=%s)...", equipment_type, site_id or "global")
         start_time = datetime.now()
 
         # Get sensor configuration
@@ -83,20 +87,29 @@ class AutoencoderTrainer:
             )
 
         config = AUTOENCODER_SENSOR_CONFIGS[equipment_type]
-        n_features = len(config["features"])
+        feature_names = get_autoencoder_features(equipment_type, site_id)
+        if not feature_names:
+            feature_names = config["features"]
+        n_features = len(feature_names)
+        provenance: dict[str, Any] = {
+            "site_id": site_id,
+            "requested_use_demo_data": use_demo_data,
+        }
 
         # Prepare data
         data_prep = AutoencoderDataPrep(window_size=self.window_size)
 
         try:
             if not use_demo_data:
-                # Load real data from Supabase equipment_sensor_readings
+                # Load real data from long-retention hourly aggregate telemetry.
                 from ml.data.supabase_loader import SupabaseTrainingDataLoader
 
-                loader = SupabaseTrainingDataLoader()
+                loader = SupabaseTrainingDataLoader(site_id=site_id)
                 data_array = loader.load_equipment_type_array(equipment_type, min_hours=200)
                 if data_array is not None:
-                    logger.info(f"Loaded {len(data_array)} hours of real data for {equipment_type}")
+                    logger.info("Loaded %d hours of real aggregate data for %s", len(data_array), equipment_type)
+                    provenance.update(loader.last_load_metadata)
+                    provenance["use_demo_data"] = False
                     # Create windows from real data (assumed normal operation)
                     windows = []
                     for i in range(len(data_array) - self.window_size):
@@ -106,6 +119,13 @@ class AutoencoderTrainer:
                     anomaly_indices = []
                 else:
                     logger.warning(f"Insufficient real data for {equipment_type}, falling back to demo data")
+                    provenance.update(
+                        {
+                            "data_source": "synthetic_fallback",
+                            "use_demo_data": True,
+                            "synthetic_fallback_reason": "insufficient_telemetry_hourly_data",
+                        }
+                    )
                     X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(
                         n_hours=5000,
                         n_features=n_features,
@@ -114,6 +134,7 @@ class AutoencoderTrainer:
                     )
             else:
                 logger.info(f"Using demo data for {equipment_type}")
+                provenance.update({"data_source": "demo_forced", "use_demo_data": True})
                 X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(
                     n_hours=5000,
                     n_features=n_features,
@@ -123,6 +144,13 @@ class AutoencoderTrainer:
 
         except Exception as e:
             logger.warning(f"Could not load real data: {e}. Using demo data.")
+            provenance.update(
+                {
+                    "data_source": "synthetic_fallback",
+                    "use_demo_data": True,
+                    "synthetic_fallback_reason": str(e),
+                }
+            )
             X_normal, X_all, anomaly_indices = data_prep.generate_demo_data(n_hours=3000, n_features=n_features)
 
         logger.info(f"Normal data shape: {X_normal.shape}")
@@ -184,10 +212,13 @@ class AutoencoderTrainer:
             **detection_metrics,
         }
 
+        auto_activate = provenance.get("data_source") == "telemetry_hourly"
+
         # Register model
         model_id = self.registry.register_model(
             model_type="autoencoder",
             equipment_type=equipment_type,
+            site_id=site_id,
             model_path=str(model_path),
             metrics=metrics,
             metadata={
@@ -195,20 +226,21 @@ class AutoencoderTrainer:
                 "window_size": self.window_size,
                 "latent_dim": latent_dim,
                 "n_features": n_features,
-                "feature_names": config["features"],
+                "feature_names": feature_names,
                 "training_samples": len(X_train),
                 "validation_samples": len(X_val),
                 "epochs_trained": len(history["loss"]),
                 "threshold_percentile": model.threshold_percentile,
-                "use_demo_data": use_demo_data,
+                **provenance,
             },
-            auto_activate=True,
+            auto_activate=auto_activate,
         )
 
         training_time = (datetime.now() - start_time).total_seconds()
 
         result = {
             "equipment_type": equipment_type,
+            "site_id": site_id,
             "model_id": model_id,
             "model_path": str(model_path),
             "scaler_path": scaler_path,
@@ -388,9 +420,15 @@ class AutoencoderTrainer:
         """Train models for all equipment types."""
         results = []
 
-        for eq_type in AUTOENCODER_SENSOR_CONFIGS:
+        equipment_types = list_ml_trainable_types(self.site_id) if self.site_id else list(AUTOENCODER_SENSOR_CONFIGS)
+        for eq_type in equipment_types:
             try:
-                result = self.train_equipment_type(eq_type, epochs=epochs, use_demo_data=use_demo_data)
+                result = self.train_equipment_type(
+                    eq_type,
+                    epochs=epochs,
+                    use_demo_data=use_demo_data,
+                    site_id=self.site_id,
+                )
                 results.append(result)
             except Exception as e:
                 logger.error(f"Failed to train {eq_type}: {e}")
@@ -422,13 +460,14 @@ def main():
         "--real-data", action="store_true", default=False, help="Force real data from Supabase (fail if unavailable)"
     )
     parser.add_argument("--verbose", "-v", type=int, default=1, help="Verbosity level")
+    parser.add_argument("--site-id", type=str, default=None, help="Site ID for site-scoped training (e.g. site-002)")
 
     args = parser.parse_args()
 
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-    trainer = AutoencoderTrainer()
+    trainer = AutoencoderTrainer(site_id=args.site_id)
 
     # Default: try real data first (use_demo_data=False), fall back to demo.
     # --demo-data forces demo. --real-data forces real (no fallback).
@@ -452,6 +491,7 @@ def main():
             latent_dim=args.latent_dim,
             use_demo_data=use_demo,
             verbose=args.verbose,
+            site_id=args.site_id,
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")

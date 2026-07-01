@@ -24,13 +24,32 @@ _autoencoder_model = None
 _registry = None
 
 
-def _fetch_sensor_window_from_db(equipment_code: str, equipment_type: str, hours: int = 24) -> np.ndarray | None:
-    """Fetch real sensor readings from equipment_sensor_readings as a feature window."""
+def _infer_site_id(equipment_code: str | None) -> str | None:
+    """Infer canonical site ID from equipment code prefixes like S002-... or site-002-..."""
+    if not equipment_code:
+        return None
+    parts = equipment_code.split("-")
+    if len(parts) >= 2 and parts[0].lower() == "site":
+        return f"site-{parts[1]}".lower()
+    first = parts[0].upper()
+    if first.startswith("S") and first[1:].isdigit():
+        return f"site-{first[1:]}".lower()
+    return None
+
+
+def _fetch_sensor_window_from_db(
+    equipment_code: str,
+    equipment_type: str,
+    hours: int = 24,
+    feature_cols: list[str] | None = None,
+    site_id: str | None = None,
+) -> np.ndarray | None:
+    """Fetch aggregate telemetry from telemetry_hourly as a model feature window."""
     import os
 
     import psycopg2
 
-    feature_cols: dict[str, list[str]] = {
+    default_feature_cols: dict[str, list[str]] = {
         "chiller": [
             "chw_supply_temp",
             "chw_return_temp",
@@ -44,7 +63,7 @@ def _fetch_sensor_window_from_db(equipment_code: str, equipment_type: str, hours
         "vav": ["zone_temp", "co2_ppm", "damper_position", "airflow_lps"],
         "site_aggregate": ["hvac_kw", "lighting_kw", "total_kw", "total_occupancy", "occupied_zones"],
     }
-    cols = feature_cols.get(equipment_type)
+    cols = feature_cols or default_feature_cols.get(equipment_type)
     if not cols:
         return None
 
@@ -59,17 +78,17 @@ def _fetch_sensor_window_from_db(equipment_code: str, equipment_type: str, hours
         conn.autocommit = True
         cur = conn.cursor()
 
-        placeholders = ",".join(["%s"] * len(cols))
         cur.execute(
-            f"""
-            SELECT recorded_at, sensor_type, value
-            FROM equipment_sensor_readings
+            """
+            SELECT hour_bucket, point_name, value_avg::float
+            FROM telemetry_hourly
             WHERE equipment_id = %s
-              AND sensor_type IN ({placeholders})
-              AND recorded_at >= %s
-            ORDER BY recorded_at ASC
+              AND point_name = ANY(%s)
+              AND hour_bucket >= %s
+              AND (%s IS NULL OR site_id = %s)
+            ORDER BY hour_bucket ASC
             """,
-            [equipment_code, *cols, since],
+            [equipment_code, cols, since, site_id, site_id],
         )
         rows = cur.fetchall()
         cur.close()
@@ -84,9 +103,9 @@ def _fetch_sensor_window_from_db(equipment_code: str, equipment_type: str, hours
     from collections import defaultdict
 
     hourly: dict[str, dict[str, float]] = defaultdict(dict)
-    for recorded_at, sensor_type, value in rows:
+    for recorded_at, point_name, value in rows:
         bucket = recorded_at.strftime("%Y-%m-%dT%H")
-        hourly[bucket][sensor_type] = float(value)
+        hourly[bucket][point_name] = float(value)
 
     sorted_buckets = sorted(hourly.keys())
     required_buckets = min(24, hours)
@@ -120,7 +139,7 @@ class LSTMInferenceService:
         self._loaded_scalers: dict[str, Any] = {}
         self._registry_generation: int = self.registry._generation
 
-    def _load_model(self, equipment_type: str):
+    def _load_model(self, equipment_type: str, site_id: str | None = None):
         """Load model for equipment type (cached, invalidated on registry update)."""
         # Check if registry has activated new models since last load
         if self.registry._generation != self._registry_generation:
@@ -132,12 +151,13 @@ class LSTMInferenceService:
             self._loaded_scalers.clear()
             self._registry_generation = self.registry._generation
 
-        if equipment_type in self._loaded_models:
-            return self._loaded_models[equipment_type]
+        cache_key = f"{site_id or 'global'}:{equipment_type}"
+        if cache_key in self._loaded_models:
+            return self._loaded_models[cache_key]
 
-        model_info = self.registry.get_active_model("lstm", equipment_type)
+        model_info = self.registry.get_active_model("lstm", equipment_type, site_id=site_id)
         if not model_info:
-            raise ValueError(f"No active LSTM model for {equipment_type}")
+            raise ValueError(f"No active LSTM model for {equipment_type} at site {site_id or 'global'}")
 
         # Lazy import
         import joblib
@@ -149,14 +169,20 @@ class LSTMInferenceService:
 
         if scaler_path and Path(scaler_path).exists():
             scaler = joblib.load(scaler_path)
-            self._loaded_scalers[equipment_type] = scaler
+            self._loaded_scalers[cache_key] = scaler
 
-        self._loaded_models[equipment_type] = model
-        logger.info(f"Loaded LSTM model for {equipment_type}")
+        self._loaded_models[cache_key] = (model, model_info)
+        logger.info("Loaded LSTM model for %s site=%s", equipment_type, site_id or "global")
 
-        return model
+        return model, model_info
 
-    def predict(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> dict[str, Any]:
+    def predict(
+        self,
+        equipment_id: str,
+        equipment_type: str,
+        sensor_data: np.ndarray = None,
+        site_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Get 24/48/72h predictions for equipment.
 
@@ -170,12 +196,20 @@ class LSTMInferenceService:
             Prediction result with confidence
         """
         try:
-            model = self._load_model(equipment_type)
+            site_id = site_id or _infer_site_id(equipment_id)
+            model, model_info = self._load_model(equipment_type, site_id=site_id)
         except Exception as e:
             return {"equipment_id": equipment_id, "error": str(e), "predictions": None}
 
         if sensor_data is None:
-            sensor_data = _fetch_sensor_window_from_db(equipment_id, equipment_type, hours=168)
+            feature_names = model_info.get("metadata", {}).get("feature_names")
+            sensor_data = _fetch_sensor_window_from_db(
+                equipment_id,
+                equipment_type,
+                hours=168,
+                feature_cols=feature_names,
+                site_id=site_id,
+            )
             if sensor_data is None:
                 return {
                     "equipment_id": equipment_id,
@@ -196,8 +230,9 @@ class LSTMInferenceService:
         X = np.array(sensor_data[-168:]).reshape(1, 168, -1)
 
         # Scale if scaler available
-        if equipment_type in self._loaded_scalers:
-            scaler = self._loaded_scalers[equipment_type]
+        cache_key = f"{site_id or 'global'}:{equipment_type}"
+        if cache_key in self._loaded_scalers:
+            scaler = self._loaded_scalers[cache_key]
             X_flat = X.reshape(-1, X.shape[-1])
             X_scaled = scaler.transform(X_flat).reshape(X.shape)
         else:
@@ -207,7 +242,7 @@ class LSTMInferenceService:
         predictions_raw = model.predict(X_scaled)[0]
 
         # Denormalize if needed
-        if equipment_type in self._loaded_scalers:
+        if cache_key in self._loaded_scalers:
             # Simple denorm for single feature target
             predictions = predictions_raw
         else:
@@ -216,6 +251,7 @@ class LSTMInferenceService:
         return {
             "equipment_id": equipment_id,
             "equipment_type": equipment_type,
+            "site_id": site_id,
             "predictions": {
                 "24h": float(predictions[0]) if len(predictions) > 0 else None,
                 "48h": float(predictions[1]) if len(predictions) > 1 else None,
@@ -223,12 +259,27 @@ class LSTMInferenceService:
             },
             "confidence": 0.85,  # Placeholder - would calculate from model uncertainty
             "timestamp": datetime.utcnow().isoformat(),
-            "model_info": {"model_id": self.registry.get_active_model("lstm", equipment_type)["model_id"]},
+            "model_info": {"model_id": model_info["model_id"], "site_id": model_info.get("site_id")},
         }
 
-    def get_trend(self, equipment_id: str, equipment_type: str, hours_history: int = 168) -> dict[str, Any]:
+    def get_trend(
+        self,
+        equipment_id: str,
+        equipment_type: str,
+        hours_history: int = 168,
+        site_id: str | None = None,
+    ) -> dict[str, Any]:
         """Get historical + predicted trend data for visualization."""
-        sensor_data = _fetch_sensor_window_from_db(equipment_id, equipment_type, hours=hours_history)
+        site_id = site_id or _infer_site_id(equipment_id)
+        model_info = self.registry.get_active_model("lstm", equipment_type, site_id=site_id)
+        feature_names = model_info.get("metadata", {}).get("feature_names") if model_info else None
+        sensor_data = _fetch_sensor_window_from_db(
+            equipment_id,
+            equipment_type,
+            hours=hours_history,
+            feature_cols=feature_names,
+            site_id=site_id,
+        )
         if sensor_data is None:
             return {
                 "equipment_id": equipment_id,
@@ -236,7 +287,7 @@ class LSTMInferenceService:
                 "error": "Insufficient real telemetry for trend; no synthetic history generated",
             }
 
-        prediction = self.predict(equipment_id, equipment_type, sensor_data=sensor_data)
+        prediction = self.predict(equipment_id, equipment_type, sensor_data=sensor_data, site_id=site_id)
 
         if prediction.get("error"):
             return prediction
@@ -246,6 +297,7 @@ class LSTMInferenceService:
         return {
             "equipment_id": equipment_id,
             "equipment_type": equipment_type,
+            "site_id": site_id,
             "historical": historical,
             "predicted": prediction["predictions"],
             "visualization_data": {
@@ -271,7 +323,7 @@ class AnomalyDetectionService:
         self._loaded_scalers: dict[str, Any] = {}
         self._registry_generation: int = self.registry._generation
 
-    def _load_model(self, equipment_type: str):
+    def _load_model(self, equipment_type: str, site_id: str | None = None):
         """Load autoencoder for equipment type (cached, invalidated on registry update)."""
         # Check if registry has activated new models since last load
         if self.registry._generation != self._registry_generation:
@@ -283,12 +335,13 @@ class AnomalyDetectionService:
             self._loaded_scalers.clear()
             self._registry_generation = self.registry._generation
 
-        if equipment_type in self._loaded_models:
-            return self._loaded_models[equipment_type]
+        cache_key = f"{site_id or 'global'}:{equipment_type}"
+        if cache_key in self._loaded_models:
+            return self._loaded_models[cache_key]
 
-        model_info = self.registry.get_active_model("autoencoder", equipment_type)
+        model_info = self.registry.get_active_model("autoencoder", equipment_type, site_id=site_id)
         if not model_info:
-            raise ValueError(f"No active autoencoder for {equipment_type}")
+            raise ValueError(f"No active autoencoder for {equipment_type} at site {site_id or 'global'}")
 
         # Lazy import
         import joblib
@@ -300,14 +353,20 @@ class AnomalyDetectionService:
 
         if scaler_path and Path(scaler_path).exists():
             scaler = joblib.load(scaler_path)
-            self._loaded_scalers[equipment_type] = scaler
+            self._loaded_scalers[cache_key] = scaler
 
-        self._loaded_models[equipment_type] = model
-        logger.info(f"Loaded autoencoder for {equipment_type}")
+        self._loaded_models[cache_key] = (model, model_info)
+        logger.info("Loaded autoencoder for %s site=%s", equipment_type, site_id or "global")
 
-        return model
+        return model, model_info
 
-    def check_equipment(self, equipment_id: str, equipment_type: str, sensor_data: np.ndarray = None) -> dict[str, Any]:
+    def check_equipment(
+        self,
+        equipment_id: str,
+        equipment_type: str,
+        sensor_data: np.ndarray = None,
+        site_id: str | None = None,
+    ) -> dict[str, Any]:
         """
         Check equipment for anomalies.
 
@@ -320,12 +379,20 @@ class AnomalyDetectionService:
             Anomaly detection result
         """
         try:
-            model = self._load_model(equipment_type)
+            site_id = site_id or _infer_site_id(equipment_id)
+            model, model_info = self._load_model(equipment_type, site_id=site_id)
         except Exception as e:
             return {"equipment_id": equipment_id, "error": str(e), "is_anomaly": None}
 
         if sensor_data is None:
-            sensor_data = _fetch_sensor_window_from_db(equipment_id, equipment_type, hours=24)
+            feature_names = model_info.get("metadata", {}).get("feature_names")
+            sensor_data = _fetch_sensor_window_from_db(
+                equipment_id,
+                equipment_type,
+                hours=24,
+                feature_cols=feature_names,
+                site_id=site_id,
+            )
             if sensor_data is None:
                 return {
                     "equipment_id": equipment_id,
@@ -346,8 +413,9 @@ class AnomalyDetectionService:
         X = np.array(sensor_data[-24:]).reshape(1, 24, -1)
 
         # Scale if scaler available
-        if equipment_type in self._loaded_scalers:
-            scaler = self._loaded_scalers[equipment_type]
+        cache_key = f"{site_id or 'global'}:{equipment_type}"
+        if cache_key in self._loaded_scalers:
+            scaler = self._loaded_scalers[cache_key]
             X_flat = X.reshape(-1, X.shape[-1])
             X_scaled = scaler.transform(X_flat).reshape(X.shape)
         else:
@@ -362,13 +430,14 @@ class AnomalyDetectionService:
         return {
             "equipment_id": equipment_id,
             "equipment_type": equipment_type,
+            "site_id": site_id,
             "is_anomaly": bool(is_anomaly[0]),
             "anomaly_score": score,
             "threshold": threshold,
             "score_pct": (score / threshold * 100) if threshold > 0 else 0,
             "severity": self._classify_severity(score, threshold),
             "timestamp": datetime.utcnow().isoformat(),
-            "model_info": {"model_id": self.registry.get_active_model("autoencoder", equipment_type)["model_id"]},
+            "model_info": {"model_id": model_info["model_id"], "site_id": model_info.get("site_id")},
         }
 
     def _classify_severity(self, score: float, threshold: float) -> str:
@@ -423,20 +492,31 @@ class AnomalyDetectionService:
         return []
 
     def fetch_sensor_window_from_db(
-        self, equipment_code: str, equipment_type: str, hours: int = 24
+        self,
+        equipment_code: str,
+        equipment_type: str,
+        hours: int = 24,
+        site_id: str | None = None,
+        feature_cols: list[str] | None = None,
     ) -> np.ndarray | None:
-        """Fetch sensor readings from equipment_sensor_readings and return a 24h numpy window.
+        """Fetch hourly aggregate telemetry and return a numpy feature window.
 
         Queries the last `hours` of readings, pivots sensor_type columns into a
         2-D array (timesteps × features) using the feature order the autoencoder
         was trained on.  Returns None if there are insufficient rows.
         """
-        return _fetch_sensor_window_from_db(equipment_code, equipment_type, hours=hours)
+        return _fetch_sensor_window_from_db(
+            equipment_code,
+            equipment_type,
+            hours=hours,
+            site_id=site_id,
+            feature_cols=feature_cols,
+        )
 
     def run_anomaly_scan(self, site_id: str) -> list[dict[str, Any]]:
         """Run anomaly detection on all active equipment for a site using real DB data.
 
-        Fetches sensor windows from equipment_sensor_readings, runs the autoencoder,
+        Fetches sensor windows from telemetry_hourly, runs the autoencoder,
         and persists anomalies to the anomalies table.  Returns a list of result dicts.
         """
         import os
@@ -479,12 +559,19 @@ class AnomalyDetectionService:
         now = datetime.utcnow()
 
         for eq_id, eq_code, eq_type in equipment_rows:
-            sensor_data = self.fetch_sensor_window_from_db(eq_code, eq_type)
+            model_info = self.registry.get_active_model("autoencoder", eq_type, site_id=site_id)
+            feature_names = model_info.get("metadata", {}).get("feature_names") if model_info else None
+            sensor_data = self.fetch_sensor_window_from_db(
+                eq_code,
+                eq_type,
+                site_id=site_id,
+                feature_cols=feature_names,
+            )
             if sensor_data is None:
                 logger.debug(f"Skipping {eq_code}: insufficient sensor data in DB")
                 continue
 
-            result = self.check_equipment(eq_code, eq_type, sensor_data=sensor_data)
+            result = self.check_equipment(eq_code, eq_type, sensor_data=sensor_data, site_id=site_id)
             result["equipment_db_id"] = str(eq_id)
             results.append(result)
 

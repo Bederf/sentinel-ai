@@ -15,7 +15,10 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.get("/status")
 @limiter.limit("1000/minute")
-async def get_model_status(request: Request):
+async def get_model_status(
+    request: Request,
+    site_id: str | None = Query(None, description="Site ID for site-scoped model status"),
+):
     """Check all models for staleness and performance issues.
 
     Rate limit: 1000 requests/minute
@@ -23,11 +26,12 @@ async def get_model_status(request: Request):
     from ml.training.retraining_scheduler import get_retraining_scheduler
 
     scheduler = get_retraining_scheduler()
-    checks = scheduler.check_all_models()
+    checks = scheduler.check_all_models(site_id=site_id)
 
     needs_retrain = [c for c in checks if c["needs_retrain"]]
     return {
         "total_models_checked": len(checks),
+        "site_id": site_id,
         "needs_retrain": len(needs_retrain),
         "models": checks,
     }
@@ -68,6 +72,7 @@ async def trigger_retraining(
     background_tasks: BackgroundTasks,
     model_type: str = Query(..., description="Model type: lstm or autoencoder"),
     equipment_type: str = Query(..., description="Equipment type: chiller, ahu, etc."),
+    site_id: str = Query(..., description="Site ID for site-scoped retraining"),
     reason: str = Query("manual", description="Reason for retraining"),
 ):
     """Trigger model retraining (runs in background).
@@ -78,12 +83,13 @@ async def trigger_retraining(
 
     scheduler = get_retraining_scheduler()
 
-    result = scheduler.trigger_retraining(model_type, equipment_type, reason)
+    result = scheduler.trigger_retraining(model_type, equipment_type, reason, site_id=site_id)
 
     return {
         "triggered": result.success,
         "model_type": model_type,
         "equipment_type": equipment_type,
+        "site_id": site_id,
         "reason": reason,
         "new_model_id": result.new_model_id,
         "error": result.error,

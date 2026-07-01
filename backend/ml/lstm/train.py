@@ -20,6 +20,7 @@ import numpy as np
 from ..registry import get_model_registry
 from .data_prep import EquipmentDataLoader, LSTMDataPrep
 from .model import SensorLSTM
+from ml.model_config import get_lstm_features, list_ml_trainable_types
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +29,11 @@ class LSTMTrainer:
     """Training pipeline for LSTM forecasting models."""
 
     def __init__(
-        self, model_dir: str | None = None, window_size: int = 168, forecast_horizons: list[int] | None = None
+        self,
+        model_dir: str | None = None,
+        window_size: int = 168,
+        forecast_horizons: list[int] | None = None,
+        site_id: str | None = None,
     ):
         """
         Initialize trainer.
@@ -44,6 +49,7 @@ class LSTMTrainer:
         self.model_dir = Path(model_dir)
         self.model_dir.mkdir(parents=True, exist_ok=True)
 
+        self.site_id = site_id
         self.window_size = window_size
         self.forecast_horizons = forecast_horizons or [24, 48, 72]
         self.registry = get_model_registry()
@@ -56,6 +62,7 @@ class LSTMTrainer:
         test_size: float = 0.2,
         use_demo_data: bool = True,
         verbose: int = 1,
+        site_id: str | None = None,
     ) -> dict[str, Any]:
         """
         Train LSTM model for a specific equipment type.
@@ -71,40 +78,71 @@ class LSTMTrainer:
         Returns:
             Training results dictionary
         """
-        logger.info(f"Training LSTM for {equipment_type}...")
+        site_id = site_id or self.site_id
+        logger.info("Training LSTM for %s (site=%s)...", equipment_type, site_id or "global")
         start_time = datetime.now()
 
         # Get sensor configuration
         config = EquipmentDataLoader.get_config(equipment_type)
-        n_features = len(config["features"])
+        feature_names = get_lstm_features(equipment_type, site_id)
+        if not feature_names:
+            feature_names = config["features"]
+        target = config["target"] if config["target"] in feature_names else feature_names[0]
+        n_features = len(feature_names)
+        provenance: dict[str, Any] = {
+            "site_id": site_id,
+            "requested_use_demo_data": use_demo_data,
+        }
 
         # Prepare data
         data_prep = LSTMDataPrep(window_size=self.window_size, forecast_horizons=self.forecast_horizons)
 
         try:
             if not use_demo_data:
-                # Load real data from Supabase equipment_sensor_readings
+                # Load real data from long-retention hourly aggregate telemetry.
                 from ml.data.supabase_loader import SupabaseTrainingDataLoader
 
-                loader = SupabaseTrainingDataLoader()
-                df = loader.load_equipment_type_dataframe(equipment_type, min_hours=500)
+                loader = SupabaseTrainingDataLoader(site_id=site_id)
+                df = loader.load_equipment_type_dataframe(
+                    equipment_type,
+                    min_hours=500,
+                    model_type="lstm",
+                    required_features=feature_names,
+                )
                 if df is not None:
-                    logger.info(f"Loaded {len(df)} hours of real data for {equipment_type}")
+                    logger.info("Loaded %d hours of real aggregate data for %s", len(df), equipment_type)
+                    provenance.update(loader.last_load_metadata)
+                    provenance["use_demo_data"] = False
                     X, y = data_prep.prepare_from_dataframe(
                         df,
-                        feature_cols=config["features"],
-                        target_col=config["target"],
+                        feature_cols=feature_names,
+                        target_col=target,
                         timestamp_col="timestamp",
                     )
                 else:
                     logger.warning(f"Insufficient real data for {equipment_type}, falling back to demo data")
+                    provenance.update(
+                        {
+                            "data_source": "synthetic_fallback",
+                            "use_demo_data": True,
+                            "synthetic_fallback_reason": "insufficient_telemetry_hourly_data",
+                        }
+                    )
                     X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features, noise_level=0.1)
             else:
                 logger.info(f"Using demo data for {equipment_type}")
+                provenance.update({"data_source": "demo_forced", "use_demo_data": True})
                 X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features, noise_level=0.1)
 
         except Exception as e:
             logger.warning(f"Could not load real data: {e}. Using demo data.")
+            provenance.update(
+                {
+                    "data_source": "synthetic_fallback",
+                    "use_demo_data": True,
+                    "synthetic_fallback_reason": str(e),
+                }
+            )
             X, y = data_prep.generate_demo_data(n_samples=5000, n_features=n_features)
 
         # Verify data shape
@@ -158,10 +196,13 @@ class LSTMTrainer:
         scaler_path = str(model_path).replace(".h5", "_scaler.joblib")
         data_prep.save_scaler(scaler_path)
 
+        auto_activate = provenance.get("data_source") == "telemetry_hourly"
+
         # Register model
         model_id = self.registry.register_model(
             model_type="lstm",
             equipment_type=equipment_type,
+            site_id=site_id,
             model_path=str(model_path),
             metrics=metrics,
             metadata={
@@ -169,20 +210,21 @@ class LSTMTrainer:
                 "window_size": self.window_size,
                 "forecast_horizons": self.forecast_horizons,
                 "n_features": n_features,
-                "feature_names": config["features"],
-                "target": config["target"],
+                "feature_names": feature_names,
+                "target": target,
                 "training_samples": len(X_train),
                 "validation_samples": len(X_val),
                 "epochs_trained": len(history["loss"]),
-                "use_demo_data": use_demo_data,
+                **provenance,
             },
-            auto_activate=True,
+            auto_activate=auto_activate,
         )
 
         training_time = (datetime.now() - start_time).total_seconds()
 
         result = {
             "equipment_type": equipment_type,
+            "site_id": site_id,
             "model_id": model_id,
             "model_path": str(model_path),
             "scaler_path": scaler_path,
@@ -335,9 +377,17 @@ class LSTMTrainer:
         """Train models for all equipment types."""
         results = []
 
-        for eq_type in EquipmentDataLoader.list_equipment_types():
+        equipment_types = (
+            list_ml_trainable_types(self.site_id) if self.site_id else EquipmentDataLoader.list_equipment_types()
+        )
+        for eq_type in equipment_types:
             try:
-                result = self.train_equipment_type(eq_type, epochs=epochs, use_demo_data=use_demo_data)
+                result = self.train_equipment_type(
+                    eq_type,
+                    epochs=epochs,
+                    use_demo_data=use_demo_data,
+                    site_id=self.site_id,
+                )
                 results.append(result)
             except Exception as e:
                 logger.error(f"Failed to train {eq_type}: {e}")
@@ -372,13 +422,14 @@ def main():
     parser.add_argument(
         "--verbose", "-v", type=int, default=1, help="Verbosity level (0=silent, 1=progress, 2=detailed)"
     )
+    parser.add_argument("--site-id", type=str, default=None, help="Site ID for site-scoped training (e.g. site-002)")
 
     args = parser.parse_args()
 
     # Configure logging
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
-    trainer = LSTMTrainer()
+    trainer = LSTMTrainer(site_id=args.site_id)
 
     # Default: try real data first (use_demo_data=False), fall back to demo.
     # --demo-data forces demo. --real-data forces real (no fallback).
@@ -395,7 +446,11 @@ def main():
 
     elif args.equipment_type:
         result = trainer.train_equipment_type(
-            args.equipment_type, epochs=args.epochs, use_demo_data=use_demo, verbose=args.verbose
+            args.equipment_type,
+            epochs=args.epochs,
+            use_demo_data=use_demo,
+            verbose=args.verbose,
+            site_id=args.site_id,
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")

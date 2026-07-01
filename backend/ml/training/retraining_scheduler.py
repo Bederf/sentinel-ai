@@ -32,6 +32,7 @@ class RetrainResult:
     equipment_type: str
     triggered_at: str
     reason: str
+    site_id: str | None = None
     success: bool = False
     new_model_id: str | None = None
     metrics: dict[str, float] = field(default_factory=dict)
@@ -110,7 +111,7 @@ class RetrainingScheduler:
         self._last_discovery_at = now
         return all_results
 
-    def check_all_models(self) -> list[dict[str, Any]]:
+    def check_all_models(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Check freshness and performance of all active models.
 
         Returns a list of dicts with model_type, equipment_type, status (fresh/stale/missing),
@@ -123,13 +124,14 @@ class RetrainingScheduler:
 
         for model_type in MODEL_TYPES:
             for equipment_type in EQUIPMENT_TYPES:
-                model = registry.get_active_model(model_type, equipment_type)
+                model = registry.get_active_model(model_type, equipment_type, site_id=site_id)
 
                 if model is None:
                     results.append(
                         {
                             "model_type": model_type,
                             "equipment_type": equipment_type,
+                            "site_id": site_id,
                             "status": "missing",
                             "age_days": None,
                             "r2_score": None,
@@ -168,6 +170,7 @@ class RetrainingScheduler:
                     {
                         "model_type": model_type,
                         "equipment_type": equipment_type,
+                        "site_id": site_id or model.get("site_id") or model.get("metadata", {}).get("site_id"),
                         "model_id": model.get("model_id"),
                         "status": status,
                         "age_days": age_days,
@@ -184,6 +187,7 @@ class RetrainingScheduler:
         model_type: str,
         equipment_type: str,
         reason: str = "manual",
+        site_id: str | None = None,
     ) -> RetrainResult:
         """Trigger retraining for a specific model type and equipment type.
 
@@ -192,24 +196,26 @@ class RetrainingScheduler:
         and returns the result.
         """
         result = RetrainResult(
-            model_id=f"{model_type}_{equipment_type}",
+            model_id=f"{site_id + '_' if site_id else ''}{model_type}_{equipment_type}",
             model_type=model_type,
             equipment_type=equipment_type,
             triggered_at=datetime.now().isoformat(),
             reason=reason,
+            site_id=site_id,
         )
 
         try:
-            logger.info(f"Retraining triggered: {model_type}/{equipment_type} - reason: {reason}")
+            logger.info("Retraining triggered: %s/%s site=%s - reason: %s", model_type, equipment_type, site_id, reason)
 
             if model_type == "lstm":
                 from ml.lstm.train import LSTMTrainer
 
-                trainer = LSTMTrainer()
+                trainer = LSTMTrainer(site_id=site_id)
                 train_result = trainer.train_equipment_type(
                     equipment_type,
                     epochs=50,
                     use_demo_data=False,
+                    site_id=site_id,
                 )
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
@@ -217,11 +223,12 @@ class RetrainingScheduler:
             elif model_type == "autoencoder":
                 from ml.autoencoder.train import AutoencoderTrainer
 
-                trainer = AutoencoderTrainer()
+                trainer = AutoencoderTrainer(site_id=site_id)
                 train_result = trainer.train_equipment_type(
                     equipment_type,
                     epochs=50,
                     use_demo_data=False,
+                    site_id=site_id,
                 )
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
