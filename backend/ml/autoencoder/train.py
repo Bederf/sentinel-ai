@@ -61,6 +61,7 @@ class AutoencoderTrainer:
         verbose: int = 1,
         site_id: str | None = None,
         auto_activate: bool = True,
+        allow_synthetic_fallback: bool = True,
     ) -> dict[str, Any]:
         """
         Train autoencoder for a specific equipment type.
@@ -74,6 +75,7 @@ class AutoencoderTrainer:
             use_demo_data: Use synthetic demo data if real data unavailable
             verbose: Training verbosity
             auto_activate: Activate the model if real telemetry was used
+            allow_synthetic_fallback: Use synthetic fallback when real data is unavailable
 
         Returns:
             Training results dictionary
@@ -120,6 +122,8 @@ class AutoencoderTrainer:
                     X_all = X_normal  # No known anomalies in real data
                     anomaly_indices = []
                 else:
+                    if not allow_synthetic_fallback:
+                        raise ValueError(f"Insufficient real telemetry_hourly data for {equipment_type}")
                     logger.warning(f"Insufficient real data for {equipment_type}, falling back to demo data")
                     provenance.update(
                         {
@@ -145,6 +149,8 @@ class AutoencoderTrainer:
                 )
 
         except Exception as e:
+            if not use_demo_data and not allow_synthetic_fallback:
+                raise
             logger.warning(f"Could not load real data: {e}. Using demo data.")
             provenance.update(
                 {
@@ -419,7 +425,12 @@ class AutoencoderTrainer:
             "threshold": model.threshold,
         }
 
-    def train_all(self, epochs: int = 100, use_demo_data: bool = True) -> list[dict[str, Any]]:
+    def train_all(
+        self,
+        epochs: int = 100,
+        use_demo_data: bool = True,
+        allow_synthetic_fallback: bool = True,
+    ) -> list[dict[str, Any]]:
         """Train models for all equipment types."""
         results = []
 
@@ -431,6 +442,7 @@ class AutoencoderTrainer:
                     epochs=epochs,
                     use_demo_data=use_demo_data,
                     site_id=self.site_id,
+                    allow_synthetic_fallback=allow_synthetic_fallback,
                 )
                 results.append(result)
             except Exception as e:
@@ -483,7 +495,11 @@ def main():
     use_demo = args.demo_data
 
     if args.all:
-        results = trainer.train_all(epochs=args.epochs, use_demo_data=use_demo)
+        results = trainer.train_all(
+            epochs=args.epochs,
+            use_demo_data=use_demo,
+            allow_synthetic_fallback=not args.real_data,
+        )
         print("\n=== Training Results ===")
         for r in results:
             if "error" in r:
@@ -502,6 +518,7 @@ def main():
             verbose=args.verbose,
             site_id=args.site_id,
             auto_activate=not args.no_activate,
+            allow_synthetic_fallback=not args.real_data,
         )
         print(f"\n=== Training Result: {args.equipment_type} ===")
         print(f"  Model ID: {result['model_id']}")

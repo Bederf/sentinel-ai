@@ -86,7 +86,7 @@ class LSTMDataPrep:
         # Resample to hourly if needed
         df[timestamp_col] = pd.to_datetime(df[timestamp_col])
         df = df.set_index(timestamp_col)
-        df = df[feature_cols].resample("1H").mean()
+        df = df[feature_cols].resample("1h").mean()
 
         # Forward fill small gaps (up to 3 hours)
         df = df.fillna(method="ffill", limit=3)
