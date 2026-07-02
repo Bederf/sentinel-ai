@@ -17,6 +17,7 @@ class TrustHistory(BaseModel):
 
     point_id: str
     site_id: str
+    equipment_id: str = ""  # Canonical equipment code (empty for legacy rows)
     stability_days: int = 0  # Days without validation errors
     validation_runs: int = 0  # Total validation runs since first classification
     successful_actions: int = 0  # Control actions that achieved expected outcome

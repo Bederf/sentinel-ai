@@ -191,6 +191,7 @@ async def validate_relevance_node(state: RecommendationAgentState) -> dict:
     _is_advisory_rec = _advisory_type in {
         "site_profile_hvac_state_correction",
         "fault_safety_gate",
+        "zone_scope_concrete_hvac_action",
     }
     freshness_max_minutes = 24 * 60 if _is_advisory_rec else 120
     freshness = check_recommendation_freshness(rec, max_age_minutes=freshness_max_minutes)

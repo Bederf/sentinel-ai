@@ -385,6 +385,50 @@ class ReviewQueueRepository:
         decisions.sort(key=lambda d: d.reviewed_at)
         return decisions
 
+    async def mark_equipment_reset(self, equipment_id: str, reset_reason: str, *, like_match: bool = False) -> int:
+        """Update pending review_queue entries for equipment with reset reason.
+
+        Args:
+            equipment_id: Exact equipment code, or ILIKE pattern if like_match=True.
+            reset_reason: Reason text to set on matching entries.
+            like_match: When True, use ILIKE matching (for equipment-type-level drift).
+        """
+        if not self._use_json and self.client is not None:
+            try:
+                query = self.client.table("review_queue").update({"reset_reason": reset_reason}).eq("status", "pending")
+                if like_match:
+                    query = query.ilike("equipment_id", equipment_id)
+                else:
+                    query = query.eq("equipment_id", equipment_id)
+                result = query.execute()
+                count = len(result.data or [])
+                if count:
+                    logger.info(
+                        "[TRUST-RESET] Marked %d review queue entries: %s",
+                        count,
+                        reset_reason,
+                    )
+                return count
+            except Exception as exc:
+                logger.warning("review_queue update by equipment failed: %s", exc)
+
+        # JSON fallback: find and update pending entries
+        if not DATA_DIR.exists():
+            return 0
+        count = 0
+        for path in DATA_DIR.iterdir():
+            if path.suffix != ".json":
+                continue
+            try:
+                data = json.loads(path.read_text())
+                if data.get("equipment_id") == equipment_id and data.get("status") == "pending":
+                    data["reset_reason"] = reset_reason
+                    path.write_text(json.dumps(data, indent=2, default=str))
+                    count += 1
+            except Exception:
+                continue
+        return count
+
 
 _repository: ReviewQueueRepository | None = None
 

@@ -52,6 +52,9 @@ class ReviewQueueEntry(BaseModel):
     override_confidence: float | None = None
     override_justification: str | None = None
 
+    # Trust reset metadata (PLAN-162B)
+    reset_reason: str | None = None
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 

@@ -89,7 +89,7 @@ class LSTMDataPrep:
         df = df[feature_cols].resample("1h").mean()
 
         # Forward fill small gaps (up to 3 hours)
-        df = df.fillna(method="ffill", limit=3)
+        df = df.ffill(limit=3)
 
         # Drop remaining NaN rows
         df = df.dropna()

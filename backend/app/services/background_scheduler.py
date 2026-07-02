@@ -179,10 +179,16 @@ def _is_zone_scope_decomposition_rec(rec: Any) -> bool:
 
 
 def _telegram_advisory_notification_groups(recommendations: list[Any]) -> list[list[Any]]:
-    """Split decomposed zone-scope children into individually approvable Telegram cards."""
+    """Batch decomposed zone-scope children into grouped Telegram cards (5 per message).
+
+    Each group renders as one Telegram message with up to 5 individually
+    approvable inline buttons, matching the existing rendering/keyboard limit.
+    """
     zone_scope_recs = [rec for rec in recommendations if _is_zone_scope_decomposition_rec(rec)]
     other_recs = [rec for rec in recommendations if not _is_zone_scope_decomposition_rec(rec)]
-    groups: list[list[Any]] = [[rec] for rec in zone_scope_recs]
+    groups: list[list[Any]] = []
+    for i in range(0, len(zone_scope_recs), 5):
+        groups.append(zone_scope_recs[i : i + 5])
     if other_recs:
         groups.append(other_recs)
     return groups
@@ -2481,6 +2487,24 @@ class BackgroundSchedulerService:
                                     "[AI-OPT] Could not expire logical HVAC zone-scope advisory for %s: %s",
                                     site_id,
                                     _exp_err,
+                                )
+
+                        if rec_source_metadata.get("rule") == HVAC_ZONE_SCOPE_DECOMPOSITION_RULE:
+                            try:
+                                asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.expire_pending_zone_scope_for_equipment(
+                                        site_id,
+                                        equipment_id,
+                                        superseded_by_rule=HVAC_ZONE_SCOPE_DECOMPOSITION_RULE,
+                                        superseded_reason="Newer zone-scope decomposition supersedes prior child rec",
+                                    ),
+                                    self._main_loop,
+                                ).result(timeout=30)
+                            except Exception as _dedup_err:
+                                logger.warning(
+                                    "[AI-OPT] Could not dedup zone-scope child rec for %s: %s",
+                                    equipment_id,
+                                    _dedup_err,
                                 )
 
                         # Gate: skip recommendations for equipment with active urgent/critical WO
@@ -9196,6 +9220,9 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             # items belong in work-order and maintenance sections.
             def _trim_digest_text(value: str | None, max_chars: int = 96) -> str:
                 text = " ".join(str(value or "").split())
+                # Escape Markdown special chars so LLM/operator text can't break
+                # Telegram MarkdownV1 parsing (unmatched * or _ causes 400 rejection).
+                text = text.replace("*", "\\*").replace("_", "\\_")
                 if len(text) <= max_chars:
                     return text
                 trimmed = text[: max_chars - 1].rsplit(" ", 1)[0]
@@ -9440,7 +9467,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
             lines.append(f"*Open Work Orders:* {open_wo_count}")
             for wo in open_wos[:3]:
                 code = wo.get("code") or "WO"
-                title = (wo.get("title") or "")[:70]
+                title = (wo.get("title") or "")[:70].replace("*", "\\*").replace("_", "\\_")
                 assigned = wo.get("assigned_to") or "unassigned"
                 priority = (wo.get("priority") or "medium").upper()
                 lines.append(f"  `{code}` — {priority} — {assigned} — {title}")
@@ -9466,8 +9493,38 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                     lines.append(f"  System-quality exceptions: {quality_count}")
                     for event in manager_exceptions.get("system_quality_exceptions", [])[:2]:
                         qtype = str(event.get("quality_exception_type") or "quality").replace("_", " ")
-                        detected_by = event.get("detected_by") or "unknown"
+                        detected_by = (event.get("detected_by") or "unknown").replace("_", " ")
                         lines.append(f"    {qtype} — detected by {detected_by}")
+
+            # Trust resets section (PLAN-162B)
+            try:
+                reset_cutoff = (datetime.now(UTC) - timedelta(hours=24)).isoformat()
+                reset_resp = (
+                    sb.table("trust_reset_events")
+                    .select("equipment_id,trigger_type,reset_action,occurred_at")
+                    .eq("site_id", site_id)
+                    .gte("occurred_at", reset_cutoff)
+                    .order("occurred_at", desc=True)
+                    .limit(10)
+                    .execute()
+                )
+                recent_resets = reset_resp.data or []
+                if recent_resets:
+                    lines.append("")
+                    lines.append(f"*Trust Resets (24h):* {len(recent_resets)}")
+                    for ev in recent_resets[:5]:
+                        eq = ev.get("equipment_id", "?")
+                        ttype = str(ev.get("trigger_type", "")).replace("_", " ")
+                        raction = str(ev.get("reset_action", "")).replace("_", " ")
+                        ts_raw = ev.get("occurred_at") or ""
+                        try:
+                            ts_dt = datetime.fromisoformat(str(ts_raw).replace("Z", "+00:00"))
+                            ts_str = ts_dt.astimezone(SAST).strftime("%H:%M SAST")
+                        except Exception:
+                            ts_str = str(ts_raw)[:16] if ts_raw else ""
+                        lines.append(f"  [{ts_str}] `{eq}` — {ttype} ({raction})")
+            except Exception as exc:
+                logger.debug("[DIGEST] Could not fetch trust reset events: %s", exc)
 
             # Savings section
             if verified_savings > 0 or estimated_savings > 0:
@@ -9490,7 +9547,10 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 }
                 for adv in overnight_advisories[:5]:
                     eq = adv.get("target_equipment") or "site"
-                    label = _overnight_labels.get(adv.get("action_type", ""), adv.get("action_type", "advisory"))
+                    label = _overnight_labels.get(
+                        adv.get("action_type", ""),
+                        str(adv.get("action_type", "advisory")).replace("_", " "),
+                    )
                     reason = _trim_digest_text(adv.get("reason"), 100)
                     ts_raw = adv.get("timestamp") or ""
                     try:

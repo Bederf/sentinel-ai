@@ -301,6 +301,14 @@ class Settings(BaseSettings):
     allowed_document_types: list[str] = [".pdf", ".docx", ".txt"]
     supabase_storage_bucket: str = "building-documents"
 
+    # Document embedding provider (Phase 184 — Voyage v4 upgrade)
+    voyage_api_key: str = Field(default="", validation_alias="VOYAGE_API_KEY")
+    embedding_provider: str = Field(default="minilm_local", validation_alias="EMBEDDING_PROVIDER")
+    voyage_embed_model: str = Field(default="voyage-4", validation_alias="VOYAGE_EMBED_MODEL")
+    voyage_context_model: str = Field(default="voyage-context-4", validation_alias="VOYAGE_CONTEXT_MODEL")
+    embedding_dimension: int = Field(default=1024, validation_alias="EMBEDDING_DIMENSION")
+    embedding_contextualized_enabled: bool = Field(default=False, validation_alias="EMBEDDING_CONTEXTUALIZED_ENABLED")
+
     # Authentication Rate Limiting (Phase 58-04 M-5: FSR Domain 4.6 Brute-Force Protection)
     rate_limit_enabled: bool = True  # Master switch for rate limiting
     rate_limit_max_attempts: int = 5  # Max failed login attempts before lockout
@@ -663,6 +671,21 @@ class Settings(BaseSettings):
             return "anthropic"
         return provider
 
+    @field_validator("embedding_provider", mode="before")
+    @classmethod
+    def _validate_embedding_provider(cls, value):
+        provider = (value or "minilm_local").strip().lower()
+        if provider not in {"minilm", "minilm_local", "sentence_transformers", "voyage_api", "voyage_nano_local"}:
+            return "minilm_local"
+        return provider
+
+    @field_validator("embedding_dimension", mode="after")
+    @classmethod
+    def _validate_embedding_dimension(cls, value):
+        if value not in {256, 384, 512, 1024, 1536, 2048}:
+            raise ValueError(f"Unsupported EMBEDDING_DIMENSION: {value}")
+        return value
+
     @field_validator("jwt_secret_key", mode="after")
     @classmethod
     def _validate_jwt_secret_key(cls, value):
@@ -705,7 +728,7 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("anthropic_api_key", "openai_api_key", "zai_api_key", mode="after")
+    @field_validator("anthropic_api_key", "openai_api_key", "zai_api_key", "voyage_api_key", mode="after")
     @classmethod
     def _validate_ai_api_keys(cls, value):
         """Validate AI API key format."""

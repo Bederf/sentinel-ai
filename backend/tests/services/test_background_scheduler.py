@@ -113,11 +113,27 @@ class TestBackgroundScheduler:
         child_2 = SimpleNamespace(metadata={"advisory_type": "zone_scope_concrete_hvac_action"}, action={})
         ordinary = SimpleNamespace(metadata={"rule": "ordinary_rule"}, action={})
 
+        # Zone-scope children are batched into groups of 5 (one Telegram message per
+        # group), not one message per child. Ordinary recs get their own group.
         assert _telegram_advisory_notification_groups([child_1, ordinary, child_2]) == [
-            [child_1],
-            [child_2],
+            [child_1, child_2],
             [ordinary],
         ]
+
+    def test_zone_scope_children_chunk_into_groups_of_five(self):
+        from app.services.background_scheduler import (
+            HVAC_ZONE_SCOPE_DECOMPOSITION_RULE,
+            _telegram_advisory_notification_groups,
+        )
+
+        children = [
+            SimpleNamespace(metadata={"rule": HVAC_ZONE_SCOPE_DECOMPOSITION_RULE}, action={}) for _ in range(12)
+        ]
+        groups = _telegram_advisory_notification_groups(children)
+        assert len(groups) == 3
+        assert len(groups[0]) == 5
+        assert len(groups[1]) == 5
+        assert len(groups[2]) == 2
 
     def test_morning_digest_alerts_use_canonical_equipment_names(self):
         from app.services.background_scheduler import _canonical_digest_alert

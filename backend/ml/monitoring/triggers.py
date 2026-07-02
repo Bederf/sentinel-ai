@@ -206,6 +206,9 @@ class RetrainingTrigger:
                 "error": retrain_result.error,
             }
 
+            # Apply trust decay on drift signal (PLAN-162B)
+            self._apply_trust_decay_on_drift(model_type, equipment_type, reason)
+
             # Record trigger time for cooldown
             self._last_trigger[key] = datetime.now().isoformat()
 
@@ -215,6 +218,73 @@ class RetrainingTrigger:
 
         self._trigger_history.append(result)
         return result
+
+    def _apply_trust_decay_on_drift(self, model_type: str, equipment_type: str, reason: str) -> None:
+        """Apply trust decay when drift is detected.
+
+        This fires on the same drift signal that triggers retraining.
+        Decay is applied immediately — does not wait for retrain completion.
+        """
+        import re
+
+        features_drifted = 4  # default: severe (model drift)
+        m = re.search(r"(\d+) features drifted", reason)
+        if m:
+            features_drifted = int(m.group(1))
+
+        if features_drifted <= 1:
+            return
+
+        try:
+            from app.database.repositories.trust_history_repository import (
+                TrustHistoryRepository,
+            )
+            from app.database.repositories.trust_reset_repository import (
+                TrustResetRepository,
+            )
+
+            repo = TrustHistoryRepository()
+            import asyncio
+
+            count = asyncio.run(repo.decay_by_equipment_type(equipment_type, features_drifted))
+            if count:
+                logger.info(
+                    "[TRUST-DECAY] Applied decay for %s (drift: %d features): %d trust rows affected",
+                    equipment_type,
+                    features_drifted,
+                    count,
+                )
+            # Record audit trail
+            try:
+                audit_repo = TrustResetRepository()
+                asyncio.run(
+                    audit_repo.record_reset(
+                        equipment_id=f"drift:{equipment_type}",
+                        site_id="",
+                        trigger_type=("drift_severe" if features_drifted > 3 else "drift_moderate"),
+                        reset_action=("moderate_decay" if features_drifted <= 3 else "severe_decay"),
+                    )
+                )
+            except Exception as audit_err:
+                logger.warning("[TRUST-DECAY] Audit record failed: %s", audit_err)
+            # Surface in review queue
+            try:
+                from app.database.repositories.review_queue_repository import (
+                    get_review_queue_repository,
+                )
+
+                q_repo = get_review_queue_repository()
+                asyncio.run(
+                    q_repo.mark_equipment_reset(
+                        f"%-{equipment_type.upper()}-%",
+                        f"Trust decay — {features_drifted} feature(s) drifted",
+                        like_match=True,
+                    )
+                )
+            except Exception as q_err:
+                logger.warning("[TRUST-DECAY] review_queue update failed: %s", q_err)
+        except Exception as exc:
+            logger.warning("[TRUST-DECAY] Failed to apply trust decay: %s", exc)
 
     def _is_in_cooldown(self, model_key: str) -> bool:
         """Check if a model is in cooldown period after recent retrain.

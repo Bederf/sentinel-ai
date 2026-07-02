@@ -1,0 +1,325 @@
+{
+  "created_at": "2026-07-02T06:07:17.119584+00:00",
+  "real_client_site_policy": "archive_first_10_year_retention_required",
+  "report": {
+    "db_delete_order": [
+      {
+        "rows": 966,
+        "table": "adapter_health"
+      },
+      {
+        "rows": 1,
+        "table": "adapter_health_current"
+      },
+      {
+        "rows": 6,
+        "table": "alerts"
+      },
+      {
+        "rows": 149,
+        "table": "bridge_discovered_equipment"
+      },
+      {
+        "rows": 194,
+        "table": "commissioning_scorecards"
+      },
+      {
+        "rows": 1,
+        "table": "data_freshness"
+      },
+      {
+        "rows": 149,
+        "table": "equipment_aliases"
+      },
+      {
+        "rows": 486,
+        "table": "equipment_fault_events"
+      },
+      {
+        "rows": 80,
+        "table": "equipment_relationships"
+      },
+      {
+        "rows": 39678,
+        "table": "equipment_sensor_readings"
+      },
+      {
+        "rows": 148,
+        "table": "equipment_zone_relationships"
+      },
+      {
+        "rows": 1,
+        "table": "log_sources"
+      },
+      {
+        "rows": 17,
+        "table": "phase_promotion_gates"
+      },
+      {
+        "rows": 7,
+        "table": "policy_decision_log"
+      },
+      {
+        "rows": 1,
+        "table": "site_adapter_config"
+      },
+      {
+        "rows": 1,
+        "table": "site_module_configs"
+      },
+      {
+        "rows": 15,
+        "table": "site_modules"
+      },
+      {
+        "rows": 39,
+        "table": "zone_aliases"
+      },
+      {
+        "rows": 71,
+        "table": "zones"
+      },
+      {
+        "rows": 149,
+        "table": "equipment"
+      },
+      {
+        "rows": 1,
+        "table": "sites"
+      }
+    ],
+    "db_delete_results": [
+      {
+        "deleted_rows": 966,
+        "table": "adapter_health"
+      },
+      {
+        "deleted_rows": 1,
+        "table": "adapter_health_current"
+      },
+      {
+        "deleted_rows": 6,
+        "table": "alerts"
+      },
+      {
+        "deleted_rows": 149,
+        "table": "bridge_discovered_equipment"
+      },
+      {
+        "deleted_rows": 194,
+        "table": "commissioning_scorecards"
+      },
+      {
+        "deleted_rows": 1,
+        "table": "data_freshness"
+      },
+      {
+        "deleted_rows": 149,
+        "table": "equipment_aliases"
+      },
+      {
+        "deleted_rows": 486,
+        "table": "equipment_fault_events"
+      },
+      {
+        "deleted_rows": 80,
+        "table": "equipment_relationships"
+      },
+      {
+        "deleted_rows": 39678,
+        "table": "equipment_sensor_readings"
+      },
+      {
+        "deleted_rows": 148,
+        "table": "equipment_zone_relationships"
+      },
+      {
+        "deleted_rows": 1,
+        "table": "log_sources"
+      },
+      {
+        "deleted_rows": 17,
+        "table": "phase_promotion_gates"
+      },
+      {
+        "deleted_rows": 7,
+        "table": "policy_decision_log"
+      },
+      {
+        "deleted_rows": 1,
+        "table": "site_adapter_config"
+      },
+      {
+        "deleted_rows": 1,
+        "table": "site_module_configs"
+      },
+      {
+        "deleted_rows": 15,
+        "table": "site_modules"
+      },
+      {
+        "deleted_rows": 39,
+        "table": "zone_aliases"
+      },
+      {
+        "deleted_rows": 71,
+        "table": "zones"
+      },
+      {
+        "deleted_rows": 149,
+        "table": "equipment"
+      },
+      {
+        "deleted_rows": 1,
+        "table": "sites"
+      }
+    ],
+    "db_matches": [
+      {
+        "rows": 966,
+        "table": "adapter_health"
+      },
+      {
+        "rows": 1,
+        "table": "adapter_health_current"
+      },
+      {
+        "rows": 6,
+        "table": "alerts"
+      },
+      {
+        "rows": 149,
+        "table": "bridge_discovered_equipment"
+      },
+      {
+        "rows": 194,
+        "table": "commissioning_scorecards"
+      },
+      {
+        "rows": 1,
+        "table": "data_freshness"
+      },
+      {
+        "rows": 149,
+        "table": "equipment"
+      },
+      {
+        "rows": 149,
+        "table": "equipment_aliases"
+      },
+      {
+        "rows": 486,
+        "table": "equipment_fault_events"
+      },
+      {
+        "rows": 80,
+        "table": "equipment_relationships"
+      },
+      {
+        "rows": 39678,
+        "table": "equipment_sensor_readings"
+      },
+      {
+        "rows": 148,
+        "table": "equipment_zone_relationships"
+      },
+      {
+        "rows": 1,
+        "table": "log_sources"
+      },
+      {
+        "rows": 17,
+        "table": "phase_promotion_gates"
+      },
+      {
+        "rows": 7,
+        "table": "policy_decision_log"
+      },
+      {
+        "rows": 1,
+        "table": "site_adapter_config"
+      },
+      {
+        "rows": 1,
+        "table": "site_module_configs"
+      },
+      {
+        "rows": 15,
+        "table": "site_modules"
+      },
+      {
+        "rows": 1,
+        "table": "sites"
+      },
+      {
+        "rows": 39,
+        "table": "zone_aliases"
+      },
+      {
+        "rows": 71,
+        "table": "zones"
+      }
+    ],
+    "equipment_count": 149,
+    "equipment_sample": [
+      "S005-site-005-UMH-AHU-B01",
+      "S005-site-005-UMH-BOILER-B01",
+      "S005-site-005-UMH-COLD-B01",
+      "S005-site-005-UMH-GEN-B01",
+      "S005-site-005-UMH-KEF-B01",
+      "S005-site-005-UMH-MEDGAS-B01",
+      "S005-site-005-UMH-MSB-B01",
+      "S005-site-005-UMH-PUMP-B01",
+      "site-005-UMH-AHU-L2-001.fan",
+      "site-005-UMH-AHU-L3-ICU.air",
+      "site-005-UMH-AHU-L3-ICU.fan",
+      "site-005-UMH-AHU-L3-ICU.hepa",
+      "site-005-UMH-AHU-L3-ICU.room",
+      "site-005-UMH-AHU-L3-TH1.air",
+      "site-005-UMH-AHU-L3-TH1.fan",
+      "site-005-UMH-AHU-L3-TH1.hepa",
+      "site-005-UMH-AHU-L3-TH1.room",
+      "site-005-UMH-AHU-L3-TH2.air",
+      "site-005-UMH-AHU-L3-TH2.fan",
+      "site-005-UMH-AHU-L3-TH2.hepa"
+    ],
+    "filesystem_targets": [
+      {
+        "exists": true,
+        "file_count": 1,
+        "path": "/opt/bms-intelligence/backend/app/data/sites/site-005",
+        "removed": true
+      },
+      {
+        "exists": false,
+        "file_count": 0,
+        "path": "/opt/bms-intelligence/backend/app/data/simulation/S005"
+      },
+      {
+        "exists": false,
+        "file_count": 0,
+        "path": "/opt/bms-intelligence/backend/app/data/simulation/site-005"
+      }
+    ],
+    "mode": "execute",
+    "model_registry": {
+      "active_refs": {},
+      "entries": [],
+      "exists": true,
+      "path": "/opt/bms-intelligence/backend/ml/models/registry.json",
+      "removed_files": [],
+      "removed_model_ids": []
+    },
+    "site_code": "site-005",
+    "site_registry": {
+      "active_contains_site": true,
+      "exists": true,
+      "inactive_contains_site": false,
+      "path": "/opt/bms-intelligence/backend/app/data/sites/_registry.json",
+      "updated": true
+    },
+    "site_uuid": "a4a58c36-ad91-4c97-834d-b0be46601d92"
+  },
+  "reset_type": "fake_site_purge_for_reonboarding_drill",
+  "site_code": "site-005"
+}

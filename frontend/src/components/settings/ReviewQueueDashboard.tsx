@@ -332,7 +332,7 @@ export function ReviewQueueDashboard({
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b" style={borderStyle}>
-                  {["Point ID", "Equipment", "Tags", "Confidence", "Safety", "Priority", "Actions"].map((h) => (
+                  {["Point ID", "Equipment", "Tags", "Confidence", "Safety", "Priority", "Reason", "Actions"].map((h) => (
                     <th key={h} className="px-3 py-2 text-left font-medium" style={textSecondary}>{h}</th>
                   ))}
                 </tr>
@@ -378,6 +378,13 @@ export function ReviewQueueDashboard({
                           style={{ color: "var(--color-sentinel-amber)" }}
                           aria-label="Validation errors"
                         />
+                      )}
+                    </td>
+                    <td className="px-3 py-2 text-xs" style={textSecondary}>
+                      {entry.reset_reason ? (
+                        <span className="italic" style={{ color: "var(--color-sentinel-amber)" }}>{entry.reset_reason}</span>
+                      ) : (
+                        <span style={{ opacity: 0.3 }}>—</span>
                       )}
                     </td>
                     <td className="px-3 py-2">

@@ -3,6 +3,7 @@
 import logging
 import re
 import uuid
+from collections import OrderedDict
 from datetime import UTC, datetime
 from typing import Any
 
@@ -100,7 +101,7 @@ class VectorDBService:
         chunks = self._split_into_chunks(text, chunk_size, chunk_overlap)
 
         # Generate embeddings
-        embeddings = self.embedding_service.embed_batch([c["content"] for c in chunks])
+        embeddings = self.embedding_service.embed_documents([c["content"] for c in chunks])
 
         # Insert chunks with embeddings
         chunk_records = []
@@ -346,7 +347,9 @@ class VectorDBService:
             embed_texts.append(context_header + chunk["content"])
 
         # Generate embeddings from context-enhanced text
-        embeddings = self.embedding_service.embed_batch(embed_texts)
+        embeddings = self._embed_chunk_texts(
+            [{"document_id": document_id, "text": text} for text in embed_texts],
+        )
 
         # Store chunks with original content (no context header)
         chunk_records = []
@@ -423,6 +426,43 @@ class VectorDBService:
             "metadata": metadata,
         }
 
+    def _embed_chunk_texts(self, chunk_inputs: list[dict[str, str]]) -> list[list[float]]:
+        """Embed chunk texts, optionally grouping by document for contextualized embeddings."""
+        if not chunk_inputs:
+            return []
+
+        from app.config.settings import settings
+
+        if not settings.embedding_contextualized_enabled:
+            return self.embedding_service.embed_documents([item["text"] for item in chunk_inputs])
+
+        grouped: OrderedDict[str, list[str]] = OrderedDict()
+        for item in chunk_inputs:
+            grouped.setdefault(item["document_id"], []).append(item["text"])
+
+        grouped_embeddings = self.embedding_service.embed_contextualized_documents(list(grouped.values()))
+        if len(grouped_embeddings) != len(grouped):
+            raise ValueError("Contextualized embedding group count mismatch")
+
+        per_document: dict[str, list[list[float]]] = {
+            document_id: list(embeddings) for document_id, embeddings in zip(grouped.keys(), grouped_embeddings)
+        }
+        for document_id, texts in grouped.items():
+            if len(per_document[document_id]) != len(texts):
+                raise ValueError(f"Contextualized embedding chunk count mismatch for document {document_id}")
+
+        offsets = dict.fromkeys(grouped, 0)
+        flattened: list[list[float]] = []
+        for item in chunk_inputs:
+            document_id = item["document_id"]
+            offset = offsets[document_id]
+            flattened.append(per_document[document_id][offset])
+            offsets[document_id] = offset + 1
+
+        if len(flattened) != len(chunk_inputs):
+            raise ValueError("Contextualized embedding flatten mismatch")
+        return flattened
+
     def _build_grounding_metadata(
         self,
         *,
@@ -474,7 +514,7 @@ class VectorDBService:
         resolved_site_id = self._resolve_site_uuid(site_id)
 
         # Generate query embedding
-        query_embedding = self.embedding_service.embed_text(query)
+        query_embedding = self.embedding_service.embed_query(query)
 
         # Call Supabase RPC function
         result = self.client.rpc(
@@ -501,7 +541,7 @@ class VectorDBService:
         similarity_threshold: float = 0.5,
     ) -> list[dict[str, Any]]:
         """Search equipment knowledge base."""
-        query_embedding = self.embedding_service.embed_text(query)
+        query_embedding = self.embedding_service.embed_query(query)
         result = self.client.rpc(
             "match_equipment_knowledge",
             {
@@ -545,7 +585,7 @@ class VectorDBService:
         if use_hyde:
             query_embedding = await self._hyde_embed(query)
         else:
-            query_embedding = self.embedding_service.embed_text(query)
+            query_embedding = self.embedding_service.embed_query(query)
 
         resolved_site_id = self._resolve_site_uuid(site_id)
 
@@ -588,9 +628,9 @@ class VectorDBService:
             )
         except Exception as e:
             logger.warning("HyDE generation failed, falling back to raw query embed: %s", e)
-            return self.embedding_service.embed_text(query)
+            return self.embedding_service.embed_query(query)
 
-        return self.embedding_service.embed_text(hypothetical)
+        return self.embedding_service.embed_document(hypothetical)
 
     def add_knowledge(
         self,
@@ -618,7 +658,7 @@ class VectorDBService:
         if code:
             embed_text += f" Fault code: {code}"
 
-        embedding = self.embedding_service.embed_text(embed_text)
+        embedding = self.embedding_service.embed_document(embed_text)
 
         result = (
             self.client.table("equipment_knowledge")

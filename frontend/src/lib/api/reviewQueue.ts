@@ -31,6 +31,7 @@ export interface ReviewQueueEntry {
   decision_reason: string | null;
   override_tags: string[] | null;
   override_justification: string | null;
+  reset_reason: string | null;
 }
 
 export interface ReviewQueueStats {

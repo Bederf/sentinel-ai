@@ -514,6 +514,67 @@ class RecommendationRepository(SupabaseRepository):
             )
             return 0
 
+    async def expire_pending_zone_scope_for_equipment(
+        self,
+        site_id: str,
+        target_equipment: str,
+        *,
+        superseded_by_rule: str,
+        superseded_reason: str,
+    ) -> int:
+        """Expire existing pending zone-scope child recs for an equipment before creating a new one.
+
+        Ensures one active row per equipment per decomposition cycle.
+        """
+        client = await self.get_client()
+        if not client:
+            return 0
+        try:
+            result = await (
+                client.table("recommendations")
+                .update(
+                    {
+                        "status": "expired",
+                        "approval_status": "superseded",
+                    }
+                )
+                .eq("site_id", site_id)
+                .eq("target_equipment", target_equipment)
+                .eq("status", "pending")
+                .eq("action_type", "ai_optimization")
+                .filter("metadata->>rule", "eq", superseded_by_rule)
+                .execute()
+            )
+            count = len(result.data or [])
+            if count:
+                cache.deletePattern("recommendations:*")
+                for row in result.data or []:
+                    await self._record_audit_event(
+                        recommendation_id=str(row.get("id") or ""),
+                        site_id=str(row.get("site_id") or site_id),
+                        event_type="expired",
+                        previous_state={"status": "pending", "target_equipment": target_equipment},
+                        new_state=row,
+                        source="recommendation_repository.expire_pending_zone_scope_for_equipment",
+                        metadata={
+                            "target_equipment": target_equipment,
+                            "superseded_reason": superseded_reason,
+                        },
+                    )
+                logger.info(
+                    "[REC-DEDUP] Expired %d prior zone-scope child rec(s) for %s",
+                    count,
+                    target_equipment,
+                )
+            return count
+        except Exception as e:
+            logger.warning(
+                "expire_pending_zone_scope_for_equipment failed for %s: %s",
+                target_equipment,
+                e,
+            )
+            return 0
+
     async def expire_all_pending_for_equipment(self, site_id: str, target_equipment: str) -> int:
         """Expire all pending ai_optimization recs for equipment — called when fault gate blocks it."""
         client = await self.get_client()

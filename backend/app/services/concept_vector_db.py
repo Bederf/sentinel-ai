@@ -87,7 +87,7 @@ class ConceptVectorDBService:
             return 0
 
         chunks = self._split_into_chunks(text, chunk_size, chunk_overlap)
-        embeddings = self.embedding_service.embed_batch([c["content"] for c in chunks])
+        embeddings = self.embedding_service.embed_documents([c["content"] for c in chunks])
 
         chunk_records = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False)):

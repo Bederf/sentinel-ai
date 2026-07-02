@@ -33,7 +33,8 @@
         "damper_position",
         "fan_speed_setpoint",
         "ahu_on_off",
-        "ahu_mode"
+        "ahu_mode",
+        "plant_enable"
       ]
     },
     {

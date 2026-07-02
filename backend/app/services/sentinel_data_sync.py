@@ -172,18 +172,18 @@ class SentinelDataSync:
         # already computes data_freshness_hours from last_sync_at timestamps.
         freshness_threshold = DATA_FRESHNESS_MAX_HOURS  # 24h
         data_freshness_hours = 9999.0  # Default: block ML ingest
+        site_code_for_query = self.site_id
+        if self.site_id.startswith("S"):
+            # Convert S002 -> site-002 for sites table lookup
+            num = self.site_id[1:]
+            site_code_for_query = f"site-{num}"
+
         try:
             from app.database.supabase_client import get_supabase_client
 
             client = get_supabase_client()
             # Resolve site code → UUID for log_sources query (site_id is UUID there)
             # Normalize to site-XXX format for sites table query (sites table uses "site-002" not "S002")
-            site_code_for_query = self.site_id
-            if self.site_id.startswith("S"):
-                # Convert S002 → site-002 for sites table lookup
-                num = self.site_id[1:]  # "002"
-                site_code_for_query = f"site-{num}"
-
             sites_resp = client.table("sites").select("id").eq("code", site_code_for_query).execute()
             if sites_resp.data:
                 site_uuid = sites_resp.data[0]["id"]
@@ -206,7 +206,21 @@ class SentinelDataSync:
                 f"[ML FEEDER] Freshness check: no log_sources entry for site_id={self.site_id} site_code={site_code_for_query}"
             )
 
-        if data_freshness_hours > freshness_threshold:
+        ml_processing_enabled = True
+        try:
+            from app.api.sites import is_site_processing_enabled
+
+            ml_processing_enabled = await is_site_processing_enabled(site_code_for_query)
+        except Exception as e:
+            logger.warning(
+                f"[ML FEEDER] Processing-state check failed for site_id={self.site_id}: {e} — blocking ML ingest"
+            )
+            ml_processing_enabled = False
+
+        if not ml_processing_enabled:
+            logger.info(f"[ML FEEDER] Skipped ML ingest for site_id={self.site_id}: sentinel_processing_enabled=false")
+            results["ml_processing_skipped"] = "site_processing_disabled"
+        elif data_freshness_hours > freshness_threshold:
             logger.warning(
                 f"[ML FEEDER] Freshness gate rejected: site_id={self.site_id} data_freshness_hours={data_freshness_hours:.1f} threshold_hours={freshness_threshold}"
             )

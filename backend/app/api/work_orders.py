@@ -861,6 +861,7 @@ class TechnicianWorkOrderComplete(BaseModel):
     parts_used: list[str] = []
     time_spent: str
     technician_notes: str | None = None
+    work_type: str = "repair"  # repair, replacement, retrofit, maintenance
 
 
 class TechnicianWorkOrderResponse(BaseModel):
@@ -1294,6 +1295,7 @@ async def complete_technician_work_order(
         "parts_used": completion.parts_used or [],
         "actual_duration_hours": _parse_duration_hours(completion.time_spent),
         "follow_up_notes": _append_completion_notes(work_order.get("follow_up_notes"), completion.technician_notes),
+        "work_type": completion.work_type,
         "completed_at": datetime.now().isoformat(),
     }
     updated = await repo.update_work_order(work_order_id, updates)
@@ -1334,6 +1336,7 @@ async def complete_technician_work_order(
                 "parts_used": completion.parts_used,
                 "actual_hours": completion.time_spent,
                 "equipment_code": updated.get("equipment_code") or updated.get("equipment_id"),
+                "work_type": completion.work_type,
             },
         )
     except Exception:

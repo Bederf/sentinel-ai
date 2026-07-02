@@ -1049,6 +1049,61 @@ class WorkflowTriggerEngine:
             except Exception as e:
                 logger.warning(f"Failed to start feedback session (non-critical): {e}")
 
+            # 3.5. Trust profile reset for replacement/retrofit (PLAN-162B)
+            work_type = completion_data.get("work_type", "repair")
+            if work_type in ("replacement", "retrofit"):
+                try:
+                    from app.database.repositories.trust_history_repository import (
+                        TrustHistoryRepository,
+                    )
+                    from app.database.repositories.trust_reset_repository import (
+                        TrustResetRepository,
+                    )
+
+                    is_hard = work_type == "replacement"
+                    trust_repo = TrustHistoryRepository()
+                    reset_count = await trust_repo.reset_equipment_trust(equipment_id, hard=is_hard)
+                    audit_repo = TrustResetRepository()
+                    await audit_repo.record_reset(
+                        equipment_id=equipment_id,
+                        site_id="",  # resolved from context where available
+                        trigger_type=f"wo_{work_type}",
+                        trigger_id=work_order_id,
+                        reset_action="hard_reset" if is_hard else "partial_decay",
+                    )
+                    # Surface in review queue
+                    try:
+                        from app.database.repositories.review_queue_repository import (
+                            get_review_queue_repository,
+                        )
+
+                        q_repo = get_review_queue_repository()
+                        q_count = await q_repo.mark_equipment_reset(
+                            equipment_id,
+                            f"Trust reset — WO {work_order_id} ({work_type})",
+                        )
+                        if q_count:
+                            logger.info(
+                                "[TRUST-RESET] Updated %d review queue entries for %s",
+                                q_count,
+                                equipment_id,
+                            )
+                    except Exception as q_err:
+                        logger.warning("[TRUST-RESET] review_queue update failed: %s", q_err)
+                    logger.info(
+                        "[TRUST-RESET] %s for %s (%d trust rows reset, WO %s)",
+                        "Hard reset" if is_hard else "Partial decay",
+                        equipment_id,
+                        reset_count,
+                        work_order_id,
+                    )
+                except Exception as trust_err:
+                    logger.warning(
+                        "[TRUST-RESET] Failed to reset trust for %s: %s",
+                        equipment_id,
+                        trust_err,
+                    )
+
             # 4. Queue effectiveness validation (will run after post-repair baseline)
             # Store scheduled time in local memory
             validation_scheduled_time = datetime.now() + timedelta(hours=3)

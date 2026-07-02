@@ -84,6 +84,7 @@ class TrustHistoryRepository:
                 payload = {
                     "point_id": trust_history.point_id,
                     "site_id": trust_history.site_id,
+                    "equipment_id": trust_history.equipment_id or "",
                     "stability_days": trust_history.stability_days,
                     "validation_runs": trust_history.validation_runs,
                     "successful_actions": trust_history.successful_actions,
@@ -181,3 +182,149 @@ class TrustHistoryRepository:
             history.failed_actions,
         )
         await self.upsert_trust_history(history)
+
+    # ------------------------------------------------------------------
+    # Equipment-level trust reset (PLAN-162B)
+    # ------------------------------------------------------------------
+
+    async def find_by_equipment(self, equipment_id: str) -> list[TrustHistory]:
+        """Find all trust history rows for a given equipment."""
+        if not self._use_json and self.client is not None:
+            try:
+                result = self.client.table("trust_history").select("*").eq("equipment_id", equipment_id).execute()
+                if result.data:
+                    return [TrustHistory(**row) for row in result.data]
+            except Exception as exc:
+                logger.warning("Supabase query by equipment failed: %s", exc)
+
+        if not DATA_DIR.exists():
+            return []
+        results: list[TrustHistory] = []
+        for path in DATA_DIR.iterdir():
+            if path.suffix != ".json":
+                continue
+            try:
+                data = json.loads(path.read_text())
+                if data.get("equipment_id") == equipment_id:
+                    results.append(TrustHistory(**data))
+            except Exception:
+                continue
+        return results
+
+    async def reset_equipment_trust(self, equipment_id: str, *, hard: bool = False) -> int:
+        """Reset trust history for all points on an equipment.
+
+        Args:
+            equipment_id: Canonical equipment code.
+            hard: True for replacement (full zero), False for partial decay.
+
+        Returns:
+            Number of trust history rows modified.
+        """
+        rows = await self.find_by_equipment(equipment_id)
+        if not rows:
+            return 0
+
+        count = 0
+        for row in rows:
+            prior = row.model_dump(mode="json")
+            if hard:
+                row.stability_days = 0
+                row.validation_runs = 0
+                row.successful_actions = 0
+                row.failed_actions = 0
+            else:
+                row.stability_days = max(0, int(row.stability_days * 0.3))
+                row.successful_actions = max(0, row.successful_actions - 3)
+                row.validation_runs = max(0, row.validation_runs - 2)
+            row.trust_score = TrustHistory.calculate_trust_score(
+                row.stability_days,
+                row.validation_runs,
+                row.successful_actions,
+                row.failed_actions,
+            )
+            await self.upsert_trust_history(row)
+            count += 1
+            logger.info(
+                "[TRUST-RESET] %s equipment=%s point=%s prior_trust_score=%.3f",
+                "Hard reset" if hard else "Partial decay",
+                equipment_id,
+                row.point_id,
+                prior.get("trust_score", 0),
+            )
+
+        return count
+
+    # ------------------------------------------------------------------
+    # Drift-triggered trust decay (PLAN-162B)
+    # ------------------------------------------------------------------
+
+    async def decay_by_equipment_type(self, equipment_type: str, features_drifted: int = 0) -> int:
+        """Apply trust decay to all equipment matching a type.
+
+        Severity scales with features_drifted:
+        - features_drifted <= 1: no decay (noise)
+        - features_drifted 2-3: stable_days *= 0.5 (moderate)
+        - features_drifted >3 or model drift: stable_days *= 0.1 (severe)
+        """
+        if features_drifted <= 1:
+            return 0
+
+        severe = features_drifted > 3
+        eq_pattern = f"%-{equipment_type.upper()}-%"
+
+        if not self._use_json and self.client is not None:
+            try:
+                result = self.client.table("trust_history").select("*").ilike("equipment_id", eq_pattern).execute()
+                rows = [TrustHistory(**row) for row in (result.data or [])]
+            except Exception as exc:
+                logger.warning("Supabase decay lookup failed: %s", exc)
+                rows = []
+        else:
+            rows = await self._find_by_equipment_type_json(equipment_type.upper())
+
+        return await self._apply_decay_to_rows(rows, severe=severe)
+
+    async def _find_by_equipment_type_json(self, eq_type_upper: str) -> list[TrustHistory]:
+        if not DATA_DIR.exists():
+            return []
+        results: list[TrustHistory] = []
+        for path in DATA_DIR.iterdir():
+            if path.suffix != ".json":
+                continue
+            try:
+                data = json.loads(path.read_text())
+                eq_id = str(data.get("equipment_id", "")).upper()
+                if f"-{eq_type_upper}-" in eq_id:
+                    results.append(TrustHistory(**data))
+            except Exception:
+                continue
+        return results
+
+    async def _apply_decay_to_rows(self, rows: list[TrustHistory], *, severe: bool) -> int:
+        if not rows:
+            return 0
+        count = 0
+        for row in rows:
+            prior = row.model_dump(mode="json")
+            if severe:
+                row.stability_days = max(0, int(row.stability_days * 0.1))
+                row.successful_actions = max(0, int(row.successful_actions / 2))
+            else:
+                row.stability_days = max(0, int(row.stability_days * 0.5))
+            row.trust_score = TrustHistory.calculate_trust_score(
+                row.stability_days,
+                row.validation_runs,
+                row.successful_actions,
+                row.failed_actions,
+            )
+            await self.upsert_trust_history(row)
+            count += 1
+            logger.info(
+                "[TRUST-DECAY] %s equipment=%s point=%s prior_trust_score=%.3f",
+                "Severe" if severe else "Moderate",
+                row.equipment_id,
+                row.point_id,
+                prior.get("trust_score", 0),
+            )
+        return count

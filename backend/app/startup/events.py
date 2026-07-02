@@ -216,8 +216,16 @@ async def startup_event(_: FastAPI) -> None:
             from app.services.embedding_service import get_embedding_service
 
             svc = get_embedding_service()
+            provider_info = svc.provider_info()
+            _logger.info(
+                "Embedding provider configured: provider=%s model=%s dimension=%s contextualized=%s",
+                provider_info["provider"],
+                provider_info["model"],
+                provider_info["dimension"],
+                provider_info["contextualized"],
+            )
             svc.warmup()
-            _logger.info("✅ Embedding model pre-warmed")
+            _logger.info("✅ Embedding provider pre-warmed")
         except Exception as e:
             _logger.warning(f"⚠️ Embedding model warmup failed (will load on first use): {e}")
 

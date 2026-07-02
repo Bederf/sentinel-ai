@@ -1,4 +1,4 @@
-"""Embedding service using sentence-transformers (local, no API costs).
+"""Provider-backed embedding service for SENTINEL document intelligence.
 
 Includes LRU cache for query embeddings (inspired by AimTheLaw's
 QueryEmbeddingCache pattern — 60-80% hit rate on repeated queries).
@@ -6,11 +6,15 @@ QueryEmbeddingCache pattern — 60-80% hit rate on repeated queries).
 
 import hashlib
 import logging
+import os
 import time
 from collections import OrderedDict
 from threading import Lock
+from typing import Literal, Protocol
 
 logger = logging.getLogger(__name__)
+
+EmbeddingInputType = Literal["query", "document"] | None
 
 # ---------------------------------------------------------------------------
 # Embedding cache — LRU with adaptive TTL
@@ -22,12 +26,7 @@ _CACHE_MAX_TTL = 86400  # 24 hours
 
 
 class _EmbeddingCache:
-    """Thread-safe LRU cache for query embeddings.
-
-    Repeated queries (building managers ask similar questions) get a
-    cache hit instead of re-encoding.  Adaptive TTL: frequently accessed
-    entries live longer.
-    """
+    """Thread-safe LRU cache for query embeddings."""
 
     def __init__(self, max_size: int = _CACHE_MAX_SIZE):
         self._cache: OrderedDict[str, tuple[list[float], float, int]] = OrderedDict()
@@ -37,11 +36,12 @@ class _EmbeddingCache:
         self._misses = 0
 
     @staticmethod
-    def _key(text: str) -> str:
-        return hashlib.md5(text.encode(), usedforsecurity=False).hexdigest()
+    def _key(namespace: str, text: str) -> str:
+        raw_key = f"{namespace}\0{text}"
+        return hashlib.md5(raw_key.encode(), usedforsecurity=False).hexdigest()
 
-    def get(self, text: str) -> list[float] | None:
-        key = self._key(text)
+    def get(self, namespace: str, text: str) -> list[float] | None:
+        key = self._key(namespace, text)
         with self._lock:
             entry = self._cache.get(key)
             if entry is None:
@@ -49,24 +49,23 @@ class _EmbeddingCache:
                 return None
             embedding, expire_at, access_count = entry
             if time.monotonic() > expire_at:
-                # Expired
                 del self._cache[key]
                 self._misses += 1
                 return None
-            # Hit — bump access count and extend TTL adaptively
+
             self._hits += 1
             new_ttl = min(_CACHE_DEFAULT_TTL * (1 + access_count), _CACHE_MAX_TTL)
             self._cache[key] = (embedding, time.monotonic() + new_ttl, access_count + 1)
             self._cache.move_to_end(key)
             return embedding
 
-    def put(self, text: str, embedding: list[float]) -> None:
-        key = self._key(text)
+    def put(self, namespace: str, text: str, embedding: list[float]) -> None:
+        key = self._key(namespace, text)
         with self._lock:
             if key in self._cache:
                 self._cache.move_to_end(key)
             elif len(self._cache) >= self._max_size:
-                self._cache.popitem(last=False)  # evict LRU
+                self._cache.popitem(last=False)
             self._cache[key] = (embedding, time.monotonic() + _CACHE_DEFAULT_TTL, 1)
 
     @property
@@ -79,17 +78,42 @@ class _EmbeddingCache:
         return len(self._cache)
 
 
-# Module-level cache instance (shared across all EmbeddingService users)
 _embedding_cache = _EmbeddingCache()
 
 
-# ---------------------------------------------------------------------------
-# Embedding service
-# ---------------------------------------------------------------------------
+class EmbeddingProvider(Protocol):
+    """Provider contract used by RAG ingestion and query-time retrieval."""
+
+    provider_name: str
+    model_name: str
+    dimension: int
+    supports_contextualized: bool
+
+    def warmup(self) -> None: ...
+
+    def embed_text(self, text: str, input_type: EmbeddingInputType = None) -> list[float]: ...
+
+    def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 32,
+        input_type: EmbeddingInputType = None,
+    ) -> list[list[float]]: ...
+
+    def contextualized_embed_groups(
+        self,
+        grouped_texts: list[list[str]],
+        input_type: EmbeddingInputType = "document",
+    ) -> list[list[list[float]]]: ...
 
 
-class EmbeddingService:
-    """Generate embeddings using all-MiniLM-L6-v2 (384 dimensions)."""
+class MiniLMLocalProvider:
+    """Local MiniLM provider retained as a fallback until Voyage is enabled."""
+
+    provider_name = "minilm_local"
+    model_name = "all-MiniLM-L6-v2"
+    dimension = 384
+    supports_contextualized = False
 
     def __init__(self):
         self._model = None
@@ -97,34 +121,27 @@ class EmbeddingService:
     @property
     def model(self):
         if self._model is None:
-            logger.info("Loading embedding model: all-MiniLM-L6-v2")
+            logger.info("Loading embedding model: %s", self.model_name)
             from sentence_transformers import SentenceTransformer
 
-            self._model = SentenceTransformer("all-MiniLM-L6-v2")
+            self._model = SentenceTransformer(self.model_name)
             logger.info("Embedding model loaded successfully")
         return self._model
 
     def warmup(self) -> None:
-        """Pre-load the model so first real query doesn't pay the cost."""
         _ = self.model
 
-    def embed_text(self, text: str) -> list[float]:
-        """Generate embedding for a single text (with LRU cache)."""
-        # Skip cache for very short strings (not meaningful queries)
-        if len(text) > 10:
-            cached = _embedding_cache.get(text)
-            if cached is not None:
-                return cached
+    def embed_text(self, text: str, input_type: EmbeddingInputType = None) -> list[float]:
+        del input_type
+        return self.model.encode(text, normalize_embeddings=True).tolist()
 
-        embedding = self.model.encode(text, normalize_embeddings=True).tolist()
-
-        if len(text) > 10:
-            _embedding_cache.put(text, embedding)
-
-        return embedding
-
-    def embed_batch(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
-        """Generate embeddings for multiple texts efficiently."""
+    def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 32,
+        input_type: EmbeddingInputType = None,
+    ) -> list[list[float]]:
+        del input_type
         if not texts:
             return []
 
@@ -133,20 +150,235 @@ class EmbeddingService:
         )
         return embeddings.tolist()
 
+    def contextualized_embed_groups(
+        self,
+        grouped_texts: list[list[str]],
+        input_type: EmbeddingInputType = "document",
+    ) -> list[list[list[float]]]:
+        del grouped_texts, input_type
+        raise RuntimeError("MiniLM provider does not support contextualized embeddings")
+
+
+class VoyageAPIProvider:
+    """Voyage API provider for VPS/document-ingestion deployments."""
+
+    provider_name = "voyage_api"
+    supports_contextualized = True
+
+    def __init__(
+        self,
+        *,
+        api_key: str,
+        model_name: str,
+        context_model_name: str,
+        dimension: int,
+    ):
+        self.api_key = api_key
+        self.model_name = model_name
+        self.context_model_name = context_model_name
+        self.dimension = dimension
+        self._client = None
+
+    @property
+    def client(self):
+        if self._client is None:
+            try:
+                import voyageai
+            except ImportError as exc:
+                raise RuntimeError(
+                    "EMBEDDING_PROVIDER=voyage_api requires the optional 'voyageai' package. "
+                    "Install it only after dependency approval."
+                ) from exc
+
+            effective_key = self.api_key or os.getenv("VOYAGE_API_KEY", "")
+            self._client = voyageai.Client(api_key=effective_key) if effective_key else voyageai.Client()
+        return self._client
+
+    def warmup(self) -> None:
+        _ = self.client
+
+    def embed_text(self, text: str, input_type: EmbeddingInputType = None) -> list[float]:
+        return self.embed_batch([text], input_type=input_type)[0]
+
+    def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 32,
+        input_type: EmbeddingInputType = None,
+    ) -> list[list[float]]:
+        if not texts:
+            return []
+
+        effective_batch_size = max(1, min(batch_size, 500))
+        embeddings: list[list[float]] = []
+        for start in range(0, len(texts), effective_batch_size):
+            batch = texts[start : start + effective_batch_size]
+            result = self.client.embed(
+                batch,
+                model=self.model_name,
+                input_type=input_type,
+                output_dimension=self.dimension,
+            )
+            embeddings.extend(result.embeddings)
+        return embeddings
+
+    def contextualized_embed_groups(
+        self,
+        grouped_texts: list[list[str]],
+        input_type: EmbeddingInputType = "document",
+    ) -> list[list[list[float]]]:
+        if not grouped_texts:
+            return []
+
+        result = self.client.contextualized_embed(
+            inputs=grouped_texts,
+            model=self.context_model_name,
+            input_type=input_type,
+            output_dimension=self.dimension,
+        )
+        results_by_index = {item.index: item.embeddings for item in result.results}
+        return [results_by_index[i] for i in range(len(grouped_texts))]
+
+
+class VoyageNanoLocalProvider:
+    """Jetson/edge placeholder for open-weight `voyage-4-nano` local inference."""
+
+    provider_name = "voyage_nano_local"
+    model_name = "voyage-4-nano"
+    supports_contextualized = False
+
+    def __init__(self, *, dimension: int):
+        self.dimension = dimension
+
+    def _not_ready(self) -> RuntimeError:
+        return RuntimeError(
+            "VoyageNanoLocalProvider is a Jetson/edge stub. Wire the HuggingFace transformers "
+            "runtime in the Jetson deployment phase before enabling EMBEDDING_PROVIDER=voyage_nano_local."
+        )
+
+    def warmup(self) -> None:
+        raise self._not_ready()
+
+    def embed_text(self, text: str, input_type: EmbeddingInputType = None) -> list[float]:
+        del text, input_type
+        raise self._not_ready()
+
+    def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 32,
+        input_type: EmbeddingInputType = None,
+    ) -> list[list[float]]:
+        del texts, batch_size, input_type
+        raise self._not_ready()
+
+    def contextualized_embed_groups(
+        self,
+        grouped_texts: list[list[str]],
+        input_type: EmbeddingInputType = "document",
+    ) -> list[list[list[float]]]:
+        del grouped_texts, input_type
+        raise self._not_ready()
+
+
+class EmbeddingService:
+    """Generate embeddings through the configured provider."""
+
+    def __init__(self, provider: EmbeddingProvider | None = None):
+        self.provider = provider or self._build_provider()
+
+    def _build_provider(self) -> EmbeddingProvider:
+        from app.config.settings import settings
+
+        provider_name = settings.embedding_provider.strip().lower()
+        if provider_name == "voyage_api":
+            return VoyageAPIProvider(
+                api_key=settings.voyage_api_key,
+                model_name=settings.voyage_embed_model,
+                context_model_name=settings.voyage_context_model,
+                dimension=settings.embedding_dimension,
+            )
+        if provider_name == "voyage_nano_local":
+            return VoyageNanoLocalProvider(dimension=settings.embedding_dimension)
+        if provider_name in {"minilm", "minilm_local", "sentence_transformers"}:
+            return MiniLMLocalProvider()
+        raise ValueError(f"Unsupported EMBEDDING_PROVIDER: {settings.embedding_provider}")
+
+    def _cache_namespace(self, input_type: EmbeddingInputType) -> str:
+        return (
+            f"{self.provider.provider_name}:{self.provider.model_name}:{self.provider.dimension}:{input_type or 'none'}"
+        )
+
+    def provider_info(self) -> dict[str, object]:
+        """Return non-secret active provider details for startup and diagnostics."""
+        return {
+            "provider": self.provider.provider_name,
+            "model": self.provider.model_name,
+            "dimension": self.provider.dimension,
+            "contextualized": self.provider.supports_contextualized,
+        }
+
+    def warmup(self) -> None:
+        logger.info(
+            "Embedding provider active: provider=%s model=%s dimension=%s contextualized=%s",
+            self.provider.provider_name,
+            self.provider.model_name,
+            self.provider.dimension,
+            self.provider.supports_contextualized,
+        )
+        self.provider.warmup()
+
+    def embed_text(self, text: str, input_type: EmbeddingInputType = None) -> list[float]:
+        namespace = self._cache_namespace(input_type)
+        if len(text) > 10:
+            cached = _embedding_cache.get(namespace, text)
+            if cached is not None:
+                return cached
+
+        embedding = self.provider.embed_text(text, input_type=input_type)
+
+        if len(text) > 10:
+            _embedding_cache.put(namespace, text, embedding)
+
+        return embedding
+
+    def embed_query(self, text: str) -> list[float]:
+        """Embed query-time text using retrieval query semantics."""
+        return self.embed_text(text, input_type="query")
+
+    def embed_document(self, text: str) -> list[float]:
+        """Embed document/chunk text using retrieval document semantics."""
+        return self.embed_text(text, input_type="document")
+
+    def embed_batch(
+        self,
+        texts: list[str],
+        batch_size: int = 32,
+        input_type: EmbeddingInputType = None,
+    ) -> list[list[float]]:
+        return self.provider.embed_batch(texts, batch_size=batch_size, input_type=input_type)
+
+    def embed_documents(self, texts: list[str], batch_size: int = 32) -> list[list[float]]:
+        return self.embed_batch(texts, batch_size=batch_size, input_type="document")
+
+    def embed_contextualized_documents(self, grouped_texts: list[list[str]]) -> list[list[list[float]]]:
+        if not self.provider.supports_contextualized:
+            raise RuntimeError(f"{self.provider.provider_name} does not support contextualized embeddings")
+        return self.provider.contextualized_embed_groups(grouped_texts, input_type="document")
+
     def get_embedding_dimension(self) -> int:
-        """Return the embedding dimension (384 for MiniLM)."""
-        return 384
+        return self.provider.dimension
 
     def get_cache_stats(self) -> dict:
         """Return cache performance stats."""
         return {
+            **self.provider_info(),
             "cache_size": _embedding_cache.size,
             "cache_max": _CACHE_MAX_SIZE,
             "hit_rate": round(_embedding_cache.hit_rate, 3),
         }
 
 
-# Singleton instance
 _embedding_service = None
 
 
