@@ -395,11 +395,24 @@ class TestEquipmentLabel:
         assert "Level 2" in _equipment_label("S002-FCU-201")
         assert "Level 1" in _equipment_label("S002-VAV-101")
         assert "Ground Floor" in _equipment_label("S002-AHU-001")
+        assert _equipment_label("S002-FCU-201").startswith("S002-FCU-201")
 
     def test_short_code(self):
         from app.agents.recommendation_formatters import _equipment_label
 
         assert _equipment_label("FCU") == "FCU"
+
+    def test_plant_operator_label_keeps_site_and_drops_sequence(self):
+        from app.agents.recommendation_formatters import _equipment_label
+        from app.services.equipment_labels import format_operator_equipment_reference, operator_equipment_label
+
+        assert operator_equipment_label("S002-CHILLER-B1-001") == "S002-CHILLER-B1"
+        assert operator_equipment_label("S002-CHILLER-B01-001") == "S002-CHILLER-B1"
+        assert _equipment_label("S002-CHILLER-B1-001") == "S002-CHILLER-B1"
+        assert (
+            format_operator_equipment_reference("S002-CHILLER-B1-001")
+            == "S002-CHILLER-B1 (internal asset: S002-CHILLER-B1-001)"
+        )
 
     def test_empty(self):
         from app.agents.recommendation_formatters import _equipment_label

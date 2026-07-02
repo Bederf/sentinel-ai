@@ -21,7 +21,7 @@ from typing import Any
 import numpy as np
 from sklearn.model_selection import train_test_split
 
-from ..registry import get_model_registry
+from ..registry import build_input_contract_metadata, get_model_registry
 from .data_prep import AUTOENCODER_SENSOR_CONFIGS, AutoencoderDataPrep
 from .model import SensorAutoencoder
 from ml.model_config import get_autoencoder_features, list_ml_trainable_types
@@ -223,6 +223,14 @@ class AutoencoderTrainer:
         should_activate = auto_activate and provenance.get("data_source") == "telemetry_hourly"
 
         # Register model
+        input_contract = build_input_contract_metadata(
+            site_id=site_id,
+            equipment_type=equipment_type,
+            model_type="autoencoder",
+            required_features=feature_names,
+            target="reconstruction_error",
+            inference_scope="equipment_type",
+        )
         model_id = self.registry.register_model(
             model_type="autoencoder",
             equipment_type=equipment_type,
@@ -239,6 +247,7 @@ class AutoencoderTrainer:
                 "validation_samples": len(X_val),
                 "epochs_trained": len(history["loss"]),
                 "threshold_percentile": model.threshold_percentile,
+                **input_contract,
                 **provenance,
             },
             auto_activate=should_activate,
@@ -391,6 +400,14 @@ class AutoencoderTrainer:
         }
 
         # Register
+        input_contract = build_input_contract_metadata(
+            site_id=None,
+            equipment_type=equipment_type,
+            model_type="autoencoder",
+            required_features=config["features"],
+            target="reconstruction_error",
+            inference_scope="equipment_type",
+        )
         model_id = self.registry.register_model(
             model_type="autoencoder",
             equipment_type=equipment_type,
@@ -408,6 +425,7 @@ class AutoencoderTrainer:
                 "threshold_percentile": model.threshold_percentile,
                 "use_demo_data": False,
                 "data_source": "sentinel_ml_feeder",
+                **input_contract,
             },
             auto_activate=True,
         )

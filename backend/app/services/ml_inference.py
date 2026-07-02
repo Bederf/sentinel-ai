@@ -8,6 +8,9 @@ Provides:
 """
 
 import logging
+import os
+import json
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -15,6 +18,7 @@ from typing import Any
 import numpy as np
 
 from app.config.settings import settings
+from app.services.equipment_labels import format_operator_equipment_reference, operator_equipment_label
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +26,13 @@ logger = logging.getLogger(__name__)
 _lstm_model = None
 _autoencoder_model = None
 _registry = None
+
+
+@dataclass
+class FeatureWindowResult:
+    data: np.ndarray | None
+    diagnostics: dict[str, Any]
+    error: str | None = None
 
 
 def _infer_site_id(equipment_code: str | None) -> str | None:
@@ -120,6 +131,124 @@ def _fetch_sensor_window_from_db(
     return np.array(matrix, dtype=np.float32)
 
 
+def _model_input_contract(model_info: dict[str, Any]) -> dict[str, Any]:
+    metadata = model_info.get("metadata") or {}
+    return {
+        "inference_scope": metadata.get("inference_scope"),
+        "feature_surface": metadata.get("feature_surface"),
+        "required_features": metadata.get("required_features") or metadata.get("feature_names") or [],
+        "target": metadata.get("target"),
+        "missing_feature_policy": metadata.get("missing_feature_policy"),
+    }
+
+
+def _fetch_contract_sensor_window_from_db(
+    equipment_code: str,
+    equipment_type: str,
+    hours: int,
+    model_info: dict[str, Any],
+    site_id: str | None = None,
+) -> FeatureWindowResult:
+    """Fetch a contract-declared feature window and fail closed on incompleteness."""
+    import pandas as pd
+    import psycopg2
+
+    contract = _model_input_contract(model_info)
+    features = contract["required_features"]
+    diagnostics: dict[str, Any] = {
+        "equipment_id": equipment_code,
+        "equipment_type": equipment_type,
+        "site_id": site_id,
+        "model_id": model_info.get("model_id"),
+        "inference_scope": contract["inference_scope"],
+        "feature_surface": contract["feature_surface"],
+        "required_features": features,
+        "missing_feature_policy": contract["missing_feature_policy"],
+    }
+
+    if contract["missing_feature_policy"] != "fail_closed":
+        return FeatureWindowResult(None, diagnostics, "input_contract_missing_or_not_fail_closed")
+    if contract["inference_scope"] not in {"equipment_id", "equipment_type"}:
+        return FeatureWindowResult(None, diagnostics, f"invalid_inference_scope:{contract['inference_scope']}")
+    if not features:
+        return FeatureWindowResult(None, diagnostics, "required_features_missing")
+
+    database_url = settings.database_url or os.getenv("DATABASE_URL")
+    if not database_url:
+        return FeatureWindowResult(None, diagnostics, "database_url_missing")
+
+    try:
+        conn = psycopg2.connect(database_url)
+        conn.autocommit = True
+        cur = conn.cursor()
+        if contract["inference_scope"] == "equipment_type":
+            equipment_filter = f"%-{equipment_type.upper()}-%"
+            cur.execute(
+                """
+                SELECT hour_bucket, point_name, AVG(value_avg)::float AS value
+                FROM telemetry_hourly
+                WHERE equipment_id LIKE %s
+                  AND point_name = ANY(%s)
+                  AND (%s IS NULL OR site_id = %s)
+                  AND value_avg IS NOT NULL
+                GROUP BY hour_bucket, point_name
+                ORDER BY hour_bucket ASC
+                """,
+                [equipment_filter, features, site_id, site_id],
+            )
+        else:
+            cur.execute(
+                """
+                SELECT hour_bucket, point_name, value_avg::float AS value
+                FROM telemetry_hourly
+                WHERE equipment_id = %s
+                  AND point_name = ANY(%s)
+                  AND (%s IS NULL OR site_id = %s)
+                  AND value_avg IS NOT NULL
+                ORDER BY hour_bucket ASC
+                """,
+                [equipment_code, features, site_id, site_id],
+            )
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception as exc:
+        return FeatureWindowResult(None, diagnostics, f"telemetry_query_failed:{exc}")
+
+    diagnostics["raw_rows"] = len(rows)
+    if not rows:
+        return FeatureWindowResult(None, diagnostics, "no_contract_telemetry_rows")
+
+    df = pd.DataFrame(rows, columns=["hour_bucket", "point_name", "value"])
+    df["hour_bucket"] = pd.to_datetime(df["hour_bucket"], utc=True).dt.floor("h")
+    pivot = df.pivot_table(index="hour_bucket", columns="point_name", values="value", aggfunc="mean").sort_index()
+    missing_columns = [feature for feature in features if feature not in pivot.columns]
+    diagnostics["missing_columns"] = missing_columns
+    if missing_columns:
+        return FeatureWindowResult(None, diagnostics, "contract_features_absent")
+
+    full_index = pd.date_range(pivot.index.min(), pivot.index.max(), freq="h", tz="UTC")
+    raw_feature_frame = pivot.reindex(full_index)[features]
+    cleaned = raw_feature_frame.ffill(limit=3).dropna()
+    diagnostics["raw_start"] = raw_feature_frame.index.min().isoformat()
+    diagnostics["raw_end"] = raw_feature_frame.index.max().isoformat()
+    diagnostics["complete_hours_after_cleaning"] = len(cleaned)
+    diagnostics["latest_complete_hour"] = cleaned.index.max().isoformat() if not cleaned.empty else None
+
+    if len(cleaned) < hours:
+        return FeatureWindowResult(None, diagnostics, "insufficient_complete_contract_window")
+
+    window = cleaned.tail(hours)
+    raw_window = raw_feature_frame.reindex(window.index)
+    diagnostics["window_start"] = window.index.min().isoformat()
+    diagnostics["window_end"] = window.index.max().isoformat()
+    diagnostics["real_value_counts"] = {feature: int(raw_window[feature].notna().sum()) for feature in features}
+    diagnostics["hours_required"] = hours
+    diagnostics["hours_returned"] = len(window)
+
+    return FeatureWindowResult(window.values.astype(np.float32), diagnostics)
+
+
 def _get_registry():
     """Lazy load model registry."""
     global _registry
@@ -202,19 +331,32 @@ class LSTMInferenceService:
             return {"equipment_id": equipment_id, "error": str(e), "predictions": None}
 
         if sensor_data is None:
-            feature_names = model_info.get("metadata", {}).get("feature_names")
-            sensor_data = _fetch_sensor_window_from_db(
-                equipment_id,
-                equipment_type,
-                hours=168,
-                feature_cols=feature_names,
-                site_id=site_id,
-            )
+            metadata = model_info.get("metadata", {})
+            contract_result: FeatureWindowResult | None = None
+            if metadata.get("missing_feature_policy") == "fail_closed":
+                contract_result = _fetch_contract_sensor_window_from_db(
+                    equipment_id,
+                    equipment_type,
+                    hours=168,
+                    model_info=model_info,
+                    site_id=site_id,
+                )
+                sensor_data = contract_result.data
+            else:
+                feature_names = metadata.get("feature_names")
+                sensor_data = _fetch_sensor_window_from_db(
+                    equipment_id,
+                    equipment_type,
+                    hours=168,
+                    feature_cols=feature_names,
+                    site_id=site_id,
+                )
             if sensor_data is None:
                 return {
                     "equipment_id": equipment_id,
                     "equipment_type": equipment_type,
-                    "error": "Insufficient real telemetry for LSTM prediction; no synthetic data generated",
+                    "error": "model_unavailable: insufficient contract-complete telemetry for LSTM prediction",
+                    "contract_diagnostics": contract_result.diagnostics if contract_result else None,
                     "predictions": None,
                 }
 
@@ -259,7 +401,11 @@ class LSTMInferenceService:
             },
             "confidence": 0.85,  # Placeholder - would calculate from model uncertainty
             "timestamp": datetime.utcnow().isoformat(),
-            "model_info": {"model_id": model_info["model_id"], "site_id": model_info.get("site_id")},
+            "model_info": {
+                "model_id": model_info["model_id"],
+                "site_id": model_info.get("site_id"),
+                "input_contract": _model_input_contract(model_info),
+            },
         }
 
     def get_trend(
@@ -272,19 +418,31 @@ class LSTMInferenceService:
         """Get historical + predicted trend data for visualization."""
         site_id = site_id or _infer_site_id(equipment_id)
         model_info = self.registry.get_active_model("lstm", equipment_type, site_id=site_id)
-        feature_names = model_info.get("metadata", {}).get("feature_names") if model_info else None
-        sensor_data = _fetch_sensor_window_from_db(
-            equipment_id,
-            equipment_type,
-            hours=hours_history,
-            feature_cols=feature_names,
-            site_id=site_id,
-        )
+        contract_result: FeatureWindowResult | None = None
+        if model_info and (model_info.get("metadata") or {}).get("missing_feature_policy") == "fail_closed":
+            contract_result = _fetch_contract_sensor_window_from_db(
+                equipment_id,
+                equipment_type,
+                hours=hours_history,
+                model_info=model_info,
+                site_id=site_id,
+            )
+            sensor_data = contract_result.data
+        else:
+            feature_names = model_info.get("metadata", {}).get("feature_names") if model_info else None
+            sensor_data = _fetch_sensor_window_from_db(
+                equipment_id,
+                equipment_type,
+                hours=hours_history,
+                feature_cols=feature_names,
+                site_id=site_id,
+            )
         if sensor_data is None:
             return {
                 "equipment_id": equipment_id,
                 "equipment_type": equipment_type,
-                "error": "Insufficient real telemetry for trend; no synthetic history generated",
+                "error": "model_unavailable: insufficient contract-complete telemetry for trend",
+                "contract_diagnostics": contract_result.diagnostics if contract_result else None,
             }
 
         prediction = self.predict(equipment_id, equipment_type, sensor_data=sensor_data, site_id=site_id)
@@ -385,19 +543,32 @@ class AnomalyDetectionService:
             return {"equipment_id": equipment_id, "error": str(e), "is_anomaly": None}
 
         if sensor_data is None:
-            feature_names = model_info.get("metadata", {}).get("feature_names")
-            sensor_data = _fetch_sensor_window_from_db(
-                equipment_id,
-                equipment_type,
-                hours=24,
-                feature_cols=feature_names,
-                site_id=site_id,
-            )
+            metadata = model_info.get("metadata", {})
+            contract_result: FeatureWindowResult | None = None
+            if metadata.get("missing_feature_policy") == "fail_closed":
+                contract_result = _fetch_contract_sensor_window_from_db(
+                    equipment_id,
+                    equipment_type,
+                    hours=24,
+                    model_info=model_info,
+                    site_id=site_id,
+                )
+                sensor_data = contract_result.data
+            else:
+                feature_names = metadata.get("feature_names")
+                sensor_data = _fetch_sensor_window_from_db(
+                    equipment_id,
+                    equipment_type,
+                    hours=24,
+                    feature_cols=feature_names,
+                    site_id=site_id,
+                )
             if sensor_data is None:
                 return {
                     "equipment_id": equipment_id,
                     "equipment_type": equipment_type,
-                    "error": "Insufficient real telemetry for anomaly detection; no synthetic data generated",
+                    "error": "model_unavailable: insufficient contract-complete telemetry for anomaly detection",
+                    "contract_diagnostics": contract_result.diagnostics if contract_result else None,
                     "is_anomaly": None,
                 }
 
@@ -437,7 +608,11 @@ class AnomalyDetectionService:
             "score_pct": (score / threshold * 100) if threshold > 0 else 0,
             "severity": self._classify_severity(score, threshold),
             "timestamp": datetime.utcnow().isoformat(),
-            "model_info": {"model_id": model_info["model_id"], "site_id": model_info.get("site_id")},
+            "model_info": {
+                "model_id": model_info["model_id"],
+                "site_id": model_info.get("site_id"),
+                "input_contract": _model_input_contract(model_info),
+            },
         }
 
     def _classify_severity(self, score: float, threshold: float) -> str:
@@ -490,6 +665,229 @@ class AnomalyDetectionService:
     def get_anomaly_history(self, equipment_id: str, equipment_type: str, days: int = 7) -> list[dict[str, Any]]:
         """Get anomaly score history from persisted telemetry when available."""
         return []
+
+    def _surface_critical_anomaly(
+        self,
+        *,
+        conn: Any,
+        site_id: str,
+        site_uuid: str,
+        equipment_uuid: str,
+        equipment_code: str,
+        equipment_type: str,
+        result: dict[str, Any],
+        detected_at: datetime,
+    ) -> dict[str, str | None]:
+        """Persist a critical AE anomaly as alert + recommendation and notify operators."""
+        import asyncio
+        import uuid
+
+        from app.models.notification import AlertLevel
+        from app.services.notification_service import NotificationService
+
+        operator_label = operator_equipment_label(equipment_code)
+        equipment_ref = format_operator_equipment_reference(equipment_code)
+        model_info = result.get("model_info") or {}
+        contract = model_info.get("input_contract") or {}
+        anomaly_score = float(result.get("anomaly_score") or 0.0)
+        threshold = float(result.get("threshold") or 0.0)
+        ratio = anomaly_score / threshold if threshold > 0 else 0.0
+        score_pct = float(result.get("score_pct") or 0.0)
+        source_dedupe_key = f"ml:autoencoder:{site_id}:{equipment_code}:critical"
+        title = f"ML critical anomaly: {operator_label}"
+        message = (
+            f"{equipment_ref} has a critical autoencoder anomaly. "
+            f"Score {anomaly_score:.4f} vs threshold {threshold:.4f} ({ratio:.2f}x). "
+            "Check BMS trend and physical plant before clearing."
+        )
+        cur = conn.cursor()
+        try:
+            cur.execute(
+                """
+                SELECT id
+                FROM alerts
+                WHERE site_id = %s::uuid
+                  AND equipment_id = %s::uuid
+                  AND source = 'ml_inference'
+                  AND type = 'ml_autoencoder_anomaly'
+                  AND severity = 'critical'
+                  AND status = 'active'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                [site_uuid, equipment_uuid],
+            )
+            row = cur.fetchone()
+            if row:
+                alert_id = str(row[0])
+                cur.execute(
+                    """
+                    UPDATE alerts
+                    SET title = %s,
+                        message = %s,
+                        event_at = %s::timestamptz,
+                        last_seen_at = %s::timestamptz,
+                        updated_at = %s::timestamptz,
+                        occurrence_count = occurrence_count + 1
+                    WHERE id = %s::uuid
+                    """,
+                    [
+                        title,
+                        message,
+                        detected_at.isoformat(),
+                        detected_at.isoformat(),
+                        detected_at.isoformat(),
+                        alert_id,
+                    ],
+                )
+            else:
+                alert_id = str(uuid.uuid4())
+                cur.execute(
+                    """
+                    INSERT INTO alerts
+                        (id, site_id, equipment_id, type, severity, status, title, message,
+                         created_at, updated_at, source, source_dedupe_key, event_at,
+                         first_seen_at, last_seen_at, lifecycle_state, occurrence_count)
+                    VALUES
+                        (%s::uuid, %s::uuid, %s::uuid, 'ml_autoencoder_anomaly', 'critical',
+                         'active', %s, %s, %s::timestamptz, %s::timestamptz, 'ml_inference',
+                         %s, %s::timestamptz, %s::timestamptz, %s::timestamptz, 'active', 1)
+                    ON CONFLICT (site_id, source, source_dedupe_key) DO UPDATE
+                    SET title = EXCLUDED.title,
+                        message = EXCLUDED.message,
+                        status = 'active',
+                        lifecycle_state = 'active',
+                        event_at = EXCLUDED.event_at,
+                        last_seen_at = EXCLUDED.last_seen_at,
+                        updated_at = EXCLUDED.updated_at,
+                        occurrence_count = alerts.occurrence_count + 1
+                    RETURNING id
+                    """,
+                    [
+                        alert_id,
+                        site_uuid,
+                        equipment_uuid,
+                        title,
+                        message,
+                        detected_at.isoformat(),
+                        detected_at.isoformat(),
+                        source_dedupe_key,
+                        detected_at.isoformat(),
+                        detected_at.isoformat(),
+                        detected_at.isoformat(),
+                    ],
+                )
+                alert_id = str(cur.fetchone()[0])
+
+            cur.execute(
+                """
+                SELECT id
+                FROM recommendations
+                WHERE site_id = %s
+                  AND source = 'ml_inference'
+                  AND status IN ('pending', 'advisory_info', 'approved')
+                  AND (
+                    metadata->>'source_dedupe_key' = %s
+                    OR metadata->>'alert_id' = %s
+                  )
+                ORDER BY timestamp DESC
+                LIMIT 1
+                """,
+                [site_id, source_dedupe_key, alert_id],
+            )
+            rec_row = cur.fetchone()
+            if rec_row:
+                recommendation_id = str(rec_row[0])
+                created_recommendation = False
+            else:
+                recommendation_id = str(uuid.uuid4())
+                created_recommendation = True
+                action = {
+                    "type": "inspect_chiller_critical_anomaly",
+                    "operator_equipment_label": operator_label,
+                    "internal_asset_id": equipment_code,
+                    "required_outcome": ["real_fault", "sensor_fault", "alarm_cleared", "false_positive"],
+                    "point_safety_classes": [{"point": "autoencoder_critical_anomaly", "safety_class": "HIGH"}],
+                }
+                expected_impact = {
+                    "risk_reduction": "critical_fault_triage",
+                    "energy_savings_kwh": 0,
+                    "comfort_impact": "unknown_until_triage",
+                }
+                metadata = {
+                    "recommendation_type": "fault_triage",
+                    "recommendation_family": "ml_autoencoder_critical",
+                    "equipment_type": equipment_type,
+                    "operator_equipment_label": operator_label,
+                    "internal_asset_reference": equipment_code,
+                    "alert_id": alert_id,
+                    "source_dedupe_key": source_dedupe_key,
+                    "model_id": model_info.get("model_id"),
+                    "model_type": "autoencoder",
+                    "model_site_id": model_info.get("site_id"),
+                    "input_contract": contract,
+                    "anomaly_score": anomaly_score,
+                    "threshold": threshold,
+                    "score_pct": score_pct,
+                    "severity": "critical",
+                    "phase185_cutover": True,
+                    "phase188_cutover_metadata": "post_phase185_cutover",
+                    "point_safety_classes": [{"point": "autoencoder_critical_anomaly", "safety_class": "HIGH"}],
+                }
+                reason = (
+                    f"{equipment_ref}: autoencoder critical anomaly score {anomaly_score:.4f} "
+                    f"exceeds threshold {threshold:.4f} ({ratio:.2f}x). "
+                    "Create/confirm operator triage and record whether this is a real fault, "
+                    "sensor fault, cleared alarm, or false positive."
+                )
+                cur.execute(
+                    """
+                    INSERT INTO recommendations
+                        (id, site_id, timestamp, action_type, risk_level, target_equipment,
+                         action, reason, expected_impact, confidence, confidence_score, profile,
+                         multi_objective_score, status, requires_approval, approval_status,
+                         shadow_mode, metadata, source, source_type,
+                         phase188_evidence_epoch, phase188_evidence_epoch_set_at,
+                         phase188_evidence_epoch_reason)
+                    VALUES
+                        (%s::uuid, %s, %s::timestamptz, 'fault_triage', 'high', %s,
+                         %s::jsonb, %s, %s::jsonb, 'high', %s, 'supervised',
+                         %s, 'pending', false, 'not_required',
+                         false, %s::jsonb, 'ml_inference', 'autoencoder',
+                         'post_phase185_cutover', %s::timestamptz,
+                         'Phase 188 evidence starts after Phase 185 site-scoped model cutover')
+                    """,
+                    [
+                        recommendation_id,
+                        site_id,
+                        detected_at.isoformat(),
+                        equipment_code,
+                        json.dumps(action),
+                        reason,
+                        json.dumps(expected_impact),
+                        min(1.0, score_pct / 100.0),
+                        min(1.0, ratio / 3.0) if ratio else 0.0,
+                        json.dumps(metadata),
+                        detected_at.isoformat(),
+                    ],
+                )
+
+            notify_result = {"success": False, "skipped": "existing_recommendation"}
+            if created_recommendation:
+                body = f"{message}\n\nRecommendation: {recommendation_id}\nAlert: {alert_id}"
+                notify_result = asyncio.run(
+                    NotificationService().send_alert_direct(title=title, body=body, alert_level=AlertLevel.CRITICAL)
+                )
+            logger.info(
+                "[AE CRITICAL] Surfaced %s alert=%s recommendation=%s notify=%s",
+                equipment_code,
+                alert_id,
+                recommendation_id,
+                notify_result,
+            )
+            return {"alert_id": alert_id, "recommendation_id": recommendation_id}
+        finally:
+            cur.close()
 
     def fetch_sensor_window_from_db(
         self,
@@ -556,22 +954,14 @@ class AnomalyDetectionService:
 
         results = []
         anomalies_to_insert = []
+        critical_to_surface = []
         now = datetime.utcnow()
 
         for eq_id, eq_code, eq_type in equipment_rows:
-            model_info = self.registry.get_active_model("autoencoder", eq_type, site_id=site_id)
-            feature_names = model_info.get("metadata", {}).get("feature_names") if model_info else None
-            sensor_data = self.fetch_sensor_window_from_db(
-                eq_code,
-                eq_type,
-                site_id=site_id,
-                feature_cols=feature_names,
-            )
-            if sensor_data is None:
-                logger.debug(f"Skipping {eq_code}: insufficient sensor data in DB")
+            result = self.check_equipment(eq_code, eq_type, site_id=site_id)
+            if result.get("error"):
+                logger.debug("Skipping %s: %s", eq_code, result.get("error"))
                 continue
-
-            result = self.check_equipment(eq_code, eq_type, sensor_data=sensor_data, site_id=site_id)
             result["equipment_db_id"] = str(eq_id)
             results.append(result)
 
@@ -597,19 +987,37 @@ class AnomalyDetectionService:
                         },
                     }
                 )
+                if raw_sev == "critical" and (result.get("model_info") or {}).get("input_contract"):
+                    critical_to_surface.append(
+                        {
+                            "equipment_uuid": str(eq_id),
+                            "equipment_code": eq_code,
+                            "equipment_type": eq_type,
+                            "result": result,
+                        }
+                    )
 
-        if anomalies_to_insert:
+        site_uuid = None
+        if anomalies_to_insert or critical_to_surface:
             try:
                 conn = psycopg2.connect(database_url)
                 conn.autocommit = True
                 cur = conn.cursor()
 
-                # site_id must be UUID in anomalies table — resolve it
                 cur.execute("SELECT id FROM sites WHERE code = %s LIMIT 1", [site_id])
                 row = cur.fetchone()
                 site_uuid = str(row[0]) if row else None
+                cur.close()
+                conn.close()
+            except Exception as e:
+                logger.error(f"run_anomaly_scan: site lookup failed for {site_id}: {e}")
 
-                if site_uuid:
+        if anomalies_to_insert and site_uuid:
+            try:
+                conn = psycopg2.connect(database_url)
+                conn.autocommit = True
+                cur = conn.cursor()
+                try:
                     for a in anomalies_to_insert:
                         a["site_id"] = site_uuid
                         cur.execute(
@@ -626,11 +1034,30 @@ class AnomalyDetectionService:
                             {**a, "sensor_values": __import__("json").dumps(a["sensor_values"])},
                         )
                     logger.info(f"[ANOMALY SCAN] Persisted {len(anomalies_to_insert)} anomalies for {site_id}")
-
-                cur.close()
-                conn.close()
+                finally:
+                    cur.close()
+                    conn.close()
             except Exception as e:
                 logger.error(f"run_anomaly_scan: anomaly insert failed: {e}")
+
+        if critical_to_surface and site_uuid:
+            try:
+                conn = psycopg2.connect(database_url)
+                conn.autocommit = True
+                for item in critical_to_surface:
+                    self._surface_critical_anomaly(
+                        conn=conn,
+                        site_id=site_id,
+                        site_uuid=site_uuid,
+                        equipment_uuid=item["equipment_uuid"],
+                        equipment_code=item["equipment_code"],
+                        equipment_type=item["equipment_type"],
+                        result=item["result"],
+                        detected_at=now,
+                    )
+                conn.close()
+            except Exception as e:
+                logger.error(f"run_anomaly_scan: AE critical surfacing failed: {e}", exc_info=True)
 
         logger.info(
             f"[ANOMALY SCAN] {site_id}: checked {len(results)} equipment, {len(anomalies_to_insert)} anomalies detected"

@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
@@ -954,6 +955,7 @@ class BackgroundSchedulerService:
         self._feedback_retraining_last_trigger: dict[str, datetime] = {}
         self._last_after_hours_hvac_analysis: dict[str, datetime] = {}
         self._last_optimization_analysis_at: dict[str, datetime] = {}
+        self._shutdown_requested = threading.Event()
         self._feedback_retraining_policy = {
             "min_records": 10,
             "min_success_rate": 70.0,
@@ -973,13 +975,19 @@ class BackgroundSchedulerService:
             logger.info("Background scheduler not started in this worker; another worker owns the scheduler lock")
             return
         if not self.scheduler.running:
+            self._shutdown_requested.clear()
             self.scheduler.start()
             logger.info("Background scheduler started")
 
     def stop(self):
         """Stop the background scheduler."""
         if self.scheduler.running:
-            self.scheduler.shutdown(wait=False)
+            self._shutdown_requested.set()
+            try:
+                self.scheduler.remove_all_jobs()
+            except Exception:
+                logger.warning("Failed to remove pending scheduler jobs before shutdown", exc_info=True)
+            self.scheduler.shutdown(wait=True)
             logger.info("Background scheduler stopped")
         self._release_leader_lock()
 
@@ -5151,6 +5159,46 @@ class BackgroundSchedulerService:
         )
         logger.info("Added anomaly weekly retrain job (Sunday 02:00, delegates to drift detection)")
 
+    def add_anomaly_detection_job(self, interval_seconds: int = 1800, site_id: str = "site-002"):
+        """Add periodic autoencoder anomaly detection for a site."""
+        job_id = f"autoencoder_anomaly_detection_{site_id}"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing autoencoder anomaly detection job for %s", site_id)
+
+        self.scheduler.add_job(
+            func=self._run_anomaly_detection,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            args=[site_id],
+            id=job_id,
+            name=f"Autoencoder Anomaly Detection ({site_id})",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
+        logger.info("Added autoencoder anomaly detection job for %s with %ss interval", site_id, interval_seconds)
+
+    @track_job_metrics("autoencoder_anomaly_detection")
+    def _run_anomaly_detection(self, site_id: str):
+        """Run site-scoped AE anomaly scan and surface critical contract-path results."""
+        if self._shutdown_requested.is_set():
+            logger.info("Skipping autoencoder anomaly detection during scheduler shutdown")
+            return
+        try:
+            from app.services.ml_inference import get_anomaly_service
+
+            results = get_anomaly_service().run_anomaly_scan(site_id)
+            critical_count = sum(1 for result in results if result.get("severity") == "critical")
+            logger.info(
+                "[ANOMALY SCAN] %s completed: results=%s critical=%s",
+                site_id,
+                len(results),
+                critical_count,
+            )
+        except Exception as exc:
+            logger.error("Autoencoder anomaly detection failed for %s: %s", site_id, exc, exc_info=True)
+
     def add_drift_detection_job(self, interval_seconds: int = 3600):
         """
         Add a job to monitor for data/model drift and trigger retraining if detected.
@@ -5189,6 +5237,9 @@ class BackgroundSchedulerService:
         Helps system adapt to changing building behaviors and conditions.
         """
         try:
+            if self._shutdown_requested.is_set():
+                logger.info("Skipping drift detection during scheduler shutdown")
+                return
             from ml.monitoring.drift import EQUIPMENT_TYPES, get_drift_detector
             from ml.monitoring.triggers import RetrainingTrigger
 
@@ -5238,6 +5289,9 @@ class BackgroundSchedulerService:
         system overload. Models are prioritized by age and performance degradation.
         """
         try:
+            if self._shutdown_requested.is_set():
+                logger.info("Skipping ML retraining during scheduler shutdown")
+                return
             from ml.training.retraining_scheduler import get_retraining_scheduler
 
             logger.info("Running scheduled ML model staleness check...")
@@ -5470,6 +5524,9 @@ class BackgroundSchedulerService:
     def _run_feedback_retraining(self):
         """Trigger retraining when module outcome success drops below threshold."""
         try:
+            if self._shutdown_requested.is_set():
+                logger.info("Skipping feedback retraining during scheduler shutdown")
+                return
             from app.services.ml_feedback_service import get_ml_feedback_service
             from ml.training.retraining_scheduler import get_retraining_scheduler
 

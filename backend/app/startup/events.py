@@ -967,15 +967,15 @@ async def startup_event(_: FastAPI) -> None:
     # Critical path monitor — SLI Tier 3: hourly aggregation of PARASITE decision latencies
     scheduler_service.add_critical_path_monitor_job()
 
-    # Autoencoder anomaly detection — note: add_anomaly_detection_job not yet implemented
-    # pending bridge integration; commented out to eliminate warning
-    # try:
-    #     from app.core.site_resolver import get_registered_site_ids as _anomaly_site_ids_fn
-    #     for _site_id in _anomaly_site_ids_fn() or []:
-    #         scheduler_service.add_anomaly_detection_job(interval_seconds=1800, site_id=_site_id)
-    #     _logger.info("✅ Anomaly detection jobs initialized (30 min interval)")
-    # except Exception as e:
-    #     _logger.warning("⚠️ Anomaly detection job initialization failed: %s", e)
+    # Autoencoder anomaly detection — contract-path criticals persist alerts/recommendations and notify immediately.
+    try:
+        from app.core.site_resolver import get_registered_site_ids as _anomaly_site_ids_fn
+
+        for _site_id in _anomaly_site_ids_fn() or []:
+            scheduler_service.add_anomaly_detection_job(interval_seconds=1800, site_id=_site_id)
+        _logger.info("Autoencoder anomaly detection jobs initialized (30 min interval)")
+    except Exception as e:
+        _logger.warning("Autoencoder anomaly detection job initialization failed: %s", e)
 
     # Error auto-resolution job (daily) - resolves errors if component healthy for 24+ hours
     scheduler_service.add_error_auto_resolve_job(interval_seconds=86400)

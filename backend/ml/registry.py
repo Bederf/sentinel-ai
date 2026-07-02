@@ -16,6 +16,74 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
+CONTRACT_MODEL_TYPES = {"lstm", "autoencoder"}
+VALID_INFERENCE_SCOPES = {"equipment_type", "equipment_id"}
+VALID_MISSING_FEATURE_POLICIES = {"fail_closed"}
+REQUIRED_INPUT_CONTRACT_FIELDS = {
+    "inference_scope",
+    "feature_surface",
+    "required_features",
+    "target",
+    "missing_feature_policy",
+}
+
+
+def build_input_contract_metadata(
+    *,
+    site_id: str | None,
+    equipment_type: str,
+    model_type: str,
+    required_features: list[str],
+    target: str,
+    inference_scope: str = "equipment_type",
+    feature_surface: str | None = None,
+    missing_feature_policy: str = "fail_closed",
+) -> dict:
+    """Build standard model input contract metadata for feature-window models."""
+    site_part = (site_id or "global").replace("-", "_")
+    scope_part = inference_scope.replace("-", "_")
+    return {
+        "inference_scope": inference_scope,
+        "feature_surface": feature_surface or f"{site_part}_{equipment_type}_{model_type}_{scope_part}_v1",
+        "required_features": list(required_features),
+        "target": target,
+        "missing_feature_policy": missing_feature_policy,
+    }
+
+
+def validate_input_contract_metadata(model_type: str, metadata: dict | None) -> None:
+    """Fail closed for new LSTM/autoencoder registrations without an input contract."""
+    if model_type not in CONTRACT_MODEL_TYPES:
+        return
+    metadata = metadata or {}
+    missing = sorted(REQUIRED_INPUT_CONTRACT_FIELDS - set(metadata))
+    if missing:
+        raise ValueError(f"{model_type} registration missing input contract metadata: {missing}")
+
+    inference_scope = metadata.get("inference_scope")
+    if inference_scope not in VALID_INFERENCE_SCOPES:
+        raise ValueError(f"{model_type} registration has invalid inference_scope: {inference_scope!r}")
+
+    policy = metadata.get("missing_feature_policy")
+    if policy not in VALID_MISSING_FEATURE_POLICIES:
+        raise ValueError(f"{model_type} registration has invalid missing_feature_policy: {policy!r}")
+
+    required_features = metadata.get("required_features")
+    if (
+        not isinstance(required_features, list)
+        or not required_features
+        or not all(isinstance(feature, str) and feature for feature in required_features)
+    ):
+        raise ValueError(f"{model_type} registration requires a non-empty required_features list")
+
+    target = metadata.get("target")
+    if not isinstance(target, str) or not target:
+        raise ValueError(f"{model_type} registration requires a non-empty target")
+
+    feature_surface = metadata.get("feature_surface")
+    if not isinstance(feature_surface, str) or not feature_surface:
+        raise ValueError(f"{model_type} registration requires a non-empty feature_surface")
+
 
 class ModelRegistry:
     """Registry for managing ML model versions."""
@@ -123,6 +191,7 @@ class ModelRegistry:
 
         # Convert paths to relative for portability
         stored_metadata = dict(metadata) if metadata else {}
+        validate_input_contract_metadata(model_type, stored_metadata)
         if "scaler_path" in stored_metadata:
             stored_metadata["scaler_path"] = self._to_relative_path(str(stored_metadata["scaler_path"]))
         if site_id:

@@ -4740,12 +4740,18 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         decision: dict[str, Any],
     ) -> dict[str, Any]:
         """Generate an advisory recommendation for a fault-suppressed equipment."""
+        from app.services.equipment_labels import internal_asset_reference, operator_equipment_label
+
         reason_codes = decision.get("reason_codes", ["Active fault condition"])
+        operator_target = operator_equipment_label(target)
+        internal_ref = internal_asset_reference(target)
         reason = (
-            f"{target} excluded from optimization — "
+            f"{operator_target} excluded from optimization — "
             f"{' '.join(reason_codes)}. "
             "Resolve before plant group tuning resumes."
         )
+        if internal_ref:
+            reason += f" Internal asset reference: {internal_ref}."
         return {
             "equipment_id": target,
             "target_equipment": target,
@@ -4769,6 +4775,8 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 "advisory_type": "fault_safety_gate",
                 "fault_type": decision.get("fault_type", "unknown"),
                 "reason_codes": reason_codes,
+                "operator_equipment_label": operator_target,
+                "internal_asset_reference": internal_ref,
                 "suppressed_optimization": True,
                 "site_id": site_id,
                 "non_expiring": True,

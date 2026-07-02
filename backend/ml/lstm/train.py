@@ -17,12 +17,36 @@ from typing import Any
 
 import numpy as np
 
-from ..registry import get_model_registry
+from ..registry import build_input_contract_metadata, get_model_registry
 from .data_prep import EquipmentDataLoader, LSTMDataPrep
 from .model import SensorLSTM
 from ml.model_config import get_lstm_features, list_ml_trainable_types
 
 logger = logging.getLogger(__name__)
+
+
+def resolve_lstm_training_contract(equipment_type: str, site_id: str | None = None) -> tuple[list[str], str]:
+    """Resolve feature and target contract for LSTM training.
+
+    The target is a contract, not a defaultable convenience. If site-specific
+    feature discovery does not include the configured target, training must stop
+    before any model artifact can be registered with a silently changed target.
+    """
+    config = EquipmentDataLoader.get_config(equipment_type)
+    feature_names = get_lstm_features(equipment_type, site_id)
+    if not feature_names:
+        feature_names = config["features"]
+
+    expected_target = config["target"]
+    if expected_target not in feature_names:
+        site_label = site_id or "global"
+        raise ValueError(
+            "LSTM target is absent from available features for "
+            f"{equipment_type} at {site_label}: expected target '{expected_target}', "
+            f"available features={feature_names}"
+        )
+
+    return feature_names, expected_target
 
 
 class LSTMTrainer:
@@ -86,12 +110,8 @@ class LSTMTrainer:
         logger.info("Training LSTM for %s (site=%s)...", equipment_type, site_id or "global")
         start_time = datetime.now()
 
-        # Get sensor configuration
-        config = EquipmentDataLoader.get_config(equipment_type)
-        feature_names = get_lstm_features(equipment_type, site_id)
-        if not feature_names:
-            feature_names = config["features"]
-        target = config["target"] if config["target"] in feature_names else feature_names[0]
+        # Get sensor contract. Target mismatch is fail-closed: no silent substitution.
+        feature_names, target = resolve_lstm_training_contract(equipment_type, site_id)
         n_features = len(feature_names)
         provenance: dict[str, Any] = {
             "site_id": site_id,
@@ -208,6 +228,14 @@ class LSTMTrainer:
         should_activate = auto_activate and provenance.get("data_source") == "telemetry_hourly"
 
         # Register model
+        input_contract = build_input_contract_metadata(
+            site_id=site_id,
+            equipment_type=equipment_type,
+            model_type="lstm",
+            required_features=feature_names,
+            target=target,
+            inference_scope="equipment_type",
+        )
         model_id = self.registry.register_model(
             model_type="lstm",
             equipment_type=equipment_type,
@@ -224,6 +252,7 @@ class LSTMTrainer:
                 "training_samples": len(X_train),
                 "validation_samples": len(X_val),
                 "epochs_trained": len(history["loss"]),
+                **input_contract,
                 **provenance,
             },
             auto_activate=should_activate,
@@ -348,6 +377,14 @@ class LSTMTrainer:
         data_prep.save_scaler(scaler_path)
 
         # Register
+        input_contract = build_input_contract_metadata(
+            site_id=None,
+            equipment_type=equipment_type,
+            model_type="lstm",
+            required_features=config["features"],
+            target=config["target"],
+            inference_scope="equipment_type",
+        )
         model_id = self.registry.register_model(
             model_type="lstm",
             equipment_type=equipment_type,
@@ -365,6 +402,7 @@ class LSTMTrainer:
                 "epochs_trained": len(history["loss"]),
                 "use_demo_data": False,
                 "data_source": "sentinel_ml_feeder",
+                **input_contract,
             },
             auto_activate=True,
         )

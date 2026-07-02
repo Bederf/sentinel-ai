@@ -14,20 +14,20 @@ LLM usage: Zero. All formatting is pure Python string building.
 
 from typing import Any
 
+from app.services.equipment_labels import operator_equipment_label
+
 
 def _equipment_label(equipment_code: str) -> str:
-    """Convert equipment code to human-readable label.
-
-    Examples:
-        S002-FCU-201 -> FCU-201 (Level 2, Zone A)
-        S002-CHILLER-B1-001 -> CHILLER-B1-001 (Basement 1)
-    """
+    """Convert equipment code to operator-facing label."""
     parts = equipment_code.split("-") if equipment_code else []
     if len(parts) < 3:
         return equipment_code
 
-    # Remove site prefix for display
-    short = "-".join(parts[1:])
+    operator_label = operator_equipment_label(equipment_code)
+
+    # Plant room assets use logical operator labels without floor prose.
+    if len(parts) >= 4 and parts[-1].isdigit() and len(parts[-1]) == 3:
+        return operator_label
 
     # Try to decode zone from the last numeric segment
     zone_part = parts[-1] if parts[-1].isdigit() else ""
@@ -43,9 +43,9 @@ def _equipment_label(equipment_code: str) -> str:
             level = "Level 3"
         else:
             level = f"Zone {zone_num}"
-        return f"{short} ({level})"
+        return f"{operator_label} ({level})"
 
-    return short
+    return operator_label
 
 
 def _risk_emoji(risk: str) -> str:
