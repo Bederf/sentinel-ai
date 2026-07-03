@@ -17,8 +17,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.models.document_record import DocumentType, ExtractionStatus
+from app.models.document_record import DocumentRecord, DocumentType, ExtractionStatus
 from app.models.document_source import SourceSystem
+from app.services.document_indexing_service import IndexingStatus
 from app.services.document_adapter_mri import FIELD_MAP, ConceptMRIAdapter
 
 
@@ -357,10 +358,57 @@ class TestGetDocumentFile:
             adapter = ConceptMRIAdapter()
         return adapter
 
-    def test_get_document_file_returns_bytes(self):
+    @pytest.mark.asyncio
+    async def test_get_document_file_returns_bytes(self):
         adapter = self.get_adapter_with_mock_client()
         mock_bytes = b"PDF content here"
-        adapter.client.get_document_file = MagicMock(return_value=mock_bytes)
-        result = adapter.get_document_file("DOC-001")
+        adapter.client.get_document_file = AsyncMock(return_value=mock_bytes)
+        result = await adapter.get_document_file("DOC-001")
         adapter.client.get_document_file.assert_called_once_with("DOC-001")
         assert result == mock_bytes
+
+
+class TestRunSyncIndexesFiles:
+    """Test MRI sync owns file fetch and delegates indexing to DocumentIndexingService."""
+
+    def get_adapter_with_mock_client(self):
+        with patch("app.services.document_source_adapter._get_supabase"):
+            adapter = ConceptMRIAdapter()
+        return adapter
+
+    @pytest.mark.asyncio
+    async def test_run_sync_fetches_file_bytes_and_calls_indexing_service(self):
+        adapter = self.get_adapter_with_mock_client()
+        record = DocumentRecord(
+            source_system=SourceSystem.CONCEPT_MRI,
+            source_document_id="MRI-001",
+            site_id="site-002",
+            document_type=DocumentType.SERVICE_REPORT,
+            equipment_description="generator",
+            raw_file_path="",
+        )
+
+        indexer = MagicMock()
+        indexer.index_document = AsyncMock(return_value=MagicMock(status=IndexingStatus.COMPLETE, chunks=2, error=None))
+
+        with (
+            patch.object(adapter, "_get_last_sync", return_value=None),
+            patch.object(adapter, "fetch_new_documents", AsyncMock(return_value=[record])),
+            patch.object(adapter, "_upsert", AsyncMock(return_value="11111111-1111-1111-1111-111111111111")),
+            patch.object(adapter, "_resolve_asset_id", AsyncMock(return_value="S002-GEN-001")),
+            patch.object(adapter, "get_document_file", AsyncMock(return_value=b"%PDF service report")) as get_file,
+            patch.object(adapter, "_update_sync_state") as update_sync,
+            patch("app.services.document_adapter_mri.DocumentIndexingService", return_value=indexer),
+        ):
+            result = await adapter.run_sync(site_id="site-002")
+
+        assert result == {"synced": 1, "failed": 0, "errors": []}
+        get_file.assert_awaited_once_with("MRI-001")
+        indexer.index_document.assert_awaited_once()
+        call = indexer.index_document.await_args.kwargs
+        assert str(call["document_id"]) == "11111111-1111-1111-1111-111111111111"
+        assert call["file_bytes"] == b"%PDF service report"
+        assert call["doc_class"] == "site"
+        assert call["asset_id"] == "S002-GEN-001"
+        assert call["source_system"] == "concept_mri"
+        update_sync.assert_called_once_with("site-002", 1, 0, 0)

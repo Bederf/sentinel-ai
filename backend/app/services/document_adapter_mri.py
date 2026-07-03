@@ -11,9 +11,12 @@ from __future__ import annotations
 
 import logging
 from datetime import date, datetime
+from uuid import UUID
 
 from app.models.document_record import DocumentRecord, DocumentType, ExtractionStatus
 from app.models.document_source import SourceSystem
+from app.services.asset_id_resolver import AssetIDResolver
+from app.services.document_indexing_service import DocumentIndexingService, IndexingStatus
 from app.services.document_source_adapter import DocumentSourceAdapter
 from app.services.mri_document_client import MRIDocumentClient
 
@@ -65,9 +68,69 @@ class ConceptMRIAdapter(DocumentSourceAdapter):
         raw_list = await self.client.fetch_documents(since)
         return [self.normalise(raw) for raw in raw_list]
 
-    def get_document_file(self, source_document_id: str) -> bytes:
+    async def get_document_file(self, source_document_id: str) -> bytes:
         """Retrieve raw file bytes for the given source_document_id."""
-        return self.client.get_document_file(source_document_id)
+        return await self.client.get_document_file(source_document_id)
+
+    async def run_sync(self, site_id: str | None = None) -> dict:
+        """
+        Sync MRI metadata, fetch source files, and index site documents.
+
+        The adapter owns MRI API fetch/auth. DocumentIndexingService remains
+        source-agnostic and receives only file bytes plus resolved indexing context.
+        """
+        last_sync = self._get_last_sync(site_id)
+        records = await self.fetch_new_documents(since=last_sync, site_id=site_id)
+
+        synced = failed = 0
+        errors: list[str] = []
+        indexing_service = DocumentIndexingService(db=self.db)
+
+        for record in records:
+            source_id = record.source_document_id or ""
+            try:
+                doc_id = await self._upsert(record)
+                if not doc_id:
+                    failed += 1
+                    errors.append(f"{source_id}: metadata upsert returned no document id")
+                    continue
+
+                synced += 1
+                asset_id = await self._resolve_asset_id(record)
+                file_bytes = await self.get_document_file(source_id)
+                result = await indexing_service.index_document(
+                    document_id=UUID(str(doc_id)),
+                    file_bytes=file_bytes,
+                    doc_class="site",
+                    asset_id=asset_id,
+                    source_system=self.source_system.value,
+                )
+                if result.status in {IndexingStatus.FAILED, IndexingStatus.QUARANTINE}:
+                    failed += 1
+                    errors.append(f"{source_id}: indexing {result.status.value}: {result.error}")
+            except Exception as exc:
+                failed += 1
+                errors.append(f"{source_id}: {exc}")
+                logger.error(
+                    "[%s] run_sync: failed to sync/index document %s: %s",
+                    self.source_system.value,
+                    source_id,
+                    exc,
+                )
+
+        self._update_sync_state(site_id, synced, failed, len(errors))
+        await self.client.close()
+        return {"synced": synced, "failed": failed, "errors": errors}
+
+    async def _resolve_asset_id(self, record: DocumentRecord) -> str | None:
+        if record.asset_id:
+            return record.asset_id
+        resolver = AssetIDResolver(db=self.db, site_id=record.site_id)
+        result = await resolver.resolve(
+            record.equipment_description or "",
+            record.document_type.value if record.document_type else None,
+        )
+        return result.asset_id
 
     def normalise(self, raw: dict) -> DocumentRecord:
         """
