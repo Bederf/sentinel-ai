@@ -318,7 +318,7 @@ class TestFetchNewDocuments:
         import asyncio
 
         result = asyncio.run(adapter.fetch_new_documents(since=None, site_id="site-002"))
-        adapter.client.fetch_documents.assert_called_once_with(None)
+        adapter.client.fetch_documents.assert_called_once_with(None, limit=None)
         assert len(result) == 1
         assert result[0].source_document_id == "DOC-001"
         assert result[0].document_type == DocumentType.SERVICE_REPORT
@@ -348,6 +348,35 @@ class TestFetchNewDocuments:
         assert len(result) == 2
         assert result[0].document_type == DocumentType.SERVICE_REPORT
         assert result[1].document_type == DocumentType.INSPECTION
+
+    def test_fetch_new_documents_passes_limit_and_slices_results(self):
+        adapter = self.get_adapter_with_mock_client()
+        mock_raw = [
+            {
+                FIELD_MAP["DocumentId"]: "DOC-001",
+                FIELD_MAP["DocumentUrl"]: None,
+                FIELD_MAP["Site"]: "site-002",
+                FIELD_MAP["DocumentType"]: "Service Report",
+            },
+            {
+                FIELD_MAP["DocumentId"]: "DOC-002",
+                FIELD_MAP["DocumentUrl"]: None,
+                FIELD_MAP["Site"]: "site-002",
+                FIELD_MAP["DocumentType"]: "Inspection",
+            },
+            {
+                FIELD_MAP["DocumentId"]: "DOC-003",
+                FIELD_MAP["DocumentUrl"]: None,
+                FIELD_MAP["Site"]: "site-002",
+                FIELD_MAP["DocumentType"]: "Certificate",
+            },
+        ]
+        adapter.client.fetch_documents = AsyncMock(return_value=mock_raw)
+        import asyncio
+
+        result = asyncio.run(adapter.fetch_new_documents(since=None, site_id="site-002", limit=2))
+        adapter.client.fetch_documents.assert_called_once_with(None, limit=2)
+        assert [record.source_document_id for record in result] == ["DOC-001", "DOC-002"]
 
 
 class TestGetDocumentFile:
@@ -412,3 +441,54 @@ class TestRunSyncIndexesFiles:
         assert call["asset_id"] == "S002-GEN-001"
         assert call["source_system"] == "concept_mri"
         update_sync.assert_called_once_with("site-002", 1, 0, 0)
+
+    @pytest.mark.asyncio
+    async def test_initial_run_sync_limits_documents_before_indexing(self):
+        adapter = self.get_adapter_with_mock_client()
+        records = [
+            DocumentRecord(
+                source_system=SourceSystem.CONCEPT_MRI,
+                source_document_id=f"MRI-00{i}",
+                site_id="site-002",
+                document_type=DocumentType.SERVICE_REPORT,
+                equipment_description="generator",
+                raw_file_path="",
+            )
+            for i in range(1, 4)
+        ]
+
+        async def fake_fetch_new_documents(*, since, site_id, limit):
+            assert since is None
+            assert site_id == "site-002"
+            assert limit == 2
+            return records[:limit]
+
+        indexer = MagicMock()
+        indexer.index_document = AsyncMock(return_value=MagicMock(status=IndexingStatus.COMPLETE, chunks=2, error=None))
+
+        with (
+            patch.object(adapter, "_get_last_sync", return_value=None),
+            patch.object(adapter, "fetch_new_documents", AsyncMock(side_effect=fake_fetch_new_documents)),
+            patch.object(
+                adapter,
+                "_upsert",
+                AsyncMock(
+                    side_effect=[
+                        "11111111-1111-1111-1111-111111111111",
+                        "22222222-2222-2222-2222-222222222222",
+                    ]
+                ),
+            ),
+            patch.object(adapter, "_resolve_asset_id", AsyncMock(return_value="S002-GEN-001")),
+            patch.object(adapter, "get_document_file", AsyncMock(return_value=b"%PDF service report")) as get_file,
+            patch.object(adapter, "_update_sync_state") as update_sync,
+            patch("app.services.document_adapter_mri.DocumentIndexingService", return_value=indexer),
+            patch("app.services.document_adapter_mri.settings.mri_document_initial_sync_limit", 2),
+            patch("app.services.document_adapter_mri.settings.mri_document_per_document_delay_seconds", 0),
+        ):
+            result = await adapter.run_sync(site_id="site-002")
+
+        assert result == {"synced": 2, "failed": 0, "errors": []}
+        assert get_file.await_count == 2
+        assert indexer.index_document.await_count == 2
+        update_sync.assert_called_once_with("site-002", 2, 0, 0)

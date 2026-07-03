@@ -591,6 +591,10 @@ class Settings(BaseSettings):
     mri_document_base_url: str = Field(default="", validation_alias="MRI_DOCUMENT_BASE_URL")
     mri_document_api_key: str = Field(default="", validation_alias="MRI_DOCUMENT_API_KEY")
     document_sync_interval_hours: int = Field(default=4, validation_alias="DOCUMENT_SYNC_INTERVAL_HOURS")
+    mri_document_initial_sync_limit: int = Field(default=25, validation_alias="MRI_DOCUMENT_INITIAL_SYNC_LIMIT")
+    mri_document_per_document_delay_seconds: float = Field(
+        default=0.5, validation_alias="MRI_DOCUMENT_PER_DOCUMENT_DELAY_SECONDS"
+    )
 
     # WhatsApp delivery — Twilio (primary) or n8n webhook (fallback)
     twilio_account_sid: str = ""  # Twilio Account SID (ACxxxx)

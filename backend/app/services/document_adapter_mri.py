@@ -10,11 +10,13 @@ source_system: SourceSystem.CONCEPT_MRI
 from __future__ import annotations
 
 import logging
+import asyncio
 from datetime import date, datetime
 from uuid import UUID
 
 from app.models.document_record import DocumentRecord, DocumentType, ExtractionStatus
 from app.models.document_source import SourceSystem
+from app.config.settings import settings
 from app.services.asset_id_resolver import AssetIDResolver
 from app.services.document_indexing_service import DocumentIndexingService, IndexingStatus
 from app.services.document_source_adapter import DocumentSourceAdapter
@@ -56,7 +58,7 @@ class ConceptMRIAdapter(DocumentSourceAdapter):
         self.client = MRIDocumentClient()
 
     async def fetch_new_documents(
-        self, since: datetime | None = None, site_id: str | None = None
+        self, since: datetime | None = None, site_id: str | None = None, limit: int | None = None
     ) -> list[DocumentRecord]:
         """
         Fetch new documents from MRI Concept since last sync.
@@ -65,7 +67,9 @@ class ConceptMRIAdapter(DocumentSourceAdapter):
         support site-level filtering on the documents endpoint, so we fetch
         all and filter locally.
         """
-        raw_list = await self.client.fetch_documents(since)
+        raw_list = await self.client.fetch_documents(since, limit=limit)
+        if limit is not None and limit > 0:
+            raw_list = raw_list[:limit]
         return [self.normalise(raw) for raw in raw_list]
 
     async def get_document_file(self, source_document_id: str) -> bytes:
@@ -80,13 +84,15 @@ class ConceptMRIAdapter(DocumentSourceAdapter):
         source-agnostic and receives only file bytes plus resolved indexing context.
         """
         last_sync = self._get_last_sync(site_id)
-        records = await self.fetch_new_documents(since=last_sync, site_id=site_id)
+        initial_limit = settings.mri_document_initial_sync_limit if last_sync is None else None
+        records = await self.fetch_new_documents(since=last_sync, site_id=site_id, limit=initial_limit)
 
         synced = failed = 0
         errors: list[str] = []
         indexing_service = DocumentIndexingService(db=self.db)
+        delay_seconds = max(0.0, settings.mri_document_per_document_delay_seconds)
 
-        for record in records:
+        for index, record in enumerate(records):
             source_id = record.source_document_id or ""
             try:
                 doc_id = await self._upsert(record)
@@ -117,6 +123,8 @@ class ConceptMRIAdapter(DocumentSourceAdapter):
                     source_id,
                     exc,
                 )
+            if delay_seconds and index < len(records) - 1:
+                await asyncio.sleep(delay_seconds)
 
         self._update_sync_state(site_id, synced, failed, len(errors))
         await self.client.close()

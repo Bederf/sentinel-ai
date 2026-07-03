@@ -67,7 +67,7 @@ class MRIDocumentClient:
             await self._client.aclose()
             self._client = None
 
-    async def fetch_documents(self, since: datetime | None = None) -> list[dict[str, Any]]:
+    async def fetch_documents(self, since: datetime | None = None, limit: int | None = None) -> list[dict[str, Any]]:
         """
         Pull documents from the MRI Evolution documents endpoint.
 
@@ -84,6 +84,8 @@ class MRIDocumentClient:
         params: dict[str, Any] = {}
         if since:
             params["updated_since"] = since.isoformat()
+        if limit is not None and limit > 0:
+            params["limit"] = limit
 
         client = await self._get_client()
 
