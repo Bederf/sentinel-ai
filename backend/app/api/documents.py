@@ -391,6 +391,7 @@ async def upload_document(
     try:
         chunk_count = vector_db.chunk_and_embed_markdown(
             document_id=document_id,
+            doc_class="site",
             doc_title=doc_title,
             doc_type=document_type,
             max_chunk_size=800,
@@ -413,7 +414,7 @@ async def upload_document(
         document_id=document_id,
         title=doc_title,
         chunk_count=chunk_count,
-        indexing_status="embedded",
+        indexing_status="complete",
         storage_path=storage_path,
     )
 

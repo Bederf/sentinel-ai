@@ -361,6 +361,7 @@ async def main():
             try:
                 chunk_count = vector_db.chunk_and_embed_markdown(
                     doc_id,
+                    doc_class="system",
                     doc_title=title,
                     doc_type=document_type,
                 )
@@ -483,6 +484,7 @@ async def main():
                         doc_id = result.data[0]["id"]
                         chunk_count = vector_db.chunk_and_embed_markdown(
                             doc_id,
+                            doc_class="system",
                             doc_title=template_name,
                             doc_type="maintenance_procedure",
                         )

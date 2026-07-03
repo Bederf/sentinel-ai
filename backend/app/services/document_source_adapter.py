@@ -24,6 +24,7 @@ B2 fix: _upsert ONLY writes source_system, source_document_id, site_id.
 from __future__ import annotations
 
 import logging
+import re
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any
@@ -136,14 +137,50 @@ class DocumentSourceAdapter(ABC):
             return False
         return True
 
+    def _resolve_site_uuid(self, site_id: str | None) -> str | None:
+        """Resolve site codes to the live documents.site_id UUID FK."""
+        if not site_id:
+            return None
+        if re.fullmatch(r"[0-9a-fA-F-]{36}", site_id):
+            return site_id
+        try:
+            result = self.db.table("sites").select("id").eq("code", site_id).limit(1).execute()
+            if result.data:
+                return result.data[0]["id"]
+        except Exception as exc:
+            logger.warning("[%s] failed to resolve site %s to UUID: %s", self.source_system.value, site_id, exc)
+        return None
+
+    def _document_code(self, record: DocumentRecord) -> str:
+        """Build a stable code that satisfies the documents.code unique key."""
+        source_doc_id = record.source_document_id or datetime.utcnow().strftime("%Y%m%d%H%M%S%f")
+        safe_source = re.sub(r"[^A-Za-z0-9]+", "-", self.source_system.value).strip("-").upper()
+        safe_doc_id = re.sub(r"[^A-Za-z0-9]+", "-", source_doc_id).strip("-").upper()
+        return f"{safe_source}-{safe_doc_id}"[:120]
+
+    def _document_title(self, record: DocumentRecord) -> str:
+        """Prefer human-facing metadata, then fall back to the source id."""
+        if record.tech_notes:
+            return record.tech_notes[:255]
+        if record.equipment_description:
+            return record.equipment_description[:255]
+        if record.source_document_id:
+            return f"{record.document_type.value.replace('_', ' ').title()} {record.source_document_id}"[:255]
+        return f"{record.source_system.value} document"[:255]
+
+    def _document_source(self) -> str:
+        """Map adapter provenance into the constrained documents.source values."""
+        if self.source_system.value == "manual_upload":
+            return "user_upload"
+        return "service_history"
+
     async def _upsert(self, record: DocumentRecord) -> str:
         """
         Upsert a DocumentRecord into the documents table.
 
-        B1 fix: checks column existence before writing — no-op (returns "") if migration not applied.
-        B2 fix: ONLY writes the 3 new columns (source_system, source_document_id, site_id).
-                Does NOT write to documents.source or documents.document_type — those
-                are managed exclusively by the existing upload_technician_document flow.
+        B1 fix: checks source columns before writing — no-op (returns "") if migration not applied.
+        Live schema fix: provides required documents fields while keeping adapter
+        provenance in source_system/source_document_id.
 
         Returns the document_id on success, "" on failure (missing columns or error).
         """
@@ -155,13 +192,24 @@ class DocumentSourceAdapter(ABC):
             )
             return ""
 
-        # Map DocumentRecord fields to documents table columns
-        # NOTE: only the 3 new columns are written here
         data: dict[str, Any] = {
+            "code": self._document_code(record),
+            "title": self._document_title(record),
+            "document_type": record.document_type.value if record.document_type else "unknown",
+            "equipment_type": record.sub_class or "general",
+            "source": self._document_source(),
             "source_system": record.source_system.value,
             "source_document_id": record.source_document_id or "",
-            "site_id": record.site_id,
+            "site_id": self._resolve_site_uuid(record.site_id),
         }
+
+        if record.equipment_description:
+            data["summary"] = record.equipment_description[:500]
+
+        if record.ocr_text:
+            data["full_text"] = record.ocr_text
+            data["summary"] = record.ocr_text[:500]
+            data["indexing_status"] = "pending"
 
         if record.source_url:
             data["source_url"] = record.source_url

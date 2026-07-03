@@ -220,7 +220,12 @@ async def main():
                 doc_id = doc_result["id"]
 
                 # Chunk and embed
-                chunk_count = vector_db.chunk_and_embed_document(doc_id, chunk_size=800, chunk_overlap=100)
+                chunk_count = vector_db.chunk_and_embed_document(
+                    doc_id,
+                    doc_class="system",
+                    chunk_size=800,
+                    chunk_overlap=100,
+                )
 
                 print(f"   Indexed: {relative_path} ({chunk_count} chunks)")
                 total_docs += 1

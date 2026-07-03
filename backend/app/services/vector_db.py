@@ -5,9 +5,10 @@ import re
 import uuid
 from collections import OrderedDict
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 logger = logging.getLogger(__name__)
+DOCUMENT_EMBED_BATCH_SIZE = 500
 
 
 class VectorDBService:
@@ -38,6 +39,12 @@ class VectorDBService:
         except Exception as exc:
             logger.warning("Failed to resolve site code %s to UUID: %s", site_id, exc)
         return site_id
+
+    def _validate_doc_class(self, doc_class: str) -> Literal["system", "site"]:
+        """Force callers to declare whether chunks are platform docs or site docs."""
+        if doc_class not in {"system", "site"}:
+            raise ValueError("doc_class must be either 'system' or 'site'")
+        return doc_class  # type: ignore[return-value]
 
     def add_document(
         self,
@@ -79,8 +86,16 @@ class VectorDBService:
         )
         return result.data[0] if result.data else None
 
-    def chunk_and_embed_document(self, document_id: str, chunk_size: int = 500, chunk_overlap: int = 50) -> int:
+    def chunk_and_embed_document(
+        self,
+        document_id: str,
+        *,
+        doc_class: Literal["system", "site"],
+        chunk_size: int = 500,
+        chunk_overlap: int = 50,
+    ) -> int:
         """Chunk document text and generate embeddings."""
+        doc_class = self._validate_doc_class(doc_class)
         # Get document
         doc = self.client.table("documents").select("*").eq("id", document_id).single().execute()
         document = doc.data
@@ -89,8 +104,7 @@ class VectorDBService:
             logger.error(f"Document not found: {document_id}")
             return 0
 
-        # Update status
-        self.client.table("documents").update({"indexing_status": "chunking"}).eq("id", document_id).execute()
+        self.client.table("documents").update({"indexing_status": "embedding"}).eq("id", document_id).execute()
 
         # Split into chunks
         text = document.get("full_text", "")
@@ -101,7 +115,10 @@ class VectorDBService:
         chunks = self._split_into_chunks(text, chunk_size, chunk_overlap)
 
         # Generate embeddings
-        embeddings = self.embedding_service.embed_documents([c["content"] for c in chunks])
+        embeddings = self.embedding_service.embed_documents(
+            [c["content"] for c in chunks],
+            batch_size=DOCUMENT_EMBED_BATCH_SIZE,
+        )
 
         # Insert chunks with embeddings
         chunk_records = []
@@ -113,6 +130,7 @@ class VectorDBService:
                     chunk_index=i,
                     chunk=chunk,
                     embedding=embedding,
+                    doc_class=doc_class,
                 )
             )
 
@@ -122,7 +140,7 @@ class VectorDBService:
         # Update document status
         self.client.table("documents").update(
             {
-                "indexing_status": "embedded",
+                "indexing_status": "complete",
                 "indexed_at": datetime.now(UTC).isoformat(),
                 "chunk_count": len(chunk_records),
             }
@@ -303,6 +321,8 @@ class VectorDBService:
     def chunk_and_embed_markdown(
         self,
         document_id: str,
+        *,
+        doc_class: Literal["system", "site"],
         doc_title: str = "",
         doc_type: str = "",
         max_chunk_size: int = 800,
@@ -313,13 +333,14 @@ class VectorDBService:
         embedding quality (document title + heading path + type).
         Original content is stored without the header.
         """
+        doc_class = self._validate_doc_class(doc_class)
         doc = self.client.table("documents").select("*").eq("id", document_id).single().execute()
         document = doc.data
         if not document:
             logger.error(f"Document not found: {document_id}")
             return 0
 
-        self.client.table("documents").update({"indexing_status": "chunking"}).eq("id", document_id).execute()
+        self.client.table("documents").update({"indexing_status": "embedding"}).eq("id", document_id).execute()
 
         text = document.get("full_text", "")
         if not text:
@@ -367,6 +388,7 @@ class VectorDBService:
                         },
                     },
                     embedding=embedding,
+                    doc_class=doc_class,
                 )
             )
 
@@ -378,7 +400,7 @@ class VectorDBService:
                 self.client.table("document_chunks").insert(batch).execute()
 
         self.client.table("documents").update(
-            {"indexing_status": "embedded", "indexed_at": "now()", "chunk_count": len(chunk_records)}
+            {"indexing_status": "complete", "indexed_at": "now()", "chunk_count": len(chunk_records)}
         ).eq("id", document_id).execute()
 
         logger.info(f"Indexed markdown document {document_id}: {len(chunk_records)} chunks (section-aware)")
@@ -392,8 +414,10 @@ class VectorDBService:
         chunk_index: int,
         chunk: dict[str, Any],
         embedding: Any,
+        doc_class: Literal["system", "site"],
     ) -> dict[str, Any]:
         """Build a chunk record with stable citation grounding metadata."""
+        doc_class = self._validate_doc_class(doc_class)
         chunk_uuid = str(uuid.uuid4())
         section_title = chunk.get("section")
         page_number = chunk.get("page_number")
@@ -424,6 +448,7 @@ class VectorDBService:
             "keywords": document.get("keywords"),
             "failure_modes": document.get("failure_modes"),
             "metadata": metadata,
+            "doc_class": doc_class,
         }
 
     def _embed_chunk_texts(self, chunk_inputs: list[dict[str, str]]) -> list[list[float]]:
@@ -434,7 +459,10 @@ class VectorDBService:
         from app.config.settings import settings
 
         if not settings.embedding_contextualized_enabled:
-            return self.embedding_service.embed_documents([item["text"] for item in chunk_inputs])
+            return self.embedding_service.embed_documents(
+                [item["text"] for item in chunk_inputs],
+                batch_size=DOCUMENT_EMBED_BATCH_SIZE,
+            )
 
         grouped: OrderedDict[str, list[str]] = OrderedDict()
         for item in chunk_inputs:
@@ -495,6 +523,7 @@ class VectorDBService:
         manufacturer: str | None = None,
         site_id: str | None = None,
         similarity_threshold: float = 0.5,
+        doc_class: str | None = None,
     ) -> list[dict[str, Any]]:
         """Semantic search for relevant document chunks.
 
@@ -506,6 +535,7 @@ class VectorDBService:
             manufacturer: Optional filter by manufacturer
             site_id: Optional filter by building (includes system docs if None)
             similarity_threshold: Minimum similarity score
+            doc_class: Optional filter: "system" or "site"
 
         Returns:
             List of matching document chunks
@@ -527,6 +557,7 @@ class VectorDBService:
                 "filter_manufacturer": manufacturer,
                 "filter_site_id": resolved_site_id,
                 "similarity_threshold": similarity_threshold,
+                "filter_doc_class": doc_class,
             },
         ).execute()
 
@@ -564,6 +595,7 @@ class VectorDBService:
         keyword_weight: float = 0.3,
         semantic_weight: float = 0.7,
         use_hyde: bool = False,
+        doc_class: str | None = None,
     ) -> list[dict[str, Any]]:
         """Hybrid search combining keyword and semantic matching.
 
@@ -578,6 +610,7 @@ class VectorDBService:
                 answer with Haiku, embeds that instead of the raw query to resolve
                 vocabulary mismatches between informal queries and formal documents.
                 Keyword component always uses the original query.
+            doc_class: Optional filter: "system" or "site"
 
         Returns:
             List of matching document chunks with hybrid scores
@@ -599,6 +632,7 @@ class VectorDBService:
                 "filter_site_id": resolved_site_id,
                 "keyword_weight": keyword_weight,
                 "semantic_weight": semantic_weight,
+                "filter_doc_class": doc_class,
             },
         ).execute()
 

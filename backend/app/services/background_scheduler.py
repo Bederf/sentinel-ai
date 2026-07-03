@@ -981,13 +981,13 @@ class BackgroundSchedulerService:
 
     def stop(self):
         """Stop the background scheduler."""
+        self._shutdown_requested.set()
         if self.scheduler.running:
-            self._shutdown_requested.set()
             try:
                 self.scheduler.remove_all_jobs()
             except Exception:
                 logger.warning("Failed to remove pending scheduler jobs before shutdown", exc_info=True)
-            self.scheduler.shutdown(wait=True)
+            self.scheduler.shutdown(wait=False)
             logger.info("Background scheduler stopped")
         self._release_leader_lock()
 
@@ -2057,6 +2057,29 @@ class BackgroundSchedulerService:
                                 for e in existing_pending
                                 if e.action_type == "ai_optimization"
                             )
+                            existing_hvac_conflict_advisory = _has_pending_source_rule(
+                                existing_pending,
+                                {HVAC_OCCUPANCY_CONFLICT_RULE},
+                            )
+                            recent_approved_hvac_conflict_gate = False
+                            try:
+                                approved_history = asyncio.run_coroutine_threadsafe(
+                                    recommendation_repo.get_history(
+                                        site_id,
+                                        status_filter=RecommendationStatus.APPROVED.value,
+                                        limit=100,
+                                    ),
+                                    self._main_loop,
+                                ).result(timeout=30)
+                                recent_approved_hvac_conflict_gate = _has_recent_approved_occupancy_control_gate(
+                                    approved_history
+                                )
+                            except Exception as _approved_gate_err:
+                                logger.warning(
+                                    "[AI-OPT] Could not load approved HVAC occupancy gates for %s: %s",
+                                    site_id,
+                                    _approved_gate_err,
+                                )
 
                             validation_results = validation.get("validation_results", [])
                             advisory_recs: list[dict] = []
@@ -8263,6 +8286,22 @@ class BackgroundSchedulerService:
         )
         logger.info("compiler_worker job registered — interval=%s min", interval_minutes)
 
+    def add_document_indexing_sweep_job(self, interval_minutes: int = 15):
+        """Add periodic cleanup for documents stuck in transient indexing states."""
+        job_id = "document_indexing_sweep"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+
+        self.scheduler.add_job(
+            _run_document_indexing_sweep_sync,
+            "interval",
+            minutes=interval_minutes,
+            id=job_id,
+            replace_existing=True,
+            max_instances=1,
+        )
+        logger.info("document_indexing_sweep job registered — interval=%s min", interval_minutes)
+
     def add_financial_roi_job(self, interval_seconds: int = 86400) -> None:
         """Add daily financial ROI recommendation generation job.
 
@@ -8912,6 +8951,23 @@ def _run_compiler_worker_sync():
             logger.info("[CompilerWorker] Processed %d records", count)
     except Exception as exc:
         logger.critical("[CompilerWorker] sync runner failed: %s", exc, exc_info=True)
+        raise
+
+
+@track_job_metrics("document_indexing_sweep")
+def _run_document_indexing_sweep_sync():
+    """Mark long-running document indexing attempts as failed."""
+    import logging
+
+    from app.services.document_indexing_service import DocumentIndexingService
+
+    logger = logging.getLogger(__name__)
+    try:
+        count = DocumentIndexingService().sweep_stuck_documents()
+        if count:
+            logger.warning("[DocumentIndexing] Marked %d stuck documents failed", count)
+    except Exception as exc:
+        logger.critical("[DocumentIndexing] stuck-document sweep failed: %s", exc, exc_info=True)
         raise
 
 

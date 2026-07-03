@@ -14,8 +14,8 @@ class _FakeEmbeddingService:
     def __init__(self):
         self.calls = []
 
-    def embed_documents(self, texts):
-        self.calls.append(("documents", list(texts)))
+    def embed_documents(self, texts, batch_size=32):
+        self.calls.append(("documents", list(texts), batch_size))
         return [[float(i)] for i, _ in enumerate(texts)]
 
     def embed_contextualized_documents(self, grouped_texts):
@@ -83,8 +83,67 @@ def test_chunk_embedding_uses_standard_document_embeddings_when_contextualized_d
         ]
     )
 
-    assert fake.calls == [("documents", ["a1", "b1"])]
+    assert fake.calls == [("documents", ["a1", "b1"], 500)]
     assert result == [[0.0], [1.0]]
+
+
+def test_chunk_record_marks_system_docs_by_source():
+    svc = VectorDBService(_DummyClient())
+
+    record = svc._build_chunk_record(
+        document={
+            "source": "system_docs",
+            "title": "Architecture",
+            "equipment_type": "general",
+            "document_type": "system_documentation",
+        },
+        document_id="11111111-1111-1111-1111-111111111111",
+        chunk_index=0,
+        chunk={"content": "System architecture", "section": "Overview"},
+        embedding=[0.1],
+        doc_class="system",
+    )
+
+    assert record["doc_class"] == "system"
+
+
+def test_chunk_record_marks_non_system_docs_as_site():
+    svc = VectorDBService(_DummyClient())
+
+    record = svc._build_chunk_record(
+        document={
+            "source": "service_history",
+            "title": "Generator Service",
+            "equipment_type": "generator",
+            "document_type": "service_report",
+        },
+        document_id="11111111-1111-1111-1111-111111111111",
+        chunk_index=0,
+        chunk={"content": "Generator service report", "section": "Findings"},
+        embedding=[0.1],
+        doc_class="site",
+    )
+
+    assert record["doc_class"] == "site"
+
+
+def test_chunk_record_rejects_missing_or_invalid_doc_class():
+    svc = VectorDBService(_DummyClient())
+
+    with pytest.raises(ValueError, match="doc_class"):
+        svc._build_chunk_record(
+            document={
+                "source": "system_docs",
+                "title": "Architecture",
+                "equipment_type": "general",
+                "document_type": "system_documentation",
+            },
+            document_id="11111111-1111-1111-1111-111111111111",
+            chunk_index=0,
+            chunk={"content": "System architecture", "section": "Overview"},
+            embedding=[0.1],
+            doc_class="",
+        )
 
 
 @pytest.mark.asyncio

@@ -379,6 +379,7 @@ async def main():
     print("\nChunking and embedding...")
     chunk_count = vector_db.chunk_and_embed_markdown(
         doc_id,
+        doc_class="system",
         doc_title=DOC_TITLE,
         doc_type=DOC_TYPE,
         max_chunk_size=800,

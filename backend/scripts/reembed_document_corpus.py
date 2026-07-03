@@ -69,6 +69,10 @@ def _is_completed(checkpoint: dict, namespace: str, row_id: str) -> bool:
     return _checkpoint_key(namespace, row_id) in checkpoint["completed"]
 
 
+def _doc_class_for_row(row: dict) -> str:
+    return "system" if row.get("source") == "system_docs" else "site"
+
+
 def _mark_completed(checkpoint: dict, namespace: str, row_id: str, detail: dict) -> None:
     key = _checkpoint_key(namespace, row_id)
     checkpoint["completed"][key] = {"completed_at": datetime.now(UTC).isoformat(), **detail}
@@ -116,6 +120,7 @@ def _reembed_documents(
             client.table("document_chunks").delete().eq("document_id", doc_id).execute()
             chunk_count = vector_db.chunk_and_embed_markdown(
                 document_id=doc_id,
+                doc_class=_doc_class_for_row(row),
                 doc_title=row.get("title", ""),
                 doc_type=row.get("document_type", ""),
             )
@@ -280,4 +285,12 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    finally:
+        try:
+            from app.services.ai_usage_tracker import usage_tracker
+
+            usage_tracker.flush()
+        except Exception:
+            pass

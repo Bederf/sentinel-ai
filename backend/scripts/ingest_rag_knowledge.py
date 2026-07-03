@@ -530,12 +530,18 @@ async def main():
     # 3. Process documents (chunk and embed)
     print("\n3. Processing documents for chunking and embedding...")
     try:
-        docs = client.table("documents").select("id, title, indexing_status").eq("indexing_status", "pending").execute()
+        docs = (
+            client.table("documents")
+            .select("id, title, indexing_status, source")
+            .eq("indexing_status", "pending")
+            .execute()
+        )
         pending_docs = docs.data or []
         print(f"   Found {len(pending_docs)} documents pending indexing")
 
         for doc in pending_docs:
-            chunk_count = vector_db.chunk_and_embed_document(doc["id"])
+            doc_class = "system" if doc.get("source") == "system_docs" else "site"
+            chunk_count = vector_db.chunk_and_embed_document(doc["id"], doc_class=doc_class)
             print(f"   Indexed {doc['title']}: {chunk_count} chunks")
     except Exception as e:
         print(f"   Error processing documents: {e}")

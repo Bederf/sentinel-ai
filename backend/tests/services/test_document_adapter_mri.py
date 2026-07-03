@@ -316,9 +316,7 @@ class TestFetchNewDocuments:
         adapter.client.fetch_documents = AsyncMock(return_value=mock_raw)
         import asyncio
 
-        result = asyncio.get_event_loop().run_until_complete(
-            adapter.fetch_new_documents(since=None, site_id="site-002")
-        )
+        result = asyncio.run(adapter.fetch_new_documents(since=None, site_id="site-002"))
         adapter.client.fetch_documents.assert_called_once_with(None)
         assert len(result) == 1
         assert result[0].source_document_id == "DOC-001"
@@ -345,9 +343,7 @@ class TestFetchNewDocuments:
         adapter.client.fetch_documents = AsyncMock(return_value=mock_raw)
         import asyncio
 
-        result = asyncio.get_event_loop().run_until_complete(
-            adapter.fetch_new_documents(since=None, site_id="site-002")
-        )
+        result = asyncio.run(adapter.fetch_new_documents(since=None, site_id="site-002"))
         assert len(result) == 2
         assert result[0].document_type == DocumentType.SERVICE_REPORT
         assert result[1].document_type == DocumentType.INSPECTION

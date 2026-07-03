@@ -107,6 +107,7 @@ async def search_documents(
     document_type: str | None = Query(None, description="Filter by document type"),
     site_id: str | None = Query(None, description="Filter by site/building"),
     source: str | None = Query(None, description="Filter by document source"),
+    doc_class: str | None = Query(None, description="Filter by document class: system or site"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     similarity_threshold: float = Query(0.7, ge=0.0, le=1.0, description="Minimum similarity score"),
     auth: AuthContext = Depends(require_role(1)),
@@ -125,6 +126,7 @@ async def search_documents(
         document_type=document_type,
         site_id=site_id,
         similarity_threshold=similarity_threshold,
+        doc_class=doc_class,
     )
 
     if source:
@@ -158,6 +160,7 @@ async def search_knowledge(
 async def hybrid_search(
     query: str = Query(..., description="Search query"),
     equipment_type: str | None = Query(None, description="Filter by equipment type"),
+    doc_class: str | None = Query(None, description="Filter by document class: system or site"),
     n_results: int = Query(5, ge=1, le=20, description="Number of results"),
     keyword_weight: float = Query(0.3, ge=0.0, le=1.0, description="Weight for keyword matching"),
     semantic_weight: float = Query(0.7, ge=0.0, le=1.0, description="Weight for semantic matching"),
@@ -173,6 +176,7 @@ async def hybrid_search(
         equipment_type=equipment_type,
         keyword_weight=keyword_weight,
         semantic_weight=semantic_weight,
+        doc_class=doc_class,
     )
 
     return {"query": query, "count": len(results), "results": results}
@@ -262,7 +266,7 @@ async def add_document(request: DocumentRequest, auth: AuthContext = Depends(req
         raise HTTPException(status_code=500, detail="Failed to create document")
 
     # Chunk and embed
-    chunk_count = vector_db.chunk_and_embed_document(doc["id"])
+    chunk_count = vector_db.chunk_and_embed_document(doc["id"], doc_class="site")
 
     return {
         "id": doc["id"],
@@ -348,7 +352,7 @@ async def reindex_document(document_id: str, auth: AuthContext = Depends(require
     client.table("document_chunks").delete().eq("document_id", document_id).execute()
 
     # Re-chunk and embed
-    chunk_count = vector_db.chunk_and_embed_document(document_id)
+    chunk_count = vector_db.chunk_and_embed_document(document_id, doc_class="site")
 
     return {"document_id": document_id, "chunk_count": chunk_count, "status": "reindexed"}
 

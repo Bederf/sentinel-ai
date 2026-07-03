@@ -459,7 +459,10 @@ class TestUpsertIdempotency:
             mock_get.return_value = mock_db
             mock_db.table.return_value.upsert.return_value.execute.return_value = MagicMock(data=[{"id": "doc-123"}])
             adapter = ManualUploadAdapter()
-            with patch.object(adapter, "_columns_exist", return_value=True):
+            with (
+                patch.object(adapter, "_columns_exist", return_value=True),
+                patch.object(adapter, "_resolve_site_uuid", return_value="site-uuid"),
+            ):
                 record = DocumentRecord(
                     source_system=SourceSystem.MANUAL_UPLOAD,
                     source_document_id="doc-123",
@@ -470,6 +473,14 @@ class TestUpsertIdempotency:
                 result = await adapter._upsert(record)
             assert result == "doc-123"
             mock_db.table.return_value.upsert.assert_called()
+            upsert_payload = mock_db.table.return_value.upsert.call_args.args[0]
+            assert upsert_payload["code"] == "MANUAL-UPLOAD-DOC-123"
+            assert upsert_payload["document_type"] == "service_report"
+            assert upsert_payload["equipment_type"] == "general"
+            assert upsert_payload["source"] == "user_upload"
+            assert upsert_payload["site_id"] == "site-uuid"
+            assert upsert_payload["source_system"] == "manual_upload"
+            assert upsert_payload["source_document_id"] == "doc-123"
 
     @pytest.mark.asyncio
     async def test_upsert_idempotent_same_source_document_id(self):
@@ -486,7 +497,10 @@ class TestUpsertIdempotency:
                 raw_file_path="uploads/doc.pdf",
                 document_type=DocumentType.SERVICE_REPORT,
             )
-            with patch.object(adapter, "_columns_exist", return_value=True):
+            with (
+                patch.object(adapter, "_columns_exist", return_value=True),
+                patch.object(adapter, "_resolve_site_uuid", return_value="site-uuid"),
+            ):
                 result1 = await adapter._upsert(record)
                 result2 = await adapter._upsert(record)
             assert result1 == "doc-123"

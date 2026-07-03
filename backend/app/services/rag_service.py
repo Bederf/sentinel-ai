@@ -82,10 +82,15 @@ Keep the language practical and technical but accessible to field technicians.""
         """
         if use_hybrid:
             results = await self.vector_db.hybrid_search(
-                query=query, n_results=n_results, equipment_type=equipment_type
+                query=query, n_results=n_results, equipment_type=equipment_type, doc_class="site"
             )
         else:
-            results = self.vector_db.search(query=query, n_results=n_results, equipment_type=equipment_type)
+            results = self.vector_db.search(
+                query=query,
+                n_results=n_results,
+                equipment_type=equipment_type,
+                doc_class="site",
+            )
 
         if not results:
             return "No relevant documentation found."

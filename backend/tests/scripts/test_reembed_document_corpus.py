@@ -1,11 +1,14 @@
 """Tests for resumable corpus re-embedding sweep."""
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from backend.scripts import reembed_document_corpus as sweep
+if TYPE_CHECKING:
+    from backend.scripts import reembed_document_corpus as sweep
+else:
+    from scripts import reembed_document_corpus as sweep
 
 
 class _Result:
@@ -69,8 +72,9 @@ class _VectorDB:
         self.fail_on = fail_on
         self.embedded = []
 
-    def chunk_and_embed_markdown(self, *, document_id, doc_title, doc_type):
+    def chunk_and_embed_markdown(self, *, document_id, doc_class, doc_title, doc_type):
         del doc_title, doc_type
+        assert doc_class in {"system", "site"}
         if document_id == self.fail_on:
             raise RuntimeError("boom")
         self.embedded.append(document_id)

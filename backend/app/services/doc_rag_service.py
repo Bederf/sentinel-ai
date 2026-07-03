@@ -49,6 +49,7 @@ async def search_documentation(
             site_id=site_id,  # Filter to building or include system docs
             keyword_weight=0.4,  # Give keyword matching significant weight
             semantic_weight=0.6,  # Still favor semantic for natural language queries
+            doc_class="system",
         )
 
         # Filter to only documentation type if needed

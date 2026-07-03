@@ -8,8 +8,11 @@ import asyncio
 import contextlib
 import logging
 import os
+import time
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from typing import TypeVar
 
 from fastapi import FastAPI
 
@@ -19,6 +22,34 @@ from app.services.simbiot_service import simbiot_service  # SIMBIOT Concept Evol
 
 _logger = logging.getLogger("sentinel.startup")
 _SIMULATION_RECOVERY_WINDOW = timedelta(minutes=30)
+_T = TypeVar("_T")
+
+
+async def _shutdown_await(name: str, awaitable: Awaitable[_T], timeout_seconds: float = 3.0) -> _T | None:
+    """Run a shutdown awaitable with timing and a bounded timeout."""
+    started = time.monotonic()
+    try:
+        result = await asyncio.wait_for(awaitable, timeout=timeout_seconds)
+        _logger.info("Shutdown step complete: %s %.2fs", name, time.monotonic() - started)
+        return result
+    except TimeoutError:
+        _logger.warning("Shutdown step timed out: %s after %.2fs", name, timeout_seconds)
+        return None
+    except Exception:
+        _logger.warning("Shutdown step failed: %s %.2fs", name, time.monotonic() - started, exc_info=True)
+        return None
+
+
+def _shutdown_call(name: str, fn: Callable[[], _T]) -> _T | None:
+    """Run a synchronous shutdown step with timing."""
+    started = time.monotonic()
+    try:
+        result = fn()
+        _logger.info("Shutdown step complete: %s %.2fs", name, time.monotonic() - started)
+        return result
+    except Exception:
+        _logger.warning("Shutdown step failed: %s %.2fs", name, time.monotonic() - started, exc_info=True)
+        return None
 
 
 @asynccontextmanager
@@ -925,13 +956,21 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.error(f"Compiler worker job initialization failed: {e}", exc_info=True)
 
-    # Anomaly model weekly retraining — trains Isolation Forest on zone temp + HVAC power
-    # data every Sunday at 02:00. Works with as little as 72h of data (vs LSTM's 500h).
     try:
-        scheduler_service.add_anomaly_weekly_retrain_job(interval_hours=168)
-        _logger.info("Anomaly weekly retrain job initialized (weekly at 02:00)")
+        scheduler_service.add_document_indexing_sweep_job(interval_minutes=15)
+        _logger.info("Document indexing sweep job initialized (15 min interval)")
     except Exception as e:
-        _logger.error(f"Anomaly weekly retrain job initialization failed: {e}", exc_info=True)
+        _logger.error(f"Document indexing sweep initialization failed: {e}", exc_info=True)
+
+    # Anomaly model weekly retraining — gated with the rest of background training.
+    if not settings.edge_mode and settings.ml_background_training_enabled:
+        try:
+            scheduler_service.add_anomaly_weekly_retrain_job(interval_hours=168)
+            _logger.info("Anomaly weekly retrain job initialized (weekly at 02:00)")
+        except Exception as e:
+            _logger.error(f"Anomaly weekly retrain job initialization failed: {e}", exc_info=True)
+    else:
+        _logger.info("⏸️ Anomaly weekly retraining disabled (ML_BACKGROUND_TRAINING_ENABLED=false)")
 
     # Sync ML model registry JSON → ml_models Supabase table (best-effort)
     try:
@@ -1093,61 +1132,64 @@ async def shutdown_event(_: FastAPI) -> None:
     This function is called when the FastAPI application shuts down.
     It stops background services and closes connections.
     """
+    shutdown_started = time.monotonic()
+
     # Persist buffered AI usage before anything else — the tracker holds the
     # day's calls in an in-memory cache that is otherwise only flushed at 23:55.
     # Without this, every restart silently discards the day's usage rows.
-    try:
+    def _flush_usage() -> None:
         from app.services.ai_usage_tracker import usage_tracker
 
         usage_tracker.flush()
-    except Exception:
-        _logger.warning("Failed to flush AI usage tracker on shutdown", exc_info=True)
+
+    _shutdown_call("ai_usage_flush", _flush_usage)
+    _shutdown_call("background_scheduler", scheduler_service.stop)
 
     # Stop Sentry JWT token refresh
     from app.services.sentry_auth_service import get_sentry_auth_service
 
     sentry_auth = get_sentry_auth_service()
     if sentry_auth:
-        await sentry_auth.stop_background_refresh()
+        await _shutdown_await("sentry_auth_refresh", sentry_auth.stop_background_refresh(), timeout_seconds=3.0)
 
     # Notification tasks cleanup (Phase 140)
     from app.services.notification_tasks import stop_notification_tasks
 
-    await stop_notification_tasks()
+    await _shutdown_await("notification_tasks", stop_notification_tasks(), timeout_seconds=3.0)
 
     # n8n client cleanup (Phase 140)
     from app.services.n8n_service import shutdown_n8n_service
 
-    await shutdown_n8n_service()
+    await _shutdown_await("n8n_service", shutdown_n8n_service(), timeout_seconds=3.0)
 
     # ServiceNow client cleanup (Phase 138)
     from app.services.servicenow_service import shutdown_servicenow_service
 
-    await shutdown_servicenow_service()
+    await _shutdown_await("servicenow_service", shutdown_servicenow_service(), timeout_seconds=3.0)
 
     from app.services.space_mqtt_listener import get_space_mqtt_listener
 
-    await get_space_mqtt_listener().stop()
+    await _shutdown_await("space_mqtt_listener", get_space_mqtt_listener().stop(), timeout_seconds=3.0)
 
     try:
         from app.services.fuel_mqtt_listener import get_fuel_mqtt_listener
 
-        await get_fuel_mqtt_listener().stop()
+        await _shutdown_await("fuel_mqtt_listener", get_fuel_mqtt_listener().stop(), timeout_seconds=3.0)
     except Exception:
-        pass
+        _logger.warning("Shutdown step failed: fuel_mqtt_listener import", exc_info=True)
 
     # Event bus cleanup (Phase 139)
     from app.services.event_bus import reset_event_bus
 
-    reset_event_bus()
+    _shutdown_call("event_bus_reset", reset_event_bus)
 
     # Phase 178-06: MRI Evolution polling scheduler shutdown
     from app.api.mri_connector import stop_scheduler as stop_mri_scheduler
 
-    stop_mri_scheduler()
+    _shutdown_call("mri_scheduler", stop_mri_scheduler)
 
-    scheduler_service.stop()
-    await simbiot_service.shutdown()
+    await _shutdown_await("simbiot_service", simbiot_service.shutdown(), timeout_seconds=3.0)
+    _logger.info("Shutdown complete in %.2fs", time.monotonic() - shutdown_started)
 
 
 def register_events(app: FastAPI) -> None:

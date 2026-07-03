@@ -91,7 +91,7 @@ async def index_guide():
 
     # Chunk and embed the document
     logger.info("Chunking and embedding document...")
-    chunk_count = vector_db.chunk_and_embed_document(doc["id"])
+    chunk_count = vector_db.chunk_and_embed_document(doc["id"], doc_class="system")
 
     if chunk_count > 0:
         logger.info(f"✓ Successfully indexed guide with {chunk_count} chunks")
