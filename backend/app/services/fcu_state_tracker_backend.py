@@ -90,7 +90,9 @@ class SupabaseBackend(FCUStateTrackerBackend):
                 if row.get("prev_timestamp") is not None
                 else None
             ),
-            fcu_inferred_running=bool(row.get("fcu_inferred_running", False)),
+            fcu_inferred_running=(
+                bool(row["fcu_inferred_running"]) if row.get("fcu_inferred_running") is not None else None
+            ),
             occupancy_source=str(row.get("occupancy_source", "bridge")),
         )
 

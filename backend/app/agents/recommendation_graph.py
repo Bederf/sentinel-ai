@@ -46,6 +46,7 @@ from app.agents.recommendation_formatters import (
     format_execution_result,
 )
 from app.agents.recommendation_tools import (
+    PERSISTENT_ADVISORY_TYPES,
     check_recommendation_action_still_needed,
     check_equipment_health,
     check_maintenance_calendar,
@@ -188,11 +189,7 @@ async def validate_relevance_node(state: RecommendationAgentState) -> dict:
     rec_metadata = rec.get("metadata") or {}
     rec_source_meta = rec_metadata.get("source_metadata") or {}
     _advisory_type = rec_source_meta.get("advisory_type") or rec_metadata.get("advisory_type")
-    _is_advisory_rec = _advisory_type in {
-        "site_profile_hvac_state_correction",
-        "fault_safety_gate",
-        "zone_scope_concrete_hvac_action",
-    }
+    _is_advisory_rec = _advisory_type in PERSISTENT_ADVISORY_TYPES
     freshness_max_minutes = 24 * 60 if _is_advisory_rec else 120
     freshness = check_recommendation_freshness(rec, max_age_minutes=freshness_max_minutes)
     if not freshness["is_fresh"]:
@@ -265,7 +262,7 @@ async def mark_expired_node(state: RecommendationAgentState) -> dict:
     reason = state.get("relevance_reason", "Expired")
 
     if rec_id:
-        await update_recommendation_status(rec_id, "expired")
+        await update_recommendation_status(rec_id, "expired", reason=reason)
         logger.info(f"[RecAgent] Marked recommendation {rec_id} as expired: {reason}")
 
     return {
@@ -356,7 +353,7 @@ async def defer_node(state: RecommendationAgentState) -> dict:
     conflict = state.get("conflict_details", "Schedule conflict")
 
     if rec_id:
-        await update_recommendation_status(rec_id, "expired")
+        await update_recommendation_status(rec_id, "expired", reason=f"Schedule conflict: {conflict}")
         logger.info(f"[RecAgent] Expired recommendation {rec_id} due to schedule conflict: {conflict}")
 
     return {

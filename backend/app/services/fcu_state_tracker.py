@@ -44,8 +44,8 @@ class _ZoneState:
     # Temperature trend
     prev_room_temp: float | None = None
     prev_timestamp: datetime | None = None
-    # FCU state
-    fcu_inferred_running: bool = False
+    # FCU state (None = inference not possible from available telemetry)
+    fcu_inferred_running: bool | None = None
     # Occupancy source
     occupancy_source: str = "bridge"  # 'bridge' | 'sensor'
 
@@ -242,7 +242,7 @@ class FCUStateTracker:
         current_temp: float | None,
         setpoint: float | None,
         prev_state: _ZoneState | None,
-    ) -> bool:
+    ) -> bool | None:
         """Infer if FCU is actively cooling based on temperature trend.
 
         Running if:
@@ -252,26 +252,31 @@ class FCUStateTracker:
         Not running if:
         - room_temp is stable and at/above setpoint
         - room_temp is rising (FCU off, passive heat gain)
+
+        Returns None (unknown) when the available telemetry cannot support the
+        inference. Without a setpoint, the only remaining signal is a single
+        inter-poll temperature delta, and observed sensor noise (±2°C between
+        5-minute polls) dwarfs the ±0.5°C decision threshold — the result is a
+        coin flip that made reflex rules churn create/expire cycles all night.
+        Consumers must treat None as "state unknown", not "not running".
         """
         if current_temp is None:
-            return False
+            return None
 
         if prev_state is None:
-            return False  # no history yet — can't infer
+            return None  # no history yet — can't infer
 
         prev_temp = prev_state.room_temp_c
         if prev_temp is None:
-            return False
+            return None
+
+        if setpoint is None:
+            return None  # single-poll temp delta alone is noise, not signal
 
         temp_delta = current_temp - prev_temp  # negative = cooling, positive = warming
-
-        if setpoint is not None:
-            below_setpoint = current_temp < setpoint - 1.0
-            actively_cooling = temp_delta < -0.5
-            return bool(below_setpoint or actively_cooling)
-
-        # Fallback: no setpoint — only use temp delta
-        return temp_delta < -0.5
+        below_setpoint = current_temp < setpoint - 1.0
+        actively_cooling = temp_delta < -0.5
+        return bool(below_setpoint or actively_cooling)
 
     def _zone_to_equipment_id(self, zone_id: str, site_id: str = "S002") -> str:
         """Map zone ID to FCU equipment code.

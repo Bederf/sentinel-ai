@@ -13,6 +13,22 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+# Advisory types that represent persistent operational conditions (e.g. HVAC
+# running after hours, occupancy-conflict control gates). These must survive
+# both the RecAgent freshness sweep (24h window instead of 120min) and the
+# execution_blocked early-exit — the condition persists until it clears, so
+# the recommendation must too. Single source of truth: recommendation_graph
+# imports this set; keeping two hand-maintained copies is how ZONE-SCOPE
+# advisories ended up expiring at exactly 120min while their condition held.
+PERSISTENT_ADVISORY_TYPES = frozenset(
+    {
+        "site_profile_hvac_state_correction",
+        "fault_safety_gate",
+        "occupancy_conflict_control_gate",
+        "zone_scope_concrete_hvac_action",
+    }
+)
+
 
 def _candidate_site_ids(site_id: str) -> list[str]:
     """Return normalized site-id variants for cross-service compatibility."""
@@ -158,11 +174,7 @@ async def check_recommendation_action_still_needed(recommendation: dict[str, Any
         metadata = recommendation.get("metadata") or {}
         source_meta = metadata.get("source_metadata") or {}
         advisory_type = source_meta.get("advisory_type") or metadata.get("advisory_type")
-        if advisory_type in {
-            "site_profile_hvac_state_correction",
-            "fault_safety_gate",
-            "occupancy_conflict_control_gate",
-        }:
+        if advisory_type in PERSISTENT_ADVISORY_TYPES:
             return {
                 "is_needed": True,
                 "checked": True,
@@ -642,12 +654,15 @@ def check_recommendation_freshness(recommendation: dict[str, Any], max_age_minut
         return {"is_fresh": False, "age_minutes": 999, "reason": f"Parse error: {e}"}
 
 
-async def update_recommendation_status(recommendation_id: str, status: str) -> bool:
+async def update_recommendation_status(recommendation_id: str, status: str, reason: str | None = None) -> bool:
     """Update recommendation status in the repository.
 
     Args:
         recommendation_id: Recommendation ID
         status: New status value (e.g., "expired")
+        reason: Why the status changed — persisted to metadata so the audit
+            trail records it (previously only logged, leaving expired rows
+            with no recorded cause)
 
     Returns:
         True if updated successfully
@@ -660,6 +675,11 @@ async def update_recommendation_status(recommendation_id: str, status: str) -> b
         rec = await repo.get(recommendation_id)
         if rec:
             rec.status = RecommendationStatus(status)
+            if reason:
+                metadata = dict(rec.metadata or {})
+                metadata["status_change_reason"] = reason
+                metadata["status_changed_at"] = datetime.now(UTC).isoformat()
+                rec.metadata = metadata
             await repo.update(recommendation_id, rec)
             return True
         return False

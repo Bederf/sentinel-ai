@@ -18,6 +18,7 @@ When 500+ events are buffered → train Fault Classifier.
 """
 
 import asyncio
+import collections
 import contextlib
 import logging
 import os
@@ -361,6 +362,58 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
+def _zone_suffix_from_bridge_zone_id(zone_id: str) -> str | None:
+    numeric = re.match(r"^Zone-(\d{3})$", str(zone_id or "").strip(), re.IGNORECASE)
+    if numeric:
+        return numeric.group(1)
+
+    level_alias = re.match(r"^Zone-L(\d+)-(\d+)$", str(zone_id or "").strip(), re.IGNORECASE)
+    if level_alias:
+        floor = int(level_alias.group(1))
+        seq = int(level_alias.group(2))
+        return f"{floor * 100 + seq:03d}"
+
+    return None
+
+
+def _zone_sensor_state_from_bridge_zone(
+    *,
+    site_prefix: str,
+    zone_id: str,
+    zone: dict[str, Any],
+    occupancy_pct: float | None,
+) -> tuple[str, dict[str, Any]] | None:
+    zone_suffix = _zone_suffix_from_bridge_zone_id(zone_id)
+    if not zone_suffix:
+        return None
+
+    readings: dict[str, float] = {}
+    if (temp := _safe_float(zone.get("temperature_c"))) is not None:
+        readings["room_temp_c"] = temp
+    if (co2 := _safe_float(zone.get("co2_ppm"))) is not None:
+        readings["co2_ppm"] = co2
+    if occupancy_pct is not None:
+        readings["occupancy"] = float(occupancy_pct)
+
+    if not readings:
+        return None
+
+    return (
+        f"{site_prefix}-ZONE-{zone_suffix}",
+        {
+            "type": "zone_sensor",
+            "sensor_readings": readings,
+        },
+    )
+
+
+def _site_aggregate_occupancy_summary(zone_occupancy_samples: list[float]) -> tuple[int, float]:
+    """Summarize per-zone occupancy samples for the site aggregate row."""
+    occupied_zones = sum(1 for pct in zone_occupancy_samples if pct > 0.0)
+    peak_zone_density = max(zone_occupancy_samples) if zone_occupancy_samples else 0.0
+    return occupied_zones, peak_zone_density
+
+
 class ShadowModePollingService:
     """Polls the site bridge and feeds live data to the ML pipeline."""
 
@@ -377,6 +430,9 @@ class ShadowModePollingService:
         self._override_bridge_token = bridge_token
         self._poll_count = 0
         self._last_poll_result: dict[str, Any] | None = None  # Cached result of last poll
+        # Rolling window of recent total_kw readings for anomaly detection (last 12 = ~1h at 5min cycles)
+        self._total_kw_history: collections.deque[float] = collections.deque(maxlen=12)
+        self._last_anomaly_alert_at: datetime | None = None  # Throttle: one alert per hour max
         # Cached BACnet object catalog: maps object_id → metadata
         # Loaded once on first poll, refreshed weekly.
         self._object_catalog: dict[str, dict[str, Any]] = {}
@@ -842,6 +898,7 @@ class ShadowModePollingService:
 
             # Pre-fetch DALI zone occupancy for all zones (in-memory, fast)
             dali_occupancy_by_zone: dict[str, float] = {}
+            zone_occupancy_samples: list[float] = []
             try:
                 from app.services.lighting_service import get_lighting_service
 
@@ -862,8 +919,9 @@ class ShadowModePollingService:
                         "[SHADOW] Ignoring bridge zone %s for %s: not in Supabase zone inventory", zone_id, self.site_id
                     )
                     continue
-                parts = zone_id.split("-")
-                zone_num = parts[1] if len(parts) == 2 else zone_id
+                zone_num = _zone_suffix_from_bridge_zone_id(zone_id)
+                if not zone_num:
+                    continue
                 equip_code = f"{self._site_prefix}-FCU-{zone_num}"
 
                 temp = z.get("temperature_c")
@@ -884,8 +942,26 @@ class ShadowModePollingService:
                 # Determine zone occupancy: use DALI PIR (in-memory) if available,
                 # otherwise fall back to fused site-level verdict, then schedule.
                 zone_occ_pct = dali_occupancy_by_zone.get(zone_id)
+                # Only DIRECT per-zone measurements may feed the site aggregate
+                # (occupied_zones on S002-SITE-AGG). The fused verdict is itself
+                # derived from that aggregate — counting fanned-out fused values
+                # here closes a feedback loop that latched "all 15 zones
+                # occupied" through closed overnight hours (Finding 2,
+                # 2026-07-04 pipeline verification).
+                if zone_occ_pct is not None:
+                    zone_occupancy_samples.append(float(zone_occ_pct))
                 if zone_occ_pct is None and fused_site_verdict is not None:
                     zone_occ_pct = fused_site_verdict.occupancy_percent
+
+                zone_sensor_state = _zone_sensor_state_from_bridge_zone(
+                    site_prefix=self._site_prefix,
+                    zone_id=zone_id,
+                    zone=z,
+                    occupancy_pct=zone_occ_pct,
+                )
+                if zone_sensor_state:
+                    zone_sensor_code, state = zone_sensor_state
+                    zone_states[zone_sensor_code] = state
 
                 # Phase 1a: feed zone poll to FCU state tracker
                 self.fcu_state_tracker.record_poll(
@@ -931,7 +1007,9 @@ class ShadowModePollingService:
             if lighting_kw is not None:
                 agg_readings["lighting_kw"] = float(lighting_kw)
             if total_kw is not None:
-                agg_readings["total_kw"] = float(total_kw)
+                total_kw_float = float(total_kw)
+                agg_readings["total_kw"] = total_kw_float
+                self._check_power_anomaly(total_kw_float, now)
             # Accumulate energy from power readings (kW → kWh)
             if hvac_kw is not None and lighting_kw is not None and total_kw is not None:
                 self._accumulate_energy(float(hvac_kw), float(lighting_kw), float(total_kw), now)
@@ -1151,9 +1229,12 @@ class ShadowModePollingService:
             total_occ = occ.get("total_occupancy", 0)
 
             if f"{self._site_prefix}-SITE-AGG" in agg_states:
+                occupied_zones, peak_zone_density = _site_aggregate_occupancy_summary(zone_occupancy_samples)
                 agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["total_occupancy"] = float(total_occ)
-                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["occupied_zones"] = 0.0
-                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["peak_zone_density"] = 0.0
+                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["occupied_zones"] = float(occupied_zones)
+                agg_states[f"{self._site_prefix}-SITE-AGG"]["sensor_readings"]["peak_zone_density"] = float(
+                    peak_zone_density
+                )
             result["occupancy_fetched"] = True
         except Exception as e:
             logger.debug(f"[SHADOW] Occupancy poll skipped: {e}")
@@ -2141,6 +2222,51 @@ class ShadowModePollingService:
             # Reset accumulator for new day
             self._energy_accumulator = {"hvac_kwh": 0.0, "lighting_kwh": 0.0, "other_kwh": 0.0, "total_kwh": 0.0}
             self._energy_accum_start = now
+
+    def _check_power_anomaly(self, total_kw: float, now: datetime) -> None:
+        if total_kw <= 0:
+            return
+        self._total_kw_history.append(total_kw)
+        if len(self._total_kw_history) < 3:
+            return
+        mean = sum(self._total_kw_history) / len(self._total_kw_history)
+        deviation = abs(total_kw - mean) / mean
+        if deviation > 0.25:
+            logger.warning(
+                "[DATA_QUALITY] total_kw anomaly at %s: %.1f kW deviates %.0f%% from %.1f kW rolling mean "
+                "(window=%d readings) — possible BACnet unit/BMS meter collision",
+                now.isoformat(),
+                total_kw,
+                deviation * 100,
+                mean,
+                len(self._total_kw_history),
+            )
+            throttle_hours = 1
+            if (
+                self._last_anomaly_alert_at is None
+                or (now - self._last_anomaly_alert_at).total_seconds() > throttle_hours * 3600
+            ):
+                self._last_anomaly_alert_at = now
+                try:
+                    from app.database.supabase_client import get_supabase_client
+
+                    sb = get_supabase_client()
+                    sb.table("alerts").insert(
+                        {
+                            "site_id": self.site_id,
+                            "title": "Power reading anomaly detected",
+                            "message": (
+                                f"total_kw={total_kw:.0f} deviates {deviation * 100:.0f}% from "
+                                f"{mean:.0f} kW rolling mean — possible BACnet unit collision or meter scaling error"
+                            ),
+                            "severity": "warning",
+                            "type": "data_quality",
+                            "status": "active",
+                            "source": "shadow_mode_polling",
+                        }
+                    ).execute()
+                except Exception as exc:
+                    logger.warning("[DATA_QUALITY] Failed to insert power anomaly alert: %s", exc)
 
     def _flush_energy_to_db(self, accum_date, force: bool = False) -> None:
         """Write accumulated energy to energy_consumption_history table."""

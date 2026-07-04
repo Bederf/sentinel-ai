@@ -43,9 +43,10 @@ class TestOccupancyTransitions:
         assert state is not None
         assert state.occupancy_pct == 0.0
         assert state.occupancy_end_time is not None
-        # end_time should be the moment of transition (5 min after start)
+        # end_time is the PREVIOUS poll timestamp — the zone emptied somewhere
+        # between the two polls, so the last-known-occupied time is used
         elapsed = (state.timestamp - state.occupancy_end_time).total_seconds() / 60.0
-        assert elapsed == 0.0
+        assert elapsed == 5.0
 
     def test_remaining_occupied_keeps_previous_end_time(self):
         tracker = make_tracker()
@@ -101,7 +102,7 @@ class TestFCUInference:
         tracker.record_poll("Zone-201", 0.0, 25.0, 24.0, NOW)
 
         state = tracker.get_state("Zone-201")
-        assert state.fcu_inferred_running is False  # no prev temp
+        assert state.fcu_inferred_running is None  # no history — inference not possible
 
     def test_no_inference_without_temp(self):
         tracker = make_tracker()
@@ -109,7 +110,7 @@ class TestFCUInference:
         poll(tracker, "Zone-201", 0.0, None, 24.0, delta_minutes=5)
 
         state = tracker.get_state("Zone-201")
-        assert state.fcu_inferred_running is False
+        assert state.fcu_inferred_running is None  # no temp — inference not possible
 
 
 class TestWasteCandidates:
@@ -119,12 +120,12 @@ class TestWasteCandidates:
         tracker = make_tracker("balanced")  # 10-min threshold
         poll(tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
         poll(tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)
-        # After 5 min: still below threshold (10 min for balanced)
-        assert tracker.get_minutes_since_zone_emptied("Zone-201") == 0.0
+        # end_time = previous poll (t=0), so already 5 min empty — still below 10-min threshold
+        assert tracker.get_minutes_since_zone_emptied("Zone-201") == 5.0
         # FCU still running (temp converging)
-        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=10)  # 5 min empty, delta=-0.5
-        # At exactly 10 min threshold
-        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=15)  # 10 min empty
+        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=10)  # 10 min empty, delta=-0.5
+        # Past the 10 min threshold
+        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=15)  # 15 min empty
 
         candidates = tracker.get_waste_candidates()
         assert len(candidates) == 1
@@ -173,8 +174,8 @@ class TestProfileThresholds:
         # cost_saving profile: 5 min threshold
         cs_tracker = make_tracker("cost_saving")
         poll(cs_tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
-        poll(cs_tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)  # transition at 5 min
-        poll(cs_tracker, "Zone-201", 0.0, 21.8, 24.0, delta_minutes=12)  # 7 min empty (12-5=7)
+        poll(cs_tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)  # end_time = t=0
+        poll(cs_tracker, "Zone-201", 0.0, 21.8, 24.0, delta_minutes=8)  # 8 min empty
 
         cs_candidates = cs_tracker.get_waste_candidates()
         assert len(cs_candidates) == 1  # past 5 min threshold
@@ -183,7 +184,7 @@ class TestProfileThresholds:
         bal_tracker = make_tracker("balanced")
         poll(bal_tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
         poll(bal_tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)
-        poll(bal_tracker, "Zone-201", 0.0, 21.8, 24.0, delta_minutes=12)  # same 7 min empty
+        poll(bal_tracker, "Zone-201", 0.0, 21.8, 24.0, delta_minutes=8)  # same 8 min empty
 
         bal_candidates = bal_tracker.get_waste_candidates()
         assert len(bal_candidates) == 0  # below 10 min threshold
@@ -284,9 +285,9 @@ class TestConfidenceScoring:
     def test_medium_confidence_15x_threshold(self):
         tracker = make_tracker("balanced")
         poll(tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
-        poll(tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)
+        poll(tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)  # end_time = t=0
         # At 15 min elapsed (1.5x threshold) → 0.80 confidence
-        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=20)
+        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=15)
 
         candidates = tracker.get_waste_candidates()
         assert len(candidates) == 1
@@ -295,8 +296,8 @@ class TestConfidenceScoring:
     def test_low_confidence_at_threshold(self):
         tracker = make_tracker("balanced")
         poll(tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
-        poll(tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)
-        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=15)  # just past 10 min
+        poll(tracker, "Zone-201", 0.0, 22.0, 24.0, delta_minutes=5)  # end_time = t=0
+        poll(tracker, "Zone-201", 0.0, 21.5, 24.0, delta_minutes=12)  # 12 min: past 10, below 1.5x
 
         candidates = tracker.get_waste_candidates()
         assert len(candidates) == 1

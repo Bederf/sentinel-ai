@@ -366,7 +366,9 @@ class TestScheduleConflictPath:
             )
 
             assert "expired" in result["response"].lower()
-            update_status.assert_awaited_once_with(rec["id"], "expired")
+            update_status.assert_awaited_once_with(
+                rec["id"], "expired", reason="Schedule conflict: Active maintenance on FCU-201"
+            )
 
     @pytest.mark.asyncio
     async def test_maintenance_rec_expires_when_equipment_health_recovers(self):
@@ -402,7 +404,7 @@ class TestScheduleConflictPath:
 
             assert "expired" in result["response"].lower()
             assert "health recovered" in result["response"].lower()
-            update_status.assert_awaited_once_with(rec["id"], "expired")
+            update_status.assert_awaited_once_with(rec["id"], "expired", reason=relevance["relevance_reason"])
 
     @pytest.mark.asyncio
     async def test_maintenance_rec_stays_active_when_health_unavailable(self):
@@ -486,7 +488,7 @@ class TestScheduleConflictPath:
 
             assert "expired" in result["response"].lower()
             assert "already at recommended value" in result["response"].lower()
-            update_status.assert_awaited_once_with(rec["id"], "expired")
+            update_status.assert_awaited_once_with(rec["id"], "expired", reason=relevance["relevance_reason"])
 
     @pytest.mark.asyncio
     async def test_execution_blocked_rec_expires(self):
@@ -533,7 +535,7 @@ class TestScheduleConflictPath:
 
             assert "expired" in result["response"].lower()
             assert "unresolved_bms_point" in result["response"]
-            update_status.assert_awaited_once_with(rec["id"], "expired")
+            update_status.assert_awaited_once_with(rec["id"], "expired", reason=relevance["relevance_reason"])
 
 
 # ===================================================================

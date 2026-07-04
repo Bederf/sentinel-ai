@@ -4279,7 +4279,9 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 "occupancy_pct": occupancy,
                 "room_temp_c": self._float_or_none(state.get("room_temp_c")),
                 "setpoint_c": self._float_or_none(state.get("setpoint_c")),
-                "fcu_inferred_running": bool(state.get("fcu_inferred_running")),
+                "fcu_inferred_running": (
+                    bool(state["fcu_inferred_running"]) if state.get("fcu_inferred_running") is not None else None
+                ),
             }
             if occupancy > SERVED_ZONE_EMPTY_OCCUPANCY_PCT:
                 decision["occupied_zones"].append(zone_summary)

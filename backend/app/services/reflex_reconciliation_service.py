@@ -709,7 +709,11 @@ class ReflexReconciliationService:
                     system_type="hvac",
                     occupancy_pct=occupancy_pct,
                     occupied=occupancy_pct is not None and occupancy_pct > 5.0,
-                    running=bool(row.get("fcu_inferred_running")),
+                    # NULL means "running state unknowable from telemetry" — must not
+                    # collapse to False or the occupied-zone-idle rule fires on noise.
+                    running=(
+                        bool(row["fcu_inferred_running"]) if row.get("fcu_inferred_running") is not None else None
+                    ),
                     room_temp_c=_float_or_none(row.get("room_temp_c")),
                     setpoint_c=_float_or_none(row.get("setpoint_c")),
                     source=str(row.get("occupancy_source") or "fcu_zone_state"),
