@@ -23,7 +23,7 @@ import contextlib
 import logging
 import os
 import re
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -912,6 +912,12 @@ class ShadowModePollingService:
             except Exception:
                 pass
 
+            # The bridge /zones payload carries no cooling_setpoint, so read
+            # each FCU's setpoint back from equipment operating_data (kept
+            # fresh every cycle by the setpoint poll / sentinel sync). Without
+            # this the FCU state tracker can never infer running state.
+            fcu_setpoint_by_equip = self._load_fcu_setpoints()
+
             for z in zones:
                 zone_id: str = z.get("zone_id", "")
                 if zone_id not in self._valid_bridge_zone_ids:
@@ -964,11 +970,14 @@ class ShadowModePollingService:
                     zone_states[zone_sensor_code] = state
 
                 # Phase 1a: feed zone poll to FCU state tracker
+                setpoint_c = z.get("cooling_setpoint")
+                if setpoint_c is None:
+                    setpoint_c = fcu_setpoint_by_equip.get(equip_code)
                 self.fcu_state_tracker.record_poll(
                     zone_id=zone_id,
                     occupancy_pct=zone_occ_pct if zone_occ_pct is not None else 0.0,
                     room_temp_c=z.get("temperature_c"),
-                    setpoint_c=z.get("cooling_setpoint"),
+                    setpoint_c=setpoint_c,
                     timestamp=now,
                 )
 
@@ -2222,6 +2231,50 @@ class ShadowModePollingService:
             # Reset accumulator for new day
             self._energy_accumulator = {"hvac_kwh": 0.0, "lighting_kwh": 0.0, "other_kwh": 0.0, "total_kwh": 0.0}
             self._energy_accum_start = now
+
+    def _load_fcu_setpoints(self, max_age_minutes: int = 30) -> dict[str, float]:
+        """Latest per-FCU setpoint from equipment operating_data, keyed by equipment code.
+
+        The bridge zone payload has no cooling_setpoint field, but each FCU's
+        setpoint reaches operating_data.setpoint every poll cycle via the
+        setpoint poll / sentinel sync. Entries older than max_age_minutes are
+        dropped so a stalled writer degrades to "setpoint unknown" (tracker
+        infers None) rather than feeding stale values into the inference.
+        """
+        setpoints: dict[str, float] = {}
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            rows = (
+                get_supabase_client()
+                .table("equipment")
+                .select("code,operating_data")
+                .like("code", f"{self._site_prefix}-FCU-%")
+                .execute()
+                .data
+                or []
+            )
+            cutoff = datetime.now(tz=UTC) - timedelta(minutes=max_age_minutes)
+            for row in rows:
+                op = row.get("operating_data")
+                sp = op.get("setpoint") if isinstance(op, dict) else None
+                if not isinstance(sp, dict):
+                    continue
+                value = _safe_float(sp.get("value"))
+                if value is None:
+                    continue
+                try:
+                    ts = datetime.fromisoformat(str(sp.get("timestamp")).replace("Z", "+00:00"))
+                except (TypeError, ValueError):
+                    continue
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=UTC)
+                if ts < cutoff:
+                    continue
+                setpoints[str(row.get("code") or "").upper()] = value
+        except Exception as e:
+            logger.debug("[SHADOW] FCU setpoint load skipped: %s", e)
+        return setpoints
 
     def _check_power_anomaly(self, total_kw: float, now: datetime) -> None:
         if total_kw <= 0:
