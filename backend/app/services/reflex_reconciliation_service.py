@@ -38,6 +38,13 @@ POINT_IN_TIME_REFLEX_ACTION_TYPES = {
     "comfort_risk",
 }
 
+# A single clear observation must not resolve an active reflex advisory: the
+# fused occupancy fan-out can spike past the 5% empty threshold for one cycle
+# on noise (CO2-elevation flapping produced 4 create/resolve episodes per zone
+# on 2026-07-05 with the physical condition never clearing). Resolve only when
+# the condition has stayed clear for at least this long (~2+ reconcile cycles).
+CLEAR_DEBOUNCE_MINUTES = 12.0
+
 
 @dataclass
 class ZoneSystemState:
@@ -422,6 +429,8 @@ class ReflexReconciliationRepository:
 
         client = await get_async_supabase_client()
         metadata = dict(recommendation.get("metadata") or {})
+        # Condition re-observed — abort any in-flight clear debounce.
+        metadata.pop("pending_clear_since", None)
         observation_count = _int_or_none(metadata.get("observation_count")) or 1
         timestamp = recommendation.get("timestamp")
         metadata.update(
@@ -448,6 +457,24 @@ class ReflexReconciliationRepository:
         if result.data:
             return Recommendation.from_dict(result.data[0])
         return None
+
+    async def mark_pending_clear(
+        self,
+        recommendations: list[dict[str, Any]],
+        *,
+        now: datetime,
+    ) -> int:
+        """Stamp pending_clear_since on rows whose condition just went clear."""
+        from app.database.supabase_client import get_async_supabase_client
+
+        client = await get_async_supabase_client()
+        marked = 0
+        for row in recommendations:
+            metadata = dict(row.get("metadata") or {})
+            metadata["pending_clear_since"] = now.isoformat()
+            result = await client.table("recommendations").update({"metadata": metadata}).eq("id", row["id"]).execute()
+            marked += len(result.data or [])
+        return marked
 
     async def resolve_recommendations(
         self,
@@ -665,17 +692,21 @@ class ReflexReconciliationService:
                 if rec:
                     created.append(rec)
 
-        resolved_rows = _resolved_point_in_time_rows(
+        clear_candidates = _resolved_point_in_time_rows(
             active_rows,
             evaluated_rule_keys=evaluated_rule_keys,
             observed_finding_keys=observed_finding_keys,
         )
-        if resolved_rows:
-            await self.repository.resolve_recommendations(
-                resolved_rows,
-                now=now,
-                reason="condition_cleared",
-            )
+        if clear_candidates:
+            to_resolve, to_mark = _split_clear_debounce(clear_candidates, now=now)
+            if to_mark:
+                await self.repository.mark_pending_clear(to_mark, now=now)
+            if to_resolve:
+                await self.repository.resolve_recommendations(
+                    to_resolve,
+                    now=now,
+                    reason="condition_cleared",
+                )
         return created
 
     async def reconcile_all_sites(self, *, now: datetime | None = None) -> dict[str, int]:
@@ -861,6 +892,35 @@ def _active_reflex_rows_by_key(
         active_by_key[key] = sorted_rows[0]
         duplicate_rows.extend(sorted_rows[1:])
     return active_by_key, duplicate_rows
+
+
+def _split_clear_debounce(
+    rows: list[dict[str, Any]],
+    *,
+    now: datetime,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split clear-condition rows into (resolve now, start debounce).
+
+    Rows without a pending_clear_since stamp start the debounce; rows whose
+    stamp is older than CLEAR_DEBOUNCE_MINUTES resolve; rows still inside the
+    debounce window are left untouched (neither list).
+    """
+    to_resolve: list[dict[str, Any]] = []
+    to_mark: list[dict[str, Any]] = []
+    for row in rows:
+        metadata = row.get("metadata") or {}
+        stamp = metadata.get("pending_clear_since") if isinstance(metadata, dict) else None
+        pending_since = None
+        if stamp:
+            try:
+                pending_since = _ensure_aware(datetime.fromisoformat(str(stamp).replace("Z", "+00:00")))
+            except (TypeError, ValueError):
+                pending_since = None
+        if pending_since is None:
+            to_mark.append(row)
+        elif (now - pending_since).total_seconds() >= CLEAR_DEBOUNCE_MINUTES * 60:
+            to_resolve.append(row)
+    return to_resolve, to_mark
 
 
 def _resolved_point_in_time_rows(

@@ -80,6 +80,7 @@ class FakeReflexRepository:
 
     async def update_recommendation_observation(self, recommendation, finding, *, action_type, now):
         metadata = dict(recommendation.get("metadata") or {})
+        metadata.pop("pending_clear_since", None)
         metadata.update(
             {
                 "canonical_zone_id": finding.canonical_zone_id,
@@ -109,6 +110,17 @@ class FakeReflexRepository:
                 "reason": finding.reason,
             },
         )()
+
+    async def mark_pending_clear(self, recommendations, *, now):
+        ids = {row["id"] for row in recommendations}
+        marked = 0
+        for row in self.rows:
+            if row["id"] in ids:
+                metadata = dict(row.get("metadata") or {})
+                metadata["pending_clear_since"] = now.isoformat()
+                row["metadata"] = metadata
+                marked += 1
+        return marked
 
     async def resolve_recommendations(self, recommendations, *, now, reason):
         resolved = 0
@@ -274,12 +286,15 @@ async def test_repeated_resolved_occurrence_same_bucket_promotes_to_schedule_def
 
     await svc.reconcile_site("site-002", now=sunday_evening)
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 40, "fcu_inferred_running": True}]
+    # Clear debounce: first clear cycle stamps, a second past the window resolves.
     await svc.reconcile_site("site-002", now=sunday_evening + timedelta(minutes=10))
+    await svc.reconcile_site("site-002", now=sunday_evening + timedelta(minutes=25))
 
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
     await svc.reconcile_site("site-002", now=sunday_evening + timedelta(days=7))
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 40, "fcu_inferred_running": True}]
     await svc.reconcile_site("site-002", now=sunday_evening + timedelta(days=7, minutes=10))
+    await svc.reconcile_site("site-002", now=sunday_evening + timedelta(days=7, minutes=25))
 
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
     await svc.reconcile_site("site-002", now=sunday_evening + timedelta(days=14))
@@ -358,7 +373,10 @@ async def test_condition_resolves_then_recurs_closes_old_row_and_opens_new_occur
 
     await svc.reconcile_site("site-002", now=start)
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 40, "fcu_inferred_running": True}]
+    # First clear cycle starts the debounce; a second clear cycle past
+    # CLEAR_DEBOUNCE_MINUTES actually resolves the row.
     await svc.reconcile_site("site-002", now=start + timedelta(minutes=5))
+    await svc.reconcile_site("site-002", now=start + timedelta(minutes=20))
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
     await svc.reconcile_site("site-002", now=start + timedelta(days=7))
 
@@ -366,6 +384,38 @@ async def test_condition_resolves_then_recurs_closes_old_row_and_opens_new_occur
     assert len([row for row in repo.rows if row["status"] == "expired"]) == 1
     assert len([row for row in repo.rows if row["status"] == "advisory_info"]) == 1
     assert len(repo.occurrence_calls) == 2
+
+
+@pytest.mark.asyncio
+async def test_single_cycle_occupancy_flap_does_not_resolve_advisory():
+    """One noisy clear cycle (fused occupancy spiking past 5%) must not churn
+    the advisory — observed 2026-07-05: 4 create/resolve episodes per zone on
+    a closed Sunday while the physical condition never cleared."""
+    svc, repo, _notifier = _service()
+    start = datetime(2026, 6, 21, 18, 0, tzinfo=UTC)
+
+    repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
+    await svc.reconcile_site("site-002", now=start)
+
+    # Single-cycle occupancy spike: debounce starts, row stays active.
+    repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 17.1, "fcu_inferred_running": True}]
+    await svc.reconcile_site("site-002", now=start + timedelta(minutes=5))
+    assert len([row for row in repo.rows if row["status"] == "expired"]) == 0
+    assert repo.rows[0]["metadata"].get("pending_clear_since") is not None
+
+    # Condition re-observed: debounce aborted, same row keeps accumulating.
+    repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
+    await svc.reconcile_site("site-002", now=start + timedelta(minutes=10))
+    assert len(repo.created) == 1
+    assert repo.rows[0]["metadata"].get("pending_clear_since") is None
+    assert repo.rows[0]["metadata"]["observation_count"] == 2
+
+    # Sustained clear (two cycles spanning >= debounce) does resolve.
+    repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 60, "fcu_inferred_running": True}]
+    await svc.reconcile_site("site-002", now=start + timedelta(minutes=15))
+    await svc.reconcile_site("site-002", now=start + timedelta(minutes=30))
+    assert len([row for row in repo.rows if row["status"] == "expired"]) == 1
+    assert repo.rows[0]["metadata"]["resolution_reason"] == "condition_cleared"
 
 
 def test_recurrence_bucket_uses_day_of_week_and_two_hour_local_bucket():
