@@ -367,6 +367,12 @@ async def startup_event(_: FastAPI) -> None:
     # Start prediction generation job (no LLM, can run more often)
     scheduler_service.add_prediction_generation_job(interval_seconds=300)  # 5 min
 
+    # Start PPM emission job — daily, emits preventive WOs for big equipment
+    # whose last_rollup_at is older than their cadence (per-asset
+    # service_interval_days or type-level default from
+    # health_calculation_config.json). See ppm_scheduler.py.
+    scheduler_service.add_ppm_emission_job(interval_seconds=86400)  # 24h
+
     # Start AI recommendation generation job (rule-based, sim-time gated)
     scheduler_service.add_recommendation_generation_job(interval_seconds=1800)  # 30 min
 

@@ -3495,6 +3495,64 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run prediction generation: {e}")
 
+    def add_ppm_emission_job(self, interval_seconds: int = 86400):
+        """
+        Add a job to emit preventive WOs for big equipment whose last rollup
+        is older than their cadence (Phase B.5).
+
+        Default interval is 24h (daily); matches the operator's expectation
+        that PPM WOs appear once per workday, not per minute.
+
+        Args:
+            interval_seconds: How often to run (default: 86400s = 24h).
+        """
+        # Remove existing job if it exists (idempotent across restarts).
+        if self.scheduler.get_job("ppm_emission"):
+            self.scheduler.remove_job("ppm_emission")
+            logger.info("Removed existing PPM emission job")
+
+        # Delay first run by one full interval to avoid startup burst.
+        first_run = datetime.now() + timedelta(seconds=interval_seconds)
+
+        self.scheduler.add_job(
+            func=self._run_ppm_emission,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="ppm_emission",
+            name="PPM Emission — emit preventive WOs for due big equipment",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(f"Added PPM emission job with {interval_seconds}s interval")
+
+    @track_job_metrics("ppm_emission")
+    def _run_ppm_emission(self):
+        """
+        Wrapper to run PPM emission (runs in background).
+
+        Mirrors the prediction-generation wrapper: asyncio.run_coroutine_threadsafe
+        on a sync APScheduler trigger so we don't block the scheduler thread.
+        """
+        try:
+            import asyncio
+
+            from app.services.ppm_scheduler import get_ppm_scheduler
+
+            logger.info("Running scheduled PPM emission...")
+
+            scheduler = get_ppm_scheduler()
+
+            result = asyncio.run_coroutine_threadsafe(scheduler.tick(), self._main_loop).result(timeout=180)
+            logger.info(
+                f"PPM emission complete: selected={result.get('selected')} "
+                f"emitted={result.get('emitted')} "
+                f"skipped_existing={result.get('skipped_existing')} "
+                f"failed={result.get('failed')}"
+            )
+
+        except Exception as e:
+            logger.error(f"Failed to run PPM emission: {e}")
+
     def add_recommendation_generation_job(self, interval_seconds: int = 600):
         """
         Add a job to generate AI recommendations periodically.
@@ -5368,13 +5426,19 @@ class BackgroundSchedulerService:
             )
 
             # Trigger retraining for ONE model only (others will be retrained in subsequent cycles)
-            retrain_result = scheduler.trigger_retraining(
+            retrain_result = scheduler.queue_retraining(
                 model_type=priority_model["model_type"],
                 equipment_type=priority_model["equipment_type"],
                 reason=priority_model.get("reason", "scheduled_maintenance"),
+                site_id=priority_model.get("site_id"),
             )
 
-            if retrain_result.success:
+            if retrain_result.queued:
+                logger.info(
+                    f"✅ Retraining queued for {retrain_result.model_type}/{retrain_result.equipment_type} "
+                    f"(site={retrain_result.site_id or 'global'})"
+                )
+            elif retrain_result.success:
                 logger.info(
                     f"✅ Retraining triggered for {retrain_result.model_type}/{retrain_result.equipment_type}. "
                     f"New model ID: {retrain_result.new_model_id}"
