@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pytest
 
 from app.services.occupancy_fusion_service import OccupancyFusionService
@@ -176,3 +178,61 @@ async def test_site_level_fusion_uses_site_aggregate_co2():
     assert signal.normalized_pct == 100.0
     assert signal.raw_value["avg_co2"] == 1100
     assert signal.raw_value["source_scope"] == "site_fcu_aggregate"
+
+
+@pytest.mark.asyncio
+async def test_flat_elevated_co2_gets_background_confidence():
+    """Elevated but flat/declining CO2 is stale recirculated air, not presence.
+
+    Weekend pattern (2026-07-05): per-zone values straddle the 500ppm elevated
+    threshold with rising_count=0, and the 0.25 mid confidence was enough to
+    strobe the fused verdict past the 5% empty gate with zero people present.
+    """
+    now = datetime.now(tz=UTC)
+    latest = now.isoformat()
+    prev = (now - timedelta(minutes=5)).isoformat()
+    svc = OccupancyFusionService(
+        supabase_client=_FakeSupabase(
+            [
+                # 3 FCUs elevated and flat (delta < rising threshold), 5-min apart
+                _co2_row("S002-FCU-101", 556, latest),
+                _co2_row("S002-FCU-101", 555, prev),
+                _co2_row("S002-FCU-102", 890, latest),
+                _co2_row("S002-FCU-102", 895, prev),
+                _co2_row("S002-FCU-103", 620, latest),
+                _co2_row("S002-FCU-103", 618, prev),
+            ]
+        )
+    )
+
+    signal = await svc._get_co2_elevation("site-002")
+
+    assert signal is not None
+    assert signal.raw_value["rising_count"] == 0
+    assert signal.normalized_pct == 100.0  # still reports elevation…
+    # …but carries only background weight in the fusion.
+    assert signal.confidence <= 0.1
+
+
+@pytest.mark.asyncio
+async def test_rising_elevated_co2_keeps_occupancy_confidence():
+    now = datetime.now(tz=UTC)
+    latest = now.isoformat()
+    prev = (now - timedelta(minutes=5)).isoformat()
+    svc = OccupancyFusionService(
+        supabase_client=_FakeSupabase(
+            [
+                # All FCUs rising >= 10ppm within the trend window
+                _co2_row("S002-FCU-101", 640, latest),
+                _co2_row("S002-FCU-101", 610, prev),
+                _co2_row("S002-FCU-102", 655, latest),
+                _co2_row("S002-FCU-102", 620, prev),
+            ]
+        )
+    )
+
+    signal = await svc._get_co2_elevation("site-002")
+
+    assert signal is not None
+    assert signal.raw_value["rising_count"] == 2
+    assert signal.confidence > 0.5

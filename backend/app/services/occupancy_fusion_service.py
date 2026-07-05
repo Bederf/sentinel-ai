@@ -444,27 +444,33 @@ class OccupancyFusionService:
         rising_ratio = rising_count / total_count if total_count else 0
 
         # CO2 confidence tiers (trend-sensitive at all levels)
+        #   rising_count == 0: elevated-but-flat/declining is stale air, not
+        #              presence — background weight regardless of level. A
+        #              closed-building HVAC recirculates Friday's CO2 all
+        #              weekend; per-zone values straddling the elevated
+        #              threshold strobed the fused verdict past the 5% empty
+        #              gate on 2026-07-05 with zero people in the building.
         #   <500ppm:   background, minimal confidence
-        #   500-600:   stale decay unless rising (people leaving/left)
-        #   600-800:   occupied stable or rising (likely people present)
-        #   800+:      rising = definitely occupied; flat = could be stale recirculation
-        #              (a chiller running all day in a closed building recirculates
-        #               Friday's CO2 to 1000+ ppm with zero people present)
-        if avg_co2 >= CO2_STRONGLY_ELEVATED_PPM:
+        #   500-600:   people entering if rising
+        #   600-800:   rising = strong occupancy signal
+        #   800+:      rising = definitely occupied
+        if rising_count == 0:
+            co2_confidence = 0.1
+        elif avg_co2 >= CO2_STRONGLY_ELEVATED_PPM:
             if rising_ratio > 0.3:
                 co2_confidence = 0.9  # actively rising at high level = definitely occupied
             else:
-                co2_confidence = 0.60  # flat/stable at 800+ = high but not conclusive
+                co2_confidence = 0.60  # some devices rising at 800+ = high but not conclusive
         elif avg_co2 >= 600.0:
             if rising_ratio > 0.3:
                 co2_confidence = 0.85  # rising above 600 = strong occupancy signal
             else:
-                co2_confidence = 0.55  # stable at 600+ = occupied, not decaying
+                co2_confidence = 0.55  # some devices rising at 600+ = occupied, not decaying
         elif avg_co2 >= CO2_ELEVATED_PPM:
             if rising_ratio > 0.3:
                 co2_confidence = 0.75  # rising = people entering
             else:
-                co2_confidence = 0.25  # stable/declining at 500-600 = stale air
+                co2_confidence = 0.25  # few devices rising at 500-600 = weak signal
         else:
             co2_confidence = 0.1
 
