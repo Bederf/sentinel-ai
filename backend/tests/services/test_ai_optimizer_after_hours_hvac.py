@@ -764,12 +764,28 @@ async def test_closed_empty_building_gate_skips_llm_equipment_optimization(monke
     async def _list_devices_by_site(_site_id):
         return [_chiller(), _ahu()]
 
+    # Pin the live-DB seams so the gate evaluates only the test conditions:
+    # plant-enable mappings and zone-scope decomposition expand the advisory
+    # into per-AHU/per-zone recs from production state, and the fusion service
+    # injects a live occupancy verdict that can override occupancy=0.
+    async def _no_mappings(_site_id):
+        return {}
+
+    async def _no_decompose(_site_id, _conditions, recs):
+        return recs
+
+    async def _no_live_occupancy(_current_conditions, _site_id):
+        return {"label": "low", "detail": "pinned", "is_live": False}
+
     monkeypatch.setattr("app.services.ai_optimizer.ensure_device_manager_initialized", _noop_init)
     monkeypatch.setattr("app.services.ai_optimizer.device_manager.list_devices_by_site", _list_devices_by_site)
     monkeypatch.setattr(optimizer, "_gather_lighting_zone_data", lambda *_args, **_kwargs: {})
     monkeypatch.setattr(optimizer, "_analyze_with_claude", _boom)
     monkeypatch.setattr(optimizer, "_apply_quality_gate", _noop_quality_gate)
     monkeypatch.setattr(optimizer, "_enrich_with_health_features", _noop_health_features)
+    monkeypatch.setattr(optimizer, "_fetch_plant_enable_mappings", _no_mappings)
+    monkeypatch.setattr(optimizer, "_decompose_hvac_zone_scope_advisories", _no_decompose)
+    monkeypatch.setattr(optimizer, "_format_live_occupancy_context", _no_live_occupancy)
 
     result = await optimizer.analyze_building(
         "site-002",

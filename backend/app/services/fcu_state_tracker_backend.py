@@ -126,6 +126,16 @@ class SupabaseBackend(FCUStateTrackerBackend):
         except Exception as e:
             logger.warning(f"[FCU-SUPABASE-BACKEND] Failed to persist state for {zone_id}: {e}")
 
+    def refresh(self) -> None:
+        """Drop the cache so the next access re-reads persisted state.
+
+        Readers in a different process from the writer (the AI optimizer vs
+        ShadowModePollingService) must call this before evaluating state —
+        _load_all only runs once per instance otherwise.
+        """
+        self._loaded = False
+        self._cache = {}
+
     def iter_zones(self):
         self._load_all()
         return self._cache.items()

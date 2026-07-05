@@ -68,9 +68,9 @@ class TestFiveLayerPromptStructure:
     def equipment_inventory(self):
         return {"hvac": [], "lighting": [], "power": []}
 
-    def test_layer1_comes_before_layer2(self, service, site, equipment_inventory):
+    async def test_layer1_comes_before_layer2(self, service, site, equipment_inventory):
         """Layer 2 waste block should appear after Layer 1 in prompt."""
-        prompt = service._build_optimization_prompt(
+        prompt = await service._build_optimization_prompt(
             site=site,
             current_conditions={},
             weather_forecast={},
@@ -83,9 +83,9 @@ class TestFiveLayerPromptStructure:
         layer2_pos = prompt.find("LAYER 2")
         assert layer1_pos < layer2_pos, "Layer 1 must appear before Layer 2"
 
-    def test_layer2_empty_waste_block(self, service, site, equipment_inventory):
+    async def test_layer2_empty_waste_block(self, service, site, equipment_inventory):
         """When no waste opportunities, Layer 2 says 'No waste opportunities detected'."""
-        prompt = service._build_optimization_prompt(
+        prompt = await service._build_optimization_prompt(
             site=site,
             current_conditions={},
             weather_forecast={},
@@ -96,7 +96,7 @@ class TestFiveLayerPromptStructure:
         )
         assert "No waste opportunities detected" in prompt
 
-    def test_layer2_with_waste_opportunities(self, service, site, equipment_inventory):
+    async def test_layer2_with_waste_opportunities(self, service, site, equipment_inventory):
         """When waste opportunities exist, Layer 2 shows them."""
         mock_precompute = MagicMock()
         mock_precompute.format_for_prompt.return_value = (
@@ -119,7 +119,7 @@ class TestFiveLayerPromptStructure:
             active_profile="balanced",
         )
 
-        prompt = service._build_optimization_prompt(
+        prompt = await service._build_optimization_prompt(
             site=site,
             current_conditions={},
             weather_forecast={},
@@ -131,8 +131,17 @@ class TestFiveLayerPromptStructure:
         assert "WASTE OPPORTUNITIES DETECTED" in prompt
         assert "S002-FCU-201" in prompt
 
-    def test_public_holiday_is_included_in_decision_context(self, service, site, equipment_inventory, monkeypatch):
+    async def test_public_holiday_is_included_in_decision_context(
+        self, service, site, equipment_inventory, monkeypatch
+    ):
         """Public holidays must be explicit in the optimizer prompt."""
+
+        # Pin occupancy to the legacy single-source path — the fusion service
+        # reads live Supabase state, making the asserted detail nondeterministic.
+        async def _legacy_occupancy_context(current_conditions, site_id):
+            return {"label": "low", "detail": "Occupancy telemetry reports low", "is_live": False}
+
+        monkeypatch.setattr(service, "_format_live_occupancy_context", _legacy_occupancy_context)
 
         monkeypatch.setattr(
             service,
@@ -147,7 +156,7 @@ class TestFiveLayerPromptStructure:
             },
         )
 
-        prompt = service._build_optimization_prompt(
+        prompt = await service._build_optimization_prompt(
             site=site,
             current_conditions={"occupancy": "low"},
             weather_forecast={},

@@ -240,6 +240,17 @@ class FCUStateTracker:
         self._active_profile = active_profile
         logger.info(f"[FCUTracker] Profile updated to: {active_profile}")
 
+    def refresh_from_backend(self) -> None:
+        """Re-read persisted zone state (SupabaseBackend caches after first load).
+
+        No-op for InMemoryBackend. Read-only consumers (the AI optimizer's
+        waste-candidate evaluation) must call this each cycle or they evaluate
+        the state frozen at first access.
+        """
+        refresh = getattr(self._backend, "refresh", None)
+        if callable(refresh):
+            refresh()
+
     def get_state(self, zone_id: str) -> _ZoneState | None:
         """Expose zone state for debugging."""
         return self._backend.get_state(zone_id)

@@ -20,7 +20,10 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.services.fcu_state_tracker import FCUStateTracker
 
 from app.config.settings import settings
 from app.models.device import Device, DevicePoint, DeviceType, ExposureDirection, ZoneType
@@ -292,6 +295,25 @@ class AIOptimizerService:
 
         self.fcu_state_tracker = FCUStateTracker()
         self.context_precompute_service = ContextPreComputeService(self.fcu_state_tracker)
+        # Per-site Supabase-backed trackers for waste-candidate evaluation.
+        # Zone polls happen in ShadowModePollingService (a different instance),
+        # so the default in-memory tracker above never has state — reading the
+        # persisted fcu_zone_state store is the only way the optimizer sees it.
+        self._site_fcu_trackers: dict[str, FCUStateTracker] = {}
+
+    def _fcu_tracker_for_site(self, site_id: str, active_profile: str) -> "FCUStateTracker":
+        """Supabase-backed tracker over the site's persisted zone state, refreshed per call."""
+        from app.services.fcu_state_tracker import FCUStateTracker
+        from app.services.fcu_state_tracker_backend import SupabaseBackend
+
+        tracker = self._site_fcu_trackers.get(site_id)
+        if tracker is None:
+            tracker = FCUStateTracker(active_profile=active_profile, backend=SupabaseBackend(site_id=site_id))
+            self._site_fcu_trackers[site_id] = tracker
+        elif tracker._active_profile != active_profile:
+            tracker.update_profile(active_profile)
+        tracker.refresh_from_backend()
+        return tracker
 
     @property
     def sites(self) -> list[dict[str, Any]]:
@@ -525,6 +547,7 @@ class AIOptimizerService:
             active_profile=active_profile_name,
             outdoor_temp=outdoor_temp,
             peak_tariff=peak_tariff,
+            fcu_tracker=self._fcu_tracker_for_site(site_id, active_profile_name),
         )
 
         # Collect suppressed equipment codes for prompt filtering and post-LLM filtering.

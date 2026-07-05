@@ -46,6 +46,7 @@ class ContextPreComputeService:
         active_profile: str,
         outdoor_temp: float | None,
         peak_tariff: float,
+        fcu_tracker: "FCUStateTracker | None" = None,
     ) -> PreComputedContext:
         """Run all waste detection rules against current conditions.
 
@@ -60,11 +61,16 @@ class ContextPreComputeService:
             active_profile: Active optimization profile name
             outdoor_temp: Current outdoor temperature in °C
             peak_tariff: Peak energy tariff in R/kWh
+            fcu_tracker: Site-specific tracker to evaluate for Rule 1. The
+                constructor-injected tracker is only correct when the caller
+                feeds it record_poll in-process (tests do); zone polls happen
+                in ShadowModePollingService, so the optimizer must pass a
+                Supabase-backed tracker or Rule 1 evaluates an empty store.
         """
         opportunities: list[WasteOpportunity] = []
 
         # Rule 1: FCU post-occupancy waste
-        opportunities.extend(self.fcu_state_tracker.get_waste_candidates())
+        opportunities.extend((fcu_tracker or self.fcu_state_tracker).get_waste_candidates())
 
         # Rule 2: AHU overcapacity
         ahu_waste = self._check_ahu_overcapacity(current_conditions)

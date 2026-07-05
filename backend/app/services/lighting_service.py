@@ -10,7 +10,7 @@ loaded when a site explicitly configures a JSON file.
 import json
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.database.supabase_client import get_supabase_client
@@ -24,6 +24,23 @@ from app.models.lighting import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Occupancy readings older than this must not count as presence. The
+# latest-per-point telemetry query has no time filter, so without this gate a
+# stale "occupied" reading (e.g. from a decommissioned write path) would keep
+# reporting an occupied PIR sensor indefinitely — which feeds the occupancy
+# fusion's lighting_pir signal (2026-07-05 fused-occupancy loop).
+OCCUPANCY_READING_MAX_AGE_MINUTES = 30.0
+
+
+def _occupancy_reading_is_stale(recorded_at: str, max_age_minutes: float = OCCUPANCY_READING_MAX_AGE_MINUTES) -> bool:
+    try:
+        ts = datetime.fromisoformat(recorded_at.replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return True  # unparseable timestamp → cannot vouch for freshness
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    return (datetime.now(tz=UTC) - ts).total_seconds() > max_age_minutes * 60
 
 
 @dataclass
@@ -814,6 +831,8 @@ class LightingService:
 
                 st = sensor_type.lower()
                 if "occupancy" in st:
+                    if _occupancy_reading_is_stale(recorded_at):
+                        continue  # stale reading must not count as a PIR sensor at all
                     zone["sensors"].append(
                         {
                             "sensor_id": equipment_id,
