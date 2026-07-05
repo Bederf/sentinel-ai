@@ -947,23 +947,31 @@ class ShadowModePollingService:
 
                 # Determine zone occupancy: use DALI PIR (in-memory) if available,
                 # otherwise fall back to fused site-level verdict, then schedule.
-                zone_occ_pct = dali_occupancy_by_zone.get(zone_id)
+                direct_occ_pct = dali_occupancy_by_zone.get(zone_id)
                 # Only DIRECT per-zone measurements may feed the site aggregate
                 # (occupied_zones on S002-SITE-AGG). The fused verdict is itself
                 # derived from that aggregate — counting fanned-out fused values
                 # here closes a feedback loop that latched "all 15 zones
                 # occupied" through closed overnight hours (Finding 2,
                 # 2026-07-04 pipeline verification).
-                if zone_occ_pct is not None:
-                    zone_occupancy_samples.append(float(zone_occ_pct))
+                if direct_occ_pct is not None:
+                    zone_occupancy_samples.append(float(direct_occ_pct))
+                zone_occ_pct = direct_occ_pct
                 if zone_occ_pct is None and fused_site_verdict is not None:
                     zone_occ_pct = fused_site_verdict.occupancy_percent
 
+                # Same rule for the S002-ZONE-* sensor write path: the lighting
+                # service counts every persisted "occupancy" reading > 0 as an
+                # occupied PIR sensor, which feeds the fusion's lighting_pir
+                # signal. Writing the fused fan-out here re-created the Finding 2
+                # feedback loop one layer down (fused floored at ~32.6% through a
+                # closed Sunday night while every real PIR/badge/water signal
+                # read 0). Only direct measurements may be persisted as readings.
                 zone_sensor_state = _zone_sensor_state_from_bridge_zone(
                     site_prefix=self._site_prefix,
                     zone_id=zone_id,
                     zone=z,
-                    occupancy_pct=zone_occ_pct,
+                    occupancy_pct=direct_occ_pct,
                 )
                 if zone_sensor_state:
                     zone_sensor_code, state = zone_sensor_state
