@@ -7,7 +7,7 @@ Provides waste opportunity detection for the AI optimizer's pre-computation laye
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 if TYPE_CHECKING:
     from app.services.fcu_state_tracker_backend import FCUStateTrackerBackend
@@ -77,8 +77,6 @@ class FCUStateTracker:
     Integration point: called from ShadowModePollingService after each zone poll cycle.
     """
 
-    from typing import ClassVar
-
     # Profile-aware post-occupancy thresholds (minutes empty before flagging waste)
     POST_OCCUPANCY_THRESHOLDS: ClassVar[dict[str, int]] = {
         "cost_saving": 5,
@@ -86,6 +84,11 @@ class FCUStateTracker:
         "asset_preservation": 10,
         "balanced": 10,
     }
+
+    # Occupancy <= this % counts as "empty" — noisy live PIR/fused percentages
+    # rarely settle at exactly 0.0, so both the transition detector and the
+    # waste-candidate gate must share this cutoff.
+    EMPTY_THRESHOLD: ClassVar[float] = 5.0
 
     def __init__(
         self,
@@ -106,6 +109,7 @@ class FCUStateTracker:
         room_temp_c: float | None,
         setpoint_c: float | None,
         timestamp: datetime | None = None,
+        fcu_running: bool | None = None,
     ) -> None:
         """Record a zone poll result and update state.
 
@@ -113,7 +117,9 @@ class FCUStateTracker:
 
         Tracks:
         - Occupancy state transitions (occupied → empty) → records occupancy_end_time
-        - FCU running state (inferred from temp delta vs setpoint)
+        - FCU running state — direct measurement (fcu_running, from fan_speed /
+          valve_position readings) when the caller has one, else inferred from
+          temp delta vs setpoint
         - Temperature trend for FCU inference
 
         Occupancy is taken from the live poll result only. No schedule/profile
@@ -128,12 +134,9 @@ class FCUStateTracker:
         effective_occupancy = occupancy_pct
         occupancy_source = "bridge"
 
-        # Treat <= 5% as "empty" and > 5% as "occupied" for noisy live PIR/zone percentages.
-        EMPTY_THRESHOLD = 5.0
-
         # Detect transition: occupied → empty
-        is_empty = effective_occupancy <= EMPTY_THRESHOLD
-        occupancy_ended = prev is not None and prev.occupancy_pct > EMPTY_THRESHOLD and is_empty
+        is_empty = effective_occupancy <= self.EMPTY_THRESHOLD
+        occupancy_ended = prev is not None and prev.occupancy_pct > self.EMPTY_THRESHOLD and is_empty
 
         # occupancy_end_time: carry forward if zone remains empty; clear if re-occupied
         # When first detecting empty state, use PREVIOUS timestamp (the zone emptied
@@ -155,8 +158,14 @@ class FCUStateTracker:
             occupancy_end_time=new_occupancy_end_time,
             prev_room_temp=prev_temp,
             prev_timestamp=prev.timestamp if prev else None,
-            # Infer FCU running state
-            fcu_inferred_running=self._infer_fcu_running(zone_id, room_temp_c, setpoint_c, prev),
+            # Direct measurement (fan_speed/valve_position) beats temp inference —
+            # the ±2°C inter-poll sensor noise flips the delta heuristic even with
+            # a setpoint present (observed on above-setpoint zones, 2026-07-04).
+            fcu_inferred_running=(
+                fcu_running
+                if fcu_running is not None
+                else self._infer_fcu_running(zone_id, room_temp_c, setpoint_c, prev)
+            ),
             # Track source for prompt description
             occupancy_source=occupancy_source,
         )
@@ -167,15 +176,16 @@ class FCUStateTracker:
         """Return zones where FCU appears to be running unnecessarily.
 
         Criteria for inclusion:
-        - Zone occupancy = 0%
+        - Zone occupancy <= EMPTY_THRESHOLD (same "empty" cutoff record_poll uses
+          for the transition — fused/PIR percentages rarely hit exactly 0.0)
         - Zone has been empty > profile threshold (cost_saving=5min, balanced=10min, etc.)
-        - FCU inferred as running (active cooling OR significantly below setpoint)
+        - FCU running (direct fan/valve measurement, or temp-trend inference)
         """
         threshold_min = self._threshold_for_profile(self._active_profile)
         opportunities: list[WasteOpportunity] = []
 
         for zone_id, state in self._backend.iter_zones():
-            if state.occupancy_pct > 0.0:
+            if state.occupancy_pct > self.EMPTY_THRESHOLD:
                 continue  # zone still occupied
 
             if state.occupancy_end_time is None:

@@ -16,10 +16,10 @@ def make_tracker(profile: str = "balanced") -> FCUStateTracker:
     return FCUStateTracker(active_profile=profile, backend=InMemoryBackend())
 
 
-def poll(tracker, zone_id, occupancy_pct, room_temp_c, setpoint_c=None, delta_minutes=0):
+def poll(tracker, zone_id, occupancy_pct, room_temp_c, setpoint_c=None, delta_minutes=0, fcu_running=None):
     """Helper: record a poll at a given offset from NOW."""
     ts = NOW + timedelta(minutes=delta_minutes)
-    tracker.record_poll(zone_id, occupancy_pct, room_temp_c, setpoint_c, ts)
+    tracker.record_poll(zone_id, occupancy_pct, room_temp_c, setpoint_c, ts, fcu_running=fcu_running)
 
 
 class TestOccupancyTransitions:
@@ -112,6 +112,32 @@ class TestFCUInference:
         state = tracker.get_state("Zone-201")
         assert state.fcu_inferred_running is None  # no temp — inference not possible
 
+    def test_direct_measurement_overrides_temp_inference(self):
+        tracker = make_tracker()
+        # Stable at setpoint → temp inference would say False, but fan is on
+        poll(tracker, "Zone-201", 0.0, 24.2, 24.0, delta_minutes=0)
+        poll(tracker, "Zone-201", 0.0, 24.3, 24.0, delta_minutes=5, fcu_running=True)
+
+        state = tracker.get_state("Zone-201")
+        assert state.fcu_inferred_running is True
+
+    def test_direct_measurement_off_overrides_below_setpoint(self):
+        tracker = make_tracker()
+        # 1.5°C below setpoint → temp inference would say True, but fan is off
+        poll(tracker, "Zone-201", 0.0, 22.5, 24.0, delta_minutes=0)
+        poll(tracker, "Zone-201", 0.0, 22.5, 24.0, delta_minutes=5, fcu_running=False)
+
+        state = tracker.get_state("Zone-201")
+        assert state.fcu_inferred_running is False
+
+    def test_direct_measurement_works_without_temp_or_setpoint(self):
+        tracker = make_tracker()
+        # First poll, no temp, no setpoint — inference impossible, but fan reading exists
+        tracker.record_poll("Zone-201", 0.0, None, None, NOW, fcu_running=True)
+
+        state = tracker.get_state("Zone-201")
+        assert state.fcu_inferred_running is True
+
 
 class TestWasteCandidates:
     """Waste candidate detection."""
@@ -162,6 +188,27 @@ class TestWasteCandidates:
         tracker = make_tracker()
         poll(tracker, "Zone-201", 80.0, 22.0, 24.0, delta_minutes=0)
         poll(tracker, "Zone-201", 50.0, 22.5, 24.0, delta_minutes=5)
+
+        assert tracker.get_waste_candidates() == []
+
+    def test_near_zero_occupancy_still_counts_as_empty(self):
+        """Fused/PIR percentages rarely hit exactly 0.0 — the waste gate must use
+        the same EMPTY_THRESHOLD as the transition detector, not a strict 0."""
+        tracker = make_tracker("balanced")
+        poll(tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
+        poll(tracker, "Zone-201", 3.0, 22.0, 24.0, delta_minutes=5, fcu_running=True)
+        poll(tracker, "Zone-201", 4.5, 21.8, 24.0, delta_minutes=15, fcu_running=True)
+
+        candidates = tracker.get_waste_candidates()
+        assert len(candidates) == 1
+        assert candidates[0].equipment_id == "S002-FCU-201"
+
+    def test_occupancy_above_empty_threshold_blocks_candidate(self):
+        tracker = make_tracker("balanced")
+        poll(tracker, "Zone-201", 80.0, 22.5, 24.0, delta_minutes=0)
+        poll(tracker, "Zone-201", 3.0, 22.0, 24.0, delta_minutes=5, fcu_running=True)
+        # Re-occupied above threshold at candidate time
+        poll(tracker, "Zone-201", 6.0, 21.8, 24.0, delta_minutes=15, fcu_running=True)
 
         assert tracker.get_waste_candidates() == []
 
