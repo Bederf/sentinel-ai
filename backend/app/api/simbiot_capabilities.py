@@ -7,10 +7,13 @@ policy systems can render/write from one BMS-agnostic contract.
 from __future__ import annotations
 
 import contextlib
+import hashlib
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.core.site_resolver import get_registered_site_ids
+from app.database.supabase_client import get_supabase_client
 from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
 from app.services.simbiot import BmsConnectionConfig, create_bms_adapter
@@ -91,9 +94,48 @@ async def get_site_capabilities(
                 }
             )
 
+        # Persist discovery session for attestation + freshness validation
+        discovery_id = None
+        try:
+            payload_for_hash = json.dumps(
+                {"devices": out_devices, "summary": {"devices": len(out_devices), "points": total_points}},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+            raw_hash = hashlib.sha256(payload_for_hash.encode("utf-8")).hexdigest()
+            client = get_supabase_client()
+            result = (
+                client.table("site_discovery_sessions")
+                .insert(
+                    {
+                        "site_id": site_id,
+                        "adapter_type": adapter.adapter_id,
+                        "host": host,
+                        "port": port,
+                        "device_count": len(out_devices),
+                        "point_count": total_points,
+                        "writable_point_count": writable_points,
+                        "raw_response_hash": raw_hash,
+                        "status": "active",
+                    }
+                )
+                .execute()
+            )
+            if result.data:
+                discovery_id = str(result.data[0]["discovery_id"])
+                discovered_at = result.data[0]["discovered_at"]
+        except Exception as exc:
+            # Discovery session persistence is advisory — do not fail the capability call
+            import logging
+
+            logging.getLogger(__name__).warning("Failed to persist discovery session for %s: %s", site_id, exc)
+
         return {
             "site_id": site_id,
+            "discovery_id": discovery_id,
+            "discovered_at": discovered_at if discovery_id else None,
             "adapter_id": adapter.adapter_id,
+            "adapter_type": adapter.adapter_id,
             "adapter_capabilities": {
                 "supports_device_discovery": adapter.capabilities.supports_device_discovery,
                 "supports_point_discovery": adapter.capabilities.supports_point_discovery,

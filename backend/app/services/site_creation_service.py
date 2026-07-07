@@ -9,8 +9,12 @@ When the SIMBIOT wizard onboards a new site, this service:
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+import shutil
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("sentinel.site_creation")
@@ -22,8 +26,9 @@ _MAX_CREATE_RETRIES = 3
 class SiteCreationService:
     """Creates new sites with auto-generated or manual site codes."""
 
-    def __init__(self, supabase_client=None):
+    def __init__(self, supabase_client=None, policy_dir: Path | None = None):
         self._supabase = supabase_client
+        self._policy_dir = policy_dir or (Path(__file__).resolve().parent.parent / "data" / "policies")
 
     @property
     def supabase(self):
@@ -155,6 +160,7 @@ class SiteCreationService:
                         building_type,
                     )
                     self.seed_phase_promotion_gates(site_code)
+                    self.seed_mode_policy_files(site_code, onboarding_phase)
                     return result.data[0]
 
                 raise RuntimeError(f"No data returned when creating site {site_code}")
@@ -183,6 +189,50 @@ class SiteCreationService:
         """Fetch a site by its code, or None if not found."""
         result = self.supabase.table("sites").select("*").eq("code", site_code).execute()
         return result.data[0] if result.data else None
+
+    def seed_mode_policy_files(self, site_code: str, onboarding_phase: str = "shadow_live") -> None:
+        """Create mode policy and state files for a newly onboarded site."""
+        try:
+            self._policy_dir.mkdir(parents=True, exist_ok=True)
+            state_path = self._policy_dir / f"{site_code}-mode-policy-state.json"
+            policy_path = self._policy_dir / f"{site_code}-mode-policy.json"
+
+            if not state_path.exists():
+                now = datetime.now(UTC).isoformat()
+                state = {
+                    "site_id": site_code,
+                    "current_stage": onboarding_phase,
+                    "candidate_stage": None,
+                    "candidate_since": None,
+                    "violation_stage": None,
+                    "violation_since": None,
+                    "last_demoted_at": None,
+                    "last_evaluated_at": None,
+                    "stage_entered_at": now,
+                }
+                state_path.write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
+
+            if policy_path.exists():
+                return
+
+            template_path = self._policy_dir / "site-002-mode-policy.json"
+            if not template_path.exists():
+                logger.warning("[SCS] Mode policy template missing: %s", template_path)
+                return
+
+            shutil.copy2(template_path, policy_path)
+            policy = json.loads(policy_path.read_text(encoding="utf-8"))
+            policy["site_id"] = site_code
+            policy["default_stage"] = onboarding_phase
+            if onboarding_phase == "commissioning":
+                policy.setdefault("stages", {}).setdefault("commissioning", {}).setdefault(
+                    "promotion",
+                    {},
+                ).setdefault("entry_thresholds", {})["truth_check_required"] = True
+            policy_path.write_text(json.dumps(policy, indent=2) + "\n", encoding="utf-8")
+            logger.info("[SCS] Seeded mode policy files for %s", site_code)
+        except Exception as e:
+            logger.warning("[SCS] Failed to seed mode policy files for %s: %s", site_code, e)
 
     def seed_phase_promotion_gates(self, site_code: str) -> None:
         """Seed standard phase promotion gates for a newly created site.

@@ -217,6 +217,7 @@ class ModuleRegistryService:
                         "last_telemetry": m.last_telemetry,
                         "error_message": m.error_message,
                         "licensed": m.licensed,
+                        "phase_override": "shadow",
                         "updated_at": datetime.utcnow().isoformat(),
                     },
                     on_conflict="instance_id",
@@ -920,17 +921,35 @@ class ModuleRegistryService:
 
         return True  # Idempotent
 
-    def ensure_base_modules(self, site_id: str, site_name: str) -> list[str]:
-        """Ensure all 7 mandatory platform modules exist and are active for a site.
+    def ensure_site_modules(
+        self,
+        site_id: str,
+        site_name: str,
+        equipment_types: list[str] | None = None,
+    ) -> list[str]:
+        """Ensure mandatory + inferred modules exist and are active for a site.
 
+        All modules are seeded with phase_override='shadow' regardless of site phase.
         Idempotent — activating an existing module is a no-op.
-        Building system modules are NOT seeded here — they require explicit licensing.
-        Returns list of module_types that were newly created.
+
+        Args:
+            site_id: Site code (e.g. 'site-005')
+            site_name: Display name for the site
+            equipment_types: Optional list of equipment types to infer building-system modules from.
+                Empty list = mandatory platform modules only.
+
+        Returns:
+            List of module_type values that were newly created.
         """
         site_id = self._normalize_site_id(site_id)
         from app.models.module_registry import MANDATORY_MODULES
+        from app.services.simbiot.connection_policy import (
+            infer_module_from_equipment_type,
+        )
 
-        created = []
+        created: list[str] = []
+
+        # ── Mandatory platform modules ──
         for mod_type_str in MANDATORY_MODULES:
             try:
                 mt = ModuleType(mod_type_str)
@@ -938,10 +957,35 @@ class ModuleRegistryService:
                     self.activate_module(site_id, site_name, mt)
                     created.append(mod_type_str)
             except Exception as e:
-                logger.warning(f"Failed to seed module {mod_type_str} for {site_id}: {e}")
+                logger.warning(f"Failed to seed mandatory module {mod_type_str} for {site_id}: {e}")
+
+        # ── Inferred building-system modules ──
+        if equipment_types:
+            inferred_modules: set[str] = set()
+            for eq_type in equipment_types:
+                inferred = infer_module_from_equipment_type(eq_type)
+                if inferred:
+                    inferred_modules.add(inferred.value)
+
+            for mod_type_str in inferred_modules:
+                try:
+                    mt = ModuleType(mod_type_str)
+                    if not self.is_module_active(site_id, mt):
+                        self.activate_module(site_id, site_name, mt)
+                        created.append(mod_type_str)
+                except Exception as e:
+                    logger.warning(f"Failed to seed inferred module {mod_type_str} for {site_id}: {e}")
+
         if created:
-            logger.info(f"Backfilled {len(created)} base modules for {site_id}: {created}")
+            logger.info(f"Seeded {len(created)} modules for {site_id}: {created}")
         return created
+
+    def ensure_base_modules(self, site_id: str, site_name: str) -> list[str]:
+        """DEPRECATED — use ensure_site_modules().
+
+        Seeds mandatory platform modules only (no equipment-type inference).
+        """
+        return self.ensure_site_modules(site_id, site_name, equipment_types=[])
 
     def ensure_base_modules_all_sites(self) -> dict[str, list[str]]:
         """Ensure all registered sites have all 15 mandatory base modules.

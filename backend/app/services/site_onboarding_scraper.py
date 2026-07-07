@@ -131,6 +131,15 @@ async def _scrape_public_text(site_name: str, address: str, building_type: str) 
         if proc.returncode != 0:
             logger.info("Firecrawl site fact search failed: %s", stderr.decode(errors="ignore")[:300])
             return None
+        from app.services.ai_usage_tracker import usage_tracker
+
+        usage_tracker.record_service(
+            provider="firecrawl",
+            units=1,
+            unit_type="scrape",
+            source="site_onboarding_search",
+            site_id="unknown",
+        )
         return stdout.decode(errors="ignore")
     except (TimeoutError, FileNotFoundError) as exc:
         logger.info("Firecrawl site fact search unavailable: %s", exc)
@@ -144,9 +153,13 @@ def _extract_facts(text: str) -> dict[str, Any]:
     if email:
         facts["contact_email"] = email
 
+    address = _labeled_line_value(text, "Address")
+    if address:
+        facts["address"] = address
+
     phone = _first_match(
         text,
-        r"(?:\+27|0)\s?\d{2}\s?\d{3}\s?\d{4}\b",
+        r"(?:\+27|0)\s*\(?\d{2,3}\)?[\s-]?\d{3}[\s-]?\d{4}\b",
         re.IGNORECASE,
     )
     if phone:
@@ -196,8 +209,18 @@ def _first_match(text: str, pattern: str, flags: int = 0) -> str | None:
     return match.group(1) if match.lastindex else match.group(0)
 
 
+def _labeled_line_value(text: str, label: str) -> str | None:
+    match = re.search(rf"\b{re.escape(label)}\.\s*([^\n]+)", text, re.IGNORECASE)
+    if not match:
+        return None
+    value = re.sub(r"\s+", " ", match.group(1)).strip(" .")
+    return value or None
+
+
 def _normalize_phone(phone: str) -> str:
-    return re.sub(r"\s+", " ", phone).strip()
+    normalized = re.sub(r"[()\-]", " ", phone)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
 
 
 def _confidence_for_field(field: str) -> float:

@@ -91,6 +91,7 @@ export interface DeskStatsResponse {
 }
 
 export interface CreateSiteRequest {
+  id?: string;
   name: string;
   address?: string;
   region?: string;
@@ -135,6 +136,24 @@ export interface OnboardingFactsResponse {
   scrape_available: boolean;
 }
 
+export interface BuildingConfigResponse {
+  id: string;
+  code: string;
+  name: string;
+  display_name?: string;
+  address?: string;
+  type?: string;
+  region?: string;
+  floors?: string[];
+  sqm?: number;
+  metadata?: Record<string, unknown>;
+  features?: Record<string, boolean>;
+  contacts?: Record<string, unknown>;
+  optimization?: Record<string, unknown>;
+  latitude?: number | null;
+  longitude?: number | null;
+}
+
 // ============= Sites API Methods =============
 
 export const sitesApi = {
@@ -161,6 +180,9 @@ export const sitesApi = {
    */
   getSite: (siteId: string) =>
     sitesBatcher(siteId),
+
+  getBuildingConfig: (siteId: string) =>
+    fetchApi<BuildingConfigResponse>(`/api/buildings/${encodeURIComponent(siteId)}`),
 
   /**
    * Create new site

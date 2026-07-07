@@ -23,6 +23,8 @@ import type {
   BMSVendor,
   BACnetDevice,
   SimbiotCapabilitiesSummary,
+  SimbiotCapabilitiesResponse,
+  NiagaraApproveResponse,
   OnboardingCanonicalizationSummary,
   OnboardingHierarchySummary,
 } from '@/lib/api';
@@ -69,9 +71,10 @@ const VENDOR_HELP_TEXT: Record<BMSVendor, string> = {
 
 export interface BMSConnectionWizardProps {
   siteId: string;
+  requestedSiteId?: string;
   sites: Site[];
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: (siteId?: string) => void;
 }
 
 type ConnectionStatus = "idle" | "testing" | "connected" | "failed";
@@ -80,6 +83,7 @@ type ApproveStatus = "idle" | "approving" | "approved" | "failed";
 interface WizardState {
   step: number;
   // New site details
+  requestedSiteId: string;
   siteName: string;
   siteAddress: string;
   siteRegion: string;
@@ -113,6 +117,7 @@ interface WizardState {
   tenantName: string;
   tenantAccessMode: string;
   tenantAccessConfirmed: boolean;
+  bridgeDataFlowEnabled: boolean;
   // Connection method: network discovery or CSV upload
   connectionMethod: "network" | "csv";
   csvFile: File | null;
@@ -141,7 +146,10 @@ interface WizardState {
     hierarchy_summary?: OnboardingHierarchySummary;
   } | null;
   capabilitySummary: SimbiotCapabilitiesSummary | null;
+  capabilityDetails: SimbiotCapabilitiesResponse | null;
   capabilityError: string | null;
+  savedSiteLoading: boolean;
+  savedSiteMessage: string;
   onboardingFactsLoading: boolean;
   onboardingFactsMessage: string;
   onboardingFactSources: Record<string, OnboardingFactSource>;
@@ -164,6 +172,7 @@ type WizardAction =
   | { type: "SET_STEP"; step: number }
   | { type: "SET_DISCOVERY"; id: string; summary: DiscoverClassifyResponse }
   | { type: "SET_MAPPINGS"; mappings: BMSMappingSummary }
+  | { type: "RESET_DISCOVERY_REVIEW" }
   | { type: "TOGGLE_EQUIPMENT"; equipmentId: string }
   | {
       type: "SET_APPROVE_STATUS";
@@ -175,7 +184,7 @@ type WizardAction =
         hierarchy_summary?: OnboardingHierarchySummary;
       };
     }
-  | { type: "SET_CAPABILITIES"; summary: SimbiotCapabilitiesSummary | null; error?: string | null }
+  | { type: "SET_CAPABILITIES"; summary: SimbiotCapabilitiesSummary | null; details?: SimbiotCapabilitiesResponse | null; error?: string | null }
   | { type: "SET_LOADING"; loading: boolean }
   | { type: "SET_ERROR"; error: string | null }
   | { type: "SET_VERIFICATION_WIZARD"; show: boolean }
@@ -211,6 +220,15 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       };
     case "SET_MAPPINGS":
       return { ...state, mappings: action.mappings, loading: false };
+    case "RESET_DISCOVERY_REVIEW":
+      return {
+        ...state,
+        discoveryId: null,
+        discoverySummary: null,
+        mappings: null,
+        expandedEquipment: new Set<string>(),
+        error: null,
+      };
     case "TOGGLE_EQUIPMENT": {
       const next = new Set(state.expandedEquipment);
       if (next.has(action.equipmentId)) {
@@ -232,6 +250,7 @@ function wizardReducer(state: WizardState, action: WizardAction): WizardState {
       return {
         ...state,
         capabilitySummary: action.summary,
+        capabilityDetails: action.details ?? null,
         capabilityError: action.error || null,
       };
     case "SET_LOADING":
@@ -398,6 +417,13 @@ function isHospitalType(siteType: string): boolean {
   return ["hospital", "private_hospital"].includes(siteType);
 }
 
+function wizardBuildingType(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "commercial_office") return "office";
+  if (normalized === "hospital") return "private_hospital";
+  return normalized;
+}
+
 function parseWizardNumber(value: string): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -442,17 +468,248 @@ function shouldPrefillNumber(current: number): boolean {
   return !Number.isFinite(current) || current <= 0;
 }
 
+function normalizeRequestedSiteId(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function isValidRequestedSiteId(value: string): boolean {
+  return value === "" || /^site-\d{3}$/.test(value);
+}
+
+function capabilityRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function capabilityString(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function capabilityNumber(value: unknown): number {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function capabilityBoolean(value: unknown): boolean {
+  return typeof value === "boolean" ? value : false;
+}
+
+function parseAdapterBaseUrl(baseUrl: string): { host: string; port: number; useHttps: boolean } {
+  try {
+    const url = new URL(baseUrl);
+    return {
+      host: url.hostname,
+      port: Number(url.port) || (url.protocol === "https:" ? 443 : 80),
+      useHttps: url.protocol === "https:",
+    };
+  } catch {
+    const withoutProtocol = baseUrl.replace(/^https?:\/\//, "");
+    const [host, port] = withoutProtocol.split(":");
+    return { host: host || "", port: Number(port) || 8080, useHttps: baseUrl.startsWith("https://") };
+  }
+}
+
+function deriveCapabilityEquipmentId(pointId: string, pointName: string, deviceId: string, index: number): string {
+  const text = `${pointId} ${pointName}`.toUpperCase();
+  const match = text.match(/\b(?:AHU|FCU|VAV|BOILER|BLR|CT|GEN|UPS|MEDGAS|BESS|PV|INV|FIRE|LIFT|CHILLER|CHWP|CWP|HWP|PUMP|METER|PM)[A-Z0-9_-]*(?:[-_ ][A-Z0-9]+){0,4}\b/);
+  if (match?.[0]) {
+    return match[0].replace(/\s+/g, "-");
+  }
+
+  const prefix = pointId.split(/[.:/]/)[0]?.trim();
+  if (prefix && !["analog-input", "analog-output", "binary-input", "binary-output", "multi-state-input", "multi-state-output"].includes(prefix.toLowerCase())) {
+    return prefix;
+  }
+
+  return deviceId ? `${deviceId}-unclassified` : `unclassified-${index + 1}`;
+}
+
+function inferCapabilityEquipmentType(equipmentId: string): string {
+  const value = equipmentId.toLowerCase();
+  if (value.includes("ccure") || value.includes("access") || value.includes("reader") || value.includes("badge")) return "access_control";
+  if (value.includes("-door-") || value.includes("_door_")) return "access_control_door";
+  if (value.includes("-gate-") || value.includes("_gate_") || value.includes("barrier")) return "access_control_gate";
+  if (value.includes("cctv") || value.includes("camera")) return "cctv";
+  if (value.includes("cold") || value.includes("freezer") || value.includes("fridge")) return "cold_room";
+  if (value.includes("-zone-") || value.includes("_zone_")) return "zone_environment";
+  if (value.includes("water-mtr") || value.includes("water_meter") || value.includes("water-meter")) return "water_meter";
+  if (value.includes("-msb-") || value.includes("-mdb-") || value.includes("-db-")) return "electrical_distribution";
+  if (value.includes("jace")) return "bms_controller";
+  if (value.includes("-kef-") || value.includes("extract")) return "kitchen_extract_fan";
+  if (value.includes("split")) return "split_ac";
+  if (value.includes("medgas") || value.includes("medical-gas")) return "medical_gas";
+  if (value.includes("ahu")) return "ahu";
+  if (value.includes("fcu")) return "fcu";
+  if (value.includes("vav")) return "vav";
+  if (value.includes("boiler") || value.includes("blr")) return "boiler";
+  if (value.includes("tower") || /\bct[-_]/.test(value)) return "cooling_tower";
+  if (value.includes("gen")) return "generator";
+  if (value.includes("ups")) return "ups";
+  if (value.includes("bess")) return "battery_storage";
+  if (value.includes("pv") || value.includes("inv")) return "solar";
+  if (value.includes("fire")) return "fire_panel";
+  if (value.includes("lift")) return "lift";
+  if (value.includes("chiller")) return "chiller";
+  if (value.includes("pump") || value.includes("chwp") || value.includes("cwp") || value.includes("hwp")) return "pump";
+  if (value.includes("meter") || /\bpm[-_]/.test(value)) return "power_meter";
+  return "unknown";
+}
+
+function inferCapabilityPointType(pointId: string, pointName: string, rawType: string): string {
+  const value = `${pointId} ${pointName}`.toLowerCase();
+  if (value.includes("temperature_sp") || value.includes("temp_sp") || value.includes("setpoint")) return "setpoint";
+  if (value.includes("temperature") || value.includes(".temp") || value.includes("_temp")) return "temperature";
+  if (value.includes("humidity")) return "humidity";
+  if (value.includes("co2")) return "co2";
+  if (value.includes("occupancy_pct")) return "occupancy_percent";
+  if (value.includes("occupancy")) return "occupancy";
+  if (value.includes("damper_position")) return "damper_position";
+  if (value.includes("valve_position")) return "valve_position";
+  if (value.includes("fan_speed")) return "fan_speed";
+  if (value.includes("fan_status")) return "fan_status";
+  if (value.includes("door_status")) return "door_status";
+  if (value.includes("door_position")) return "door_position";
+  if (value.includes("gate_position")) return "gate_position";
+  if (value.includes("barrier_status")) return "barrier_status";
+  if (value.includes("lock_status")) return "lock_status";
+  if (value.includes("reader_status")) return "reader_status";
+  if (value.includes("reader_format")) return "reader_format";
+  if (value.includes("last_card_read")) return "last_card_read";
+  if (value.includes("last_vehicle_read")) return "last_vehicle_read";
+  if (value.includes("last_result")) return "access_result";
+  if (value.includes("access_granted")) return "access_granted";
+  if (value.includes("access_denied")) return "access_denied";
+  if (value.includes("interlock_status")) return "interlock_status";
+  if (value.includes("door_forced")) return "door_forced";
+  if (value.includes("door_held")) return "door_held";
+  if (value.includes("controller_status")) return "controller_status";
+  if (value.includes("unlock_cmd")) return "unlock_command";
+  if (value.includes("biometric_status")) return "biometric_status";
+  if (value.includes("anpr_status")) return "anpr_status";
+  if (value.includes("anpr_match")) return "anpr_match";
+  if (value.includes("vehicle_count")) return "vehicle_count";
+  if (value.includes("loop_status")) return "loop_status";
+  if (value.includes("degradation")) return "degradation_status";
+  if (value.includes("flow_rate")) return "flow_rate";
+  if (value.includes("peak_flow")) return "peak_flow";
+  if (value.includes("flow_direction")) return "flow_direction";
+  if (value.includes("reverse_flow")) return "reverse_flow";
+  if (value.includes("total_liters") || value.includes("total_m3")) return "totalized_consumption";
+  if (value.includes("daily_liters") || value.includes("daily_demand")) return "daily_consumption";
+  if (value.includes("hourly_liters")) return "hourly_consumption";
+  if (value.includes("monthly_m3")) return "monthly_consumption";
+  if (value.includes("leak_status")) return "leak_status";
+  if (value.includes("sensor_fault")) return "sensor_fault";
+  if (value.includes("meter_status")) return "meter_status";
+  if (value.includes("low_pressure_alarm")) return "low_pressure_alarm";
+  if (value.includes("high_pressure_alarm")) return "high_pressure_alarm";
+  if (value.includes("mains_status")) return "mains_status";
+  if (value.includes("power_factor")) return "power_factor";
+  if (value.includes("total_kw")) return "power";
+  if (value.includes("bacnet_device_count")) return "bacnet_device_count";
+  if (value.includes("comms_status")) return "communications_status";
+  if (value.includes("cpu_usage")) return "cpu_usage";
+  if (value.includes("memory_usage")) return "memory_usage";
+  if (value.includes("uptime_hours")) return "uptime";
+  if (value.includes("fuel_level")) return "fuel_level";
+  if (value.includes("load_percentage") || value.includes("load_pct")) return "load_percent";
+  if (value.includes("pressure")) return "pressure";
+  return rawType || "unknown";
+}
+
+function buildCapabilitiesMapping(details: SimbiotCapabilitiesResponse | null, siteId: string): BMSMappingSummary {
+  const summary = details?.summary || { devices: 0, points: 0, writable_points: 0, controllable_devices: 0 };
+  const groups = new Map<string, BMSMappingSummary["equipment"][number]>();
+  let fallbackIndex = 0;
+
+  for (const rawDevice of details?.devices || []) {
+    const device = capabilityRecord(rawDevice);
+    if (!device) continue;
+
+    const deviceId = capabilityString(device.device_id) || `bridge-${siteId}`;
+    const rawPoints = Array.isArray(device.points) ? device.points : [];
+    rawPoints.forEach((rawPoint) => {
+      const point = capabilityRecord(rawPoint);
+      if (!point) return;
+
+      const metadata = capabilityRecord(point.metadata) || {};
+      const pointId = capabilityString(point.point_id);
+      const pointName = capabilityString(point.point_name) || pointId;
+      const equipmentId =
+        capabilityString(metadata.equipment_id) ||
+        deriveCapabilityEquipmentId(pointId, pointName, deviceId, fallbackIndex++);
+      const equipmentType = inferCapabilityEquipmentType(equipmentId);
+      const confidence = equipmentType === "unknown" ? "medium" : "high";
+
+      if (!groups.has(equipmentId)) {
+        groups.set(equipmentId, {
+          equipment_id: equipmentId,
+          equipment_name: equipmentId,
+          equipment_type: equipmentType,
+          confidence,
+          points: [],
+          point_count: 0,
+        });
+      }
+
+      const group = groups.get(equipmentId);
+      if (!group) return;
+
+      group.points.push({
+        name: pointId || pointName,
+        original_name: pointName,
+        point_type: inferCapabilityPointType(pointId, pointName, capabilityString(point.point_type)),
+        confidence,
+        brick_class: capabilityString(metadata.bacnet_object_type) || capabilityString(point.point_type) || undefined,
+        unit: capabilityString(point.unit) || undefined,
+      });
+      group.point_count = group.points.length;
+    });
+  }
+
+  if (groups.size === 0) {
+    groups.set(`bridge-${siteId}`, {
+      equipment_id: `bridge-${siteId}`,
+      equipment_name: `Bridge Device (${siteId})`,
+      equipment_type: "bridge",
+      confidence: "medium",
+      points: [],
+      point_count: summary.points ?? 0,
+    });
+  }
+
+  const equipment = Array.from(groups.values()).sort((a, b) => a.equipment_id.localeCompare(b.equipment_id));
+  const confidenceBreakdown = equipment.reduce<Record<string, number>>((acc, item) => {
+    acc[item.confidence] = (acc[item.confidence] || 0) + 1;
+    return acc;
+  }, {});
+
+  return {
+    discovery_id: `discovery-${siteId}`,
+    status: "completed",
+    equipment,
+    validation: {},
+    total_points: summary.points ?? equipment.reduce((sum, item) => sum + (item.point_count || item.points.length), 0),
+    equipment_count: equipment.length,
+    needs_review: equipment
+      .filter((item) => item.equipment_type === "unknown")
+      .reduce((sum, item) => sum + (item.point_count || item.points.length), 0),
+    confidence_breakdown: confidenceBreakdown,
+  };
+}
+
 // ============= Main Component =============
 
 export function BMSConnectionWizard({
   siteId: initialSiteId,
-  sites: _sites,  // Kept for backward compatibility, not used in new onboarding flow
+  requestedSiteId: initialRequestedSiteId,
+  sites,
   onClose,
   onComplete,
 }: BMSConnectionWizardProps) {
   const [state, dispatch] = useReducer(wizardReducer, {
     step: 1,
     // New site details
+    requestedSiteId: normalizeRequestedSiteId(initialRequestedSiteId || initialSiteId || ""),
     siteName: "",
     siteAddress: "",
     siteRegion: "Gauteng",
@@ -492,6 +749,7 @@ export function BMSConnectionWizard({
     tenantName: "",
     tenantAccessMode: "shadow_readonly",
     tenantAccessConfirmed: false,
+    bridgeDataFlowEnabled: false,
     siteId: initialSiteId || "",
     discoveredDevices: [],
     selectedDeviceId: null,
@@ -506,7 +764,10 @@ export function BMSConnectionWizard({
     approveMessage: "",
     approveResult: null,
     capabilitySummary: null,
+    capabilityDetails: null,
     capabilityError: null,
+    savedSiteLoading: false,
+    savedSiteMessage: "",
     onboardingFactsLoading: false,
     onboardingFactsMessage: "",
     onboardingFactSources: {},
@@ -540,6 +801,129 @@ export function BMSConnectionWizard({
     }
     return devices.length === 1 ? devices[0].device_id : null;
   }, []);
+
+  const handleLoadSavedSite = useCallback(async (siteCodeInput?: string) => {
+    const siteCode = normalizeRequestedSiteId(siteCodeInput || state.requestedSiteId);
+    if (!isValidRequestedSiteId(siteCode) || !siteCode) {
+      dispatch({ type: "SET_FIELD", field: "savedSiteMessage", value: "Enter a site code like site-005 first." });
+      return;
+    }
+
+    dispatch({ type: "SET_FIELD", field: "savedSiteLoading", value: true });
+    dispatch({ type: "SET_FIELD", field: "savedSiteMessage", value: "" });
+    dispatch({ type: "SET_ERROR", error: null });
+
+    try {
+      const [buildingResult, profileResult, adaptersResult] = await Promise.allSettled([
+        sitesApi.getBuildingConfig(siteCode),
+        siteProfileApi.get(siteCode),
+        bmsConnectionApi.getSimbiotAdapterConfigs(siteCode),
+      ]);
+
+      if (buildingResult.status !== "fulfilled") {
+        throw new Error("No saved site was found for that code.");
+      }
+
+      const building = buildingResult.value;
+      const metadata = capabilityRecord(building.metadata) || {};
+      const contacts = capabilityRecord(building.contacts) || {};
+      const optimization = capabilityRecord(building.optimization) || {};
+      const features = capabilityRecord(building.features) || {};
+
+      siteIdRef.current = siteCode;
+      dispatch({ type: "SET_FIELD", field: "requestedSiteId", value: siteCode });
+      dispatch({ type: "SET_FIELD", field: "siteId", value: siteCode });
+      dispatch({ type: "SET_FIELD", field: "siteName", value: building.name || building.display_name || "" });
+      dispatch({ type: "SET_FIELD", field: "siteAddress", value: building.address || "" });
+      dispatch({ type: "SET_FIELD", field: "siteRegion", value: building.region || state.siteRegion });
+      dispatch({ type: "SET_FIELD", field: "siteType", value: wizardBuildingType(building.type || state.siteType) });
+      if (Array.isArray(building.floors) && building.floors.length > 0) {
+        dispatch({ type: "SET_FIELD", field: "siteFloors", value: building.floors.join(", ") });
+      }
+      dispatch({ type: "SET_FIELD", field: "siteSqm", value: capabilityNumber(building.sqm ?? metadata.sqm) });
+      dispatch({ type: "SET_FIELD", field: "yearBuilt", value: capabilityNumber(metadata.year_built) });
+      dispatch({ type: "SET_FIELD", field: "occupancyCapacity", value: capabilityNumber(metadata.occupancy_capacity) });
+      dispatch({ type: "SET_FIELD", field: "totalDesks", value: capabilityNumber(metadata.total_desks) });
+      dispatch({ type: "SET_FIELD", field: "parkingBays", value: capabilityNumber(metadata.parking_bays) });
+      dispatch({ type: "SET_FIELD", field: "nmdLimitKva", value: capabilityNumber(metadata.nmd_limit_kva) });
+      dispatch({ type: "SET_FIELD", field: "demandChargePerKva", value: capabilityNumber(metadata.demand_charge_per_kva) });
+      dispatch({ type: "SET_FIELD", field: "electricityProvider", value: capabilityString(metadata.electricity_provider) });
+      dispatch({ type: "SET_FIELD", field: "facilityManager", value: capabilityString(contacts.facility_manager) });
+      dispatch({ type: "SET_FIELD", field: "contactEmail", value: capabilityString(contacts.email) });
+      dispatch({ type: "SET_FIELD", field: "contactPhone", value: capabilityString(contacts.emergency) });
+      dispatch({ type: "SET_FIELD", field: "whatsappPhone", value: capabilityString(contacts.whatsapp) });
+      dispatch({
+        type: "SET_GEOCODE",
+        latitude: typeof building.latitude === "number" ? building.latitude : null,
+        longitude: typeof building.longitude === "number" ? building.longitude : null,
+        orientation_degrees: null,
+      });
+      dispatch({ type: "SET_FIELD", field: "primaryObjective", value: capabilityString(optimization.active_profile) || state.primaryObjective });
+      dispatch({ type: "SET_FIELD", field: "clinicalZonesPresent", value: capabilityBoolean(features.clinical_zones) || isHospitalType(wizardBuildingType(building.type || "")) });
+
+      if (profileResult.status === "fulfilled") {
+        const profile = profileResult.value;
+        dispatch({ type: "SET_FIELD", field: "siteType", value: wizardBuildingType(profile.building_type || building.type || state.siteType) });
+        dispatch({
+          type: "SET_FIELD",
+          field: "primaryObjective",
+          value: profile.primary_objective === "cost_saving" ? "cost" : profile.primary_objective || state.primaryObjective,
+        });
+        dispatch({ type: "SET_FIELD", field: "clinicalZonesPresent", value: !!profile.clinical_zones_present });
+        const schedule = capabilityRecord(profile.operating_schedule);
+        if (schedule) {
+          dispatch({ type: "SET_FIELD", field: "siteOperates24_7", value: capabilityBoolean(schedule.is_24_7) });
+          dispatch({ type: "SET_FIELD", field: "weekdayStart", value: capabilityString(schedule.weekday_start) || state.weekdayStart });
+          dispatch({ type: "SET_FIELD", field: "weekdayEnd", value: capabilityString(schedule.weekday_end) || state.weekdayEnd });
+          dispatch({ type: "SET_FIELD", field: "saturdayActive", value: capabilityBoolean(schedule.saturday_active) });
+          dispatch({ type: "SET_FIELD", field: "sundayActive", value: capabilityBoolean(schedule.sunday_active) });
+        }
+      }
+
+      if (adaptersResult.status === "fulfilled") {
+        const adapter = adaptersResult.value.adapters.find((item) => item.enabled) || adaptersResult.value.adapters[0];
+        if (adapter) {
+          const protocolVendor: Record<string, BMSVendor> = {
+            bridge: "bridge",
+            obix: "niagara",
+            bacnet: "generic",
+            mqtt: "mqtt-bridge",
+          };
+          dispatch({ type: "SET_FIELD", field: "bmsVendor", value: protocolVendor[adapter.protocol] || "generic" });
+          const config = capabilityRecord(adapter.connection_config) || {};
+          const baseUrl = capabilityString(config.base_url);
+          if (baseUrl) {
+            const parsed = parseAdapterBaseUrl(baseUrl);
+            dispatch({ type: "SET_FIELD", field: "host", value: parsed.host });
+            dispatch({ type: "SET_FIELD", field: "port", value: parsed.port });
+            dispatch({ type: "SET_FIELD", field: "useHttps", value: parsed.useHttps });
+          } else {
+            dispatch({ type: "SET_FIELD", field: "host", value: capabilityString(config.host) });
+            dispatch({ type: "SET_FIELD", field: "port", value: capabilityNumber(config.port) || state.port });
+            dispatch({ type: "SET_FIELD", field: "username", value: capabilityString(config.username) });
+            dispatch({ type: "SET_FIELD", field: "useHttps", value: capabilityBoolean(config.use_https) || capabilityBoolean(config.use_tls) });
+          }
+        }
+      }
+
+      dispatch({ type: "SET_BACNET_DEVICES", devices: [], selectedDeviceId: null });
+      dispatch({ type: "SET_CAPABILITIES", summary: null, details: null, error: null });
+      dispatch({
+        type: "SET_CONNECTION_STATUS",
+        status: "idle",
+        message: `Loaded saved details for ${siteCode}. Test the connection to refresh capabilities.`,
+      });
+      dispatch({ type: "SET_FIELD", field: "savedSiteMessage", value: `Loaded saved details for ${siteCode}.` });
+    } catch (err) {
+      dispatch({
+        type: "SET_FIELD",
+        field: "savedSiteMessage",
+        value: err instanceof Error ? err.message : "Could not load saved site details.",
+      });
+    } finally {
+      dispatch({ type: "SET_FIELD", field: "savedSiteLoading", value: false });
+    }
+  }, [state.primaryObjective, state.requestedSiteId, state.siteRegion, state.siteType, state.weekdayEnd, state.weekdayStart, state.port]);
 
   const handleScrapeOnboardingFacts = useCallback(async () => {
     dispatch({ type: "SET_FIELD", field: "onboardingFactsLoading", value: true });
@@ -593,7 +977,9 @@ export function BMSConnectionWizard({
       dispatch({
         type: "SET_FIELD",
         field: "onboardingFactsMessage",
-        value: result.scrape_available
+        value: foundCount === 0
+          ? "No public onboarding facts were extracted. Enter the remaining fields manually."
+          : result.scrape_available
           ? `Prefilled ${foundCount} field${foundCount === 1 ? "" : "s"}. ${missingCount} still need manual confirmation.`
           : `Geocode/manual mode: Firecrawl did not return public facts. ${missingCount} fields still need manual completion.`,
       });
@@ -646,6 +1032,7 @@ export function BMSConnectionWizard({
         state.primaryObjective === "cost" ? "cost_saving" : state.primaryObjective === "comfort" ? "comfort" : "balanced",
       control_tier: "supervised",
     };
+    const requestedSiteId = normalizeRequestedSiteId(state.requestedSiteId);
 
     createSitePromiseRef.current = sitesApi.create({
       name: state.siteName.trim(),
@@ -672,6 +1059,7 @@ export function BMSConnectionWizard({
       operating_hours: operatingHours,
       optimization_settings: optimizationSettings,
       features,
+      ...(requestedSiteId && { id: requestedSiteId }),
     }).then(async (siteResult) => {
       siteIdRef.current = siteResult.id;
       dispatch({ type: "SET_FIELD", field: "siteId", value: siteResult.id });
@@ -682,8 +1070,8 @@ export function BMSConnectionWizard({
         tariff_structure: state.electricityProvider.toLowerCase().includes("eskom") ? "tou_megaflex" : "municipal",
         clinical_zones_present: state.clinicalZonesPresent || isHospitalType(state.siteType),
         regulatory_frameworks: isHospitalType(state.siteType)
-          ? ["SANS_10400", "LEGIONELLA_RISK_MANAGEMENT"]
-          : ["SANS_10400"],
+          ? ["SANS_10400_XA", "SANS_10400_T", "LEGIONELLA"]
+          : ["SANS_10400_XA"],
       });
       return siteResult.id;
     }).finally(() => {
@@ -713,6 +1101,18 @@ export function BMSConnectionWizard({
     const safePort = state.port && Number.isFinite(portNum) && portNum > 0 && portNum <= 65535
       ? portNum
       : portFallback;
+    const requestedSiteId = normalizeRequestedSiteId(state.requestedSiteId);
+    if (!isValidRequestedSiteId(requestedSiteId)) {
+      dispatch({
+        type: "SET_CONNECTION_STATUS",
+        status: "failed",
+        message: "Site code must use the format site-005",
+      });
+      return;
+    }
+    if (requestedSiteId !== state.requestedSiteId) {
+      dispatch({ type: "SET_FIELD", field: "requestedSiteId", value: requestedSiteId });
+    }
 
     try {
       const isBridge = state.bmsVendor === 'bridge';
@@ -855,7 +1255,7 @@ export function BMSConnectionWizard({
           ...(state.username && { username: state.username }),
           ...(state.password && { password: state.password }),
         });
-        dispatch({ type: "SET_CAPABILITIES", summary: capabilities.summary, error: null });
+        dispatch({ type: "SET_CAPABILITIES", summary: capabilities.summary, details: capabilities, error: null });
       } catch (capErr) {
         dispatch({
           type: "SET_CAPABILITIES",
@@ -895,7 +1295,7 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Connection failed",
       });
     }
-  }, [buildConnectionMessage, ensureSiteCreated, usesObix, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.siteName, state.useHttps, state.username]);
+  }, [buildConnectionMessage, ensureSiteCreated, usesObix, pickDefaultDeviceId, state.bmsVendor, state.host, state.password, state.port, state.requestedSiteId, state.siteName, state.useHttps, state.username]);
 
   // ---------- CSV Upload ----------
   const handleCsvUpload = useCallback(async () => {
@@ -937,10 +1337,14 @@ export function BMSConnectionWizard({
   }, [state.csvFile, state.siteName, ensureSiteCreated]);
 
   // ---------- Step 2: Discover & Classify ----------
-  const handleDiscover = useCallback(async () => {
-    if (!state.siteId) {
-      dispatch({ type: "SET_ERROR", error: "Create the site before starting discovery" });
+  const handleDiscover = useCallback(async (forceRefresh = false, siteIdOverride?: string) => {
+    const resolvedSiteId = siteIdOverride || state.siteId || normalizeRequestedSiteId(state.requestedSiteId);
+    if (!resolvedSiteId || !isValidRequestedSiteId(resolvedSiteId)) {
+      dispatch({ type: "SET_ERROR", error: "Create or select the site before starting discovery" });
       return;
+    }
+    if (!state.siteId) {
+      dispatch({ type: "SET_FIELD", field: "siteId", value: resolvedSiteId });
     }
 
     // CSV mode: data already loaded from upload
@@ -973,11 +1377,12 @@ export function BMSConnectionWizard({
         const bridgePort = usesObixNow ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
         const discPort = Number(state.port);
         const discSafePort = state.port && Number.isFinite(discPort) && discPort > 0 && discPort <= 65535 ? discPort : bridgePort;
-        let cap = state.capabilitySummary;
-        if (!cap) {
+        let cap = forceRefresh ? null : state.capabilitySummary;
+        let details = forceRefresh ? null : state.capabilityDetails;
+        if (!details) {
           try {
             const fresh = await bmsConnectionApi.getSimbiotCapabilities({
-              site_id: state.siteId,
+              site_id: resolvedSiteId,
               bms_vendor: state.bmsVendor,
               host: state.host.trim(),
               port: discSafePort,
@@ -986,16 +1391,19 @@ export function BMSConnectionWizard({
               ...(state.password && { password: state.password }),
             });
             cap = fresh.summary;
+            details = fresh;
+            dispatch({ type: "SET_CAPABILITIES", summary: fresh.summary, details: fresh, error: null });
           } catch { /* use defaults */ }
         }
+        const directMapping = buildCapabilitiesMapping(details, resolvedSiteId);
         dispatch({
           type: "SET_DISCOVERY",
-          id: `discovery-${state.siteId}`,
+          id: `discovery-${resolvedSiteId}`,
           summary: {
-            site_id: state.siteId,
-            discovery_id: `discovery-${state.siteId}`,
+            site_id: resolvedSiteId,
+            discovery_id: `discovery-${resolvedSiteId}`,
             points_count: cap?.points ?? 0,
-            equipment_count: cap?.devices ?? 0,
+            equipment_count: directMapping.equipment_count,
             status: "completed",
             summary: {},
           },
@@ -1003,7 +1411,7 @@ export function BMSConnectionWizard({
       } else {
         const res = await bmsConnectionApi.discoverAndClassify({
           device_ip: state.host,
-          site_id: state.siteId,
+          site_id: resolvedSiteId,
           device_bacnet_id: state.selectedDeviceId ?? undefined,
           adapter_type: "bacnet",
           bms_vendor: state.bmsVendor,
@@ -1021,13 +1429,21 @@ export function BMSConnectionWizard({
       });
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 0 });
     }
-  }, [state.bmsVendor, state.capabilitySummary, state.connectionMethod, state.discoveryId, state.host, state.password, state.port, state.selectedDeviceId, state.siteId, state.username]);
+  }, [state.bmsVendor, state.capabilityDetails, state.capabilitySummary, state.connectionMethod, state.discoveryId, state.host, state.password, state.port, state.requestedSiteId, state.selectedDeviceId, state.siteId, state.username]);
 
   // ---------- Step 3: Load Mappings ----------
-  const handleLoadMappings = useCallback(async () => {
-    if (!state.discoveryId) return;
+  const handleLoadMappings = useCallback(async (forceRefresh = false, siteIdOverride?: string) => {
     const isCsvMode = state.connectionMethod === "csv";
     const usesDirectCapabilities = (state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara' || state.bmsVendor === 'mqtt-bridge' || state.bmsVendor === 'mqtt-direct') && !isCsvMode;
+    if (!state.discoveryId && !usesDirectCapabilities) return;
+    const resolvedSiteId = siteIdOverride || state.siteId || normalizeRequestedSiteId(state.requestedSiteId);
+    if (!resolvedSiteId || !isValidRequestedSiteId(resolvedSiteId)) {
+      dispatch({ type: "SET_ERROR", error: "Create or select the site before loading mappings" });
+      return;
+    }
+    if (!state.siteId) {
+      dispatch({ type: "SET_FIELD", field: "siteId", value: resolvedSiteId });
+    }
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
 
@@ -1039,30 +1455,33 @@ export function BMSConnectionWizard({
       dispatch({ type: "SET_DISCOVERY_PHASE", phase: 3 }); // Classifying equipment...
 
       if (usesDirectCapabilities) {
-        // Bridge/oBIX: no separate mappings — use capabilities data for UI
-        const cap = state.capabilitySummary || { points: 0, devices: 0, writable_points: 0 };
-        const totalPts = cap.points ?? 0;
+        // Bridge/oBIX: no separate mappings endpoint; group the capability point list for review.
+        let details = forceRefresh ? null : state.capabilityDetails;
+        if (!details) {
+          const usesObixNow = state.bmsVendor === 'niagara';
+          const defaultPort = usesObixNow ? 80 : state.bmsVendor === 'bridge' ? 8080 : 47808;
+          const mappingPort = Number(state.port);
+          const safePort = state.port && Number.isFinite(mappingPort) && mappingPort > 0 && mappingPort <= 65535 ? mappingPort : defaultPort;
+          try {
+            const fresh = await bmsConnectionApi.getSimbiotCapabilities({
+              site_id: resolvedSiteId,
+              bms_vendor: state.bmsVendor,
+              host: state.host.trim(),
+              port: safePort,
+              commissioning: true,
+              ...(state.username && { username: state.username }),
+              ...(state.password && { password: state.password }),
+            });
+            details = fresh;
+            dispatch({ type: "SET_CAPABILITIES", summary: fresh.summary, details: fresh, error: null });
+          } catch { /* mapping fallback below will show a single review card */ }
+        }
         dispatch({
           type: "SET_MAPPINGS",
-          mappings: {
-            equipment: [{
-              equipment_id: `bridge-${state.siteId}`,
-              equipment_name: `Bridge Device (${state.siteId})`,
-              equipment_type: "bridge",
-              confidence: "high",
-              points: [],
-              point_count: totalPts,
-              metadata: { zone: {} },
-            }],
-            total_points: totalPts,
-            equipment_count: cap.devices ?? 0,
-            needs_review: 0,
-            writable_points: cap.writable_points ?? 0,
-            confidence_breakdown: { high: 1 },
-          },
+          mappings: buildCapabilitiesMapping(details, resolvedSiteId),
         });
       } else {
-        const res = await bmsConnectionApi.getMappings(state.discoveryId);
+        const res = await bmsConnectionApi.getMappings(state.discoveryId || "");
         dispatch({ type: "SET_MAPPINGS", mappings: res });
       }
     } catch (err) {
@@ -1071,7 +1490,7 @@ export function BMSConnectionWizard({
         error: err instanceof Error ? err.message : "Failed to load mappings",
       });
     }
-  }, [state.discoveryId, state.bmsVendor, state.capabilitySummary, state.connectionMethod, state.siteId]);
+  }, [state.discoveryId, state.bmsVendor, state.capabilityDetails, state.connectionMethod, state.host, state.password, state.port, state.requestedSiteId, state.siteId, state.username]);
 
   // ---------- Step 4: Approve ----------
   const handleApprove = useCallback(async () => {
@@ -1080,11 +1499,21 @@ export function BMSConnectionWizard({
 
     const isCsvMode = state.connectionMethod === "csv";
     const usesDirectCapabilities = (state.bmsVendor === 'bridge' || state.bmsVendor === 'niagara' || state.bmsVendor === 'mqtt-bridge' || state.bmsVendor === 'mqtt-direct') && !isCsvMode;
+    const processingEnabledAfterApproval = false;
     dispatch({ type: "SET_LOADING", loading: true });
     dispatch({ type: "SET_ERROR", error: null });
 
     try {
+      let res: NiagaraApproveResponse;
       if (usesDirectCapabilities) {
+        const approvedMappings =
+          state.mappings || buildCapabilitiesMapping(state.capabilityDetails, state.siteId);
+        const bridgeCommit = await bmsConnectionApi.commitBridgeReviewMappings(
+          state.siteId,
+          approvedMappings,
+          state.approvedBy,
+          state.capabilityDetails?.discovery_id,
+        );
         let canonicalizationSummary: OnboardingCanonicalizationSummary | undefined;
         let hierarchySummary: OnboardingHierarchySummary | undefined;
         if (state.siteId) {
@@ -1107,12 +1536,12 @@ export function BMSConnectionWizard({
               error: err instanceof Error ? err.message : "Hierarchy ingestion failed",
             };
           }
-          await api.toggleSiteProcessing(state.siteId, true);
+          await api.toggleSiteProcessing(state.siteId, processingEnabledAfterApproval);
         }
         res = {
           success: true,
-          message: "Site activated",
-          equipment_created: 0,
+          message: `Site approved; ${bridgeCommit.equipment_total} equipment and ${bridgeCommit.points_mapped} points committed. Processing remains disabled.`,
+          equipment_created: bridgeCommit.equipment_created,
           canonicalization_summary: canonicalizationSummary,
           hierarchy_summary: hierarchySummary,
         };
@@ -1140,7 +1569,7 @@ export function BMSConnectionWizard({
               error: err instanceof Error ? err.message : "Hierarchy ingestion failed",
             };
           }
-          await api.toggleSiteProcessing(state.siteId, true);
+          await api.toggleSiteProcessing(state.siteId, processingEnabledAfterApproval);
         }
       }
       dispatch({
@@ -1170,13 +1599,21 @@ export function BMSConnectionWizard({
         message: err instanceof Error ? err.message : "Approval failed",
       });
     }
-  }, [state.approvedBy, state.bmsVendor, state.connectionMethod, state.discoveryId, state.siteId]);
+  }, [
+    state.approvedBy,
+    state.bmsVendor,
+    state.capabilityDetails,
+    state.connectionMethod,
+    state.discoveryId,
+    state.mappings,
+    state.siteId,
+  ]);
 
   // ---------- Step navigation ----------
   const goNext = useCallback(async () => {
     const nextStep = state.step + 1;
     if (nextStep > 6) {
-      onComplete();
+      onComplete(state.siteId || state.requestedSiteId);
       return;
     }
     dispatch({ type: "SET_STEP", step: nextStep });
@@ -1186,11 +1623,23 @@ export function BMSConnectionWizard({
     } else if (nextStep === 3) {
       await handleLoadMappings();
     }
-  }, [state.step, handleDiscover, handleLoadMappings, onComplete]);
+  }, [state.step, state.siteId, state.requestedSiteId, handleDiscover, handleLoadMappings, onComplete]);
 
   const goBack = useCallback(() => {
     dispatch({ type: "SET_STEP", step: Math.max(1, state.step - 1) });
   }, [state.step]);
+
+  const handleRediscover = useCallback(async () => {
+    const resolvedSiteId = state.siteId || normalizeRequestedSiteId(state.requestedSiteId);
+    dispatch({ type: "RESET_DISCOVERY_REVIEW" });
+    await handleDiscover(true, resolvedSiteId);
+  }, [handleDiscover, state.requestedSiteId, state.siteId]);
+
+  const handleRescanReview = useCallback(async () => {
+    const resolvedSiteId = state.siteId || normalizeRequestedSiteId(state.requestedSiteId);
+    await handleDiscover(true, resolvedSiteId);
+    await handleLoadMappings(true, resolvedSiteId);
+  }, [handleDiscover, handleLoadMappings, state.requestedSiteId, state.siteId]);
 
   const canGoNext = (): boolean => {
     switch (state.step) {
@@ -1285,8 +1734,77 @@ export function BMSConnectionWizard({
         </div>
 
         <div className="grid grid-cols-2 gap-4">
+          {sites.length > 0 && (
+            <div className="col-span-2 sm:col-span-1">
+              <label className="block text-sm font-medium mb-1" style={labelStyle}>
+                Saved Site
+              </label>
+              <select
+                value={sites.some((site) => normalizeRequestedSiteId(site.code || site.id) === state.requestedSiteId) ? state.requestedSiteId : ""}
+                onChange={(e) => {
+                  if (!e.target.value) return;
+                  void handleLoadSavedSite(e.target.value);
+                }}
+                className="w-full rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              >
+                <option value="">Select saved site...</option>
+                {sites.map((site) => {
+                  const code = normalizeRequestedSiteId(site.code || site.id);
+                  return (
+                    <option key={site.id || code} value={code}>
+                      {code} — {site.name}
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+          )}
+
+          <div className="col-span-2 sm:col-span-1">
+            <label className="block text-sm font-medium mb-1" style={labelStyle}>
+              Site Code
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={state.requestedSiteId}
+                onChange={(e) =>
+                  dispatch({
+                    type: "SET_FIELD",
+                    field: "requestedSiteId",
+                    value: e.target.value,
+                  })
+                }
+                placeholder="site-005"
+                className="flex-1 rounded px-3 py-2 text-sm"
+                style={inputStyle}
+              />
+              <button
+                type="button"
+                onClick={() => void handleLoadSavedSite()}
+                disabled={state.savedSiteLoading}
+                className="px-3 py-2 rounded text-sm font-medium transition-colors flex items-center gap-2"
+                style={{
+                  background: "var(--color-sentinel-bg-primary)",
+                  border: "1px solid var(--color-sentinel-border)",
+                  color: "var(--color-sentinel-text-primary)",
+                  opacity: state.savedSiteLoading ? 0.7 : 1,
+                }}
+              >
+                {state.savedSiteLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                Load
+              </button>
+            </div>
+            {state.savedSiteMessage && (
+              <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                {state.savedSiteMessage}
+              </p>
+            )}
+          </div>
+
           {/* Site Name */}
-          <div className="col-span-2">
+          <div className="col-span-2 sm:col-span-1">
             <label className="block text-sm font-medium mb-1 flex items-center gap-2" style={labelStyle}>
               <span>Site Name *</span>
               <Tooltip content="Unique identifier for this building (e.g., 'Sandton City Tower', 'Client Hospital')">
@@ -2187,7 +2705,7 @@ export function BMSConnectionWizard({
           <div>
             <p>{state.error}</p>
             <button
-              onClick={handleDiscover}
+              onClick={() => void handleDiscover()}
               className="mt-2 underline text-xs"
             >
               Retry discovery
@@ -2213,6 +2731,21 @@ export function BMSConnectionWizard({
               classified
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => void handleRediscover()}
+            disabled={state.loading}
+            className="flex items-center gap-2 px-3 py-2 rounded text-sm font-medium transition-opacity disabled:opacity-50"
+            style={{
+              background: "var(--color-sentinel-bg-secondary)",
+              border: "1px solid var(--color-sentinel-border)",
+              color: "var(--color-sentinel-text-primary)",
+            }}
+          >
+            {state.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+            Rediscover Points
+          </button>
 
           {/* Summary cards */}
           <div className="grid grid-cols-3 gap-3">
@@ -2357,6 +2890,33 @@ export function BMSConnectionWizard({
         v2.0 standard format.
       </HelpSection>
 
+      <div
+        className="flex flex-wrap items-center gap-3 rounded p-3"
+        style={{
+          background: "var(--color-sentinel-bg-secondary)",
+          border: "1px solid var(--color-sentinel-border)",
+        }}
+      >
+        <button
+          type="button"
+          onClick={() => void handleRescanReview()}
+          disabled={state.loading}
+          className="flex items-center gap-2 px-4 py-2 rounded text-sm font-semibold transition-opacity disabled:opacity-50"
+          style={{
+            background: "var(--color-sentinel-blue)",
+            color: "#fff",
+            border: "1px solid var(--color-sentinel-blue)",
+            cursor: state.loading ? "not-allowed" : "pointer",
+          }}
+        >
+          {state.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+          {state.loading ? "Rescanning..." : "Rescan & Reload Review"}
+        </button>
+        <span className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+          Refetches bridge capabilities and reruns grouping/classification.
+        </span>
+      </div>
+
       {state.loading && (
         <div className="flex flex-col items-center gap-3 py-8">
           <Loader2
@@ -2385,7 +2945,7 @@ export function BMSConnectionWizard({
           <div>
             <p>{state.error}</p>
             <button
-              onClick={handleLoadMappings}
+              onClick={() => void handleLoadMappings()}
               className="mt-2 underline text-xs"
             >
               Retry
@@ -3218,7 +3778,7 @@ export function BMSConnectionWizard({
         console.warn("Failed to save contacts", e);
       }
       dispatch({ type: "SET_LOADING", loading: false });
-      onComplete();
+      onComplete(state.siteId || state.requestedSiteId);
     };
 
     return (
@@ -3279,10 +3839,34 @@ export function BMSConnectionWizard({
             Enable data flow from BMS to SENTINEL
           </p>
         </div>
-        <label className="relative inline-flex items-center cursor-pointer">
-          <input type="checkbox" className="sr-only peer" defaultChecked={false} />
-          <div className="w-11 h-6 rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all" style={{ background: "var(--color-sentinel-border)" }} />
-        </label>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={state.bridgeDataFlowEnabled}
+          onClick={() =>
+            dispatch({
+              type: "SET_FIELD",
+              field: "bridgeDataFlowEnabled",
+              value: !state.bridgeDataFlowEnabled,
+            })
+          }
+          className="relative inline-flex h-7 w-14 items-center rounded-full transition-colors"
+          style={{
+            background: state.bridgeDataFlowEnabled ? "var(--color-sentinel-green)" : "#dc2626",
+            border: `1px solid ${state.bridgeDataFlowEnabled ? "var(--color-sentinel-green)" : "#b91c1c"}`,
+          }}
+        >
+          <span
+            className="absolute h-5 w-5 rounded-full bg-white shadow transition-transform"
+            style={{
+              left: 3,
+              transform: state.bridgeDataFlowEnabled ? "translateX(28px)" : "translateX(0)",
+            }}
+          />
+          <span className="sr-only">
+            {state.bridgeDataFlowEnabled ? "SIMBIOT Bridge data flow active" : "SIMBIOT Bridge data flow inactive"}
+          </span>
+        </button>
       </div>
 
       <div className="rounded-lg p-4 space-y-3" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--color-sentinel-border)" }}>
@@ -3325,7 +3909,7 @@ export function BMSConnectionWizard({
           style={{ background: "var(--color-sentinel-green)", color: "#fff" }}
         >
           <CheckCircle className="w-4 h-4" />
-          Done — go to Dashboard
+          Finish Onboarding
         </button>
       </div>
     </div>

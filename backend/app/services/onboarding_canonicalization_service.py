@@ -217,7 +217,10 @@ class OnboardingCanonicalizationService:
     def _load_equipment(self, site_uuid: str) -> list[dict[str, Any]]:
         response = (
             self.client.table("equipment")
-            .select("id, code, name, type, zone_key, raw_code")
+            .select(
+                "id, code, name, type, zone_key, raw_code, canonical_code, canonical_zone_id, "
+                "canonicalization_status, canonicalization_source, canonicalization_metadata"
+            )
             .eq("site_id", site_uuid)
             .execute()
         )
@@ -230,7 +233,11 @@ class OnboardingCanonicalizationService:
     ) -> list[ZoneProposal]:
         proposals: dict[str, ZoneProposal] = {}
         for row in equipment:
-            parsed = self._parse_raw_source_code(str(row.get("code") or ""))
+            parsed = None
+            for candidate in (row.get("raw_code"), row.get("code")):
+                parsed = self._parse_raw_source_code(str(candidate or ""))
+                if parsed:
+                    break
             if not parsed:
                 continue
             equipment_type, floor_code, source_zone, has_point_suffix = parsed
@@ -293,6 +300,23 @@ class OnboardingCanonicalizationService:
         code = str(row.get("code") or "")
         current_type = str(row.get("type") or "")
         upper_code = code.upper()
+        existing_status = str(row.get("canonicalization_status") or "")
+        existing_source = str(row.get("canonicalization_source") or "")
+        existing_canonical_code = row.get("canonical_code")
+        if existing_status and existing_status != "needs_review" and existing_source != "onboarding_canonicalization":
+            return CanonicalizationPlan(
+                equipment_id=equipment_id,
+                raw_code=raw_code,
+                canonical_code=existing_canonical_code,
+                canonical_zone_id=row.get("canonical_zone_id"),
+                status=existing_status,
+                relationship_type=None,
+                alias_type=None,
+                confidence=1.0,
+                reason="existing_reviewed_canonical_mapping_preserved",
+                current_type=current_type,
+                metadata=row.get("canonicalization_metadata") or {},
+            )
 
         split = split_canonical_code(upper_code)
         if split:
@@ -337,7 +361,11 @@ class OnboardingCanonicalizationService:
                     metadata={"equipment_type": equipment_type},
                 )
 
-        parsed = self._parse_raw_source_code(code)
+        parsed = None
+        for candidate in (raw_code, code):
+            parsed = self._parse_raw_source_code(candidate)
+            if parsed:
+                break
         if parsed:
             equipment_type, floor_code, source_zone, has_point_suffix = parsed
             if floor_code.upper() == "R" or floor_code.upper().startswith("B"):

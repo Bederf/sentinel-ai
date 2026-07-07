@@ -620,6 +620,10 @@ export interface EquipmentMetadata {
   status?: string;
   health_score?: number;
   location?: string;
+  // Per-asset PPM cadence override; null/absent = type-level default applies
+  service_interval_days?: number | null;
+  baseline_state?: "none" | "seed_only" | "rolling_active" | "locked";
+  last_rollup_at?: string | null;
 }
 
 export interface EquipmentMetadataResponse {
@@ -1407,6 +1411,17 @@ export interface Prediction {
     lead_time_days: number;
   }> | string[];
   urgency: string;
+  // Baseline lifecycle state of the underlying equipment — the predictions
+  // tab only renders cards for rolling_active/locked equipment.
+  baseline_state?: "none" | "seed_only" | "rolling_active" | "locked";
+  // Object form of evidence.last_reading passed through by the backend.
+  latest_reading?: {
+    parameter: string;
+    value: number;
+    baseline: number;
+    threshold: number;
+    trend: string;
+  } | null;
 }
 
 // Predictions response interface
@@ -1641,9 +1656,8 @@ export const api = {
   async getSites(): Promise<Site[]> {
     try {
       const response = await fetchApi<{ total: number; sites: Site[] }>("/api/sites");
-      const activeSites = response.sites.filter((s) => s.sentinel_processing_enabled !== false);
-      localStorage.setItem(SITES_CACHE_KEY, JSON.stringify(activeSites));
-      return activeSites;
+      localStorage.setItem(SITES_CACHE_KEY, JSON.stringify(response.sites));
+      return response.sites;
     } catch (error) {
       const maybeApiError = error as { status?: number };
       if (maybeApiError?.status === 429) {
@@ -1812,6 +1826,22 @@ export const api = {
         changed_by: changedBy,
         change_reason: changeReason,
       }),
+    });
+  },
+
+  /**
+   * Set the per-asset PPM cadence (equipment.service_interval_days).
+   * Pass null to clear the override so the type-level default applies.
+   * @param equipmentId - Equipment UUID or code
+   * @param serviceIntervalDays - Days between preventive services (1-365) or null
+   */
+  async setEquipmentServiceInterval(
+    equipmentId: string,
+    serviceIntervalDays: number | null
+  ): Promise<{ status: string; equipment_code: string; service_interval_days: number | null; message: string }> {
+    return fetchApi(`/api/equipment/${equipmentId}/service-interval`, {
+      method: "PATCH",
+      body: JSON.stringify({ service_interval_days: serviceIntervalDays }),
     });
   },
 
@@ -4554,6 +4584,17 @@ export interface NiagaraApproveResponse {
   hierarchy_summary?: OnboardingHierarchySummary;
 }
 
+export interface BridgeReviewCommitResponse {
+  success: boolean;
+  site_id: string;
+  site_uuid: string;
+  equipment_received: number;
+  equipment_created: number;
+  equipment_total: number;
+  points_mapped: number;
+  staged_rows_onboarded: number;
+}
+
 export interface OnboardingCanonicalizationSummary {
   site_id: string;
   site_uuid: string;
@@ -4620,10 +4661,25 @@ export interface SimbiotCapabilitiesSummary {
 
 export interface SimbiotCapabilitiesResponse {
   site_id: string;
+  discovery_id?: string;
+  discovered_at?: string;
   adapter_id: string;
+  adapter_type?: string;
   adapter_capabilities: Record<string, boolean>;
   summary: SimbiotCapabilitiesSummary;
   devices: Array<Record<string, unknown>>;
+}
+
+export interface SimbiotAdapterConfig {
+  protocol: string;
+  enabled: boolean;
+  connection_config?: Record<string, unknown>;
+  poll_interval_seconds?: number;
+}
+
+export interface SimbiotAdapterConfigsResponse {
+  site_id: string;
+  adapters: SimbiotAdapterConfig[];
 }
 
 const _PROTOCOL_FROM_VENDOR: Record<string, string> = {
@@ -4696,6 +4752,15 @@ export const niagaraApi = {
       { method: 'POST' },
     ),
 
+  commitBridgeReviewMappings: (siteId: string, mappings: NiagaraMappingSummary, approvedBy: string, discoveryId?: string) =>
+    fetchApi<BridgeReviewCommitResponse>(
+      `/api/onboarding/bridge-review/${encodeURIComponent(siteId)}/commit`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ mappings, approved_by: approvedBy, discovery_id: discoveryId }),
+      },
+    ),
+
   canonicalizeOnboardingEquipment: (siteId: string, commit = false) =>
     fetchApi<OnboardingCanonicalizationSummary>(
       `/api/onboarding/equipment-canonicalization/${encodeURIComponent(siteId)}`,
@@ -4733,6 +4798,11 @@ export const niagaraApi = {
         method: 'PUT',
         body: JSON.stringify(params.config),
       },
+    ),
+
+  getSimbiotAdapterConfigs: (siteId: string) =>
+    fetchApi<SimbiotAdapterConfigsResponse>(
+      `/api/simbiot/sites/${encodeURIComponent(siteId)}/adapters`
     ),
 };
 

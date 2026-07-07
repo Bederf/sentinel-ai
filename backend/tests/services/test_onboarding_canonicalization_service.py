@@ -1,4 +1,5 @@
 from app.services.onboarding_canonicalization_service import (
+    OnboardingCanonicalizationService,
     _equipment_type_from_canonical_code,
     canonical_zone_from_floor_index,
     compact_plant_code,
@@ -46,3 +47,69 @@ def test_equipment_type_from_canonical_code_handles_source_alias_rows():
     assert _equipment_type_from_canonical_code("S005-KEF-B1-001") == "exhaust_fan"
     assert _equipment_type_from_canonical_code("S002-DALI_CONTROLLER-B1-001") == "dali_controller"
     assert _equipment_type_from_canonical_code("site-005-UMH-AHU-L3-ICU") is None
+
+
+def test_canonicalizer_uses_raw_code_when_code_is_normalized():
+    service = OnboardingCanonicalizationService(client=object())
+
+    plan = service._plan_equipment(
+        {
+            "id": "eq-1",
+            "code": "S005-UMH-AHU-L3-ICU-FAN",
+            "raw_code": "site-005-UMH-AHU-L3-ICU.fan",
+            "type": "ahu",
+        },
+        site_prefix="S005",
+        zones={"Zone-300"},
+        aliases={"Zone-L3-ICU": "Zone-300"},
+    )
+
+    assert plan.status == "point_level_source"
+    assert plan.canonical_code == "S005-AHU-300"
+    assert plan.canonical_zone_id == "Zone-300"
+    assert plan.relationship_type == "monitors"
+    assert plan.alias_type == "point_source"
+
+
+def test_zone_proposals_use_raw_code_when_code_is_normalized():
+    service = OnboardingCanonicalizationService(client=object())
+
+    proposals = service._propose_source_zones(
+        [
+            {
+                "code": "S005-UMH-FCU-L4-03",
+                "raw_code": "site-005-UMH-FCU-L4-03",
+            }
+        ],
+        aliases={},
+    )
+
+    assert len(proposals) == 1
+    assert proposals[0].alias_key == "Zone-L4-003"
+    assert proposals[0].canonical_zone_id == "Zone-402"
+
+
+def test_canonicalizer_preserves_reviewed_manual_mapping():
+    service = OnboardingCanonicalizationService(client=object())
+
+    plan = service._plan_equipment(
+        {
+            "id": "eq-1",
+            "code": "S005-AHU-304",
+            "raw_code": "S005-AHU-304",
+            "type": "ahu",
+            "canonical_code": "S005-AHU-304",
+            "canonical_zone_id": "Zone-L3-HDU",
+            "canonicalization_status": "canonical",
+            "canonicalization_source": "site005_manual_mapping_seed",
+            "canonicalization_metadata": {"reason": "reviewed_manual_mapping"},
+        },
+        site_prefix="S005",
+        zones={"Zone-L3-HDU"},
+        aliases={},
+    )
+
+    assert plan.status == "canonical"
+    assert plan.canonical_code == "S005-AHU-304"
+    assert plan.canonical_zone_id == "Zone-L3-HDU"
+    assert plan.reason == "existing_reviewed_canonical_mapping_preserved"

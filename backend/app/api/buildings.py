@@ -560,6 +560,9 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
                     "occupancy_capacity": b.get("occupancy_capacity"),
                     "total_desks": b.get("total_desks"),
                     "parking_bays": b.get("parking_bays"),
+                    "nmd_limit_kva": b.get("nmd_limit_kva"),
+                    "demand_charge_per_kva": b.get("demand_charge_per_kva"),
+                    "electricity_provider": b.get("electricity_provider"),
                     "bms_vendor": opt.get("bms_vendor"),
                     "operating_hours": b.get("operating_hours"),
                     "year_built": b.get("year_built"),
@@ -569,6 +572,7 @@ async def get_site(site_id: str, auth: AuthContext = Depends(require_site_access
                     "facility_manager": b.get("contact_facility_manager"),
                     "email": b.get("contact_email"),
                     "emergency": b.get("contact_emergency") or b.get("contact_phone"),
+                    "whatsapp": b.get("whatsapp_phone"),
                 },
                 "optimization": {
                     "active_profile": opt.get("active_profile", "balanced"),

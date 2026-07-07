@@ -10,6 +10,8 @@ Phase: 206-asset-onboarding
 """
 
 import logging
+import re
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -36,6 +38,12 @@ class HierarchyIngestionBody(BaseModel):
     hierarchy: dict[str, Any] | None = None
 
 
+class BridgeReviewCommitBody(BaseModel):
+    mappings: dict[str, Any]
+    approved_by: str = "system"
+    discovery_id: str | None = None
+
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/onboarding", tags=["onboarding"])
@@ -51,6 +59,105 @@ def _check_site_access(auth: AuthContext, site_id: str) -> None:
             status_code=403,
             detail=f"You do not have access to site {site_id}",
         )
+
+
+def _site_prefix(site_id: str) -> str:
+    match = re.search(r"(\d{3})", site_id)
+    return f"S{match.group(1)}" if match else site_id.upper()
+
+
+def _normalise_bridge_equipment_code(site_id: str, equipment_id: str) -> str:
+    prefix = _site_prefix(site_id)
+    value = (equipment_id or "").strip()
+    value = re.sub(r"^site-(\d{3})[-_]", lambda m: f"S{m.group(1)}-", value, flags=re.IGNORECASE)
+    if not value.upper().startswith(f"{prefix}-"):
+        value = f"{prefix}-{value}"
+    value = re.sub(r"[\s.:/]+", "-", value.upper())
+    value = re.sub(r"-+", "-", value).strip("-")
+    return value or f"{prefix}-BRIDGE-EQUIPMENT"
+
+
+def _point_match_confidence(confidence: str) -> str:
+    return {
+        "high": "exact",
+        "medium": "fuzzy",
+        "low": "manual",
+        "manual": "manual",
+        "unknown": "unmatched",
+    }.get((confidence or "").lower(), "fuzzy")
+
+
+def _chunks(items: list[dict[str, Any]], size: int = 500) -> list[list[dict[str, Any]]]:
+    return [items[index : index + size] for index in range(0, len(items), size)]
+
+
+def _validate_discovery_session(site_id: str, discovery_id: str | None, max_age_minutes: int = 10) -> dict:
+    """Validate a discovery session for freshness and status.
+
+    Returns {"valid": True, ...} or raises HTTPException with 400/403/404.
+    """
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+
+    if not discovery_id:
+        raise HTTPException(status_code=400, detail="discovery_id is required for bridge review commit")
+
+    result = (
+        client.table("site_discovery_sessions")
+        .select("site_id, adapter_type, discovered_at, status")
+        .eq("discovery_id", discovery_id)
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=404, detail=f"Discovery session {discovery_id} not found")
+
+    session = result.data[0]
+    if session.get("site_id") != site_id:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Discovery session {discovery_id} belongs to site {session.get('site_id')}, not {site_id}",
+        )
+
+    if session.get("status") != "active":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Discovery session {discovery_id} is not active (status={session.get('status')})",
+        )
+
+    from datetime import timedelta
+
+    discovered_at = session.get("discovered_at")
+    if discovered_at:
+        try:
+            discovered_dt = datetime.fromisoformat(discovered_at.replace("Z", "+00:00"))
+            if datetime.now(UTC) - discovered_dt > timedelta(minutes=max_age_minutes):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Discovery session {discovery_id} expired (> {max_age_minutes} min). Rescan and retry.",
+                )
+        except ValueError:
+            pass  # malformed timestamp — warn but don't block
+
+    return {"valid": True, "adapter_type": session.get("adapter_type"), "discovered_at": discovered_at}
+
+
+def _bridge_read_only_modules(site_id: str, equipment_rows: list[dict[str, Any]]) -> list[str]:
+    from app.models.module_registry import MANDATORY_MODULE_TYPES
+    from app.services.simbiot.connection_policy import infer_module_from_equipment_type, infer_module_from_identifiers
+
+    modules = {module.value for module in MANDATORY_MODULE_TYPES}
+    for row in equipment_rows:
+        inferred = infer_module_from_equipment_type(row.get("type")) or infer_module_from_identifiers(
+            row.get("code"),
+            row.get("raw_code"),
+            row.get("name"),
+        )
+        if inferred:
+            modules.add(inferred.value)
+    modules.add("simbiot")
+    return sorted(modules)
 
 
 async def _get_major_mechanical_equipment(site_id: str) -> list[dict[str, Any]]:
@@ -93,6 +200,94 @@ async def canonicalize_onboarding_equipment(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         logger.error("Onboarding equipment canonicalization failed for %s: %s", site_id, exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/bridge-review/{site_id}/commit")
+async def commit_bridge_review_mappings(
+    site_id: str,
+    body: BridgeReviewCommitBody,
+    auth: AuthContext = Depends(require_auth()),
+) -> dict[str, Any]:
+    """Commit approved direct-bridge review mappings into runtime tables.
+
+    Delegates to the atomic Postgres RPC `commit_bridge_review` which
+    performs all upserts in a single transaction.
+    """
+    _check_site_access(auth, site_id)
+    _validate_discovery_session(site_id, body.discovery_id)
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        equipment = body.mappings.get("equipment") if isinstance(body.mappings, dict) else None
+        if not isinstance(equipment, list):
+            raise HTTPException(status_code=400, detail="Bridge review mappings must include equipment[]")
+
+        # Build equipment array for RPC
+        equipment_array: list[dict[str, Any]] = []
+        point_array: list[dict[str, Any]] = []
+        for raw_item in equipment:
+            if not isinstance(raw_item, dict):
+                continue
+            raw_equipment_id = str(raw_item.get("equipment_id") or raw_item.get("equipment_name") or "").strip()
+            if not raw_equipment_id:
+                continue
+            equipment_code = _normalise_bridge_equipment_code(site_id, raw_equipment_id)
+            equipment_type = str(raw_item.get("equipment_type") or "unknown").strip() or "unknown"
+            raw_points = raw_item.get("points")
+            points: list[Any] = raw_points if isinstance(raw_points, list) else []
+            equipment_array.append(
+                {
+                    "code": equipment_code,
+                    "raw_code": raw_equipment_id,
+                    "name": str(raw_item.get("equipment_name") or raw_equipment_id),
+                    "type": equipment_type,
+                    "confidence": raw_item.get("confidence"),
+                    "points": points,
+                }
+            )
+            for raw_point in points:
+                if not isinstance(raw_point, dict):
+                    continue
+                point_id = str(raw_point.get("name") or raw_point.get("original_name") or "").strip()
+                if not point_id:
+                    continue
+                point_array.append(
+                    {
+                        "name": point_id,
+                        "original_name": str(raw_point.get("original_name") or point_id),
+                        "point_type": str(raw_point.get("point_type") or "sensor"),
+                        "confidence": str(raw_point.get("confidence") or raw_item.get("confidence") or "medium"),
+                        "equipment_code": equipment_code,
+                    }
+                )
+
+        # Infer modules (same logic as before, but passed to RPC)
+        read_only_modules = _bridge_read_only_modules(site_id, equipment_array)
+
+        result = client.rpc(
+            "commit_bridge_review",
+            {
+                "p_site_id": site_id,
+                "p_discovery_id": body.discovery_id,
+                "p_approved_by": body.approved_by,
+                "p_modules": read_only_modules,
+                "p_equipment": equipment_array,
+                "p_points": point_array,
+            },
+        ).execute()
+
+        if not result.data:
+            raise HTTPException(status_code=500, detail="commit_bridge_review returned no data")
+
+        summary = result.data if isinstance(result.data, dict) else result.data[0]
+        summary["equipment_received"] = len(equipment)
+        return summary
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Bridge review commit failed for %s: %s", site_id, exc)
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 

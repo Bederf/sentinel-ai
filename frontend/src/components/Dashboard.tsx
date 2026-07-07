@@ -54,7 +54,7 @@ import { EmptyState } from "./EmptyState";
 import { type View } from "./Sidebar";
 import type { BuildingTabId } from "../lib/navigation";
 import { useModules } from "@/contexts/ModuleHooks";
-import { getStoredSelectedSite, setStoredSelectedSite } from "@/lib/siteSelection";
+import { setStoredSelectedSite } from "@/lib/siteSelection";
 
 // Time period options for energy chart
 const TIME_PERIODS = [7, 30, 90] as const;
@@ -162,7 +162,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
   const [energyFilterSiteId, setEnergyFilterSiteId] = useState<string | null>(null);
   const [selectedDays, setSelectedDays] = useState<TimePeriod>(30);
   const [energyLastUpdated, setEnergyLastUpdated] = useState<Date | null>(null);
-  const [isFallbackEnergyData, setIsFallbackEnergyData] = useState(false);
+  const [isEstimatedEnergyData, setIsEstimatedEnergyData] = useState(false);
 
   // KPI card order (draggable)
   const [kpiOrder, setKpiOrder] = useState<KPICardId[]>([
@@ -242,33 +242,44 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
         if (response.data.length > 0) {
           setEnergyData(response.data);
           setEnergyLastUpdated(new Date());
+          setIsEstimatedEnergyData(false);
           return;
         }
 
-        // Fallback for bridge-only sites with no historical energy table rows yet.
-        const contextualSiteId = energyFilterSiteId || getStoredSelectedSite() || autoSelectSiteId || null;
-        const preferredSite =
-          (contextualSiteId ? buildingsList.find((site: Site) => site.id === contextualSiteId) : null) ||
-          buildingsList[0];
+        // Bridge-only/live sites may have power telemetry before daily kWh history is materialized.
+        // Use live site telemetry as an estimate, but label it as an estimate rather than demo data.
+        const targetSites = energyFilterSiteId
+          ? buildingsList.filter((site: Site) => site.id === energyFilterSiteId)
+          : buildingsList;
 
-        if (!preferredSite) {
+        if (targetSites.length === 0) {
           setEnergyData([]);
+          setIsEstimatedEnergyData(false);
           return;
         }
 
-        const rawTelemetryResp = await authorizedFetch(
-          `/api/sites/${encodeURIComponent(preferredSite.id)}/telemetry`
-        ).catch(() => null);
+        const estimatedSeries = (
+          await Promise.all(
+            targetSites.map(async (site: Site) => {
+              const rawTelemetryResp = await authorizedFetch(
+                `/api/sites/${encodeURIComponent(site.id)}/telemetry`
+              ).catch(() => null);
+              if (!rawTelemetryResp || !rawTelemetryResp.ok) {
+                return [];
+              }
+              const rawTelemetry = await rawTelemetryResp.json();
+              return buildFallbackEnergySeries(site, selectedDays, rawTelemetry?.power);
+            })
+          )
+        ).flat();
 
-        if (rawTelemetryResp && rawTelemetryResp.ok) {
-          const rawTelemetry = await rawTelemetryResp.json();
-          const fallbackSeries = buildFallbackEnergySeries(preferredSite, selectedDays, rawTelemetry?.power);
-          setEnergyData(fallbackSeries);
+        if (estimatedSeries.length > 0) {
+          setEnergyData(estimatedSeries);
           setEnergyLastUpdated(new Date());
-          setIsFallbackEnergyData(true);
+          setIsEstimatedEnergyData(true);
         } else {
           setEnergyData([]);
-          setIsFallbackEnergyData(false);
+          setIsEstimatedEnergyData(false);
         }
       } catch (err) {
         console.error("Failed to load energy data:", err);
@@ -337,8 +348,11 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
   // Calculate energy intensity (kWh/m²) for selected site or all sites
   const energyIntensity = useMemo(() => {
     if (!energyData.length) return null;
-    const totalKwh = energyData.reduce((sum, d) => sum + (d.total_kwh || 0), 0);
-    const days = energyData.length;
+    const filteredEnergy = energyFilterSiteId
+      ? energyData.filter((d) => d.site_id === energyFilterSiteId)
+      : energyData;
+    const totalKwh = filteredEnergy.reduce((sum, d) => sum + (d.total_kwh || 0), 0);
+    const days = new Set(filteredEnergy.map((d) => d.date)).size;
     const dailyKwh = days > 0 ? totalKwh / days : 0;
     // Get sqm from selected site or sum of all sites
     let totalSqm = 0;
@@ -717,10 +731,10 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                     </span>
                   )}
 
-                  {/* Demo Data Indicator */}
-                  {isFallbackEnergyData && (
+                  {/* Estimated Data Indicator */}
+                  {isEstimatedEnergyData && (
                     <span
-                      title="Real telemetry unavailable — showing estimated values"
+                      title="Daily kWh history is not current; values are estimated from live site power telemetry."
                       style={{
                         fontSize: 10,
                         color: "var(--color-sentinel-amber)",
@@ -732,7 +746,7 @@ export function Dashboard({ onViewChange, autoSelectSiteId, defaultBuildingTab: 
                         letterSpacing: "0.5px",
                       }}
                     >
-                      DEMO DATA
+                      LIVE POWER ESTIMATE
                     </span>
                   )}
                 </div>
