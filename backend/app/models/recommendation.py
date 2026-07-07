@@ -332,6 +332,8 @@ class Recommendation:
             executed_at=executed_at,
             execution_result=data.get("execution_result"),
             rejection_reason=data.get("rejection_reason"),
+            source=data.get("source", ""),
+            source_type=data.get("source_type", ""),
             outcome_validated=data.get("outcome_validated"),
             outcome_notes=data.get("outcome_notes"),
             outcome_validated_at=outcome_validated_at,

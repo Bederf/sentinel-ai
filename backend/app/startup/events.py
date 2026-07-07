@@ -373,6 +373,16 @@ async def startup_event(_: FastAPI) -> None:
     # health_calculation_config.json). See ppm_scheduler.py.
     scheduler_service.add_ppm_emission_job(interval_seconds=86400)  # 24h
 
+    # Pinned-signal integrity detection (Phase 236-02): flags plausible-but-
+    # frozen telemetry feeds and persists verdicts that downstream inference
+    # (FCU running derivation) uses to treat pinned inputs as unavailable.
+    scheduler_service.add_pinned_signal_job(interval_seconds=21600)  # 6h
+
+    # ML measured accuracy + drift (Phase 236-03): joins logged predictions to
+    # telemetry_hourly actuals for a real drift signal (report-only — never
+    # retrains or activates). Replaces the hardcoded fake-baseline drift path.
+    scheduler_service.add_ml_accuracy_job(interval_seconds=86400)  # 24h
+
     # Start AI recommendation generation job (rule-based, sim-time gated)
     scheduler_service.add_recommendation_generation_job(interval_seconds=1800)  # 30 min
 
@@ -967,6 +977,16 @@ async def startup_event(_: FastAPI) -> None:
         _logger.info("Document indexing sweep job initialized (15 min interval)")
     except Exception as e:
         _logger.error(f"Document indexing sweep initialization failed: {e}", exc_info=True)
+
+    # Run a one-shot sweep at startup to catch documents stranded before a restart.
+    try:
+        from app.services.document_indexing_service import DocumentIndexingService
+
+        count = DocumentIndexingService().sweep_stuck_documents()
+        if count:
+            _logger.warning("[Startup] Marked %d previously-stuck documents as failed", count)
+    except Exception as e:
+        _logger.error("[Startup] Stuck-document sweep failed: %s", e, exc_info=True)
 
     # Anomaly model weekly retraining — gated with the rest of background training.
     if not settings.edge_mode and settings.ml_background_training_enabled:

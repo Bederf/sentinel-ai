@@ -218,8 +218,9 @@ async def main():
             return
     else:
         md_files = sorted(DOCS_DIR.rglob("*.md"))
-        # Exclude templates directory
-        md_files = [f for f in md_files if "/_templates/" not in str(f)]
+        # Exclude templates and GSD planning directories
+        _skip_dirs = ("/_templates/", "/00-GSD-Phases/")
+        md_files = [f for f in md_files if not any(d in str(f) for d in _skip_dirs)]
 
         # Also collect from extra scan directories
         extra_count = 0
