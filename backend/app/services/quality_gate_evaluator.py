@@ -105,7 +105,7 @@ class QualityGateEvaluator:
     def __init__(self) -> None:
         self._policy = QualityGatePolicy()
 
-    def evaluate(self, mode: str, metrics: dict[str, float], site_id: str = "unknown") -> QualityGateResult:
+    def evaluate(self, mode: str, metrics: dict[str, float | None], site_id: str = "unknown") -> QualityGateResult:
         """Evaluate metrics against quality gate thresholds for a mode.
 
         Pure function — no IO. Takes pre-collected metrics and returns
@@ -127,7 +127,7 @@ class QualityGateEvaluator:
 
         for metric_name, threshold in thresholds.items():
             value = metrics.get(metric_name, 0.0)
-            state = threshold.evaluate(value)
+            state = RuleState.NA if value is None else threshold.evaluate(value)
 
             # Determine reason code (only for failures)
             reason_code = None
@@ -234,7 +234,7 @@ class QualityGateEvaluator:
 
         return recommendation
 
-    async def collect_metrics(self, site_id: str | None = None) -> dict[str, float]:
+    async def collect_metrics(self, site_id: str | None = None) -> dict[str, float | None]:
         """Aggregate metrics from existing services.
 
         Collects from MonitoringService, CommissioningService, MVVerificationService,
@@ -255,7 +255,7 @@ class QualityGateEvaluator:
 
         # Start with defaults based on mode
         defaults = _SIMULATION_DEFAULTS if is_simulation else _LIVE_DEFAULTS
-        metrics: dict[str, float] = dict(defaults)
+        metrics: dict[str, float | None] = dict(defaults)
 
         # Fail-closed: no site_id in live modes means all metrics stay at FAIL defaults
         if not site_id and not is_simulation:
@@ -312,6 +312,8 @@ class QualityGateEvaluator:
                 total_verifications = summary.get("total_verifications", 0)
                 rollbacks = summary.get("rollbacks_recommended", 0)
                 if total_verifications > 0:
+                    if avg_acc is None:
+                        metrics["mv_accuracy_7d_pct"] = None
                     metrics["rollback_rate_7d_pct"] = (rollbacks / total_verifications) * 100.0
                     return
 
@@ -359,7 +361,11 @@ class QualityGateEvaluator:
 
                         if accuracies:
                             metrics["mv_accuracy_7d_pct"] = (sum(accuracies) / len(accuracies)) * 100.0
+                        else:
+                            metrics["mv_accuracy_7d_pct"] = None
                         metrics["rollback_rate_7d_pct"] = (rollbacks / len(measured)) * 100.0
+                    else:
+                        metrics["mv_accuracy_7d_pct"] = None
                 except Exception as exc:
                     logger.warning("Failed to collect recommendation outcome M&V metrics: %s", exc)
 

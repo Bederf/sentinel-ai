@@ -7,6 +7,9 @@ with trust_weight governance.
 
 from __future__ import annotations
 
+import pytest
+
+import app.services.prediction_generator as prediction_generator
 from app.services.prediction_generator import (
     MIN_PROBABILITY_THRESHOLD,
     _health_score_to_base_probability,
@@ -14,45 +17,62 @@ from app.services.prediction_generator import (
 )
 
 
+@pytest.fixture(autouse=True)
+def configured_thresholds(monkeypatch):
+    """Keep probability tests independent from live site_thresholds rows."""
+
+    def fake_get_health_thresholds(*, site_id=None, force_refresh=False):
+        if site_id == "strict-site":
+            return {"healthy": 90, "warning": 70, "critical": 50}
+        return {"healthy": 85, "warning": 65, "critical": 40}
+
+    monkeypatch.setattr(prediction_generator, "get_health_thresholds", fake_get_health_thresholds)
+
+
 class TestHealthScoreToBaseProbability:
     """Pure rule-based fallback — no ML signals."""
 
     def test_healthy_returns_zero(self):
-        """Health >= 90 returns 0 (healthy equipment, no prediction)."""
+        """Health >= configured healthy threshold returns 0."""
         assert _health_score_to_base_probability(100) == 0.0
         assert _health_score_to_base_probability(95) == 0.0
-        assert _health_score_to_base_probability(90) == 0.0
+        assert _health_score_to_base_probability(85) == 0.0
 
     def test_critical_band(self):
-        """Health < 50 -> critical band 60-75%."""
+        """Health < configured critical threshold -> critical band 60-75%."""
         # base = 75 - health * 0.3
-        assert _health_score_to_base_probability(49) == 60.3  # 75 - 49*0.3
+        assert _health_score_to_base_probability(39) == 63.3  # 75 - 39*0.3
         assert _health_score_to_base_probability(30) == 66.0  # 75 - 30*0.3
         assert _health_score_to_base_probability(0) == 75.0  # 75 - 0*0.3
 
     def test_warning_band(self):
-        """50 <= health < 70 -> warning band 55-65%."""
-        assert _health_score_to_base_probability(69) == 55.5
-        assert _health_score_to_base_probability(60) == 60.0
-        assert _health_score_to_base_probability(50) == 65.0
+        """Configured critical <= health < warning -> warning band."""
+        assert _health_score_to_base_probability(64) == 53.0
+        assert _health_score_to_base_probability(60) == 55.0
+        assert _health_score_to_base_probability(50) == 60.0
 
     def test_moderate_band(self):
-        """70 <= health < 90 -> moderate band."""
-        # At 89: base = 55 - (89-70)*0.5 = 45.5 -> max(50, 45.5) = 50
-        assert _health_score_to_base_probability(89) == 50.0
-        # At 80: base = 55 - (80-70)*0.5 = 50 -> max(50, 50) = 50
+        """Configured warning <= health < healthy -> moderate band."""
+        # At 84: base = 55 - (84-65)*0.5 = 45.5 -> max(50, 45.5) = 50
+        assert _health_score_to_base_probability(84) == 50.0
+        # At 80: base = 55 - (80-65)*0.5 = 47.5 -> max(50, 47.5) = 50
         assert _health_score_to_base_probability(80) == 50.0
-        # At 70: base = 55 - (70-70)*0.5 = 55 -> max(50, 55) = 55
-        assert _health_score_to_base_probability(70) == 55.0
+        # At 65: base = 55 - (65-65)*0.5 = 55 -> max(50, 55) = 55
+        assert _health_score_to_base_probability(65) == 55.0
 
     def test_never_below_50(self):
         """Minimum probability is 50 for degraded equipment."""
-        assert _health_score_to_base_probability(88) >= 50
+        assert _health_score_to_base_probability(84) >= 50
         assert _health_score_to_base_probability(50) >= 50
 
     def test_never_above_75_in_base(self):
         """Base probability capped at 75 (critical band ceiling)."""
         assert _health_score_to_base_probability(0) <= 75
+
+    def test_site_specific_thresholds_are_used(self):
+        """The same score can be healthy globally and degraded on a stricter site."""
+        assert _health_score_to_base_probability(88) == 0.0
+        assert _health_score_to_base_probability(88, site_id="strict-site") >= MIN_PROBABILITY_THRESHOLD
 
 
 class TestHealthToProbabilityUsesAnomalyScoreWhenAvailable:
@@ -94,6 +114,18 @@ class TestHealthToProbabilityUsesAnomalyScoreWhenAvailable:
             ml_hours_ingested=2000,
         )
         assert prob > 72.0, f"High anomaly should elevate probability: {prob}"
+
+    def test_telemetry_envelope_signal_values_are_supported(self):
+        """Live operating_data stores anomaly signals as {value, timestamp, source} envelopes."""
+        base = _health_score_to_base_probability(65)
+        with_ml = health_to_probability(
+            health_score=65,
+            anomaly_score={"value": 0.9, "timestamp": "2026-07-05T15:38:48Z"},  # type: ignore[arg-type]
+            lstm_anomaly_score={"value": 0.7, "source": "sentinel"},  # type: ignore[arg-type]
+            ml_hours_ingested=500,
+        )
+
+        assert with_ml > base
 
 
 class TestHealthToProbabilityIgnoresAnomalyWhenTrustZero:
@@ -164,7 +196,7 @@ class TestHealthToProbabilityFallsBackToRulesWhenNoMl:
 
     def test_no_ml_returns_base(self):
         """Neither anomaly_score nor lstm_anomaly_score -> base probability."""
-        for health in [30, 50, 65, 80, 89]:
+        for health in [30, 50, 65, 80, 84]:
             base = _health_score_to_base_probability(health)
             result = health_to_probability(
                 health_score=health,
@@ -216,13 +248,14 @@ class TestMinProbabilityThreshold:
         assert MIN_PROBABILITY_THRESHOLD == 50
 
     def test_threshold_allows_warning_equipment(self):
-        """Warning-tier equipment (health 70-89) must pass threshold."""
+        """Warning-tier equipment under configured thresholds must pass threshold."""
         # health=78 (AHU-201) -> base 55, ML uplift may push higher
         assert (
             health_to_probability(78) >= MIN_PROBABILITY_THRESHOLD
             or _health_score_to_base_probability(78) >= MIN_PROBABILITY_THRESHOLD
         )
-        # health=80 -> base 55
+        # health=80 -> base floor 50
         assert _health_score_to_base_probability(80) >= MIN_PROBABILITY_THRESHOLD
-        # health=89 -> base 50.5 (at boundary)
-        assert _health_score_to_base_probability(89) >= MIN_PROBABILITY_THRESHOLD
+        # health=84 -> base floor 50; health=85 is healthy under default thresholds
+        assert _health_score_to_base_probability(84) >= MIN_PROBABILITY_THRESHOLD
+        assert _health_score_to_base_probability(85) == 0.0

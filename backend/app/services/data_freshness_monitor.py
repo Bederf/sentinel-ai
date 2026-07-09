@@ -335,7 +335,7 @@ class DataFreshnessMonitor:
         import psycopg2
         import psycopg2.extras
 
-        database_url = settings.database_url or os.getenv("DATABASE_URL")
+        database_url = self._database_url()
         if not database_url:
             logger.warning(
                 "[FRESHNESS] DATABASE_URL not configured; telemetry stream freshness skipped for %s", site_id
@@ -641,6 +641,14 @@ class DataFreshnessMonitor:
             "missing_streams": list(row.get("missing_streams") or []),
             "missing_equipment": list(row.get("missing_equipment") or []),
         }
+
+    def _database_url(self) -> str:
+        return (
+            settings.database_url
+            or os.getenv("DATABASE_URL")
+            or os.getenv("DATABASE_URL_DIRECT")
+            or "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+        )
 
     async def _handle_breach_logic(
         self,

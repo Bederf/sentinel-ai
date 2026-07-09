@@ -65,6 +65,8 @@ class ServiceRecordRepository:
 
     async def add_reading(self, record_id: str, reading_data: dict[str, Any]) -> dict[str, Any]:
         """Add a reading to service record."""
+        if reading_data.get("id") is None:
+            reading_data.pop("id", None)
         reading_data["service_record_id"] = record_id
         response = self.client.table("service_readings").insert(reading_data).execute()
         return response.data[0] if response.data else {}
@@ -76,6 +78,8 @@ class ServiceRecordRepository:
 
     async def add_attachment(self, attachment_data: dict[str, Any]) -> dict[str, Any]:
         """Add attachment to service record."""
+        if attachment_data.get("id") is None:
+            attachment_data.pop("id", None)
         response = self.client.table("service_attachments").insert(attachment_data).execute()
         return response.data[0] if response.data else {}
 
@@ -86,6 +90,8 @@ class ServiceRecordRepository:
 
     async def add_observation(self, record_id: str, observation_data: dict[str, Any]) -> dict[str, Any]:
         """Add observation to service record."""
+        if observation_data.get("id") is None:
+            observation_data.pop("id", None)
         observation_data["service_record_id"] = record_id
         response = self.client.table("service_observations").insert(observation_data).execute()
         return response.data[0] if response.data else {}

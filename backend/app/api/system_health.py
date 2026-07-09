@@ -550,18 +550,18 @@ async def onboard_discovered_equipment(site_id: str, discovery_id: str, body: On
 
 
 @router.get("/health", response_model=SystemHealthSnapshot)
-async def get_current_health():
+async def get_current_health(site_id: str | None = Query(None)):
     """
     Get unified system health snapshot.
 
     Aggregates health from 15+ backend endpoints into a single view.
-    Cached with 30-second TTL.
+    Pass site_id to scope probes to a specific site.
 
     Returns:
         SystemHealthSnapshot with overall status and component details
     """
     try:
-        snapshot = await service.get_current_health()
+        snapshot = await service.get_current_health(site_id=site_id)
 
         # Transform to response model
         components = {}
@@ -606,6 +606,7 @@ async def get_current_health():
             overall_status=snapshot["overall_status"],
             overall_score=snapshot["overall_score"],
             components=components,
+            active_alerts=snapshot.get("active_alerts", []),
             recommendations=[
                 "Monitor system performance",
                 "Review error logs for issues",
@@ -618,6 +619,7 @@ async def get_current_health():
 @router.get("/health/history", response_model=HealthHistoryData)
 async def get_health_history(
     range: str = Query("24h", pattern="^(24h|7d|30d)$"),
+    site_id: str | None = Query(None),
 ):
     """
     Get historical health data for trend analysis.
@@ -626,12 +628,13 @@ async def get_health_history(
 
     Args:
         range: "24h", "7d", or "30d"
+        site_id: When set, filter snapshots to this site
 
     Returns:
         Historical snapshots and calculated metrics
     """
     try:
-        history = await service.get_health_history(range)
+        history = await service.get_health_history(range, site_id=site_id)
         return HealthHistoryData(
             range=history["range"],
             snapshots=history["snapshots"],

@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import type { IntegrationHealthSummary, Site } from '@/lib/api';
-import type { CommissioningSnapshot, QualityGateStatus } from '@/lib/api/system';
+import type { CommissioningSnapshot, QualityGateStatus, MlTrainingReadiness } from '@/lib/api/system';
 
 const GATE_IDS = [
   'match_coverage', 'unmatched_points', 'data_freshness', 'error_rate',
@@ -53,6 +53,7 @@ import { PageLoading } from './PageLoading';
 import { AdapterHealthCard } from './system/AdapterHealthCard';
 import { CriticalPathCard } from './system/CriticalPathCard';
 import { CommissioningGatePanel } from './system/CommissioningGatePanel';
+import { MlTrainingReadinessCard } from './system/MlTrainingReadinessCard';
 import { PhaseProgressCard } from './system/PhaseProgressCard';
 import { TabBar } from './TabBar';
 import type { TabDef } from './TabBar';
@@ -146,6 +147,7 @@ export default function SystemHealthPage() {
   const [dataFreshness, setDataFreshness] = useState<DataFreshnessResponse | null>(null);
   const [commissioning, setCommissioning] = useState<CommissioningSnapshot | null>(null);
   const [qualityGate, setQualityGate] = useState<QualityGateStatus | null>(null);
+  const [mlTrainingReadiness, setMlTrainingReadiness] = useState<MlTrainingReadiness | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>('site-002');
   const [discoveredEquipment, setDiscoveredEquipment] = useState<DiscoveredEquipment[]>([]);
@@ -156,6 +158,11 @@ export default function SystemHealthPage() {
   const [discoveryActionId, setDiscoveryActionId] = useState<string | null>(null);
   const [manualMappingActionId, setManualMappingActionId] = useState<string | null>(null);
   const mappingReviewRef = useRef<HTMLDivElement | null>(null);
+  const selectedSiteIdRef = useRef<string>(selectedSiteId);
+
+  useEffect(() => {
+    selectedSiteIdRef.current = selectedSiteId;
+  }, [selectedSiteId]);
 
   // Load sites list
   useEffect(() => {
@@ -178,6 +185,7 @@ export default function SystemHealthPage() {
     loadDataFreshness();
     loadUptimeData();
     loadGateData();
+    loadMlTrainingReadiness();
     loadDiscoveredEquipment();
     loadUnmappedEquipment();
     loadUnmatchedPoints();
@@ -190,6 +198,7 @@ export default function SystemHealthPage() {
     const freshnessInterval = setInterval(loadDataFreshness, 300000);
     const uptimeInterval = setInterval(loadUptimeData, 600000);
     const gateInterval = setInterval(loadGateData, 60000);
+    const mlReadinessInterval = setInterval(loadMlTrainingReadiness, 60000);
     const discoveryInterval = setInterval(loadDiscoveredEquipment, 60000);
     const unmappedInterval = setInterval(loadUnmappedEquipment, 60000);
     const unmatchedInterval = setInterval(loadUnmatchedPoints, 60000);
@@ -198,6 +207,7 @@ export default function SystemHealthPage() {
       clearInterval(freshnessInterval);
       clearInterval(uptimeInterval);
       clearInterval(gateInterval);
+      clearInterval(mlReadinessInterval);
       clearInterval(discoveryInterval);
       clearInterval(unmappedInterval);
       clearInterval(unmatchedInterval);
@@ -211,8 +221,8 @@ export default function SystemHealthPage() {
       setError(null);
 
       const [healthRes, historyRes, integration] = await Promise.all([
-        authorizedFetch('/api/system/health'),
-        authorizedFetch('/api/system/health/history?range=24h'),
+        authorizedFetch(`/api/system/health?site_id=${selectedSiteId}`),
+        authorizedFetch(`/api/system/health/history?range=24h&site_id=${selectedSiteId}`),
         monitoringApi.getIntegrationHealth(selectedSiteId),
       ]);
 
@@ -284,6 +294,23 @@ export default function SystemHealthPage() {
       }
     } catch (err) {
       console.error('Gate data fetch error:', err);
+    }
+  };
+
+  const loadMlTrainingReadiness = async () => {
+    const siteAtRequest = selectedSiteId;
+    try {
+      setMlTrainingReadiness(null);
+      const res = await authorizedFetch(`/api/settings/ai-policy/${selectedSiteId}`);
+      if (selectedSiteIdRef.current !== siteAtRequest) return;
+      if (res.ok) {
+        const data = await res.json();
+        setMlTrainingReadiness(data.ml_training_readiness ?? null);
+      }
+    } catch (err) {
+      if (selectedSiteIdRef.current !== siteAtRequest) return;
+      setMlTrainingReadiness(null);
+      console.error('ML training readiness fetch error:', err);
     }
   };
 
@@ -483,7 +510,14 @@ export default function SystemHealthPage() {
   };
 
   const ProgressBar = ({ value, color }: { value: number; color: string }) => {
-    const barColor = color === 'green' ? 'var(--color-sentinel-green)' : color === 'yellow' ? 'var(--color-sentinel-amber)' : 'var(--color-sentinel-red)';
+    const barColor =
+      color === 'green'
+        ? 'var(--color-sentinel-green)'
+        : color === 'yellow'
+          ? 'var(--color-sentinel-amber)'
+          : color === 'red'
+            ? 'var(--color-sentinel-red)'
+            : 'var(--color-sentinel-text-disabled)';
     return (
       <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(148, 163, 184, 0.2)' }}>
         <div className="h-2 w-full origin-left transition-transform duration-500 will-change-transform rounded-full" style={{ transform: `scaleX(${Math.min(100, Math.max(0, value)) / 100})`, background: barColor }} />
@@ -510,6 +544,7 @@ export default function SystemHealthPage() {
 
   const overallStatus = currentHealth?.overall_status || 'healthy';
   const overallTone = getStatusTone(overallStatus);
+  const activeAlertCount = currentHealth?.active_alerts?.length ?? 0;
   const healthTrendData = (history?.snapshots || [])
     .map((snapshot: any) => {
       const score = Number(snapshot?.overall_score);
@@ -674,7 +709,7 @@ export default function SystemHealthPage() {
                 <div className="mt-3 flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <LinkIcon className="w-4 h-4 text-amber-500" />
-                    <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Active alerts: {integrationHealth?.alerts?.length || 0}</p>
+                    <p style={{ color: "var(--color-sentinel-text-secondary)" }}>System active alerts: {activeAlertCount}</p>
                   </div>
                   <p style={{ color: "var(--color-sentinel-text-secondary)" }}>Recent errors: {integrationHealth?.recent_errors_count || 0}</p>
                 </div>
@@ -695,6 +730,7 @@ export default function SystemHealthPage() {
                 commissioning={commissioning}
                 qualityGate={qualityGate}
               />
+              <MlTrainingReadinessCard readiness={mlTrainingReadiness} />
 
               <AdapterHealthCard siteId={selectedSiteId} key={selectedSiteId} />
 
@@ -1015,7 +1051,7 @@ export default function SystemHealthPage() {
                     Platform Components
                   </p>
                   <p className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    Global service probes across SENTINEL, not filtered by the selected site.
+                    Service probes scoped to {selectedSiteId}. Global infrastructure (Redis, event bus, n8n, ServiceNow, notifications) shown as not_configured.
                   </p>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

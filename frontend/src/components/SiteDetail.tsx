@@ -182,6 +182,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [alertsTotal, setAlertsTotal] = useState<number>(0);
   const [predictions, setPredictions] = useState<Prediction[]>([]);
+  // Predictions withheld by the strict baseline gate (equipment not yet
+  // rolling_active/locked) — rendered as a baseline-incomplete notice.
+  const [baselineGatedPredictions, setBaselineGatedPredictions] = useState<Prediction[]>([]);
   const [totalRiskExposure, setTotalRiskExposure] = useState<number>(0);
   const [energyData, setEnergyData] = useState<EnergyDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -331,32 +334,18 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         if (siteData.sentinel_processing_enabled === false) {
           setEquipment([]);
           setEquipmentCategories({});
-          setAlerts([]);
+          setAlertsTotal(0);
           setPredictions([]);
+          setBaselineGatedPredictions([]);
           setEnergyData([]);
           setError(null);
           return;
         }
 
-        // Fetch equipment for this building using new building equipment endpoint
-        try {
-          const buildingEquipment = await api.getSiteEquipment(siteId);
-          // API returns Equipment[] with health_score field
-          setEquipment(buildingEquipment.equipment as any);
-          setEquipmentCategories(buildingEquipment.categories);
-        } catch (eqErr) {
-          console.warn("Building equipment endpoint failed, falling back to legacy:", eqErr);
-          // Fallback to legacy equipment endpoint
-          const equipmentData = await api.getEquipment(siteId);
-          setEquipment(equipmentData.map((eq: any) => ({
-            ...eq,
-            health_score: 80,
-            health: 80,
-            category: "Other",
-            controllable: false,
-            details: {},
-          })) as Equipment[]);
-        }
+        // Fetch equipment for this building — Supabase is the source of truth
+        const buildingEquipment = await api.getSiteEquipment(siteId);
+        setEquipment(buildingEquipment.equipment as any);
+        setEquipmentCategories(buildingEquipment.categories);
 
         // Fetch alerts for this site
         const { total } = await api.getAlerts(siteId);
@@ -364,11 +353,18 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
 
         // Fetch predictions for this site
         const predictionsData = await api.getPredictions(siteId);
-        // Gate: only show predictions with last_reading data (confidence-gated at source)
-        const predictionsWithData = (predictionsData.predictions || []).filter(
-          (p: Prediction) => p.latest_reading?.value != null
+        const allPredictions: Prediction[] = predictionsData.predictions || [];
+        // Strict baseline gate: only equipment with a live rollup baseline
+        // (rolling_active/locked) may render prediction cards. Equipment that
+        // was never baselined (none) or only seeded at onboarding (seed_only)
+        // is withheld and surfaced in the baseline-incomplete notice instead.
+        const baselineReady = (p: Prediction) =>
+          p.baseline_state === "rolling_active" || p.baseline_state === "locked";
+        const predictionsWithData = allPredictions.filter(
+          (p: Prediction) => p.latest_reading?.value != null && baselineReady(p)
         );
         setPredictions(predictionsWithData);
+        setBaselineGatedPredictions(allPredictions.filter((p: Prediction) => !baselineReady(p)));
         // Sum potential_loss_zar for risk exposure KPI (all predictions, not just filtered)
         const riskSum = (predictionsData.predictions || []).reduce(
           (sum: number, p: Prediction) => sum + (p.financial_impact?.potential_loss_zar || 0),
@@ -569,25 +565,12 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
       // Use equipment control endpoint for Supabase equipment
       await api.controlEquipment(deviceId, point, value);
       // Refresh equipment list after control action
-      try {
-        const buildingEquipment = await api.getSiteEquipment(siteId);
-        setEquipment(buildingEquipment.equipment.map((eq: any) => ({
-          ...eq,
-          health_score: eq.health || eq.health_score,
-        })) as any);
-        setEquipmentCategories(buildingEquipment.categories);
-      } catch {
-        // Fallback
-        const equipmentData = await api.getEquipment(siteId);
-        setEquipment(equipmentData.map((eq: any) => ({
-          ...eq,
-          health_score: 80,
-          health: 80,
-          category: "Other",
-          controllable: false,
-          details: {},
-        })) as Equipment[]);
-      }
+      const buildingEquipment = await api.getSiteEquipment(siteId);
+      setEquipment(buildingEquipment.equipment.map((eq: any) => ({
+        ...eq,
+        health_score: eq.health || eq.health_score,
+      })) as any);
+      setEquipmentCategories(buildingEquipment.categories);
     } catch (error) {
       console.error("Equipment control failed:", error);
       throw error;
@@ -1585,7 +1568,9 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                     style={{ color: "var(--color-sentinel-text-disabled)" }}
                   />
                   <p style={{ color: "var(--color-sentinel-text-secondary)" }}>
-                    No predictions for this site
+                    {baselineGatedPredictions.length > 0
+                      ? "No baseline-backed predictions yet"
+                      : "No predictions for this site"}
                   </p>
                 </div>
               ) : (
@@ -1597,6 +1582,62 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                       onClick={() => handlePredictionClick(prediction)}
                     />
                   ))}
+                </div>
+              )}
+
+              {/* Baseline-incomplete notice: predictions withheld by the
+                  strict baseline gate. Honest state — points the operator
+                  at what unlocks each unit instead of showing ungrounded
+                  cards. */}
+              {baselineGatedPredictions.length > 0 && (
+                <div
+                  className="mt-6 rounded-lg border p-4"
+                  style={{
+                    borderColor: "var(--color-sentinel-border)",
+                    background: "var(--color-sentinel-bg-secondary)",
+                  }}
+                >
+                  <h4
+                    className="text-sm font-semibold mb-2"
+                    style={{ color: "var(--color-sentinel-text-primary)" }}
+                  >
+                    Baseline incomplete — {baselineGatedPredictions.length} prediction
+                    {baselineGatedPredictions.length === 1 ? "" : "s"} withheld
+                  </h4>
+                  <p
+                    className="text-xs mb-3"
+                    style={{ color: "var(--color-sentinel-text-secondary)" }}
+                  >
+                    These units have risk signals but no measured baseline yet, so their
+                    predictions are not shown. Predictions unlock once structured service
+                    readings establish a rolling baseline.
+                  </p>
+                  <ul className="space-y-1">
+                    {baselineGatedPredictions.slice(0, 8).map((p) => (
+                      <li
+                        key={p.id}
+                        className="text-xs flex items-center justify-between gap-2"
+                        style={{ color: "var(--color-sentinel-text-secondary)" }}
+                      >
+                        <span style={{ color: "var(--color-sentinel-text-primary)" }}>
+                          {p.equipment_id}
+                        </span>
+                        <span>
+                          {p.baseline_state === "seed_only"
+                            ? "Awaiting first PPM readings — complete the open preventive work order"
+                            : "No baseline — capture baseline readings via onboarding or the maintenance tab"}
+                        </span>
+                      </li>
+                    ))}
+                    {baselineGatedPredictions.length > 8 && (
+                      <li
+                        className="text-xs"
+                        style={{ color: "var(--color-sentinel-text-disabled)" }}
+                      >
+                        +{baselineGatedPredictions.length - 8} more
+                      </li>
+                    )}
+                  </ul>
                 </div>
               )}
             </div>
@@ -1687,7 +1728,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
         )}
         {/* #7 Occupancy */}
         {isModuleActive('lighting') && effectiveVisibleSections.includes('occupancy-dashboard') && (
-          <OccupancyPanel compact={true} />
+          <OccupancyPanel compact={true} siteId={siteId} />
         )}
         {/* #8 Lighting Intelligence */}
         {isModuleActive('lighting') && effectiveVisibleSections.includes('lighting-intelligence') && (
@@ -1763,10 +1804,10 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
               />
               {lightingSub === "Lighting" && <LightingPage siteId={siteId} />}
               {lightingSub === "Occupancy" && (
-                <div className="p-4 md:p-6"><OccupancyPanel compact={false} /></div>
+                <div className="p-4 md:p-6"><OccupancyPanel compact={false} siteId={siteId} /></div>
               )}
-              {lightingSub === "Analytics" && <OccupancyAnalyticsPage />}
-              {lightingSub === "Correlation" && <OccupancyEnergyCorrelationPage />}
+              {lightingSub === "Analytics" && <OccupancyAnalyticsPage siteId={siteId} />}
+              {lightingSub === "Correlation" && <OccupancyEnergyCorrelationPage siteId={siteId} />}
             </>
           )}
 
@@ -1783,7 +1824,7 @@ export function SiteDetail({ siteId, onBack, defaultMainTab }: SiteDetailProps) 
                 onChange={(id) => setSolarBessSub(id as SolarBessSub)}
                 accentColor="var(--color-sentinel-blue)"
               />
-              {solarBessSub === "Dashboard" && <SolarDashboard />}
+              {solarBessSub === "Dashboard" && <SolarDashboard siteId={siteId} />}
               {solarBessSub === "AEGIS" && isModuleActive('solar_control') && <AegisConsolePage />}
             </>
           )}

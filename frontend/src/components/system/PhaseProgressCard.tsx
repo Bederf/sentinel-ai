@@ -39,7 +39,7 @@ const PHASE_DETAILS: Record<string, { label: string; color: string; next: string
     label: 'Advisory',
     color: '#22c55e',
     next: 'supervised',
-    desc: 'Full data flow. Recommendations visible. System is ready for supervised control.',
+    desc: 'Full data flow. Recommendations visible. Supervised control still requires promotion and quality gates.',
   },
   supervised: {
     label: 'Supervised',

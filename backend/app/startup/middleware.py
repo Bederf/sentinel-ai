@@ -48,6 +48,7 @@ _PUBLIC_PATHS = {
     "/api/events/stream",  # SSE stream (handles own ticket-based auth, no JWT in URL)
     "/api/events/health",  # SSE health check
     "/api/complaints/submit",  # Comfort complaint reporting (read-only, no controls)
+    "/api/sentry/building-handbook",  # Authenticated in endpoint: Sentry secret/API key or JWT site access
     "/api/space/focus-sessions/9bd2f4c3-3359-4cd0-8769-1dab529248cf/close",  # TEMP: Close focus session
 }
 _PUBLIC_PREFIXES = (

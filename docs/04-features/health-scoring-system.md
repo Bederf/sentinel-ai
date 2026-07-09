@@ -652,9 +652,60 @@ SQL fallback in `background_scheduler.py` runs daily:
 
 ---
 
+## 2026-07-06 Updates: σ-Driven Baseline Alignment, Rollup Baselines & Prediction Grounding (Phase 236)
+
+### σ-Driven Baseline Alignment (Component 1)
+
+`HealthRatingCalculator.calculate_baseline_alignment_z()` scores the baseline
+component from a real z-score against the active rollup baseline instead of the
+legacy linear `100 − 2·deviation_percent`:
+
+```
+z = (current_reading − baseline_mean) / baseline_sigma
+score = 100 · exp(−z² / 8)      # Gaussian kernel, 2σ half-width
+# |z|=0 → 100   |z|=1 → 88.2   |z|=2 → 60.7   |z|=3 → 32.5   |z|=4 → 13.5
+```
+
+`compute_rating()` uses the z-path when the equipment has an active rollup
+baseline with σ-shaped elements and matching structured service readings;
+otherwise it falls back to the legacy percent-deviation path. A missing baseline
+returns the 85.0 healthy floor (unchanged). Trend momentum (Component 5) also
+prefers a slope measured from successive rollup baselines when available.
+
+**Implementation:** `backend/app/services/health_rating_calculator.py`
+
+### Rollup Baselines from Structured Service Readings
+
+`EquipmentBaselineRollupService` rolls numeric technician readings
+(`service_readings`, captured at closeout Step 8.5) into periodic
+`equipment_baselines` rows with `{value, sigma, n, captured_at, source_record_id}`
+per element (W=8 window). Equipment `baseline_state` advances
+`none → seed_only → rolling_active → locked`. The PPM scheduler emits preventive
+work orders per asset cadence (`equipment.service_interval_days` → type default →
+90d), settable via `PATCH /api/equipment/{id}/service-interval` (maintenance tab).
+
+### Strict Prediction Grounding
+
+The predictions tab only renders cards for equipment whose `baseline_state` is
+`rolling_active` or `locked`. Ungrounded equipment (`none`/`seed_only`) is
+withheld and surfaced in a "baseline incomplete" notice — predictions are never
+shown from a threshold-template fallback. `GET /api/predictions/{code}/lineage`
+returns the evidence chain (active baseline → source service record / WO →
+readings) so an operator can trace what produced each grounded prediction.
+
+### Telemetry Integrity Gate (Phase 236-02)
+
+Baseline seeding and the FCU running-inference now respect the pinned-signal
+detector (`pinned_signal_detector.py`): a frozen/pinned telemetry point is not
+used as evidence. See [Data Quality API](../03-api-reference/data-quality-api.md)
+and the drift-monitoring section of [MLOps API](../03-api-reference/mlops-api.md).
+
+---
+
 ## Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 2.1.0 | 2026-07-06 | Phase 236: σ-driven baseline alignment, rollup baselines from service readings, strict prediction grounding + lineage, telemetry-integrity gate |
 | 2.0.0 | 2026-05-16 | Age-only baselines, scoreability gating, deferred capture, alert generation, carbon/ESG pipeline |
 | 1.0.0 | 2026-02-02 | Initial documentation |

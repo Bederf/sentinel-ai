@@ -46,7 +46,33 @@ Detect feature distribution drift for an equipment type using simplified KS-test
 
 ### GET `/api/mlops/drift/model/{model_type}`
 
-Detect prediction accuracy drift for a model type.
+Detect prediction accuracy drift for a model type (`lstm` | `autoencoder`).
+
+**Phase 236-03 (measured drift):** this verdict is now derived ONLY from
+measured rolling accuracy in `ml_model_accuracy`, written daily by the ML
+accuracy job (`MLAccuracyService`), which joins logged predictions
+(`ml_prediction_log`) to `telemetry_hourly` actuals. The prior hardcoded
+baselines (0.89/0.85) and demo fallbacks were removed. When no measured
+accuracy row exists for the model kind (cold start / not enough joined
+samples), the endpoint fails closed:
+
+```json
+{
+  "model_type": "lstm",
+  "verdict": "insufficient_data",
+  "drift_detected": false,
+  "recent_accuracy": null,
+  "historical_accuracy": null
+}
+```
+
+When measured data exists, `recent_accuracy` is the rolling measured MAE (LSTM)
+or median score (AE), `historical_accuracy` is the model's own registered
+training-time reference, and `drift_detected` is true only when measured
+performance degrades beyond the model's own baseline. This coarse per-kind
+summary prefers a `drift_suspected` model within the latest run; the
+authoritative per-model signal is the `ml_model_drift` advisory raised by the
+accuracy job. Drift is report-only — it never triggers retrain or activation.
 
 ### GET `/api/mlops/drift/all`
 

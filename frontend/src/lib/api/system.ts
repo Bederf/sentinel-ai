@@ -99,7 +99,7 @@ export interface CommissioningSnapshot {
 
 export interface QualityMetricDetail {
   metric: string;
-  value: number;
+  value: number | null;
   state: 'pass' | 'warn' | 'fail' | 'na';
   pass_bound: number | null;
   warn_bound: number | null;
@@ -128,6 +128,28 @@ export interface ControlKPIs {
   blocked_writes_24h: number;
   approved_writes_24h: number;
   safety_violations_24h: number;
+}
+
+export interface MlReadinessThreshold {
+  pass_bound: number | null;
+  warn_bound: number | null;
+  direction: string;
+}
+
+export interface MlReadinessMetric {
+  metric: string;
+  value: number | null;
+  state: 'pass' | 'warn' | 'fail' | 'na';
+  threshold: MlReadinessThreshold;
+}
+
+export interface MlTrainingReadiness {
+  ready: boolean;
+  overall: 'pass' | 'warn' | 'fail' | 'unknown';
+  blocking_metrics: string[];
+  telemetry_results: MlReadinessMetric[];
+  evaluated_at: string | null;
+  error?: string;
 }
 
 /**

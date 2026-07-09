@@ -32,12 +32,13 @@ function getOccupancyColor(percent: number): string {
 interface OccupancyPanelProps {
   compact?: boolean;
   onViewDetails?: () => void;
+  siteId?: string;
 }
 
 // Sites with lighting integration installed
 // All registered sites are eligible for lighting integration (no hardcoded filter)
 
-export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPanelProps) {
+export function OccupancyPanel({ compact = false, onViewDetails, siteId: propSiteId }: OccupancyPanelProps) {
   const [buildingOccupancy, setBuildingOccupancy] = useState<BuildingOccupancy | null>(null);
   const [lightingStats, setDaliStats] = useState<LightingStats | null>(null);
   const [zoneLighting, setZoneLighting] = useState<Record<string, ZoneLighting>>({});
@@ -47,6 +48,8 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>("");
+
+  const effectiveSiteId = propSiteId || selectedSiteId;
 
   // Zone details panel state
   const [selectedZone, setSelectedZone] = useState<ZoneOccupancy | null>(null);
@@ -63,12 +66,16 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
   const displayOccupancy = buildingOccupancy?.occupancy_percent ?? 0;
 
   const fetchData = useCallback(async (showRefreshing = false) => {
+    if (!effectiveSiteId) {
+      setLoading(false);
+      return;
+    }
     try {
       if (showRefreshing) {
         setIsRefreshing(true);
       }
 
-      const occupancy = await lightingApi.getSiteOccupancy(selectedSiteId || undefined);
+      const occupancy = await lightingApi.getSiteOccupancy(effectiveSiteId);
       // Stagger subsequent requests by 250ms to avoid 429 rate limiting
       await new Promise((resolve) => setTimeout(resolve, 250));
       const stats = await lightingApi.getStats();
@@ -104,16 +111,15 @@ export function OccupancyPanel({ compact = false, onViewDetails }: OccupancyPane
       setLoading(false);
       setIsRefreshing(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [effectiveSiteId]);
 
-  // Fetch sites on mount and auto-select first
+  // Fetch sites on mount and auto-select first (only when no propSiteId)
   useEffect(() => {
     async function loadSites() {
       try {
         const sitesData = await api.getSites();
         setSites(sitesData);
-        if (sitesData.length > 0 && !selectedSiteId) {
+        if (sitesData.length > 0 && !selectedSiteId && !propSiteId) {
           const preferredSite =
             sitesData.find((site) => site.id === "site-002")
             ?? sitesData.find((site) => /sandton city office tower/i.test(site.name))

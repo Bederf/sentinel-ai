@@ -45,35 +45,25 @@ export function SustainabilityDashboard({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load sustainability data for site (from parent page context)
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [s, h, e, g] = await Promise.all([
-          sustainabilityApi.fetchSummary(siteId),
-          sustainabilityApi.fetchEmissions(siteId, 12),
-          sustainabilityApi.fetchEfficiency(siteId),
-          sustainabilityApi.fetchGreenStar(siteId),
-        ]);
-        setSummary(s);
-        setHistory(h);
-        setEfficiency(e);
-        setGreenStar(g);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load sustainability data');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [siteId]);
-
-  // Load new ESG metrics
-  useEffect(() => {
-    sustainabilityV2Api.getESGMetrics(siteId)
-      .then(setEsgMetrics)
-      .catch(() => {});
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const [s, h, e, g] = await Promise.all([
+        sustainabilityApi.fetchSummary(siteId),
+        sustainabilityApi.fetchEmissions(siteId, 12),
+        sustainabilityApi.fetchEfficiency(siteId),
+        sustainabilityApi.fetchGreenStar(siteId),
+      ]);
+      setSummary(s);
+      setHistory(h);
+      setEfficiency(e);
+      setGreenStar(g);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load sustainability data');
+    } finally {
+      setLoading(false);
+    }
   }, [siteId]);
 
   useEffect(() => {

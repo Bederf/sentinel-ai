@@ -698,6 +698,24 @@ class NotificationService:
             if not created_wo:
                 return {"success": False, "error": "work_order_create_failed", "recommendation_id": recommendation_id}
 
+            if not tech_name and created_wo.get("assigned_to"):
+                tech_name = created_wo.get("assigned_to")
+                assigned_to = tech_name
+                assigned_team = created_wo.get("assigned_team")
+                try:
+                    from app.database.repositories.technician_repository import TechnicianRepository
+
+                    tech_repo = TechnicianRepository()
+                    for technician in await tech_repo.get_all_technicians(active_only=True):
+                        if technician.get("name") == tech_name:
+                            tech_telegram_id = technician.get("telegram_id") or technician.get("telegram_chat_id")
+                            tech_email = technician.get("email")
+                            break
+                except Exception as tech_err:
+                    logger.warning(
+                        "[CERTIFIED] Could not resolve assigned technician contact for %s: %s", tech_name, tech_err
+                    )
+
             rec.status = RecommendationStatus.APPROVED
             rec.approved_by = f"telegram:{requested_by_telegram_id}"
             rec.approved_at = datetime.utcnow()

@@ -22,31 +22,47 @@ class FakeSender:
         return {"ok": True}
 
 
-class FakeConceptService:
-    async def save_telegram_document(self, **kwargs):
+class FakeUploadProcessor:
+    def __init__(self) -> None:
+        self.calls: list[dict] = []
+
+    async def __call__(self, **kwargs):
+        self.calls.append(kwargs)
         return {
-            "status": "saved",
-            "concept_document_id": "concept_raw_test123",
             "site_id": kwargs["site_id"],
-            "site_name": kwargs["site_name"],
-            "concept_path": "Centre Court/Generator/Service Sheet",
-            "file_name": "CENTRE-COURT_GENERATOR_SERVICE-SHEET_2026-03-17.jpg",
-            "file_hash": "hash-123",
-            "scan_detected_type": "JPEG",
-            "scan_trust_level": "STANDARD",
+            "document_sub_class": kwargs["document_sub_class"],
+            "document_name": kwargs["document_name"],
+            "document_id": "doc-123",
+            "storage_path": "site-uuid/test-file.pdf",
         }
 
 
 @pytest.mark.asyncio
-async def test_document_intake_flow_collects_metadata_and_saves(monkeypatch):
+async def test_document_intake_flow_collects_metadata_and_processes_upload(monkeypatch):
     service = get_telegram_document_intake_service()
     sender = FakeSender()
     manager = get_conversation_manager()
     manager.end_session("chat-123")
     intake_updates: list[tuple[str, dict]] = []
+    processor = FakeUploadProcessor()
 
-    async def fake_resolve(_telegram_user_id: str):
+    async def fake_resolve_site(_telegram_user_id: str):
         return "site-002", "Centre Court"
+
+    async def fake_resolve_equipment(reference: str, site_id: str | None = None):
+        assert reference == "S002-CHILLER-B1-001"
+        return {"code": "S002-CHILLER-B1-001", "name": "Main Chiller 1", "type": "chiller"}
+
+    async def fake_download(_telegram_file_id: str):
+        return type(
+            "DownloadedTelegramFile",
+            (),
+            {
+                "file_bytes": b"fake-image-bytes",
+                "telegram_file_path": "photos/test-file.jpg",
+                "mime_type": "image/jpeg",
+            },
+        )()
 
     class FakeIntakeRepository:
         def create(self, record):
@@ -57,33 +73,42 @@ async def test_document_intake_flow_collects_metadata_and_saves(monkeypatch):
             return {"id": intake_id, **payload}
 
     monkeypatch.setattr("app.services.telegram_document_intake_service.get_telegram_sender", lambda: sender)
-    monkeypatch.setattr(service, "_resolve_site_context", fake_resolve)
-    monkeypatch.setattr(service, "_concept_service", FakeConceptService())
+    monkeypatch.setattr(service, "_resolve_site_context", fake_resolve_site)
+
+    async def fake_active_record(_chat_id: str):
+        return None
+
+    monkeypatch.setattr(service, "_resolve_active_service_record", fake_active_record)
+    monkeypatch.setattr(
+        "app.services.telegram_document_intake_service.resolve_equipment_reference", fake_resolve_equipment
+    )
+    monkeypatch.setattr(service, "_download_telegram_file", fake_download)
     monkeypatch.setattr(service, "_intake_repository", FakeIntakeRepository())
+    monkeypatch.setattr(
+        "app.services.telegram_document_intake_service.process_technician_document_upload",
+        processor,
+    )
 
     started = await service.start_intake(chat_id="chat-123", telegram_user_id="tg-123", telegram_file_id="file-123")
     assert started is True
-    assert "What type of equipment is this for?" in sender.messages[-1]["text"]
+    assert "Reply with the exact equipment code" in sender.messages[-1]["text"]
 
-    await service.handle_callback(
-        chat_id="chat-123",
-        telegram_user_id="tg-123",
-        callback_data="docintake:equipment:generator",
-    )
-    assert sender.messages[-1]["text"] == "What type of record is this?"
+    await service.handle_text(chat_id="chat-123", telegram_user_id="tg-123", text="S002-CHILLER-B1-001")
+    assert "Chiller Major Service" in sender.messages[-1]["text"]
 
-    await service.handle_callback(
-        chat_id="chat-123",
-        telegram_user_id="tg-123",
-        callback_data="docintake:document:service_sheet",
-    )
-    assert "Any extra notes?" in sender.messages[-1]["text"]
+    await service.handle_text(chat_id="chat-123", telegram_user_id="tg-123", text="Chiller Major Service")
+    assert "document sub-class" in sender.messages[-1]["text"].lower()
 
-    await service.handle_text(
-        chat_id="chat-123",
-        telegram_user_id="tg-123",
-        text="Quarterly service. Gen 2.",
-    )
+    await service.handle_text(chat_id="chat-123", telegram_user_id="tg-123", text="HVAC")
+    assert "category discipline" in sender.messages[-1]["text"].lower()
+
+    await service.handle_text(chat_id="chat-123", telegram_user_id="tg-123", text="Preventive Maintenance")
+    assert "document creation date" in sender.messages[-1]["text"].lower()
+
+    await service.handle_text(chat_id="chat-123", telegram_user_id="tg-123", text="2026-03-17")
+    assert "trigger date" in sender.messages[-1]["text"].lower()
+
+    await service.handle_text(chat_id="chat-123", telegram_user_id="tg-123", text="2026-03-18")
     assert "Please confirm before save:" in sender.messages[-1]["text"]
 
     await service.handle_callback(
@@ -91,10 +116,15 @@ async def test_document_intake_flow_collects_metadata_and_saves(monkeypatch):
         telegram_user_id="tg-123",
         callback_data="docintake:confirm:save",
     )
+
     assert sender.messages[-1]["text"].startswith("Document saved.")
     assert manager.get_session("chat-123") is None
     assert intake_updates[-1][0] == "intake-123"
     assert intake_updates[-1][1]["intake_status"] == "saved"
+    assert processor.calls[-1]["equipment_id"] == "S002-CHILLER-B1-001"
+    assert processor.calls[-1]["document_name"] == "Chiller Major Service"
+    assert processor.calls[-1]["document_sub_class"] == "HVAC"
+    assert processor.calls[-1]["category_discipline"] == "Preventive Maintenance"
 
 
 @pytest.mark.asyncio

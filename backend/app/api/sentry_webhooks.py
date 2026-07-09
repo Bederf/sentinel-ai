@@ -31,7 +31,9 @@ from pydantic import BaseModel, Field
 
 from app.config.settings import settings
 from app.database.repositories.service_record_repository import ServiceRecordRepository
+from app.middleware.auth_middleware import require_site_access
 from app.security.prompt_guard import score_prompt
+from app.services.equipment_reference_resolver import resolve_equipment_reference
 from app.services.ocr_service import get_ocr_service
 from app.services.popia_consent_guard import (
     enforce_active_processing_consent,
@@ -93,6 +95,249 @@ def _call_log_dedupe_key(req: "CallLogRequest") -> str:
     ]
     material = "|".join(_normalise_dedupe_text(part) for part in parts)
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _is_logical_work_order_target(target: str | None) -> bool:
+    """Return true for logical advisory targets that are not physical equipment codes."""
+    if not target:
+        return False
+    normalized = target.strip().upper().replace("_", "-")
+    return normalized.startswith("SITE-") and any(
+        marker in normalized
+        for marker in (
+            "HVAC-ZONE-SCOPE",
+            "HVAC-SCHEDULE",
+            "ZONE-SCOPE",
+        )
+    )
+
+
+def _truncate_for_telegram(value: str | None, limit: int = 900) -> str:
+    """Keep technician info replies inside Telegram's message size while preserving meaning."""
+    text = " ".join((value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
+def _work_order_target_from_row(work_order: dict[str, Any]) -> str | None:
+    """Best-effort target extraction for logical work orders."""
+    for key in ("equipment_code", "equipment_id", "target_equipment"):
+        value = work_order.get(key)
+        if isinstance(value, str) and _is_logical_work_order_target(value):
+            return value
+
+    title = str(work_order.get("title") or "")
+    match = re.search(r"(SITE-\d{3}-[A-Z0-9-]+)", title.upper())
+    if match and _is_logical_work_order_target(match.group(1)):
+        return match.group(1)
+    return None
+
+
+def _recommendation_action_text(recommendation: dict[str, Any] | None) -> str | None:
+    if not recommendation:
+        return None
+    action = recommendation.get("action")
+    if isinstance(action, dict):
+        value = action.get("value")
+        if value:
+            return str(value)
+    return None
+
+
+def _format_logical_work_order_info(
+    work_order: dict[str, Any],
+    recommendation: dict[str, Any] | None = None,
+) -> str:
+    """Technician-facing action brief for logical advisory work orders."""
+    wo_code = work_order.get("code") or "work order"
+    rec_target = recommendation.get("target_equipment") if recommendation else None
+    target = rec_target or _work_order_target_from_row(work_order) or "logical advisory target"
+    action_text = (
+        work_order.get("action_value")
+        or _recommendation_action_text(recommendation)
+        or work_order.get("description")
+        or "Review the SENTINEL advisory and verify a safe scoped action."
+    )
+    reason = recommendation.get("reason") if recommendation else work_order.get("description")
+    status = work_order.get("status") or "unknown"
+    assigned_to = work_order.get("assigned_to") or "unassigned"
+    assigned_team = work_order.get("assigned_team")
+    assigned = f"{assigned_to} ({assigned_team})" if assigned_team else assigned_to
+
+    lines = [
+        f"<b>Work order info: {html.escape(str(wo_code))}</b>",
+        "",
+        "<b>Type:</b> Logical SENTINEL advisory scope, not a physical equipment lookup.",
+        f"<b>Target:</b> {html.escape(str(target))}",
+        f"<b>Status:</b> {html.escape(str(status))}",
+        f"<b>Assigned:</b> {html.escape(str(assigned))}",
+        "",
+        "<b>What to do:</b>",
+        html.escape(_truncate_for_telegram(str(action_text), 700)),
+        "",
+        "<b>Field checks:</b>",
+        "1. Verify whether the building/floor/zone is actually occupied.",
+        "2. Check PIR or lighting occupancy and badge/security context.",
+        "3. Check CO2/IAQ before any setback decision.",
+        "4. Identify only zones or floor AHUs that are verified empty.",
+        "5. Do not perform a blanket HVAC shutdown while signals conflict or CO2 is high.",
+        "",
+        "<b>Closeout expected:</b>",
+        "Record whether HVAC stayed active, or list the specific verified-empty zones/floors suitable for setback.",
+    ]
+    if reason:
+        lines.extend(["", "<b>Why:</b>", html.escape(_truncate_for_telegram(str(reason), 900))])
+    return "\n".join(lines)
+
+
+async def _load_equipment_work_order_detail(
+    wo_code: str,
+) -> tuple[dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None, dict[str, Any] | None]:
+    try:
+        from app.database.repositories.service_record_repository import ServiceRecordRepository
+        from app.database.repositories.work_order_repository import WorkOrderRepository
+        from app.database.supabase_client import get_supabase_client
+        from app.services.feedback_collection_service import get_feedback_collection_service
+        from app.services.checklist_service import get_checklist_service
+
+        wo_repo = WorkOrderRepository()
+        work_order = await wo_repo.get_work_order_by_code(wo_code.strip().upper())
+        if not work_order:
+            return None, None, None, None
+
+        equipment = None
+        equipment_id = str(work_order.get("equipment_id") or "").strip()
+        if equipment_id:
+            sb = get_supabase_client()
+            for field in ("id", "code"):
+                try:
+                    eq_result = (
+                        sb.table("equipment")
+                        .select("id, code, name, type, status")
+                        .eq(field, equipment_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if eq_result.data:
+                        equipment = eq_result.data[0]
+                        break
+                except Exception:
+                    continue
+
+        service_record = None
+        try:
+            sr_repo = ServiceRecordRepository()
+            service_records = await sr_repo.list(filters={"work_order_id": work_order.get("id")})
+            if service_records:
+                service_record = next(
+                    (
+                        record
+                        for record in service_records
+                        if str(record.get("status") or "").strip().lower() != "closed"
+                    ),
+                    service_records[0],
+                )
+        except Exception as exc:
+            logger.warning("Failed to load service record for WO %s: %s", wo_code, exc)
+
+        equipment_type = str((equipment or {}).get("type") or "").strip().lower()
+        checklist_template = None
+        if equipment_type:
+            try:
+                service_type = str((service_record or {}).get("service_type") or "").strip().lower()
+                if service_type:
+                    feedback_template = get_feedback_collection_service().get_template(equipment_type, service_type)
+                    if feedback_template:
+                        checklist_template = {
+                            "template_name": f"{equipment_type.title()} Service Closeout",
+                            "required_items": feedback_template.required_items,
+                            "optional_items": feedback_template.optional_items,
+                            "prompts": feedback_template.prompts,
+                        }
+                if not checklist_template:
+                    checklist_template = get_checklist_service().get_template_for_inspection(equipment_type, "routine")
+            except Exception as exc:
+                logger.warning("Failed to load checklist template for WO %s (%s): %s", wo_code, equipment_type, exc)
+
+        return work_order, equipment, service_record, checklist_template
+    except Exception as exc:
+        logger.warning("Failed to load equipment work order detail for %s: %s", wo_code, exc)
+        return None, None, None, None
+
+
+def _format_equipment_work_order_info(
+    work_order: dict[str, Any],
+    equipment: dict[str, Any] | None = None,
+    service_record: dict[str, Any] | None = None,
+    checklist_template: dict[str, Any] | None = None,
+) -> str:
+    from app.services.work_order_info_renderer import build_work_order_info_text
+
+    return build_work_order_info_text(work_order, equipment, service_record, checklist_template)
+
+
+async def _load_recommendation_for_work_order(work_order: dict[str, Any]) -> dict[str, Any] | None:
+    rec_id = work_order.get("recommendation_id")
+    if not rec_id:
+        return None
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        result = (
+            get_supabase_client()
+            .table("recommendations")
+            .select("id, target_equipment, action, reason, confidence_score, status")
+            .eq("id", rec_id)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as exc:
+        logger.warning("Failed to load recommendation %s for WO info callback: %s", rec_id, exc)
+        return None
+
+
+async def _find_latest_logical_work_order_code(target: str) -> str | None:
+    """Resolve old /info-SITE-... buttons to the newest matching logical work order."""
+    try:
+        from app.database.repositories.work_order_repository import WorkOrderRepository
+
+        normalized_target = target.upper().replace("_", "-")
+        work_orders = await WorkOrderRepository().get_all_work_orders(limit=100)
+        for work_order in work_orders:
+            haystack = " ".join(
+                str(work_order.get(key) or "")
+                for key in ("code", "title", "description", "equipment_id", "action_value")
+            ).upper()
+            if normalized_target in haystack.replace("_", "-"):
+                return str(work_order.get("code"))
+    except Exception as exc:
+        logger.warning("Failed to resolve logical work order for target %s: %s", target, exc)
+    return None
+
+
+async def _handle_work_order_info_callback(chat_id: str, wo_code: str, sender: Any) -> dict[str, Any]:
+    work_order, equipment, service_record, checklist_template = await _load_equipment_work_order_detail(wo_code)
+    if not work_order:
+        if sender:
+            await sender.send_text(chat_id=chat_id, text=f"Work order {html.escape(wo_code)} was not found.")
+        return {"success": True, "intent": "work_order_info", "confirmed": False}
+
+    recommendation = await _load_recommendation_for_work_order(work_order)
+    target_equipment = recommendation.get("target_equipment") if recommendation else None
+    if _is_logical_work_order_target(target_equipment or work_order.get("equipment_id") or wo_code):
+        text = _format_logical_work_order_info(work_order, recommendation)
+    else:
+        text = _format_equipment_work_order_info(work_order, equipment, service_record, checklist_template)
+    if sender:
+        await sender.send_text(chat_id=chat_id, text=text)
+    return {
+        "success": True,
+        "intent": "work_order_info",
+        "confirmed": True,
+        "wo_code": work_order.get("code"),
+    }
 
 
 async def _transcribe_voice_note(voice_file_id: str) -> str | None:
@@ -228,6 +473,27 @@ def _require_sentry_secret_or_key(
     if api_key and configured_key and hmac.compare_digest(api_key, configured_key):
         return
     raise HTTPException(status_code=403, detail="Unauthorized")
+
+
+async def _require_sentry_or_site_access(
+    request: Request,
+    site_id: str,
+    secret: str | None,
+    api_key: str | None,
+    *,
+    endpoint_name: str,
+) -> None:
+    """Allow service callers by Sentry auth, and UI callers by JWT site access."""
+    if secret or api_key:
+        try:
+            _require_sentry_secret_or_key(secret, api_key, endpoint_name=endpoint_name)
+            return
+        except HTTPException:
+            if not request.headers.get("Authorization"):
+                raise
+
+    request.path_params["site_id"] = site_id
+    await require_site_access("site_id")(request)
 
 
 def _extract_supervised_approval_rec_id(text: str | None) -> str | None:
@@ -1212,6 +1478,74 @@ async def _handle_closeout_callback(
     return {"success": True, "intent": "closeout", "confirmed": True, "status": value}
 
 
+def _extract_done_work_order_code(text: str | None) -> str | None:
+    value = (text or "").strip()
+    match = re.match(r"^/(?:done)[-_](WO-\d{4}-\d+)\b", value, re.IGNORECASE)
+    if match:
+        return match.group(1).upper()
+    match = re.match(r"^done\s+#?(WO-\d{4}-\d+)\b", value, re.IGNORECASE)
+    return match.group(1).upper() if match else None
+
+
+async def _start_closeout_session_from_done_command(
+    *,
+    chat_id: str,
+    telegram_user_id: str,
+    wo_code: str,
+    sender: Any,
+) -> dict[str, Any]:
+    from app.database.supabase_client import get_supabase_client
+
+    work_order, equipment, _service_record, _checklist_template = await _load_equipment_work_order_detail(wo_code)
+    if not work_order:
+        await sender.send_text(chat_id=chat_id, text=f"Work order {html.escape(wo_code)} was not found.")
+        return {"success": True, "intent": "closeout_start", "confirmed": False}
+
+    equipment_code = str((equipment or {}).get("code") or work_order.get("equipment_code") or "").strip()
+    equipment_type = str((equipment or {}).get("type") or work_order.get("equipment_type") or "").strip().lower()
+    if not equipment_type:
+        await sender.send_text(
+            chat_id=chat_id,
+            text=f"I couldn't resolve the equipment type for {html.escape(wo_code)}. Please use /info-{html.escape(wo_code)}.",
+        )
+        return {"success": True, "intent": "closeout_start", "confirmed": False}
+
+    checklist = await get_inspection_checklist_for_telegram(equipment_type)
+    items = checklist.get("items") or []
+    if not items:
+        await sender.send_text(
+            chat_id=chat_id,
+            text=f"No closeout feedback template is configured for {html.escape(equipment_type)}.",
+        )
+        return {"success": True, "intent": "closeout_start", "confirmed": False}
+
+    payload: dict[str, Any] = {
+        "wo_code": wo_code,
+        "telegram_user_id": str(telegram_user_id),
+        "equipment_code": equipment_code,
+        "equipment_type": equipment_type,
+        "checklist_items": items,
+        "responses": {},
+        "current_index": 0,
+        "status": "in_progress",
+        "updated_at": datetime.now(UTC).isoformat(),
+    }
+    sb = get_supabase_client()
+    sb.table("sentry_inspection_sessions").upsert(payload, on_conflict="wo_code, telegram_user_id").execute()
+
+    equipment_label = equipment_code or "equipment"
+    template_name = checklist.get("template_name") or f"{equipment_type.title()} Service Closeout"
+    first_question = _closeout_item_question(items[0])
+    text = (
+        f"Starting closeout for {html.escape(wo_code)} "
+        f"({html.escape(equipment_label)}, {html.escape(equipment_type.title())}).\n\n"
+        f"{html.escape(str(template_name))} — {len(items)} items\n\n"
+        f"Item 1/{len(items)}: {html.escape(first_question)}"
+    )
+    await sender.send_text(chat_id=chat_id, text=text, keyboard=_closeout_status_keyboard(), parse_mode="HTML")
+    return {"success": True, "intent": "closeout_start", "confirmed": True, "wo_code": wo_code}
+
+
 async def _handle_telegram_developer_issue(
     *,
     chat_id: str,
@@ -2053,6 +2387,7 @@ class BuildingHandbookPost(BaseModel):
 
 @router.get("/building-handbook")
 async def get_building_handbook(
+    request: Request,
     site_id: str = Query(..., description="Site ID"),
     x_sentry_api_key: str | None = Header(None),
     x_sentry_secret: str | None = Header(None),
@@ -2062,9 +2397,15 @@ async def get_building_handbook(
     Reads from site_handbooks table. Falls back to filesystem
     BUILDING_HANDBOOK.md if not found in DB.
 
-    Authentication: X-Sentry-API-Key or X-Sentry-Secret header.
+    Authentication: X-Sentry-API-Key/X-Sentry-Secret header or JWT with site access.
     """
-    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="building-handbook")
+    await _require_sentry_or_site_access(
+        request,
+        site_id,
+        x_sentry_secret,
+        x_sentry_api_key,
+        endpoint_name="building-handbook",
+    )
 
     from app.database.supabase_client import get_supabase_client
 
@@ -2103,6 +2444,7 @@ async def get_building_handbook(
 
 @router.post("/building-handbook", status_code=status.HTTP_200_OK)
 async def save_building_handbook(
+    request: Request,
     data: BuildingHandbookPost,
     x_sentry_api_key: str | None = Header(None),
     x_sentry_secret: str | None = Header(None),
@@ -2111,9 +2453,15 @@ async def save_building_handbook(
 
     Upserts into site_handbooks table.
 
-    Authentication: X-Sentry-API-Key or X-Sentry-Secret header.
+    Authentication: X-Sentry-API-Key/X-Sentry-Secret header or JWT with site access.
     """
-    _require_sentry_secret_or_key(x_sentry_secret, x_sentry_api_key, endpoint_name="building-handbook")
+    await _require_sentry_or_site_access(
+        request,
+        data.site_id,
+        x_sentry_secret,
+        x_sentry_api_key,
+        endpoint_name="building-handbook",
+    )
 
     from datetime import UTC
 
@@ -2177,11 +2525,49 @@ async def get_inspection_checklist_for_telegram(
         - items: list of checklist items (structured) with optional oem_spec field
     """
     from app.services.checklist_service import get_checklist_service
+    from app.services.feedback_collection_service import get_feedback_collection_service
+    from app.services.work_order_info_renderer import render_service_feedback_checklist
 
     svc = get_checklist_service()
 
-    # Dynamic generation when description is provided
-    if description:
+    if not isinstance(description, str):
+        description = None
+    if not isinstance(fault_code, str):
+        fault_code = None
+
+    description_l = (description or "").strip().lower()
+    is_planned_or_service_closeout = any(
+        term in description_l
+        for term in (
+            "maintenance",
+            "maintenance work order",
+            "planned maintenance",
+            "preventive maintenance",
+            "preventative maintenance",
+            "ppm",
+            "service sheet",
+            "major service",
+            "minor service",
+        )
+    )
+    has_fault_context = bool(fault_code) or any(
+        term in description_l
+        for term in (
+            "alarm",
+            "breakdown",
+            "fault",
+            "failure",
+            "failed",
+            "leak",
+            "trip",
+            "tripped",
+            "urgent",
+        )
+    )
+
+    # Dynamic generation only for targeted fault descriptions. Generic
+    # maintenance/service closeouts must use the service-feedback contract.
+    if description and has_fault_context and not is_planned_or_service_closeout:
         generated = await svc.generate_checklist(
             equipment_type=equipment_type.lower(),
             description=description,
@@ -2195,14 +2581,57 @@ async def get_inspection_checklist_for_telegram(
             if items:
                 return await _build_checklist_response(equipment_type, items, name, duration)
 
-    # Static template fallback
-    template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
+    # Static fallback: use service-closeout feedback for technician WO closeout.
+    feedback_svc = get_feedback_collection_service()
+    feedback_template = feedback_svc.get_template(equipment_type.lower(), "callout") or feedback_svc.get_template(
+        equipment_type.lower(), "minor"
+    )
+    if feedback_template:
+        items = []
+        for item_key in feedback_template.required_items:
+            items.append(
+                {
+                    "category": "Closeout feedback",
+                    "item_id": item_key,
+                    "question": feedback_template.prompts.get(item_key) or item_key.replace("_", " ").title(),
+                    "item_type": "checklist",
+                }
+            )
+        for item_key in feedback_template.optional_items:
+            items.append(
+                {
+                    "category": "Closeout feedback",
+                    "item_id": item_key,
+                    "question": feedback_template.prompts.get(item_key) or item_key.replace("_", " ").title(),
+                    "item_type": "checklist",
+                    "optional": True,
+                }
+            )
+        name = f"{equipment_type.title()} Service Closeout"
+        duration = feedback_template.audio_duration_seconds or 30
+        checklist_text = render_service_feedback_checklist(
+            {
+                "template_name": name,
+                "required_items": feedback_template.required_items,
+                "optional_items": feedback_template.optional_items,
+                "prompts": feedback_template.prompts,
+            }
+        )
+        return {
+            "found": True,
+            "equipment_type": equipment_type,
+            "template_name": name,
+            "estimated_minutes": duration,
+            "checklist_text": checklist_text,
+            "items": items,
+        }
 
+    template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
     if not template:
         return {
             "found": False,
             "equipment_type": equipment_type,
-            "checklist_text": f"No inspection checklist available for {equipment_type}.",
+            "checklist_text": f"No closeout feedback available for {equipment_type}.",
             "items": [],
         }
 
@@ -2243,36 +2672,15 @@ async def _build_checklist_response(
                     pass
     except Exception as e:
         logger.warning(f"[INSPECTION] Could not enrich OEM specs: {e}")
+    from app.services.work_order_info_renderer import render_telegram_checklist
 
-    # Build Telegram-formatted text grouped by category
-    lines = [f"📋 {name}", f"⏱ Estimated: {duration} min", ""]
-    current_category = None
+    checklist_text = render_telegram_checklist(
+        {"template_name": name, "estimated_duration_minutes": duration, "checklist_items": items}, oem_contexts
+    )
 
     for item in items:
-        cat = item.get("category", "General")
-        if cat != current_category:
-            current_category = cat
-            lines.append(f"▸ {cat}")
-
         item_id = item.get("item_id", "")
-        item_type = item.get("item_type", "")
-        q = item.get("description") or item.get("question", "") or ""
         oem_spec = oem_contexts.get(item_id, "")
-
-        spec_hint = f" | OEM: {oem_spec[:150]}..." if oem_spec else ""
-        q_with_spec = f"{q}{spec_hint}"
-
-        if item_type == "measurement":
-            unit = item.get("unit", "")
-            tmin = item.get("tolerance_min")
-            tmax = item.get("tolerance_max")
-            tol = f" ({tmin}-{tmax} {unit})" if tmin is not None else ""
-            lines.append(f"  ☐ {q_with_spec}{tol}")
-        elif item_type == "visual_inspection":
-            lines.append(f"  📷 {q_with_spec}")
-        else:
-            lines.append(f"  ☐ {q_with_spec}")
-
         if oem_spec:
             item["oem_spec"] = oem_spec[:300]
 
@@ -2281,7 +2689,7 @@ async def _build_checklist_response(
         "equipment_type": equipment_type,
         "template_name": name,
         "estimated_minutes": duration,
-        "checklist_text": "\n".join(lines),
+        "checklist_text": checklist_text,
         "items": items,
     }
 
@@ -2311,6 +2719,101 @@ class SentryInspectionResultRequest(BaseModel):
     ai_diagnosis: str | None = Field(None, description="AI-curated diagnosis summary")
     recommendations: str | None = Field(None, description="AI recommendations for FM")
     operator_password: str | None = Field(None, description="SENTINEL operator password for sensitive operations")
+
+
+class SentryInspectionReading(BaseModel):
+    """Structured numeric reading captured during a Sentry closeout."""
+
+    item_id: str = Field(..., description="Checklist/measurement item ID")
+    value: float = Field(..., description="Numeric reading value")
+    unit: str | None = Field(None, description="Measurement unit")
+    element_id: str | None = Field(None, description="Baseline element ID; defaults to item_id")
+    raw_text: str | None = Field(None, description="Original technician/OCR text")
+    attachment_id: str | None = Field(None, description="Optional service_attachments.id reference")
+    captured_at: datetime | None = Field(None, description="Capture timestamp")
+    source: str = Field("manual", description="manual, ocr, or sensor")
+    confidence: float | None = Field(None, ge=0, le=1, description="Extraction confidence")
+
+
+class SentryInspectionReadingsRequest(BaseModel):
+    """Structured readings submission from Sentry bot after /done."""
+
+    service_record_id: str | None = Field(None, description="Existing service_records.id")
+    work_order_code: str | None = Field(None, description="WO code used to resolve service record")
+    equipment_code: str | None = Field(None, description="Equipment code used to resolve latest service record")
+    readings: list[SentryInspectionReading] = Field(..., min_length=1)
+
+
+class SentryInspectionAttachment(BaseModel):
+    """File reference captured during a Sentry closeout."""
+
+    file_id: str | None = Field(None, description="Telegram file_id or document id")
+    file_type: str | None = Field(None, description="Source file type")
+    attachment_type: str | None = Field(None, description="service_sheet, issue_photo, thermal_image, etc.")
+    file_path: str | None = Field(None, description="Stored path or Telegram path")
+    file_name: str | None = Field(None, description="Original filename")
+    file_size_bytes: int | None = Field(None, ge=0)
+    mime_type: str | None = Field(None)
+    ocr_processed: bool = Field(False)
+    captured_at: datetime | None = Field(None)
+
+
+class SentryInspectionAttachmentsRequest(BaseModel):
+    """Attachment submission from Sentry bot after /done."""
+
+    service_record_id: str | None = Field(None, description="Existing service_records.id")
+    work_order_code: str | None = Field(None, description="WO code used to resolve service record")
+    equipment_code: str | None = Field(None, description="Equipment code used to resolve latest service record")
+    attachments: list[SentryInspectionAttachment] = Field(..., min_length=1)
+
+
+async def _resolve_sentry_service_record(
+    *,
+    service_record_id: str | None,
+    work_order_code: str | None,
+    equipment_code: str | None,
+) -> dict[str, Any]:
+    """Resolve a service record for Sentry capture endpoints."""
+    sr_repo = ServiceRecordRepository()
+    if service_record_id:
+        record = await sr_repo.get_by_id(service_record_id)
+        if not record:
+            raise HTTPException(status_code=404, detail=f"Service record not found: {service_record_id}")
+        return record
+
+    if work_order_code:
+        from app.database.repositories.work_order_repository import get_work_order_repository
+
+        wo_repo = get_work_order_repository()
+        work_order = await wo_repo.get_work_order_by_code(work_order_code.strip().upper())
+        if not work_order:
+            raise HTTPException(status_code=404, detail=f"Work order not found: {work_order_code}")
+        records = await sr_repo.list(filters={"work_order_id": work_order["id"]})
+        if records:
+            return next(
+                (
+                    record
+                    for record in records
+                    if str(record.get("status") or "").strip().lower() not in {"closed", "complete"}
+                ),
+                records[0],
+            )
+
+    if equipment_code:
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        equipment_result = sb.table("equipment").select("id").eq("code", equipment_code).limit(1).execute()
+        if not equipment_result.data:
+            raise HTTPException(status_code=404, detail=f"Equipment not found: {equipment_code}")
+        records = await sr_repo.list(filters={"equipment_id": equipment_result.data[0]["id"]})
+        if records:
+            return records[0]
+
+    raise HTTPException(
+        status_code=404,
+        detail="Service record could not be resolved from service_record_id, work_order_code, or equipment_code",
+    )
 
 
 @router.post("/inspection-result", status_code=status.HTTP_200_OK)
@@ -2478,6 +2981,106 @@ async def sentry_submit_inspection_result(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/inspection-readings", status_code=status.HTTP_200_OK)
+async def sentry_submit_inspection_readings(
+    req: SentryInspectionReadingsRequest,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Persist structured closeout readings and roll them into a periodic baseline."""
+    _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_readings")
+
+    try:
+        service_record = await _resolve_sentry_service_record(
+            service_record_id=req.service_record_id,
+            work_order_code=req.work_order_code,
+            equipment_code=req.equipment_code,
+        )
+        sr_repo = ServiceRecordRepository()
+        persisted = []
+        for reading in req.readings:
+            captured_at = reading.captured_at or datetime.now(UTC)
+            data = {
+                "reading_type": reading.item_id,
+                "element_id": reading.element_id or reading.item_id,
+                "value": str(reading.value),
+                "numeric_value": reading.value,
+                "unit": reading.unit,
+                "source": reading.source,
+                "confidence": reading.confidence,
+                "captured_at": captured_at.isoformat(),
+                "raw_text": reading.raw_text,
+                "attachment_id": reading.attachment_id,
+            }
+            data = {key: value for key, value in data.items() if value is not None}
+            persisted.append(await sr_repo.add_reading(service_record["id"], data))
+
+        from app.services.equipment_baseline_rollup_service import EquipmentBaselineRollupService
+
+        rollup = await EquipmentBaselineRollupService().rollup_service_record(service_record["id"])
+        return {
+            "success": True,
+            "service_record_id": service_record["id"],
+            "readings_written": len(persisted),
+            "reading_ids": [row.get("id") for row in persisted if row.get("id")],
+            "rollup": rollup,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Sentry inspection readings submission failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/inspection-attachments", status_code=status.HTTP_200_OK)
+async def sentry_submit_inspection_attachments(
+    req: SentryInspectionAttachmentsRequest,
+    x_sentry_secret: str | None = Header(None),
+):
+    """Persist closeout file references without changing inspection-result contract."""
+    _require_sentry_secret(x_sentry_secret, endpoint_name="inspection_attachments")
+
+    try:
+        service_record = await _resolve_sentry_service_record(
+            service_record_id=req.service_record_id,
+            work_order_code=req.work_order_code,
+            equipment_code=req.equipment_code,
+        )
+        sr_repo = ServiceRecordRepository()
+        persisted = []
+        for attachment in req.attachments:
+            if not attachment.file_id and not attachment.file_path:
+                raise HTTPException(status_code=400, detail="Each attachment requires file_id or file_path")
+            captured_at = attachment.captured_at or datetime.now(UTC)
+            data = {
+                "service_record_id": service_record["id"],
+                "attachment_type": attachment.attachment_type,
+                "file_path": attachment.file_path,
+                "file_name": attachment.file_name,
+                "file_size_bytes": attachment.file_size_bytes,
+                "mime_type": attachment.mime_type,
+                "file_id": attachment.file_id,
+                "file_type": attachment.file_type,
+                "captured_at": captured_at.isoformat(),
+                "ocr_processed": attachment.ocr_processed,
+            }
+            data = {key: value for key, value in data.items() if value is not None}
+            persisted.append(await sr_repo.add_attachment(data))
+
+        return {
+            "success": True,
+            "service_record_id": service_record["id"],
+            "attachments_written": len(persisted),
+            "attachment_ids": [row.get("id") for row in persisted if row.get("id")],
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Sentry inspection attachments submission failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ---------------------------------------------------------------------------
 # Work Order Creation (Sentry-authenticated)
 # ---------------------------------------------------------------------------
@@ -2516,6 +3119,8 @@ async def sentry_create_work_order(
         wo_repo = get_work_order_repository()
         tech_repo = get_technician_repository()
 
+        equipment = await resolve_equipment_reference(req.equipment_code)
+
         tech = None
         if req.assigned_to:
             # Manual override: look up technician by name
@@ -2550,6 +3155,11 @@ async def sentry_create_work_order(
             "created_by": who,
         }
 
+        if equipment:
+            wo_data["equipment_id"] = equipment["id"]
+            wo_data["site_id"] = equipment.get("site_id")
+            wo_data["equipment_code"] = equipment.get("code") or req.equipment_code
+
         if tech:
             wo_data["assigned_to"] = tech.get("name")
             wo_data["assigned_team"] = tech.get("specialty")
@@ -2566,11 +3176,13 @@ async def sentry_create_work_order(
             wo_notify_data: dict[str, Any] = {
                 "work_order_id": created.get("id"),
                 "work_order_code": created.get("code"),
-                "equipment_id": "00000000-0000-0000-0000-000000000001",
-                "site_id": "",
+                "equipment_id": equipment["id"] if equipment else "00000000-0000-0000-0000-000000000001",
+                "site_id": equipment.get("site_id", "") if equipment else "",
                 "zone_id": "",
-                "equipment_code": req.equipment_code,
-                "equipment_name": req.equipment_code,
+                "equipment_code": equipment.get("code") if equipment else req.equipment_code,
+                "equipment_name": equipment.get("name")
+                if equipment and equipment.get("name")
+                else (equipment.get("code") if equipment else req.equipment_code),
                 "service_type": "callout",
                 "criticality": req.priority.upper(),
                 "problem_description": req.description,
@@ -3130,7 +3742,7 @@ async def sentry_work_order_detail(
 ):
     """Return full work order details including resolved equipment_code.
 
-    Used by the technician closeout skill after `done #WO-XXXX`.
+    Used by the technician closeout skill after `/done-WO-XXXX`.
     Joins equipment table to return equipment_code alongside WO fields.
     Sentry-authenticated (bot-level), no JWT required.
     """
@@ -3832,6 +4444,21 @@ async def handle_telegram_message(
             sender=sender,
         )
 
+    done_wo_code = _extract_done_work_order_code(payload.text)
+    if done_wo_code:
+        from app.services.telegram_message_sender import TelegramMessageSender
+
+        bot_token = settings.sentry_tech_bot_token or settings.telegram_bot_token
+        if not bot_token:
+            return {"success": False, "error": "Technician bot token is not configured"}
+        sender = TelegramMessageSender(bot_token)
+        return await _start_closeout_session_from_done_command(
+            chat_id=payload.chat_id,
+            telegram_user_id=payload.user_id,
+            wo_code=done_wo_code,
+            sender=sender,
+        )
+
     # Prompt guard
     if payload.text:
         guard_result = score_prompt(payload.text, "webhook")
@@ -4059,6 +4686,29 @@ async def handle_telegram_callback(
             pass
         return {"success": True, "intent": "prediction_work_order", "confirmed": result["success"], "result": result}
 
+    work_order_info_sender = (
+        TelegramMessageSender(settings.sentry_tech_bot_token)
+        if getattr(settings, "sentry_tech_bot_token", None)
+        else sender
+    )
+
+    if payload.data.startswith("woinfo:"):
+        wo_code = payload.data.split(":", 1)[1].strip()
+        return await _handle_work_order_info_callback(payload.chat_id, wo_code, work_order_info_sender)
+
+    if payload.data.startswith("/info-"):
+        target = payload.data.removeprefix("/info-").strip()
+        if _is_logical_work_order_target(target):
+            wo_code = await _find_latest_logical_work_order_code(target)  # type: ignore[assignment]  # None handled by guard below
+            if wo_code:
+                return await _handle_work_order_info_callback(payload.chat_id, wo_code, work_order_info_sender)
+            if work_order_info_sender:
+                await work_order_info_sender.send_text(
+                    chat_id=payload.chat_id,
+                    text=f"No work order was found for logical target {html.escape(target)}.",
+                )
+            return {"success": True, "intent": "work_order_info", "confirmed": False}
+
     if payload.data.startswith("wo:"):
         from app.services.notification_service import notification_service
 
@@ -4283,11 +4933,18 @@ async def handle_telegram_callback(
             }
 
     if payload.data.startswith("closeout:"):
+        from app.services.telegram_message_sender import TelegramMessageSender
+
+        closeout_sender = (
+            TelegramMessageSender(settings.sentry_tech_bot_token or bot_token)
+            if (settings.sentry_tech_bot_token or bot_token)
+            else sender
+        )
         return await _handle_closeout_callback(
             chat_id=payload.chat_id,
             telegram_user_id=payload.user_id,
             callback_data=payload.data,
-            sender=sender,
+            sender=closeout_sender,
         )
 
     # Residential onboarding — platform selection buttons (platform:solarman, platform:victron, etc.)
@@ -4325,17 +4982,27 @@ async def handle_telegram_callback(
             return {"success": True, "intent": "rec_ack", "confirmed": True}
         return {"success": False, "error": "invalid_rec_callback"}
 
-    # Inline "✅ Done" button on WO notification card — send raw WO code so it goes
-    # to the LLM (not the engine's built-in handler which matches 'done #WO' / 'closeout').
-    if payload.data.startswith("done #WO-") or payload.data.startswith("done #"):
-        try:
-            parts = payload.data.replace("#", "").split(" ", 1)
-            wo_ref = parts[1] if len(parts) > 1 else payload.data
-            if sender:
-                await sender.send_text(chat_id=payload.chat_id, text=f"▶closeout {wo_ref}")
-        except Exception as e:
-            logger.error("Failed to dispatch closeout via Done button: %s", e)
-        return {"success": True, "intent": "closeout", "method": "button_done"}
+    # Inline "Done" button on WO notification card starts deterministic backend
+    # closeout directly. Do not bounce back through the embedded agent.
+    if payload.data.startswith("/done-") or payload.data.startswith("done #WO-") or payload.data.startswith("done #"):
+        wo_code = _extract_done_work_order_code(payload.data)  # type: ignore[assignment]  # None handled by guard below
+        if wo_code:
+            from app.services.telegram_message_sender import TelegramMessageSender
+
+            closeout_sender = (
+                TelegramMessageSender(settings.sentry_tech_bot_token or bot_token)
+                if (settings.sentry_tech_bot_token or bot_token)
+                else sender
+            )
+            if not closeout_sender:
+                return {"success": False, "error": "Technician bot token is not configured"}
+            return await _start_closeout_session_from_done_command(
+                chat_id=payload.chat_id,
+                telegram_user_id=payload.user_id,
+                wo_code=wo_code,
+                sender=closeout_sender,
+            )
+        return {"success": True, "intent": "closeout", "confirmed": False, "method": "button_done"}
 
     # Classify and route
     from app.services.telegram_conversation_manager import get_conversation_manager

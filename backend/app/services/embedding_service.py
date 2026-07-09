@@ -194,6 +194,33 @@ class VoyageAPIProvider:
             self._client = voyageai.Client(api_key=effective_key) if effective_key else voyageai.Client()
         return self._client
 
+    @staticmethod
+    def _response_tokens(result) -> int:
+        usage = getattr(result, "usage", None)
+        if isinstance(usage, dict):
+            return int(usage.get("total_tokens") or usage.get("tokens") or 0)
+        usage_tokens = getattr(usage, "total_tokens", None) if usage is not None else None
+        return int(getattr(result, "total_tokens", usage_tokens) or 0)
+
+    def _record_usage(self, *, model: str, tokens: int, input_type: EmbeddingInputType) -> None:
+        if tokens <= 0:
+            return
+        try:
+            from app.services.ai_usage_tracker import usage_tracker
+
+            usage_tracker.record(
+                provider="voyage",
+                model=model,
+                input_tokens=tokens,
+                output_tokens=0,
+                source="rag_embedding",
+                site_id="system",
+                task_class="embedding",
+                feature=f"rag_embedding_{input_type or 'none'}",
+            )
+        except Exception:
+            logger.debug("Failed to record Voyage embedding usage", exc_info=True)
+
     def warmup(self) -> None:
         _ = self.client
 
@@ -219,6 +246,7 @@ class VoyageAPIProvider:
                 input_type=input_type,
                 output_dimension=self.dimension,
             )
+            self._record_usage(model=self.model_name, tokens=self._response_tokens(result), input_type=input_type)
             embeddings.extend(result.embeddings)
         return embeddings
 
@@ -235,6 +263,11 @@ class VoyageAPIProvider:
             model=self.context_model_name,
             input_type=input_type,
             output_dimension=self.dimension,
+        )
+        self._record_usage(
+            model=self.context_model_name,
+            tokens=self._response_tokens(result),
+            input_type=input_type,
         )
         results_by_index = {item.index: item.embeddings for item in result.results}
         return [results_by_index[i] for i in range(len(grouped_texts))]

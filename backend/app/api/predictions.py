@@ -96,6 +96,9 @@ def format_prediction_for_frontend(pred: dict) -> dict:
         "equipment_id": equipment.get("code", pred["equipment_id"]),
         "equipment_name": equipment.get("name", "Unknown"),
         "equipment_type": equipment.get("type", "unknown"),
+        # Baseline lifecycle state drives the frontend prediction gate:
+        # only rolling_active/locked equipment renders prediction cards.
+        "baseline_state": equipment.get("baseline_state") or "none",
         "site_id": building.get("code", pred["site_id"]),
         "site_name": building.get("name", "Unknown"),
         # Prediction details
@@ -158,7 +161,7 @@ async def list_predictions(
         .select("""
         *,
         building:sites!inner(id, name, code),
-        equipment:equipment!inner(id, name, type)
+        equipment:equipment!inner(id, code, name, type, baseline_state)
     """)
         .eq("status", "active")
     )  # Only active predictions
@@ -187,13 +190,12 @@ async def list_predictions(
     if min_probability is not None:
         query = query.gte("probability_percent", min_probability)
 
-    # Filter by confidence (using normalized confidence column)
+    # Filter by confidence (stored as canonical strings: low/medium/high)
     if min_confidence is not None:
-        valid_confidences = {"high": 3, "medium": 2, "low": 1}
-        min_level = valid_confidences.get(min_confidence.lower())
-        if min_level is not None:
-            # confidence is stored as integer 1-3 (low=1, medium=2, high=3)
-            query = query.gte("confidence", min_level)
+        confidence_order = ["low", "medium", "high"]
+        if min_confidence.lower() in confidence_order:
+            allowed = confidence_order[confidence_order.index(min_confidence.lower()) :]
+            query = query.in_("confidence", allowed)
 
     # Filter to predictions that have last_reading in evidence
     if has_last_reading:
@@ -270,7 +272,7 @@ async def get_prediction(prediction_code: str) -> dict:
         .select("""
         *,
         building:sites!inner(id, name, code, address),
-        equipment:equipment!inner(id, name, type, manufacturer, model)
+        equipment:equipment!inner(id, code, name, type, manufacturer, model, baseline_state)
     """)
         .eq("code", prediction_code)
         .execute()
@@ -281,6 +283,107 @@ async def get_prediction(prediction_code: str) -> dict:
 
     prediction = format_prediction_for_frontend(response.data[0])
     return prediction
+
+
+@router.get("/predictions/{prediction_code}/lineage")
+async def get_prediction_lineage(prediction_code: str) -> dict:
+    """Phase 236-01 (AC-7): evidence chain behind a prediction.
+
+    Traces prediction → equipment → active rollup baseline → source service
+    record → structured readings, so an operator can answer "show me the work
+    order and readings that produced this baseline". Returns a grounded flag:
+    false when the equipment has no rolling baseline yet (prediction is not
+    baseline-grounded — the strict tab gate withholds it), true when a real
+    baseline + source record back it.
+
+    Raises:
+        HTTPException 404: If the prediction is not found.
+    """
+    repo = PredictionRepository()
+    client = repo.client
+
+    pred = (
+        client.table("predictions")
+        .select("id, code, equipment_id, equipment:equipment!inner(id, code, baseline_state)")
+        .eq("code", prediction_code)
+        .execute()
+    )
+    if not pred.data:
+        raise HTTPException(status_code=404, detail=f"Prediction {prediction_code} not found")
+
+    row = pred.data[0]
+    equipment = row.get("equipment") or {}
+    equipment_uuid = equipment.get("id")
+    baseline_state = equipment.get("baseline_state") or "none"
+
+    lineage: dict = {
+        "prediction_code": prediction_code,
+        "equipment_code": equipment.get("code"),
+        "baseline_state": baseline_state,
+        "grounded": baseline_state in ("rolling_active", "locked"),
+        "baseline": None,
+        "service_record": None,
+        "readings": [],
+    }
+
+    if not equipment_uuid:
+        return lineage
+
+    baseline = (
+        client.table("equipment_baselines")
+        .select("id, baseline_date, baseline_type, source_record_id, baseline_values, captured_by")
+        .eq("equipment_id", equipment_uuid)
+        .eq("status", "active")
+        .order("baseline_date", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not baseline.data:
+        return lineage
+
+    b = baseline.data[0]
+    element_values = b.get("baseline_values") if isinstance(b.get("baseline_values"), dict) else {}
+    lineage["baseline"] = {
+        "id": b.get("id"),
+        "baseline_date": b.get("baseline_date"),
+        "baseline_type": b.get("baseline_type"),
+        "captured_by": b.get("captured_by"),
+        "elements": [
+            {
+                "element_id": element_id,
+                "value": (v or {}).get("value"),
+                "sigma": (v or {}).get("sigma"),
+                "n": (v or {}).get("n"),
+                "unit": (v or {}).get("unit"),
+            }
+            for element_id, v in element_values.items()
+            if isinstance(v, dict)
+        ],
+    }
+
+    source_record_id = b.get("source_record_id")
+    if not source_record_id:
+        return lineage
+
+    record = (
+        client.table("service_records")
+        .select("id, code, work_order_id, service_type, technician_name")
+        .eq("id", source_record_id)
+        .limit(1)
+        .execute()
+    )
+    if record.data:
+        lineage["service_record"] = record.data[0]
+
+    readings = (
+        client.table("service_readings")
+        .select("element_id, reading_type, numeric_value, value, unit, captured_at")
+        .eq("service_record_id", source_record_id)
+        .order("captured_at", desc=True)
+        .execute()
+    )
+    lineage["readings"] = readings.data or []
+    return lineage
 
 
 @router.get("/predictions/summary/overview")

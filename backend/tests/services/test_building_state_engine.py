@@ -6,7 +6,7 @@ from app.services.building_state_engine import build_building_state_payload
 from app.services.building_state_models import NarrativeCandidate, NarrativeLocation
 from app.services.cockpit_issue_fusion import CockpitIssueFusionService
 from app.services.dominant_narrative_selector import select_dominant_narrative
-from app.services.narrative_candidate_generator import generate_narrative_candidates
+from app.services.narrative_candidate_generator import _resolve_epicenter_equipment, generate_narrative_candidates
 
 
 class _NoOpRepo:
@@ -18,6 +18,37 @@ class _NoOpRepo:
 
     def get_all(self, *args, **kwargs):
         return []
+
+
+class _FakeSupabaseResponse:
+    def __init__(self, data):
+        self.data = data
+
+
+class _FakeSupabaseQuery:
+    def __init__(self, data):
+        self._data = data
+
+    def select(self, *args, **kwargs):
+        return self
+
+    def eq(self, *args, **kwargs):
+        return self
+
+    def execute(self):
+        return _FakeSupabaseResponse(self._data)
+
+
+class _FakeSupabaseClient:
+    def __init__(self, equipment_rows):
+        self._equipment_rows = equipment_rows
+
+    def table(self, table_name):
+        if table_name == "sites":
+            return _FakeSupabaseQuery([{"id": "site-uuid"}])
+        if table_name == "equipment":
+            return _FakeSupabaseQuery(self._equipment_rows)
+        return _FakeSupabaseQuery([])
 
 
 def _candidate(
@@ -41,6 +72,65 @@ def _candidate(
         propagation_risk=propagation_risk,
         eroding_margin=eroding_margin,
     )
+
+
+def test_epicenter_resolver_excludes_low_confidence_empty_data_assets(monkeypatch):
+    fake_client = _FakeSupabaseClient(
+        [
+            {
+                "code": "S002-UPS-B01",
+                "type": "ups",
+                "location": "B1 UPS / Server Room",
+                "health_score": 63,
+                "health_confidence": "low",
+                "operating_data": {},
+                "zone_key": "Zone-B",
+            },
+            {
+                "code": "S002-CHILLER-B1-001",
+                "type": "chiller",
+                "location": "B1 Plant Room",
+                "health_score": 71,
+                "health_confidence": "medium",
+                "operating_data": {"staging_state": {"value": 1}},
+                "zone_key": "Zone-B",
+            },
+        ]
+    )
+    monkeypatch.setattr("app.database.supabase_client.get_supabase_client", lambda: fake_client)
+
+    assert _resolve_epicenter_equipment("site-002") is None
+
+
+def test_epicenter_resolver_keeps_corroborated_low_health_asset(monkeypatch):
+    fake_client = _FakeSupabaseClient(
+        [
+            {
+                "code": "S002-UPS-B01",
+                "type": "ups",
+                "location": "B1 UPS / Server Room",
+                "health_score": 63,
+                "health_confidence": "low",
+                "operating_data": {},
+                "zone_key": "Zone-B",
+            },
+            {
+                "code": "S002-GEN-B01",
+                "type": "generator",
+                "location": "B1 Generator Room",
+                "health_score": 64,
+                "health_confidence": "medium",
+                "operating_data": {},
+                "zone_key": "Zone-B",
+            },
+        ]
+    )
+    monkeypatch.setattr("app.database.supabase_client.get_supabase_client", lambda: fake_client)
+
+    resolved = _resolve_epicenter_equipment("site-002")
+
+    assert resolved is not None
+    assert resolved["equipment_id"] == "S002-GEN-B01"
 
 
 def test_resolve_building_posture_returns_calm_when_no_candidates():

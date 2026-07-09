@@ -35,6 +35,79 @@ def _api_key_headers() -> dict[str, str]:
     return {"X-Sentry-API-Key": settings.sentry_bot_api_key}
 
 
+class _FakeSupabaseResult:
+    data = [
+        {
+            "content": "# Site Handbook",
+            "uploaded_by": "test",
+            "version": 1,
+            "updated_at": "2026-07-06T00:00:00+00:00",
+        }
+    ]
+
+
+class _FakeSupabaseTable:
+    def select(self, *_args):
+        return self
+
+    def eq(self, *_args):
+        return self
+
+    def limit(self, *_args):
+        return self
+
+    def execute(self):
+        return _FakeSupabaseResult()
+
+
+class _FakeSupabaseClient:
+    def table(self, name):
+        assert name == "site_handbooks"
+        return _FakeSupabaseTable()
+
+
+@pytest.mark.asyncio
+async def test_building_handbook_accepts_jwt_site_access_without_sentry_headers(
+    client,
+    auth_headers_admin,
+    monkeypatch,
+    preserve_settings_state,
+):
+    """Settings UI should use user JWT auth, not browser-exposed Sentry credentials."""
+    settings.demo_mode = False
+    settings.ingestion_mode = "shadow_live"
+    settings.sentry_webhook_secret = "test-sentry-secret"
+    settings.sentry_bot_api_key = "test-sentry-api-key"
+    monkeypatch.setenv("SENTRY_BOT_API_KEY", "test-sentry-api-key")
+    monkeypatch.setattr("app.database.supabase_client.get_supabase_client", lambda: _FakeSupabaseClient())
+
+    resp = await client.get("/api/sentry/building-handbook?site_id=site-002", headers=auth_headers_admin)
+
+    assert resp.status_code == 200
+    assert resp.json()["content"] == "# Site Handbook"
+
+
+@pytest.mark.asyncio
+async def test_building_handbook_rejects_bad_sentry_key_without_jwt(
+    client,
+    monkeypatch,
+    preserve_settings_state,
+):
+    """Invalid service credentials still fail when no user JWT is present."""
+    settings.demo_mode = False
+    settings.ingestion_mode = "shadow_live"
+    settings.sentry_webhook_secret = "test-sentry-secret"
+    settings.sentry_bot_api_key = "test-sentry-api-key"
+    monkeypatch.setenv("SENTRY_BOT_API_KEY", "test-sentry-api-key")
+
+    resp = await client.get(
+        "/api/sentry/building-handbook?site_id=site-002",
+        headers={"X-Sentry-API-Key": "wrong"},
+    )
+
+    assert resp.status_code == 403
+
+
 @pytest.mark.asyncio
 async def test_pending_work_orders_public_in_simulation_without_secret(
     client,

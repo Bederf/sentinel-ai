@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
+DOCUMENT_EMBED_BATCH_SIZE = 500
 
 
 class ConceptVectorDBService:
@@ -87,7 +88,10 @@ class ConceptVectorDBService:
             return 0
 
         chunks = self._split_into_chunks(text, chunk_size, chunk_overlap)
-        embeddings = self.embedding_service.embed_documents([c["content"] for c in chunks])
+        embeddings = self.embedding_service.embed_documents(
+            [c["content"] for c in chunks],
+            batch_size=DOCUMENT_EMBED_BATCH_SIZE,
+        )
 
         chunk_records = []
         for i, (chunk, embedding) in enumerate(zip(chunks, embeddings, strict=False)):

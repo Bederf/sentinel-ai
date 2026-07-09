@@ -11,7 +11,7 @@ import asyncio
 import contextlib
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -32,41 +32,61 @@ class SystemHealthService:
 
     # ==================== Health Aggregation ====================
 
-    async def get_current_health(self) -> dict[str, Any]:
+    async def get_current_health(self, site_id: str | None = None) -> dict[str, Any]:
         """
         Aggregate health by probing real services.
+
+        Args:
+            site_id: When set, scope probes to this site. Global-only probes
+                     (redis, event_bus, n8n, servicenow, notifications) return
+                     not_configured with no score penalty.
 
         Returns:
             Dict with overall_status, overall_score, and component details
         """
-        checks = await asyncio.gather(
-            self._check_supabase(),
-            self._check_redis(),
-            self._check_event_bus(),
-            self._check_n8n(),
-            self._check_servicenow(),
-            self._check_notifications(),
-            self._check_device_manager(),
-            self._check_lighting(),
-            self._check_supervisor(),
-            self._check_field_network(),
-            self._check_obix(),
+        # Site-scoped probes — these filter by site
+        scoped = await asyncio.gather(
+            self._check_supabase(site_id),
+            self._check_device_manager(site_id),
+            self._check_lighting(site_id),
+            self._check_supervisor(site_id),
+            self._check_field_network(site_id),
+            self._check_obix(site_id),
             return_exceptions=True,
         )
 
-        labels = [
+        scoped_labels = [
             "supabase",
-            "redis_cache",
-            "event_bus",
-            "n8n",
-            "servicenow",
-            "notifications",
             "device_manager",
             "lighting",
             "supervisor",
             "field_network",
             "obix",
         ]
+
+        # Global-only probes — skipped when site-scoped
+        if site_id:
+            global_probes = [
+                {"score": 100, "status": "not_configured", "note": "Global — not scoped per site"},
+                {"score": 100, "status": "not_configured", "note": "Global — not scoped per site"},
+                {"score": 100, "status": "not_configured", "note": "Global — not scoped per site"},
+                {"score": 100, "status": "not_configured", "note": "Global — not scoped per site"},
+                {"score": 100, "status": "not_configured", "note": "Global — not scoped per site"},
+            ]
+            global_labels = ["redis_cache", "event_bus", "n8n", "servicenow", "notifications"]
+        else:
+            global_probes = await asyncio.gather(
+                self._check_redis(),
+                self._check_event_bus(),
+                self._check_n8n(),
+                self._check_servicenow(),
+                self._check_notifications(),
+                return_exceptions=True,
+            )
+            global_labels = ["redis_cache", "event_bus", "n8n", "servicenow", "notifications"]
+
+        checks = scoped + global_probes
+        labels = scoped_labels + global_labels
 
         component_scores: dict[str, int] = {}
         component_details: dict[str, dict[str, Any]] = {}
@@ -99,8 +119,10 @@ class SystemHealthService:
             "obix": 0.05,
         }
 
+        total_weight = sum(weights.values())
         weighted_score = sum(component_scores.get(c, 0) * w for c, w in weights.items())
-        overall_score = int(weighted_score)
+        overall_score = int(weighted_score / total_weight) if total_weight else 0
+        overall_score = min(100, max(0, overall_score))
 
         if overall_score >= 80:
             overall_status = "healthy"
@@ -109,20 +131,57 @@ class SystemHealthService:
         else:
             overall_status = "critical"
 
-        return {
-            "timestamp": datetime.utcnow().isoformat(),
+        active_alerts = self._get_active_alerts(limit=100)
+        critical_alert_count = sum(1 for alert in active_alerts if alert.get("severity") == "critical")
+        if critical_alert_count and overall_status == "healthy":
+            overall_status = "degraded"
+
+        result = {
+            "timestamp": datetime.now(UTC).isoformat(),
             "overall_status": overall_status,
             "overall_score": overall_score,
             "component_scores": component_scores,
             "component_details": component_details,
+            "active_alerts": active_alerts,
             "errors": errors,
         }
+        if site_id:
+            result["site_id"] = site_id
+        return result
+
+    def _get_active_alerts(self, *, limit: int) -> list[dict[str, Any]]:
+        """Return active operational alerts for the System Health snapshot."""
+        try:
+            response = (
+                self.client.table("alerts")
+                .select(
+                    "id,site_id,equipment_id,type,severity,status,title,message,"
+                    "source,source_dedupe_key,created_at,last_seen_at"
+                )
+                .eq("status", "active")
+                .order("last_seen_at", desc=True)
+                .limit(limit)
+                .execute()
+            )
+            return response.data or []
+        except Exception as exc:
+            logger.warning("System health active alert query failed: %s", exc)
+            return []
 
     # ==================== Individual Probes ====================
 
-    async def _check_supabase(self) -> dict[str, Any]:
+    async def _check_supabase(self, site_id: str | None = None) -> dict[str, Any]:
         """Probe Supabase with a lightweight query."""
         try:
+            if site_id:
+                site_rows = self.client.table("sites").select("code").eq("code", site_id).execute()
+                return {
+                    "score": 95,
+                    "status": "healthy",
+                    "note": f"Connected · site {site_id} found"
+                    if site_rows.data
+                    else f"Connected · site {site_id} not found",
+                }
             result = self.client.table("sites").select("code", count="exact").execute()
             records = result.data or []
             sentinel_count = sum(1 for row in records if str(row.get("code", "")).startswith("site-"))
@@ -211,6 +270,13 @@ class SystemHealthService:
 
     async def _check_n8n(self) -> dict[str, Any]:
         """Check n8n connectivity."""
+        if not settings.n8n_enabled:
+            return {
+                "score": 100,
+                "status": "not_configured",
+                "note": "Disabled in config",
+            }
+
         try:
             from app.services.n8n_service import N8nConnectionStatus, get_n8n_service
 
@@ -245,8 +311,8 @@ class SystemHealthService:
             svc = get_servicenow_service()
             if not svc.is_configured:
                 return {
-                    "score": 50,
-                    "status": "degraded",
+                    "score": 100,
+                    "status": "not_configured",
                     "note": "Credentials not configured",
                 }
             domain = svc.config.domain or "unknown"
@@ -281,9 +347,24 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 30, "status": "degraded", "note": f"Check failed: {e}"}
 
-    async def _check_device_manager(self) -> dict[str, Any]:
+    async def _check_device_manager(self, site_id: str | None = None) -> dict[str, Any]:
         """Check Device Manager state."""
         try:
+            if site_id:
+                config_result = (
+                    self.client.table("site_adapter_config")
+                    .select("protocol")
+                    .eq("site_id", site_id)
+                    .eq("enabled", True)
+                    .execute()
+                )
+                adapter_count = len(config_result.data or [])
+                return {
+                    "score": 90 if adapter_count > 0 else 50,
+                    "status": "healthy" if adapter_count > 0 else "degraded",
+                    "note": f"{adapter_count} adapters configured for {site_id}",
+                }
+
             from app.services.device_abstraction import device_manager
 
             if not device_manager._initialized:
@@ -301,11 +382,10 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 40, "status": "degraded", "note": f"Check failed: {e}"}
 
-    async def _check_lighting(self) -> dict[str, Any]:
-        """Check lighting telemetry for active commercial sites that use lighting.
+    async def _check_lighting(self, site_id: str | None = None) -> dict[str, Any]:
+        """Check lighting telemetry.
 
-        Residential rows and inactive/future sites are intentionally excluded
-        from this commercial SENTINEL platform probe.
+        When site_id is set, scopes the check to that specific site only.
         """
         try:
             from datetime import date, datetime, timedelta, timezone
@@ -314,37 +394,41 @@ class SystemHealthService:
             from app.database.supabase_client import get_supabase_client
 
             supabase = get_supabase_client()
-            modules_result = (
-                supabase.table("site_modules")
-                .select("site_id,module_type,status")
-                .in_("module_type", ["lighting", "lighting_control"])
-                .eq("status", "active")
-                .execute()
-            )
-            module_site_ids = {
-                str(row.get("site_id"))
-                for row in (modules_result.data or [])
-                if str(row.get("site_id", "")).startswith("site-")
-            }
-            if not module_site_ids:
-                return {
-                    "score": 70,
-                    "status": "not_configured",
-                    "note": "No active commercial SENTINEL site has lighting telemetry enabled",
-                }
 
-            sites_result = (
-                supabase.table("sites")
-                .select("code,name,sentinel_processing_enabled")
-                .in_("code", sorted(module_site_ids))
-                .eq("sentinel_processing_enabled", True)
-                .execute()
-            )
-            lighting_sites = sorted(
-                str(row.get("code"))
-                for row in (sites_result.data or [])
-                if str(row.get("code", "")).startswith("site-")
-            )
+            if site_id:
+                lighting_sites = [site_id]
+            else:
+                modules_result = (
+                    supabase.table("site_modules")
+                    .select("site_id,module_type,status")
+                    .in_("module_type", ["lighting", "lighting_control"])
+                    .eq("status", "active")
+                    .execute()
+                )
+                module_site_ids = {
+                    str(row.get("site_id"))
+                    for row in (modules_result.data or [])
+                    if str(row.get("site_id", "")).startswith("site-")
+                }
+                if not module_site_ids:
+                    return {
+                        "score": 70,
+                        "status": "not_configured",
+                        "note": "No active commercial SENTINEL site has lighting telemetry enabled",
+                    }
+
+                sites_result = (
+                    supabase.table("sites")
+                    .select("code,name,sentinel_processing_enabled")
+                    .in_("code", sorted(module_site_ids))
+                    .eq("sentinel_processing_enabled", True)
+                    .execute()
+                )
+                lighting_sites = sorted(
+                    str(row.get("code"))
+                    for row in (sites_result.data or [])
+                    if str(row.get("code", "")).startswith("site-")
+                )
             if not lighting_sites:
                 return {
                     "score": 70,
@@ -448,46 +532,120 @@ class SystemHealthService:
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Error: {e}"}
 
-    async def _check_supervisor(self) -> dict[str, Any]:
-        """Check BMS supervisor connectivity via ShadowModePollingService.
-
-        ShadowModePollingService polls the Desigo CC supervisor bridge.
-        """
+    async def _check_supervisor(self, site_id: str | None = None) -> dict[str, Any]:
+        """Check BMS supervisor connectivity from persisted bridge health."""
         try:
-            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
+            site_code = site_id or get_primary_site_code()
+            if not site_code:
+                return {"score": 100, "status": "not_configured", "note": "No primary site configured"}
+            status = self._get_bridge_runtime_status(site_code)
+            if status["connected"]:
+                return {"score": 90, "status": "healthy", "note": status["note"]}
+            return {"score": 0, "status": "critical", "note": f"Supervisor not connected: {status['reason']}"}
+        except Exception as e:
+            return {"score": 0, "status": "critical", "note": f"Error: {e}"}
 
-            shadow = get_shadow_mode_polling_service()
-            status = shadow.status
-            if isinstance(status, dict) and status.get("connected"):
-                poll_count = status.get("poll_count", 0)
-                ml_hours = status.get("ml_hours_ingested", 0)
+    async def _check_field_network(self, site_id: str | None = None) -> dict[str, Any]:
+        """Check field network (BACnet/IP) connectivity from persisted bridge health."""
+        try:
+            site_code = site_id or get_primary_site_code()
+            if not site_code:
+                return {"score": 100, "status": "not_configured", "note": "No primary site configured"}
+            if not self._site_has_enabled_adapter(site_code, {"bacnet", "modbus", "knx"}):
                 return {
-                    "score": 90,
-                    "status": "healthy",
-                    "note": f"Supervisor bridge connected · {poll_count} polls · {ml_hours}h ML ingested",
+                    "score": 100,
+                    "status": "not_configured",
+                    "note": f"No direct field-network adapter configured for {site_code}",
                 }
-            reason = status.get("reason", "not polled") if isinstance(status, dict) else "unknown"
-            return {"score": 0, "status": "critical", "note": f"Supervisor not connected: {reason}"}
-        except Exception as e:
-            return {"score": 0, "status": "critical", "note": f"Error: {e}"}
-
-    async def _check_field_network(self) -> dict[str, Any]:
-        """Check field network (BACnet/IP) connectivity via ShadowModePollingService."""
-        try:
-            from app.services.shadow_mode_polling import get_shadow_mode_polling_service
-
-            shadow = get_shadow_mode_polling_service()
-            status = shadow.status
-            if isinstance(status, dict) and status.get("connected"):
+            status = self._get_bridge_runtime_status(get_primary_site_code())
+            if status["connected"]:
                 return {"score": 90, "status": "healthy", "note": "Field network connected"}
-            return {"score": 0, "status": "critical", "note": "Field network not connected"}
+            return {"score": 0, "status": "critical", "note": f"Field network not connected: {status['reason']}"}
         except Exception as e:
             return {"score": 0, "status": "critical", "note": f"Error: {e}"}
 
-    async def _check_obix(self) -> dict[str, Any]:
+    def _site_has_enabled_adapter(self, site_code: str, protocols: set[str]) -> bool:
+        response = (
+            self.client.table("site_adapter_config")
+            .select("protocol")
+            .eq("site_id", site_code)
+            .eq("enabled", True)
+            .execute()
+        )
+        return any(str(row.get("protocol") or "").lower() in protocols for row in (response.data or []))
+
+    def _get_bridge_runtime_status(self, site_code: str) -> dict[str, Any]:
+        """Return bridge connectivity from persisted health, not worker-local memory."""
+        now = datetime.now(UTC)
+
+        adapter_resp = (
+            self.client.table("adapter_health")
+            .select("timestamp,is_healthy,error_message,metadata")
+            .eq("site_id", site_code)
+            .eq("adapter_type", "shadow_bridge")
+            .order("timestamp", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if adapter_resp.data:
+            row = adapter_resp.data[0]
+            checked_at = self._parse_datetime(row.get("timestamp"))
+            age_seconds = (now - checked_at).total_seconds() if checked_at else None
+            if row.get("is_healthy") and age_seconds is not None and age_seconds <= 300:
+                metadata = row.get("metadata") or {}
+                last_telemetry_at = metadata.get("last_telemetry_at")
+                return {
+                    "connected": True,
+                    "note": f"Supervisor bridge connected · telemetry {last_telemetry_at or 'fresh'}",
+                }
+            if age_seconds is not None and age_seconds > 300:
+                return {"connected": False, "reason": f"adapter health stale ({int(age_seconds)}s)"}
+            return {"connected": False, "reason": row.get("error_message") or "adapter unhealthy"}
+
+        log_resp = (
+            self.client.table("log_sources")
+            .select("last_sync_at,last_sync_status")
+            .like("name", f"Shadow Bridge ({site_code})")
+            .eq("is_active", True)
+            .order("last_sync_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if log_resp.data:
+            row = log_resp.data[0]
+            last_sync_at = self._parse_datetime(row.get("last_sync_at"))
+            age_seconds = (now - last_sync_at).total_seconds() if last_sync_at else None
+            if row.get("last_sync_status") == "success" and age_seconds is not None and age_seconds <= 600:
+                return {"connected": True, "note": f"Supervisor bridge connected · last sync {int(age_seconds)}s ago"}
+            if age_seconds is not None:
+                return {"connected": False, "reason": f"last sync stale ({int(age_seconds)}s)"}
+            return {"connected": False, "reason": row.get("last_sync_status") or "not_synced"}
+
+        return {"connected": False, "reason": "not_polled"}
+
+    @staticmethod
+    def _parse_datetime(value: Any) -> datetime | None:
+        if not value:
+            return None
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=UTC)
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+
+    async def _check_obix(self, site_id: str | None = None) -> dict[str, Any]:
         """Check ObiX API connectivity for weather/external data via OBIXClient."""
         try:
             from app.services.niagara.obix_client import get_obix_client
+
+            site_code = site_id or get_primary_site_code()
+            configured_in_settings = bool(
+                settings.niagara_obix_host and settings.niagara_obix_username and settings.niagara_obix_password
+            )
+            if site_code and not configured_in_settings and not self._site_has_enabled_adapter(site_code, {"obix"}):
+                return {
+                    "score": 100,
+                    "status": "not_configured",
+                    "note": f"No oBIX adapter configured for {site_code}",
+                }
 
             svc = get_obix_client()
             if hasattr(svc, "check_connection"):
@@ -693,19 +851,17 @@ class SystemHealthService:
             Snapshot ID
         """
         try:
-            response = (
-                self.client.table("system_health_snapshots")
-                .insert(
-                    {
-                        "timestamp": snapshot["timestamp"],
-                        "overall_status": snapshot["overall_status"],
-                        "overall_score": snapshot["overall_score"],
-                        "component_scores": snapshot["component_scores"],
-                        "details": snapshot["component_details"],
-                    }
-                )
-                .execute()
-            )
+            record = {
+                "timestamp": snapshot["timestamp"],
+                "overall_status": snapshot["overall_status"],
+                "overall_score": snapshot["overall_score"],
+                "component_scores": snapshot["component_scores"],
+                "details": snapshot["component_details"],
+            }
+            site_id = snapshot.get("site_id")
+            if site_id:
+                record["site_id"] = site_id
+            response = self.client.table("system_health_snapshots").insert(record).execute()
 
             if response.data:
                 return response.data[0]["id"]
@@ -718,11 +874,13 @@ class SystemHealthService:
     async def get_health_history(
         self,
         time_range: str = "24h",
+        site_id: str | None = None,
     ) -> dict[str, Any]:
         """Get historical health data for trend analysis.
 
         Args:
             time_range: "24h", "7d", or "30d"
+            site_id: When set, filter snapshots to this site
 
         Returns:
             Historical snapshots and calculated metrics
@@ -741,22 +899,29 @@ class SystemHealthService:
 
         try:
             # Fetch snapshots from database
-            response = (
+            query = (
                 self.client.table("system_health_snapshots")
                 .select("*")
-                .filter(
-                    "timestamp",
-                    "gte",
-                    start_time,
-                )
-                .order(
-                    "timestamp",
-                    desc=False,
-                )
-                .execute()
+                .filter("timestamp", "gte", start_time)
+                .order("timestamp", desc=False)
             )
+            if site_id:
+                query = query.eq("site_id", site_id)
+            response = query.execute()
 
             snapshots = response.data or []
+
+            # Fallback: if site-scoped returned nothing, show global snapshots
+            if site_id and not snapshots:
+                fallback = (
+                    self.client.table("system_health_snapshots")
+                    .select("*")
+                    .filter("timestamp", "gte", start_time)
+                    .is_("site_id", "null")
+                    .order("timestamp", desc=False)
+                    .execute()
+                )
+                snapshots = fallback.data or []
 
             # Calculate metrics
             if snapshots:

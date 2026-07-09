@@ -10,7 +10,7 @@
  * - Recommended actions
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   X,
@@ -22,7 +22,9 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  Link2,
 } from "lucide-react";
+import { authorizedFetch } from "@/lib/api";
 import { CostCard } from "./CostCard";
 import { CostBreakdownDetail } from "./CostBreakdownDetail";
 import { PatternTimeline } from "./PatternTimeline";
@@ -877,6 +879,11 @@ export function PredictionDetail({ prediction, isOpen, onClose, onCreateWorkOrde
             </SectionCard>
           )}
 
+          {/* Baseline Lineage (Phase 236-01 AC-7): the evidence chain that
+              produced this prediction — active rollup baseline → source
+              service record / WO → structured readings. */}
+          <BaselineLineageSection predictionCode={prediction.id} />
+
           {/* Footer Actions */}
           <div className="flex justify-end gap-3 pt-4">
             <button
@@ -930,6 +937,115 @@ function MetricCard({ value, label, color }: { value: string; label: string; col
         {label}
       </span>
     </div>
+  );
+}
+
+interface PredictionLineage {
+  baseline_state: string;
+  grounded: boolean;
+  baseline: {
+    baseline_date?: string;
+    baseline_type?: string;
+    captured_by?: string;
+    elements: Array<{ element_id: string; value?: number; sigma?: number; n?: number; unit?: string }>;
+  } | null;
+  service_record: { code?: string; work_order_id?: string; technician_name?: string } | null;
+  readings: Array<{ element_id?: string; reading_type?: string; numeric_value?: number; value?: string; unit?: string }>;
+}
+
+function BaselineLineageSection({ predictionCode }: { predictionCode: string }) {
+  const [lineage, setLineage] = useState<PredictionLineage | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    authorizedFetch(`/api/predictions/${encodeURIComponent(predictionCode)}/lineage`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled) setLineage(data);
+      })
+      .catch(() => {
+        if (!cancelled) setLineage(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [predictionCode]);
+
+  if (loading || !lineage) return null;
+
+  const secondary = { color: "var(--color-sentinel-text-secondary)" };
+  const primary = { color: "var(--color-sentinel-text-primary)" };
+
+  return (
+    <SectionCard title="Baseline Lineage">
+      {!lineage.grounded ? (
+        <div className="flex items-start gap-2">
+          <Link2 className="h-4 w-4 mt-0.5" style={{ color: "var(--color-sentinel-amber)" }} />
+          <p className="text-sm" style={secondary}>
+            {lineage.baseline_state === "seed_only"
+              ? "Seed baseline only — this prediction is not yet grounded in measured readings. It unlocks once the first PPM service readings roll into an active baseline."
+              : "No measured baseline yet — this equipment has no rolling baseline, so no service record backs this prediction."}
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4" style={{ color: "var(--color-sentinel-green)" }} />
+            <span className="text-sm" style={primary}>
+              Grounded in a rolling baseline
+              {lineage.service_record?.work_order_id ? ` from ${lineage.service_record.work_order_id}` : ""}
+              {lineage.service_record?.technician_name ? ` · ${lineage.service_record.technician_name}` : ""}
+            </span>
+          </div>
+
+          {lineage.baseline?.elements && lineage.baseline.elements.length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr style={secondary}>
+                    <th className="text-left py-1 pr-4">Element</th>
+                    <th className="text-right py-1 pr-4">Baseline (mean)</th>
+                    <th className="text-right py-1 pr-4">σ</th>
+                    <th className="text-right py-1">n</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {lineage.baseline.elements.map((el) => (
+                    <tr key={el.element_id} style={{ borderTop: "1px solid var(--color-sentinel-border)" }}>
+                      <td className="py-1 pr-4" style={primary}>
+                        {el.element_id}
+                      </td>
+                      <td className="text-right py-1 pr-4" style={primary}>
+                        {el.value != null ? el.value : "—"}
+                        {el.unit ? ` ${el.unit}` : ""}
+                      </td>
+                      <td className="text-right py-1 pr-4" style={secondary}>
+                        {el.sigma != null ? el.sigma : "—"}
+                      </td>
+                      <td className="text-right py-1" style={secondary}>
+                        {el.n != null ? el.n : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {lineage.readings.length > 0 && (
+            <p className="text-xs" style={secondary}>
+              {lineage.readings.length} technician reading{lineage.readings.length === 1 ? "" : "s"} captured
+              {lineage.service_record?.code ? ` on service record ${lineage.service_record.code}` : ""}.
+            </p>
+          )}
+        </div>
+      )}
+    </SectionCard>
   );
 }
 

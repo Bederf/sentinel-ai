@@ -5,10 +5,54 @@ Work Order Repository - Database operations for work orders.
 import logging
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID
 
 from ..supabase_client import get_supabase_client
 
 logger = logging.getLogger(__name__)
+
+
+def _is_uuid_like(value: Any) -> bool:
+    try:
+        UUID(str(value))
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def _specialty_from_equipment_code(equipment_code: str | None) -> str:
+    parts = str(equipment_code or "").upper().split("-")
+    equipment_type = parts[1] if len(parts) > 1 else ""
+    if "HVAC-ZONE-SCOPE" in str(equipment_code or "").upper():
+        return "hvac"
+    return {
+        "AHU": "hvac",
+        "FCU": "hvac",
+        "VAV": "hvac",
+        "CHILLER": "hvac",
+        "PUMP": "hvac",
+        "CRAC": "hvac",
+        "CT": "hvac",
+        "SPLIT": "hvac",
+        "ZONE": "hvac",
+        "DALI": "dali",
+        "LUM": "dali",
+        "LTG": "dali",
+        "GEN": "electrical",
+        "UPS": "electrical",
+        "ATS": "electrical",
+        "MSB": "electrical",
+        "TX": "electrical",
+        "DB": "electrical",
+        "BESS": "electrical",
+        "INV": "electrical",
+        "PV": "electrical",
+        "MTR": "electrical",
+        "FIRE": "fire",
+        "CCURE": "access",
+        "DOOR": "access",
+        "GATE": "access",
+    }.get(equipment_type, "general")
 
 
 class WorkOrderRepository:
@@ -77,6 +121,20 @@ class WorkOrderRepository:
                     equipment_id = eq_result.data[0]["id"]
                     site_id = eq_result.data[0]["site_id"]
 
+            if site_id and not _is_uuid_like(site_id):
+                site_result = self.client.table("sites").select("id").eq("code", site_id).limit(1).execute()
+                if site_result.data and len(site_result.data) > 0:
+                    site_id = site_result.data[0]["id"]
+
+            if not work_order.get("assigned_to"):
+                technician = self._resolve_assignee(
+                    site_id=site_id,
+                    equipment_code=work_order.get("equipment_code"),
+                )
+                if technician:
+                    work_order["assigned_to"] = technician.get("name")
+                    work_order["assigned_team"] = technician.get("specialty")
+
             # Build insert payload
             payload = {
                 "title": work_order.get("title", "Maintenance Required"),
@@ -105,13 +163,14 @@ class WorkOrderRepository:
                 "action_value",
                 "recommendation_id",
                 "notified_technician_telegram_id",
-                "category",
-                "service_type",
+                "work_type",
                 "notes",
             )
             for field in optional_fields:
                 if work_order.get(field) is not None:
                     payload[field] = str(work_order[field]) if field == "action_value" else work_order[field]
+            if work_order.get("service_type") is not None and payload.get("work_type") is None:
+                payload["work_type"] = work_order["service_type"]
 
             # Insert with retry on duplicate code collision (DB trigger generates code)
             max_retries = 3
@@ -138,6 +197,43 @@ class WorkOrderRepository:
 
         except Exception as e:
             logger.error(f"Error creating work order: {e}")
+            return None
+
+    def _resolve_assignee(self, *, site_id: str | None, equipment_code: str | None) -> dict[str, Any] | None:
+        if not self.client:
+            return None
+
+        try:
+            site_code = site_id
+            if site_id and _is_uuid_like(site_id):
+                site_result = self.client.table("sites").select("code").eq("id", site_id).limit(1).execute()
+                if site_result.data:
+                    site_code = site_result.data[0]["code"]
+
+            if not site_code:
+                return None
+
+            result = (
+                self.client.table("technicians")
+                .select("id, name, email, phone, telegram_id, specialty, site_id")
+                .eq("site_id", site_code)
+                .eq("active", True)
+                .order("name")
+                .execute()
+            )
+            rows = result.data or []
+            if not rows:
+                return None
+
+            specialty = _specialty_from_equipment_code(equipment_code)
+            selected = next((row for row in rows if row.get("specialty") == specialty), None)
+            if selected is None and specialty != "general":
+                selected = next((row for row in rows if row.get("specialty") == "general"), None)
+            if selected is None:
+                selected = rows[0]
+            return selected
+        except Exception as e:
+            logger.warning("Failed to resolve work order assignee for %s: %s", equipment_code, e)
             return None
 
     async def get_work_order(self, work_order_id: str) -> dict[str, Any] | None:

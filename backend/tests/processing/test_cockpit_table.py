@@ -324,6 +324,80 @@ class TestHealthGrouping:
 
 
 # ---------------------------------------------------------------------------
+# Current telemetry condition grouping
+# ---------------------------------------------------------------------------
+
+
+class TestCurrentConditionGrouping:
+    def test_co2_cascade_uses_fresh_telemetry_count_not_active_alert_count(self):
+        alerts = []
+        now = datetime.now(UTC).isoformat()
+        for idx in range(1, 12):
+            alert = _bacnet_alert(
+                f"co2-{idx}",
+                type_="fault",
+                source_dedupe_key=f"point:sensor.zone-{idx:03d}.co2|code:unsigned_range|type:unsigned_range",
+            )
+            alert["title"] = f"{idx:03d}.CO2 alert: UNSIGNED_RANGE"
+            alert["created_at"] = now
+            alert["updated_at"] = now
+            alerts.append(alert)
+
+        primary, _, _, _, _ = CockpitTableProcessor.fuse(
+            alerts,
+            [],
+            [],
+            [],
+            None,
+            onboarding_phase="advisory",
+            zone_count=16,
+            co2_condition={
+                "fresh_zone_count": 15,
+                "elevated_zone_ids": ["ZONE-001", "ZONE-002", "ZONE-003", "ZONE-004", "ZONE-005"],
+                "threshold_ppm": 800.0,
+            },
+        )
+
+        assert primary[0].title == "Fresh air disruption — 5 zones affected"
+        assert "5 of 15 fresh zones" in primary[0].summary
+        assert primary[0].member_count == 5
+        assert primary[0].location.zone_ids == ["ZONE-001", "ZONE-002", "ZONE-003", "ZONE-004", "ZONE-005"]
+
+    def test_co2_cascade_without_current_telemetry_support_does_not_promote_condition(self):
+        alerts = []
+        now = datetime.now(UTC).isoformat()
+        for idx in range(1, 12):
+            alert = _bacnet_alert(
+                f"co2-stale-{idx}",
+                type_="fault",
+                source_dedupe_key=f"point:sensor.zone-{idx:03d}.co2|code:unsigned_range|type:unsigned_range",
+            )
+            alert["title"] = f"{idx:03d}.CO2 alert: UNSIGNED_RANGE"
+            alert["created_at"] = now
+            alert["updated_at"] = now
+            alerts.append(alert)
+
+        primary, overflow, _, _, selected = CockpitTableProcessor.fuse(
+            alerts,
+            [],
+            [],
+            [],
+            None,
+            onboarding_phase="advisory",
+            zone_count=16,
+            co2_condition={
+                "fresh_zone_count": 15,
+                "elevated_zone_ids": ["ZONE-001", "ZONE-002"],
+                "threshold_ppm": 800.0,
+            },
+        )
+
+        assert primary == []
+        assert overflow == []
+        assert selected is None
+
+
+# ---------------------------------------------------------------------------
 # _dedupe — ranking
 # ---------------------------------------------------------------------------
 

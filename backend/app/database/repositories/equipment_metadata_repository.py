@@ -28,7 +28,7 @@ class EquipmentMetadataRepository:
             "notes, network_info, device_info, operating_data, "
             "commissioning_date, warranty_expiry, last_discovery, "
             "install_date, last_service, status, health_score, location, "
-            "service_provider_name"
+            "service_provider_name, service_interval_days, baseline_state, last_rollup_at"
         )
 
         # Check if it looks like a UUID

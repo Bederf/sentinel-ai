@@ -483,7 +483,7 @@ class MetricRuleResult:
     """Evaluation result for a single metric."""
 
     metric: str
-    value: float
+    value: float | None
     state: RuleState
     threshold: MetricThreshold
     reason_code: ReasonCode | None = None

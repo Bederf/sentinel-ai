@@ -1,6 +1,6 @@
 """Slash command router for web chat.
 
-Intercepts FM workflow commands (/info-, /WO-, /reset-, /note-)
+Intercepts FM workflow commands (/info-, /WO-, /reset-, /note-, /done-)
 before the AI pipeline, calling internal APIs directly. Works even when
 Claude credits are exhausted — no AI invocation needed.
 
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # Pattern: /command_EQUIPMENT_CODE [optional trailing text]
 # Equipment codes use underscores in chat (S002_FCU_301), converted to dashes for APIs.
 _SLASH_RE = re.compile(
-    r"^/(info|WO|reset|note|status_WO)[-_]([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
+    r"^/(info|WO|reset|note|done|status_WO)[-_]([A-Za-z0-9][\w-]*)(?:\s+(.+))?$",
     re.DOTALL,
 )
 
@@ -91,6 +91,199 @@ def _quick_actions(code: str) -> str:
     """Render the quick-actions footer with clickable commands."""
     c = _code_for_buttons(code)
     return f"\n---\n**Quick Actions:** `/info-{c}` \u00b7 `/reset-{c}` \u00b7 `/WO-{c}` \u00b7 `/note-{c}`"
+
+
+def _is_logical_work_order_target(target: str | None) -> bool:
+    """Return true for site-scope advisory targets that are not physical equipment."""
+    if not target:
+        return False
+    normalized = target.strip().upper().replace("_", "-")
+    return normalized.startswith("SITE-") and any(
+        marker in normalized
+        for marker in (
+            "HVAC-ZONE-SCOPE",
+            "HVAC-SCHEDULE",
+            "ZONE-SCOPE",
+        )
+    )
+
+
+def _truncate_for_chat(value: str | None, limit: int = 900) -> str:
+    text = " ".join((value or "").split())
+    if len(text) <= limit:
+        return text
+    return text[: limit - 3].rstrip() + "..."
+
+
+def _is_work_order_code(code: str | None) -> bool:
+    if not code:
+        return False
+    return code.strip().upper().startswith("WO-")
+
+
+def _recommendation_action_text(recommendation: dict | None) -> str | None:
+    if not recommendation:
+        return None
+    action = recommendation.get("action")
+    if isinstance(action, dict) and action.get("value"):
+        return str(action["value"])
+    return None
+
+
+async def _load_recommendation_for_work_order(work_order: dict) -> dict | None:
+    rec_id = work_order.get("recommendation_id")
+    if not rec_id:
+        return None
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        result = (
+            get_supabase_client()
+            .table("recommendations")
+            .select("id, target_equipment, action, reason, confidence_score, status")
+            .eq("id", rec_id)
+            .limit(1)
+            .execute()
+        )
+        return result.data[0] if result.data else None
+    except Exception as exc:
+        logger.warning("Failed to load recommendation %s for slash info: %s", rec_id, exc)
+        return None
+
+
+async def _load_work_order_detail(code: str) -> tuple[dict | None, dict | None, dict | None, dict | None]:
+    try:
+        from app.database.repositories.service_record_repository import ServiceRecordRepository
+        from app.database.repositories.work_order_repository import get_work_order_repository
+        from app.database.supabase_client import get_supabase_client
+        from app.services.checklist_service import get_checklist_service
+        from app.services.feedback_collection_service import get_feedback_collection_service
+
+        wo_repo = get_work_order_repository()
+        work_order = await wo_repo.get_work_order_by_code(code.strip().upper())
+        if not work_order:
+            return None, None, None, None
+
+        equipment: dict | None = None
+        equipment_id = str(work_order.get("equipment_id") or "").strip()
+        if equipment_id:
+            sb = get_supabase_client()
+            for field in ("id", "code"):
+                try:
+                    eq_result = (
+                        sb.table("equipment")
+                        .select("id, code, name, type, status")
+                        .eq(field, equipment_id)
+                        .limit(1)
+                        .execute()
+                    )
+                    if eq_result.data:
+                        equipment = eq_result.data[0]
+                        break
+                except Exception:
+                    continue
+
+        service_record = None
+        try:
+            sr_repo = ServiceRecordRepository()
+            service_records = await sr_repo.list(filters={"work_order_id": work_order.get("id")})
+            if service_records:
+                service_record = next(
+                    (
+                        record
+                        for record in service_records
+                        if str(record.get("status") or "").strip().lower() != "closed"
+                    ),
+                    service_records[0],
+                )
+        except Exception as exc:
+            logger.warning("Failed to load service record for %s: %s", code, exc)
+
+        equipment_type = str((equipment or {}).get("type") or "").strip().lower()
+        checklist_template = None
+        if equipment_type:
+            try:
+                service_type = str((service_record or {}).get("service_type") or "").strip().lower()
+                if service_type:
+                    feedback_template = get_feedback_collection_service().get_template(equipment_type, service_type)
+                    if feedback_template:
+                        checklist_template = {
+                            "template_name": f"{equipment_type.title()} Service Closeout",
+                            "required_items": feedback_template.required_items,
+                            "optional_items": feedback_template.optional_items,
+                            "prompts": feedback_template.prompts,
+                        }
+                if not checklist_template:
+                    checklist_template = get_checklist_service().get_template_for_inspection(equipment_type, "routine")
+            except Exception as exc:
+                logger.warning("Failed to load checklist template for %s: %s", equipment_type, exc)
+
+        return work_order, equipment, service_record, checklist_template
+    except Exception as exc:
+        logger.warning("Failed to load work order detail for %s: %s", code, exc)
+        return None, None, None, None
+
+
+async def _find_latest_logical_work_order(target: str) -> dict | None:
+    try:
+        from app.database.repositories.work_order_repository import get_work_order_repository
+
+        normalized_target = target.upper().replace("_", "-")
+        repo = get_work_order_repository()
+        work_orders = await repo.get_all_work_orders(limit=100)
+        for work_order in work_orders:
+            haystack = " ".join(
+                str(work_order.get(key) or "")
+                for key in ("code", "title", "description", "equipment_id", "action_value")
+            ).upper()
+            if normalized_target in haystack.replace("_", "-"):
+                code = work_order.get("code")
+                return await repo.get_work_order_by_code(code) if code else work_order
+    except Exception as exc:
+        logger.warning("Failed to resolve logical work order for %s: %s", target, exc)
+    return None
+
+
+def _format_logical_work_order_info(work_order: dict, recommendation: dict | None = None) -> str:
+    wo_code = work_order.get("code") or "work order"
+    target = (
+        (recommendation or {}).get("target_equipment") or work_order.get("equipment_id") or "logical advisory target"
+    )
+    action_text = (
+        work_order.get("action_value")
+        or _recommendation_action_text(recommendation)
+        or work_order.get("description")
+        or "Review the SENTINEL advisory and verify a safe scoped action."
+    )
+    reason = (recommendation or {}).get("reason") or work_order.get("description")
+    assigned_to = work_order.get("assigned_to") or "unassigned"
+    assigned_team = work_order.get("assigned_team")
+    assigned = f"{assigned_to} ({assigned_team})" if assigned_team else assigned_to
+
+    lines = [
+        f"## Work Order Info: {wo_code}",
+        "",
+        "**Type:** Logical SENTINEL advisory scope, not a physical equipment lookup.",
+        f"**Target:** `{target}`",
+        f"**Status:** {work_order.get('status') or 'unknown'}",
+        f"**Assigned:** {assigned}",
+        "",
+        "**What to do:**",
+        _truncate_for_chat(str(action_text), 700),
+        "",
+        "**Field checks:**",
+        "1. Verify whether the building/floor/zone is actually occupied.",
+        "2. Check PIR or lighting occupancy and badge/security context.",
+        "3. Check CO2/IAQ before any setback decision.",
+        "4. Identify only zones or floor AHUs that are verified empty.",
+        "5. Do not perform a blanket HVAC shutdown while signals conflict or CO2 is high.",
+        "",
+        "**Closeout expected:**",
+        "Record whether HVAC stayed active, or list the specific verified-empty zones/floors suitable for setback.",
+    ]
+    if reason:
+        lines.extend(["", "**Why:**", _truncate_for_chat(str(reason), 900)])
+    return "\n".join(lines)
 
 
 async def _notify_technician(
@@ -236,7 +429,7 @@ async def _build_wo_email_body(
     lines.append("=" * 50)
     lines.append("INSTRUCTIONS")
     lines.append("=" * 50)
-    lines.append(f"1. Reply 'done #{wo_code}' in Telegram when work is complete.")
+    lines.append(f"1. Reply `/done-{wo_code}` in Telegram when work is complete.")
     lines.append("2. Use /info and /note commands as needed.")
     lines.append("")
     lines.append("-- SENTINEL Work Order System")
@@ -256,6 +449,7 @@ async def execute(
         "WO": _handle_wo,
         "reset": _handle_reset,
         "note": _handle_note,
+        "done": _handle_done,
         "status_WO": _handle_status_wo,
     }
     handler = handlers.get(command)
@@ -287,6 +481,29 @@ async def execute(
 
 async def _handle_info(code: str, _extra: str | None, _user: str | None) -> CommandResult:
     """GET /api/work-orders/equipment-info/{code} — equipment details."""
+    if _is_work_order_code(code):
+        work_order, equipment, service_record, checklist_template = await _load_work_order_detail(code)
+        if work_order:
+            from app.services.work_order_info_renderer import build_work_order_info_text
+
+            return CommandResult(
+                message=build_work_order_info_text(work_order, equipment, service_record, checklist_template)
+            )
+        return CommandResult(
+            message=f"Work order `{code}` not found.",
+            success=False,
+        )
+
+    if _is_logical_work_order_target(code):
+        work_order = await _find_latest_logical_work_order(code)
+        if work_order:
+            recommendation = await _load_recommendation_for_work_order(work_order)
+            return CommandResult(message=_format_logical_work_order_info(work_order, recommendation))
+        return CommandResult(
+            message=f"No work order was found for logical target `{code}`.",
+            success=False,
+        )
+
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.get(f"{_base_url()}/api/work-orders/equipment-info/{code}")
 
@@ -570,4 +787,16 @@ async def _handle_status_wo(code: str, _extra: str | None, user: str | None) -> 
     return CommandResult(
         message=f"Failed to look up `{code}` (HTTP {resp.status_code}). Please try again shortly.",
         success=False,
+    )
+
+
+async def _handle_done(code: str, _extra: str | None, _user: str | None) -> CommandResult:
+    """Start the guided closeout flow for a work order."""
+    c = _code_for_buttons(code)
+    return CommandResult(
+        message=(
+            f"## Closeout Started\n\n"
+            f"Work order: `{code}`\n\n"
+            f"Continue in Telegram with `/done-{c}` to start the guided closeout feedback."
+        )
     )

@@ -261,7 +261,8 @@ class FeedbackCollectionService:
         template = eq_templates.get(service_type.lower())
         if not template:
             # Fall back to minor if specific type not found
-            template = eq_templates.get("minor")
+            if service_type.lower() in {"callout", "major"}:
+                template = eq_templates.get("minor")
 
         return template
 

@@ -1,6 +1,7 @@
 """Energy consumption API endpoints."""
 
 import logging
+import os
 import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 
+from app.config.settings import settings
 from app.database.repositories.energy_consumption_repository import get_energy_consumption_repository
 from app.models.energy_rules import BuildingState
 from app.services.energy_rules_engine import get_energy_rules_engine
@@ -585,6 +587,168 @@ def get_energy_from_supabase(
         return [], False
 
 
+def get_energy_from_power_telemetry(
+    site_id: str | None,
+    days: int,
+) -> list[EnergyDataPoint]:
+    """Build daily kWh from real site power telemetry when daily history is empty."""
+    import psycopg2
+
+    database_url = settings.database_url or os.getenv("DATABASE_URL")
+    if not database_url:
+        logger.warning("DATABASE_URL is not configured; cannot derive energy from telemetry")
+        return []
+
+    days = min(days, 365)
+    end_date = date.today()
+    start_date = end_date - timedelta(days=days - 1)
+    site_filter = "AND site_id = %s" if site_id else ""
+    raw_params: list[Any] = [start_date, end_date]
+    hourly_params: list[Any] = [start_date, end_date]
+    if site_id:
+        raw_params.append(site_id)
+        hourly_params.append(site_id)
+
+    query = f"""
+        WITH raw_points AS (
+            SELECT
+                site_id,
+                recorded_at::date AS day,
+                CASE
+                    WHEN sensor_type IN ('hvac_kw', 'lighting_kw', 'total_kw') THEN sensor_type
+                    WHEN sensor_type = 'active_power_kw'
+                     AND equipment_id ~* '(^|-)MTR-' THEN 'meter_total_kw'
+                    WHEN sensor_type IN ('other_kw', 'misc_kw', 'base_kw', 'non_hvac_kw') THEN 'other_kw'
+                    ELSE NULL
+                END AS point_name,
+                equipment_id,
+                AVG(value) AS avg_kw,
+                TRUE AS prefer_source
+            FROM equipment_sensor_readings
+            WHERE recorded_at::date BETWEEN %s AND %s
+              AND (
+                sensor_type IN ('hvac_kw', 'lighting_kw', 'total_kw', 'other_kw', 'misc_kw', 'base_kw', 'non_hvac_kw')
+                OR (
+                    sensor_type = 'active_power_kw'
+                    AND equipment_id ~* '(^|-)MTR-'
+                )
+              )
+              {site_filter}
+            GROUP BY site_id, recorded_at::date, sensor_type, equipment_id
+        ),
+        raw_source AS (
+            SELECT
+                site_id,
+                day,
+                point_name,
+                CASE WHEN point_name IN ('total_kw', 'meter_total_kw') THEN MAX(avg_kw) ELSE SUM(avg_kw) END AS avg_kw,
+                TRUE AS prefer_source
+            FROM raw_points
+            WHERE point_name IS NOT NULL
+            GROUP BY site_id, day, point_name
+        ),
+        hourly_points AS (
+            SELECT
+                site_id,
+                hour_bucket::date AS day,
+                CASE
+                    WHEN point_name IN ('hvac_kw', 'lighting_kw', 'total_kw') THEN point_name
+                    WHEN point_name = 'active_power_kw'
+                     AND equipment_id ~* '(^|-)MTR-' THEN 'meter_total_kw'
+                    WHEN point_name IN ('other_kw', 'misc_kw', 'base_kw', 'non_hvac_kw') THEN 'other_kw'
+                    ELSE NULL
+                END AS point_name,
+                equipment_id,
+                AVG(value_avg) AS avg_kw,
+                FALSE AS prefer_source
+            FROM telemetry_hourly
+            WHERE hour_bucket::date BETWEEN %s AND %s
+              AND (
+                point_name IN ('hvac_kw', 'lighting_kw', 'total_kw', 'other_kw', 'misc_kw', 'base_kw', 'non_hvac_kw')
+                OR (
+                    point_name = 'active_power_kw'
+                    AND equipment_id ~* '(^|-)MTR-'
+                )
+              )
+              {site_filter}
+            GROUP BY site_id, hour_bucket::date, point_name, equipment_id
+        ),
+        hourly_source AS (
+            SELECT
+                site_id,
+                day,
+                point_name,
+                CASE WHEN point_name IN ('total_kw', 'meter_total_kw') THEN MAX(avg_kw) ELSE SUM(avg_kw) END AS avg_kw,
+                FALSE AS prefer_source
+            FROM hourly_points
+            WHERE point_name IS NOT NULL
+            GROUP BY site_id, day, point_name
+        ),
+        ranked AS (
+            SELECT
+                *,
+                ROW_NUMBER() OVER (
+                    PARTITION BY site_id, day, point_name
+                    ORDER BY prefer_source DESC
+                ) AS source_rank
+            FROM (
+                SELECT * FROM raw_source
+                UNION ALL
+                SELECT * FROM hourly_source
+            ) sources
+        )
+        SELECT
+            site_id,
+            day,
+            COALESCE(MAX(avg_kw) FILTER (WHERE point_name = 'hvac_kw'), 0) AS hvac_kw,
+            COALESCE(MAX(avg_kw) FILTER (WHERE point_name = 'lighting_kw'), 0) AS lighting_kw,
+            COALESCE(MAX(avg_kw) FILTER (WHERE point_name = 'other_kw'), 0) AS other_kw,
+            COALESCE(MAX(avg_kw) FILTER (WHERE point_name = 'meter_total_kw'), 0) AS meter_total_kw,
+            COALESCE(MAX(avg_kw) FILTER (WHERE point_name = 'total_kw'), 0) AS total_kw
+        FROM ranked
+        WHERE source_rank = 1
+        GROUP BY site_id, day
+        HAVING COALESCE(MAX(avg_kw) FILTER (WHERE point_name IN ('meter_total_kw', 'total_kw')), 0) > 0
+        ORDER BY day ASC, site_id ASC
+    """
+
+    try:
+        with psycopg2.connect(database_url) as conn, conn.cursor() as cur:
+            cur.execute(
+                "SELECT code, name FROM sites",
+            )
+            site_names = {code: name or code for code, name in cur.fetchall()}
+
+            cur.execute(query, [*raw_params, *hourly_params])
+            rows = cur.fetchall()
+
+        data: list[EnergyDataPoint] = []
+        for row_site_id, day, hvac_kw, lighting_kw, other_kw, meter_total_kw, total_kw in rows:
+            hvac_kwh = max(0.0, float(hvac_kw or 0) * 24)
+            lighting_kwh = max(0.0, float(lighting_kw or 0) * 24)
+            total_kwh = max(0.0, float(meter_total_kw or total_kw or 0) * 24)
+            direct_other_kwh = max(0.0, float(other_kw or 0) * 24)
+            residual_other_kwh = max(0.0, total_kwh - hvac_kwh - lighting_kwh)
+            other_kwh = direct_other_kwh if direct_other_kwh > 0 else residual_other_kwh
+            total_kwh = max(total_kwh, hvac_kwh + lighting_kwh + other_kwh)
+            data.append(
+                EnergyDataPoint(
+                    date=day.isoformat(),
+                    site_id=row_site_id,
+                    site_name=site_names.get(row_site_id, row_site_id),
+                    hvac_kwh=round(hvac_kwh, 2),
+                    lighting_kwh=round(lighting_kwh, 2),
+                    other_kwh=round(other_kwh, 2),
+                    total_kwh=round(hvac_kwh + lighting_kwh + other_kwh, 2),
+                )
+            )
+
+        return data
+    except Exception as e:
+        logger.warning("Failed to derive energy from telemetry: %s", e)
+        return []
+
+
 @router.get("/energy", response_model=EnergyResponse)
 async def get_energy(
     site_id: str | None = Query(None, description="Filter by site ID"),
@@ -617,10 +781,18 @@ async def get_energy(
             data=supabase_data,
         )
 
-    # Query succeeded but there are no rows — return empty; bridge telemetry
-    # or other real sources handle the chart via separate endpoints
+    telemetry_data = get_energy_from_power_telemetry(site_id, days)
+    if telemetry_data:
+        logger.info("Using telemetry-derived energy data (%s records)", len(telemetry_data))
+        return EnergyResponse(
+            days=days,
+            site_id=site_id,
+            data=telemetry_data,
+        )
+
+    # Query succeeded but there are no rows — return empty; no synthetic fallback is used.
     logger.info(
-        "Supabase energy query returned 0 rows for site=%s days=%s; returning empty dataset",
+        "Energy query returned 0 rows for site=%s days=%s; returning empty dataset",
         site_id,
         days,
     )

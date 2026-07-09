@@ -93,6 +93,52 @@ def test_voyage_api_provider_uses_configured_model_dimension_and_input_type():
     }
 
 
+def test_voyage_api_provider_records_embedding_usage(monkeypatch):
+    class _Result:
+        embeddings = [[0.1, 0.2]]
+        total_tokens = 42
+
+    class _Client:
+        def embed(self, texts, **_kwargs):
+            del texts
+            return _Result()
+
+    class _UsageTracker:
+        def __init__(self):
+            self.records = []
+
+        def record(self, **kwargs):
+            self.records.append(kwargs)
+
+    tracker = _UsageTracker()
+
+    import app.services.ai_usage_tracker as usage_module
+
+    monkeypatch.setattr(usage_module, "usage_tracker", tracker)
+
+    provider = VoyageAPIProvider(
+        api_key="test-key",
+        model_name="voyage-4",
+        context_model_name="voyage-context-4",
+        dimension=1024,
+    )
+    provider._client = _Client()
+
+    assert provider.embed_batch(["BMS network topology"], input_type="query") == [[0.1, 0.2]]
+    assert tracker.records == [
+        {
+            "provider": "voyage",
+            "model": "voyage-4",
+            "input_tokens": 42,
+            "output_tokens": 0,
+            "source": "rag_embedding",
+            "site_id": "system",
+            "task_class": "embedding",
+            "feature": "rag_embedding_query",
+        }
+    ]
+
+
 def test_voyage_api_provider_splits_large_batches():
     class _Result:
         def __init__(self, embeddings):

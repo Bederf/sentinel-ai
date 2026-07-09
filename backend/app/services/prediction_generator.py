@@ -30,13 +30,23 @@ logger = logging.getLogger(__name__)
 MIN_PROBABILITY_THRESHOLD = 50
 
 
-def _health_score_to_base_probability(health_score: float) -> float:
+def _coerce_signal_score(signal: Any) -> float | None:
+    """Accept raw ML scores or telemetry envelopes with a numeric value."""
+    if isinstance(signal, dict):
+        signal = signal.get("value")
+    try:
+        return float(signal) if signal is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _health_score_to_base_probability(health_score: float, *, site_id: str | None = None) -> float:
     """
     Pure rule-based probability derivation from health score.
     No ML signals involved — fallback when no anomaly scores available.
     Aligned with _calculate_prediction_from_health() in prediction_calculator.py.
     """
-    thresholds = get_health_thresholds()
+    thresholds = get_health_thresholds(site_id=site_id)
 
     if health_score >= thresholds["healthy"]:
         return 0.0
@@ -59,6 +69,8 @@ def health_to_probability(
     anomaly_score: float | None = None,
     lstm_anomaly_score: float | None = None,
     ml_hours_ingested: float = 0.0,
+    *,
+    site_id: str | None = None,
 ) -> float:
     """
     Maps health score to failure probability.
@@ -71,6 +83,7 @@ def health_to_probability(
         anomaly_score: Isolation Forest anomaly score [0, 1] or None
         lstm_anomaly_score: LSTM anomaly score [0, 1] or None
         ml_hours_ingested: ML training hours for trust_weight calculation
+        site_id: Site-specific threshold context
 
     Returns:
         Failure probability percentage [0, 100]
@@ -78,7 +91,10 @@ def health_to_probability(
     from app.services.ml_config import get_ml_trust_weight
 
     # Rule-based base probability
-    base_prob = _health_score_to_base_probability(health_score)
+    base_prob = _health_score_to_base_probability(health_score, site_id=site_id)
+
+    anomaly_score = _coerce_signal_score(anomaly_score)
+    lstm_anomaly_score = _coerce_signal_score(lstm_anomaly_score)
 
     # No ML signals available — return pure rule-based
     if anomaly_score is None and lstm_anomaly_score is None:
@@ -130,8 +146,8 @@ class PredictionGeneratorService:
         """
         from app.services.ml_config import get_ml_trust_weight
 
-        anomaly_score = operating_data.get("anomaly_score")
-        lstm_anomaly_score = operating_data.get("lstm_anomaly_score")
+        anomaly_score = _coerce_signal_score(operating_data.get("anomaly_score"))
+        lstm_anomaly_score = _coerce_signal_score(operating_data.get("lstm_anomaly_score"))
 
         ml_hours = await self._get_ml_hours_for_site(site_id)
 
@@ -140,17 +156,19 @@ class PredictionGeneratorService:
             anomaly_score=anomaly_score,
             lstm_anomaly_score=lstm_anomaly_score,
             ml_hours_ingested=ml_hours,
+            site_id=site_id,
         )
         trust_weight = get_ml_trust_weight(ml_hours)
         logger.info(
             "probability_calculated: equipment_id=%s health_score=%s anomaly_score=%s "
-            "lstm_anomaly_score=%s ml_hours=%s trust_weight=%s final_probability=%s",
+            "lstm_anomaly_score=%s ml_hours=%s trust_weight=%s site_id=%s final_probability=%s",
             equipment_id,
             health_score,
             anomaly_score,
             lstm_anomaly_score,
             ml_hours,
             trust_weight,
+            site_id,
             probability,
         )
         return probability
@@ -460,14 +478,17 @@ class PredictionGeneratorService:
         }
 
         try:
-            # Get health thresholds
-            thresholds = get_health_thresholds()
-            healthy_threshold = thresholds.get("healthy", 90)
-
-            logger.info(f"Starting prediction generation (health threshold: {healthy_threshold})")
+            logger.info("Starting prediction generation (site-specific health thresholds)")
 
             # Get equipment with health below threshold
-            at_risk_equipment = self._get_at_risk_equipment(healthy_threshold)
+            candidate_equipment = self._get_at_risk_equipment(100)
+            at_risk_equipment = [
+                equipment
+                for equipment in candidate_equipment
+                if equipment.get("health_score") is not None
+                and equipment["health_score"]
+                < get_health_thresholds(site_id=equipment.get("site_id")).get("healthy", 85)
+            ]
             logger.info(f"Found {len(at_risk_equipment)} equipment below health threshold")
 
             # Get equipment IDs with existing active predictions
@@ -508,7 +529,7 @@ class PredictionGeneratorService:
                     results["errors"].append(error_msg)
 
             # Auto-resolve predictions for improved equipment
-            resolved_count = await self.auto_resolve_improved_equipment(healthy_threshold)
+            resolved_count = await self.auto_resolve_improved_equipment()
             results["resolved"] = resolved_count
 
             logger.info(
@@ -578,10 +599,11 @@ class PredictionGeneratorService:
         equipment_type = equipment.get("type", "unknown")
 
         # Calculate probability based on health (inverse relationship)
-        probability = health_to_probability(health_score)
+        site_id = equipment.get("site_id")
+        probability = health_to_probability(health_score, site_id=site_id)
 
         # Determine severity based on health status - aligned with database constraint
-        health_status = get_health_status(health_score)
+        health_status = get_health_status(health_score, site_id=site_id)
         if health_status == "critical":
             severity = "critical"
             timeframe_days = 7
@@ -650,7 +672,7 @@ class PredictionGeneratorService:
 
         # Determine severity based on health status - aligned with database constraint
         # Database allows: critical, warning, healthy (NOT high, medium, low)
-        health_status = get_health_status(health_score)
+        health_status = get_health_status(health_score, site_id=site_id)
         if health_status == "critical":
             severity = "critical"
             timeframe_days = 7
@@ -734,7 +756,7 @@ class PredictionGeneratorService:
 
     def _build_evidence(self, equipment: dict[str, Any]) -> dict[str, Any]:
         """Build evidence data for prediction."""
-        thresholds = get_health_thresholds()
+        thresholds = get_health_thresholds(site_id=equipment.get("site_id"))
         health_score = equipment.get("health_score", 50)
 
         evidence = {
@@ -1036,12 +1058,9 @@ class PredictionGeneratorService:
         else:
             return f"{base_action}. Schedule at next maintenance window."
 
-    async def auto_resolve_improved_equipment(self, threshold: int) -> int:
+    async def auto_resolve_improved_equipment(self) -> int:
         """
         Auto-resolve predictions for equipment that has improved above threshold.
-
-        Args:
-            threshold: Health score threshold
 
         Returns:
             Number of predictions resolved
@@ -1057,14 +1076,16 @@ class PredictionGeneratorService:
 
             # Check which have improved
             response = (
-                self.supabase.table("equipment")
-                .select("id, health_score")
-                .in_("id", active_ids)
-                .gte("health_score", threshold)
-                .execute()
+                self.supabase.table("equipment").select("id, health_score, site_id").in_("id", active_ids).execute()
             )
 
-            improved_equipment = response.data or []
+            improved_equipment = [
+                equipment
+                for equipment in response.data or []
+                if equipment.get("health_score") is not None
+                and equipment["health_score"]
+                >= get_health_thresholds(site_id=equipment.get("site_id")).get("healthy", 85)
+            ]
 
             # Resolve predictions for improved equipment
             for equipment in improved_equipment:

@@ -103,6 +103,16 @@ class OCRService:
                 stage2_result.get("issues", []),
             )
 
+            # Flag findings immediately after extraction
+            findings_report = await self._flag_findings_from_result(
+                {
+                    "extracted_data": stage1_result["data"],
+                    "validated_data": stage3_result.get("final_data", stage2_result["data"]),
+                },
+                equipment_id,
+                service_record_id,
+            )
+
             return {
                 "status": final_status,
                 "extracted_data": stage1_result["data"],
@@ -113,6 +123,7 @@ class OCRService:
                     "stage3_enhanced": stage3_result.get("enhanced", False),
                     "issues": stage2_result.get("issues", []),
                 },
+                "findings_report": findings_report,
             }
 
         except Exception as e:
@@ -121,6 +132,29 @@ class OCRService:
         finally:
             self._currently_processing.discard(service_record_id)
             gc.collect()  # Memory cleanup after processing
+
+    async def _flag_findings_from_result(
+        self,
+        result: dict[str, Any],
+        equipment_id: str,
+        service_record_id: str,
+    ) -> dict[str, Any]:
+        """Run findings classifier on extracted data and return report."""
+        extracted = result.get("extracted_data") or result.get("validated_data")
+        if not extracted:
+            return {"findings": []}
+
+        from app.services.service_sheet_findings_service import (
+            get_service_sheet_findings_service,
+        )
+
+        svc = get_service_sheet_findings_service()
+        report = await svc.classify_and_flag_findings(
+            extracted_data=extracted,
+            equipment_code=equipment_id,
+            document_id=service_record_id,
+        )
+        return report
 
     async def _stage1_ocr_extraction(
         self, image_data: bytes, equipment_id: str, service_type: str, media_type: str

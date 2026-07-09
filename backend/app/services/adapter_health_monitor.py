@@ -40,14 +40,60 @@ _CLEARED_STATES: frozenset[str] = frozenset(
 )
 
 
+def _normalize_alarm_identity_part(value: Any) -> str:
+    return str(value or "").strip().lower().replace(" ", "_")
+
+
+def _looks_like_named_bms_point(value: Any) -> bool:
+    text = str(value or "").strip()
+    if "." not in text:
+        return False
+    if text.count(".") > 4:
+        return False
+    return any(part.strip() for part in text.split("."))
+
+
+def _extract_named_bms_point(alarm: dict[str, Any]) -> str | None:
+    """Return a stable named BMS point identity when the bridge provides one.
+
+    The S002 bridge can emit the same operational fault under many transient
+    BACnet object identifiers. Named points such as ``FCU07.FAULT_STATE`` are
+    the stable operator-facing identity in that feed.
+    """
+    for field in ("equipment_id", "equipment_code", "point_name", "object_name", "objectName"):
+        value = alarm.get(field)
+        if _looks_like_named_bms_point(value):
+            return str(value).strip()
+
+    for field in ("message_text", "active_text", "description", "message"):
+        text = str(alarm.get(field) or "").strip()
+        if not text:
+            continue
+        first_token = text.split(" ", 1)[0].split(":", 1)[0].strip("()")
+        if _looks_like_named_bms_point(first_token):
+            return first_token
+
+    return None
+
+
 def build_source_dedupe_key(alarm: dict[str, Any]) -> str:
     """Build a stable BACnet identity key for UPSERT deduplication.
 
     Priority order:
-    1. notification_class + object_identifier  — canonical BACnet alarm identity
-    2. alarm id + event_id                     — bridge-assigned stable IDs
-    3. equipment + code + type                 — fallback composite key
+    1. named BMS point + code + type           — stable bridge/operator identity
+    2. notification_class + object_identifier  — canonical BACnet alarm identity
+    3. alarm id + event_id                     — bridge-assigned stable IDs
+    4. equipment + code + type                 — fallback composite key
     """
+    named_point = _extract_named_bms_point(alarm)
+    if named_point:
+        code = _normalize_alarm_identity_part(alarm.get("code") or alarm.get("alarm_code") or "UNPARSEABLE")
+        alarm_type = _normalize_alarm_identity_part(
+            alarm.get("alarm_type") or alarm.get("event_type") or "UNCLASSIFIED"
+        )
+        point_key = _normalize_alarm_identity_part(named_point)
+        return f"point:{point_key}|code:{code}|type:{alarm_type}"
+
     notif_class = alarm.get("notification_class") or alarm.get("notificationClass")
     # Bridge uses 'bacnet_object' (e.g. 'binaryInput,2033') — map to obj_id
     obj_id = (

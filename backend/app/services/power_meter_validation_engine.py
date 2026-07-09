@@ -73,20 +73,19 @@ class PowerMeterValidationEngine:
     def _get_consumption_history(
         self,
         *,
-        meter_id: str,
         lookback_days: int,
     ) -> list[dict[str, Any]]:
-        """Fetch historical consumption using whichever live schema is available.
+        """Fetch historical consumption from the canonical daily history table.
 
-        The canonical daily history table is currently site/building scoped, but some
-        older code expected meter-scoped hourly history. Try modern schemas first and
-        only fall back to the legacy meter query if it still exists.
+        ``energy_consumption_history`` is site/building scoped (``site_id`` /
+        ``building_id`` on a ``date`` column). The legacy meter-scoped hourly history
+        query was superseded and the table no longer carries a ``meter_id`` /
+        ``timestamp`` column, so only site and building scoping remain.
         """
         cutoff = datetime.now() - timedelta(days=lookback_days)
         strategies = [
             ("site_id", self.site_id, "date", cutoff.date().isoformat()),
             ("building_id", self.site_id, "date", cutoff.date().isoformat()),
-            ("meter_id", meter_id, "timestamp", cutoff.isoformat()),
         ]
         last_error: Exception | None = None
 
@@ -130,7 +129,7 @@ class PowerMeterValidationEngine:
             Baseline stats: mean_kw, stdev_kw, min_kw, max_kw, percentile_95
         """
         try:
-            readings = self._get_consumption_history(meter_id=meter_id, lookback_days=lookback_days)
+            readings = self._get_consumption_history(lookback_days=lookback_days)
             if not readings:
                 logger.warning(f"No meter data found for {meter_id}")
                 return self._get_default_baseline()
@@ -349,7 +348,7 @@ class PowerMeterValidationEngine:
             COP adjustment recommendation with confidence
         """
         try:
-            records = self._get_consumption_history(meter_id=meter_id, lookback_days=lookback_days)
+            records = self._get_consumption_history(lookback_days=lookback_days)
             if len(records) < MINIMUM_READINGS_FOR_BASELINE:
                 return {
                     "adjustment_needed": False,

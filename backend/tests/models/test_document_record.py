@@ -21,10 +21,11 @@ class TestDocumentSourceEnum:
         assert DocumentSource.CERTIFICATE.value == "certificate"
         assert DocumentSource.TEST_REPORT.value == "test_report"
         assert DocumentSource.MANUAL.value == "manual"
+        assert DocumentSource.EQUIPMENT_MANUAL.value == "equipment_manual"
         assert DocumentSource.UNKNOWN.value == "unknown"
 
     def test_count(self):
-        assert len(DocumentSource) == 6
+        assert len(DocumentSource) == 7
 
     def test_is_string_enum(self):
         assert isinstance(DocumentSource.SERVICE_REPORT, str)
@@ -38,9 +39,10 @@ class TestSourceSystemEnum:
         assert SourceSystem.CONCEPT_MRI.value == "concept_mri"
         assert SourceSystem.SHAREPOINT.value == "sharepoint"
         assert SourceSystem.MANUAL_UPLOAD.value == "manual_upload"
+        assert SourceSystem.OEM_MANUAL.value == "oem_manual"
 
     def test_count(self):
-        assert len(SourceSystem) == 3
+        assert len(SourceSystem) == 4
 
     def test_is_string_enum(self):
         assert isinstance(SourceSystem.CONCEPT_MRI, str)

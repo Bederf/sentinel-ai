@@ -65,6 +65,16 @@ async def scrape_oem_parts(
         logger.info("[OEM SCRAPE] FIRECRAWL_API_KEY not set — skipping")
         return []
 
+    from app.services.ai_usage_tracker import usage_tracker
+
+    usage_tracker.record_service(
+        provider="firecrawl",
+        units=1,
+        unit_type="scrape",
+        source="oem_parts_search",
+        site_id="unknown",
+    )
+
     search_query = f"{manufacturer} {model} spare parts list part number"
     if equipment_type:
         search_query = f"{manufacturer} {model} {equipment_type} OEM spare parts"
@@ -86,6 +96,13 @@ async def scrape_oem_parts(
             for url in candidate_urls[:2]:
                 scrape_result = await _run_firecrawl_scrape(url, api_key)
                 if scrape_result:
+                    usage_tracker.record_service(
+                        provider="firecrawl",
+                        units=1,
+                        unit_type="scrape",
+                        source="oem_parts_deep_scrape",
+                        site_id="unknown",
+                    )
                     deep_parts = _extract_parts_from_content(scrape_result, manufacturer, model)
                     for p in deep_parts:
                         pn = p.get("part_number", "")

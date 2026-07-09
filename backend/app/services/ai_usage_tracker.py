@@ -12,6 +12,7 @@ Tracks token consumption and costs across all paid services:
 - BulkSMS (per-message pricing)
 - Telegram (free but tracked for audit)
 - EskomSePush (free tier, tracked for quota)
+- Firecrawl (per-scrape credit pricing)
 
 Persists to JSON with daily rollup. No external dependencies.
 """
@@ -65,6 +66,12 @@ PRICING_USD_PER_1M = {
     "kimi-k2-turbo-preview": {"input": 0.90, "output": 3.80},
     # DeepSeek
     "deepseek-chat": {"input": 0.27, "output": 1.10},
+    # Voyage text/contextual embedding APIs bill input tokens only.
+    "voyage-4-large": {"input": 0.12, "output": 0.0},
+    "voyage-4": {"input": 0.06, "output": 0.0},
+    "voyage-4-lite": {"input": 0.02, "output": 0.0},
+    "voyage-context-4": {"input": 0.18, "output": 0.0},
+    "voyage-context-3": {"input": 0.18, "output": 0.0},
 }
 
 # ---- Per-message pricing (USD) ----
@@ -79,6 +86,7 @@ MESSAGE_PRICING_USD = {
 SERVICE_PRICING_USD = {
     "elevenlabs_chars": 0.00003,  # ~$0.03 per 1K characters
     "eskomsepush_call": 0.0,  # Free tier (50 req/day)
+    "firecrawl_scrape": 0.002,  # ~$0.002 per scrape/search credit
 }
 
 # Default USD→ZAR rate (configurable via settings)

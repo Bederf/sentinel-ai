@@ -298,6 +298,73 @@ import { Tooltip } from "./Tooltip";
 
 ## Future Enhancements
 
+## Phase 5: Discovery Attestation & Atomic Commit (2026-07-06)
+
+### Security Hardening
+
+**Problem:** The old commit endpoint accepted arbitrary JSON from the frontend with no proof the data came from a real discovery scan.
+
+**Solution:** Every discovery run now receives a unique `discovery_id` (like a building permit):
+
+```typescript
+// GET /api/simbiot/sites/{site_id}/capabilities returns:
+{
+  "site_id": "site-005",
+  "discovery_id": "550e8400-e29b-41d4-a716-446655440000",
+  "discovered_at": "2026-07-06T14:30:00Z",
+  "adapter_type": "bridge",
+  "devices": [ ... ]
+}
+```
+
+The commit endpoint (`POST /api/onboarding/bridge-review/{site_id}/commit`) now **requires** this `discovery_id` and validates:
+- ✅ Session exists and belongs to this site
+- ✅ Status is `active` (not already used)
+- ✅ Less than 10 minutes old (prevents stale commits)
+
+**Impact:** Prevents fabricated equipment data, replay attacks, and stale approvals.
+
+### Atomic Commit
+
+**Problem:** The old commit performed 6 sequential database writes. If step 3 failed, steps 1-2 were already committed — leaving orphaned data.
+
+**Solution:** All writes now happen inside a single Postgres transaction via the `commit_bridge_review()` RPC:
+
+1. Validate discovery session
+2. Upsert equipment rows
+3. Upsert point mappings
+4. Update site equipment count
+5. Create module configs
+6. Create module rows (all with `phase_override='shadow'`)
+7. Mark bridge discoveries as onboarded
+8. Mark discovery session committed
+9. Transition onboarding state → `canonical`
+
+**All-or-nothing:** If any step fails, Postgres rolls back the entire transaction. The site remains in its previous state and the operator can retry safely.
+
+### Module Seeding Unification
+
+**Problem:** Two separate code paths seeded modules — one at site creation, one at bridge commit. They could conflict or leave gaps.
+
+**Solution:** Single `ensure_site_modules()` function handles all module seeding:
+- Mandatory platform modules (always seeded)
+- Inferred building-system modules (from discovered equipment types)
+- All modules start with `phase_override='shadow'` regardless of site phase
+
+**Impact:** Consistent module state, no duplicate rows, no modules accidentally getting control privileges.
+
+### Files Changed
+
+| File | Change |
+|------|--------|
+| `api/simbiot_capabilities.py` | Persist discovery sessions |
+| `api/onboarding.py` | Validate discovery_id, delegate to RPC |
+| `services/module_registry_service.py` | Unified `ensure_site_modules()` |
+| `frontend/src/lib/api.ts` | Pass discovery_id to commit |
+| `frontend/src/components/BMSConnectionWizard.tsx` | Use discovery_id from capabilities |
+| Migration 231 | `site_discovery_sessions` + `site_onboarding_state` tables |
+| Migration 232 | `commit_bridge_review()` atomic RPC |
+
 Potential future improvements:
 
 1. **Wizard Tutorial Mode** - First-time setup walkthrough

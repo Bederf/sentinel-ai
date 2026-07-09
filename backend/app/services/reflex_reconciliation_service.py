@@ -598,38 +598,6 @@ class ReflexReconciliationRepository:
         return await get_recommendation_repository().create(rec)
 
 
-class ReflexNotificationSink:
-    """Manager notification for first schedule-defect creation."""
-
-    async def notify_schedule_defect(self, rec: Recommendation, finding: ReflexFinding) -> bool:
-        try:
-            from app.config.settings import settings
-            from app.services.telegram_message_sender import TelegramMessageSender
-
-            bot_token = getattr(settings, "sentry_manager_bot_token", None) or getattr(
-                settings, "telegram_bot_token", None
-            )
-            chat_id = getattr(settings, "telegram_alert_chat_id", None) or getattr(settings, "sentry_fm_chat_id", None)
-            if not bot_token or not chat_id:
-                logger.warning("[REFLEX] Schedule defect notification skipped: missing manager bot token/chat id")
-                return False
-
-            text = (
-                "SENTINEL Schedule Defect\n"
-                f"Site: {finding.site_id}\n"
-                f"Zone: {finding.canonical_zone_id}\n"
-                f"System: {finding.system_type}\n"
-                f"Issue: {finding.reason}\n\n"
-                "This looks recurring, so it likely needs BMS schedule/timer correction. "
-                "SENTINEL cannot write schedules on this bridge yet; this is advisory/manual-only."
-            )
-            result = await TelegramMessageSender(bot_token).send_text(str(chat_id), text, parse_mode=None)
-            return bool(result.get("ok"))
-        except Exception as exc:
-            logger.warning("[REFLEX] Schedule defect notification failed: %s", exc)
-            return False
-
-
 class ReflexReconciliationService:
     """Evaluate current zone/system state and persist reflex findings."""
 
@@ -638,12 +606,10 @@ class ReflexReconciliationService:
         *,
         repository: ReflexReconciliationRepository | None = None,
         resolver: ZoneIdentityResolver | None = None,
-        notifier: ReflexNotificationSink | None = None,
         rules: list[ReflexRule] | None = None,
     ):
         self.repository = repository or ReflexReconciliationRepository()
         self.resolver = resolver or get_zone_identity_resolver()
-        self.notifier = notifier or ReflexNotificationSink()
         self.rules = rules or [
             EmptyZoneHvacRunningRule(),
             OccupiedZoneHvacIdleComfortRiskRule(),
@@ -824,7 +790,6 @@ class ReflexReconciliationService:
             now=now,
             reason="superseded_by_schedule_defect",
         )
-        await self.notifier.notify_schedule_defect(rec, finding)
         return rec
 
 

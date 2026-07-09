@@ -32,11 +32,40 @@ SENTINEL's SIMBIOT device abstraction layer autodetects **~60% of BMS integratio
 Each new site is onboarded via the **SIMBIOT Connection Wizard**. The wizard steps are:
 
 1. **Connect** — enter BMS connection details, test bridge/BACnet connection
-2. **Discover** — discover BACnet points, classify equipment groups
-3. **Review** — review AI-classified mappings
-4. **Approve** — enable processing, save adapter config
+2. **Discover** — discover BACnet points, classify equipment groups → receives `discovery_id`
+3. **Review** — review AI-classified mappings (must complete within 10 minutes of discovery)
+4. **Approve** — atomic commit with `discovery_id`, save adapter config
 5. **Access** — record the tenant MCP/GPT boundary before any client sharing
 6. **Configure** — set site contacts, generate building twin (optional)
+
+### Discovery Session Attestation
+
+Every discovery run receives a unique `discovery_id` that acts as a **permit**:
+
+- Proves data came from a real scan (not fabricated)
+- Expires after **10 minutes** (forces fresh discovery if user delays)
+- Can only be committed **once** (marked `committed` after use)
+- Must match the site (prevents cross-site replay)
+
+The backend validates the permit before accepting the commit. No `discovery_id` = no commit.
+
+### Atomic Commit
+
+Step 4 (Approve) now uses a **single Postgres transaction** via `commit_bridge_review()` RPC:
+
+| Step | Action |
+|------|--------|
+| 1 | Validate `discovery_id` permit |
+| 2 | Upsert all `equipment` rows |
+| 3 | Upsert all `point_asset_mappings` rows |
+| 4 | Update `sites.equipment_count` |
+| 5 | Create `site_module_configs` |
+| 6 | Create `site_modules` (all `phase_override='shadow'`) |
+| 7 | Mark `bridge_discovered_equipment` as onboarded |
+| 8 | Mark discovery session committed |
+| 9 | Transition `site_onboarding_state` → `canonical` |
+
+**All-or-nothing:** If any step fails, Postgres rolls back everything. The site stays in its previous state and the operator can retry safely. No more half-finished sites with orphaned equipment.
 
 ### Tenant MCP/GPT access gate
 

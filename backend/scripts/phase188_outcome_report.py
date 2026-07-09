@@ -43,22 +43,32 @@ def fetch_recommendations(conn, site_id: str, limit: int) -> list[dict[str, Any]
     with conn.cursor() as cur:
         cur.execute(
             """
-            select id::text,
-                   site_id,
-                   action_type,
-                   target_equipment,
-                   action,
-                   expected_impact,
-                   status,
-                   outcome_validated,
-                   outcome_notes,
-                   actual_saving_kwh,
-                   actual_saving_zar,
-                   metadata,
-                   phase188_evidence_epoch
-            from public.recommendations
-            where site_id = %s
-            order by timestamp desc
+            select r.id::text,
+                   r.site_id,
+                   r.action_type,
+                   r.target_equipment,
+                   r.action,
+                   r.expected_impact,
+                   r.status,
+                   r.outcome_validated,
+                   r.outcome_notes,
+                   r.actual_saving_kwh,
+                   r.actual_saving_zar,
+                   r.metadata,
+                   r.phase188_evidence_epoch,
+                   r.phase188_outcome_status,
+                   r.phase188_linked_work_order_id::text,
+                   r.phase188_outcome_recorded_at,
+                   r.phase188_outcome_recorded_by,
+                   r.phase188_outcome_source,
+                   r.phase188_outcome_notes,
+                   w.code as phase188_work_order_code,
+                   w.status as phase188_work_order_status
+            from public.recommendations r
+            left join public.work_orders w
+              on w.id = r.phase188_linked_work_order_id
+            where r.site_id = %s
+            order by r.timestamp desc
             limit %s
             """,
             [site_id, limit],

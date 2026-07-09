@@ -315,6 +315,55 @@ async def search_by_network_info(
     return {"search_key": key, "search_value": value, "results": results, "count": len(results)}
 
 
+class ServiceIntervalRequest(BaseModel):
+    """Request to set the per-asset PPM cadence."""
+
+    service_interval_days: int | None = Field(
+        ...,
+        ge=1,
+        le=365,
+        description="Days between preventive services; null clears the per-asset override "
+        "so the type-level default applies",
+    )
+
+
+@router.patch("/equipment/{equipment_id}/service-interval")
+async def set_service_interval(equipment_id: str, request: ServiceIntervalRequest) -> dict:
+    """Set the per-asset PPM cadence (equipment.service_interval_days).
+
+    The PPM scheduler resolves cadence per asset first, then the type-level
+    default from health_calculation_config.json, then 90 days. Clearing the
+    override (null) reverts to the type-level default.
+
+    Args:
+        equipment_id: Equipment UUID or code
+        request: New interval in days (1-365) or null to clear
+
+    Returns:
+        Updated cadence state for the equipment
+    """
+    repo = EquipmentMetadataRepository()
+    equipment = repo.get_equipment_metadata(equipment_id)
+    if not equipment:
+        raise HTTPException(status_code=404, detail=f"Equipment {equipment_id} not found")
+
+    supabase = get_supabase_client()
+    supabase.table("equipment").update({"service_interval_days": request.service_interval_days}).eq(
+        "id", equipment["id"]
+    ).execute()
+
+    return {
+        "status": "success",
+        "equipment_code": equipment.get("code"),
+        "service_interval_days": request.service_interval_days,
+        "message": (
+            f"PPM interval set to {request.service_interval_days} days"
+            if request.service_interval_days is not None
+            else "Per-asset PPM interval cleared — type-level default applies"
+        ),
+    }
+
+
 class MarkReplacedRequest(BaseModel):
     """Request to mark equipment as replaced."""
 

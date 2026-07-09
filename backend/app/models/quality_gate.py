@@ -11,7 +11,7 @@ class QualityMetricDetail(BaseModel):
     """Detail for a single quality metric evaluation."""
 
     metric: str = Field(description="Metric name (e.g. 'freshness_minutes')")
-    value: float = Field(description="Current metric value")
+    value: float | None = Field(description="Current metric value, or null when the metric is not applicable")
     state: str = Field(description="Evaluation state: pass/warn/fail/na")
     pass_bound: float | None = Field(default=None, description="Threshold for PASS")
     warn_bound: float | None = Field(default=None, description="Threshold for WARN")

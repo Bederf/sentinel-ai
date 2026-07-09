@@ -1364,18 +1364,80 @@ async def assign_technician_work_order(
 ):
     """Assign work order to a technician."""
     from app.database.repositories.work_order_repository import get_work_order_repository
+    from app.database.repositories.technician_repository import get_technician_repository
+    from app.services.telegram_message_sender import TelegramMessageSender
 
     repo = get_work_order_repository()
     work_order = await repo.get_work_order_by_id(work_order_id)
     if not work_order:
         raise HTTPException(status_code=404, detail="Work order not found")
 
+    tech_repo = get_technician_repository()
+    technician = None
+    if technician_id:
+        needle = technician_id.strip().lower()
+        try:
+            technicians = await tech_repo.get_all_technicians(active_only=True)
+        except Exception:
+            technicians = []
+        technician = next(
+            (
+                tech
+                for tech in technicians
+                if needle
+                in {
+                    str(tech.get("id") or "").strip().lower(),
+                    str(tech.get("code") or "").strip().lower(),
+                    str(tech.get("name") or "").strip().lower(),
+                    str(tech.get("telegram_id") or "").strip().lower(),
+                }
+            ),
+            None,
+        )
+
+    resolved_assignee = technician.get("name") if technician else technician_id
+    updates: dict[str, Any] = {"assigned_to": resolved_assignee, "status": "assigned"}
+    if technician and technician.get("specialty"):
+        updates["assigned_team"] = technician["specialty"]
+    if technician and technician.get("telegram_id"):
+        try:
+            updates["notified_technician_telegram_id"] = int(technician["telegram_id"])
+        except (TypeError, ValueError):
+            pass
+
     updated = await repo.update_work_order(
         work_order_id,
-        {"assigned_to": technician_id, "status": "assigned"},
+        updates,
     )
     if not updated:
         raise HTTPException(status_code=500, detail="Failed to assign work order")
+
+    if technician and technician.get("telegram_id"):
+        from app.config.settings import settings
+
+        bot_token = settings.sentry_tech_bot_token or settings.sentry_client_bot_token
+        if bot_token:
+            try:
+                wo_code = updated.get("code") or work_order_id
+                title = updated.get("title") or "Work order"
+                message = (
+                    f"Work Order Assigned #{wo_code}\n"
+                    f"{title}\n"
+                    f"Assigned: {updated.get('assigned_to') or resolved_assignee}"
+                )
+                await TelegramMessageSender(bot_token).send_text(
+                    chat_id=str(technician["telegram_id"]),
+                    text=message,
+                    parse_mode=None,
+                )
+            except Exception:
+                logger.warning(
+                    "Failed to notify technician %s for work order %s",
+                    technician.get("telegram_id"),
+                    work_order_id,
+                    exc_info=True,
+                )
+
     return _map_db_to_technician_work_order(updated)
 
 

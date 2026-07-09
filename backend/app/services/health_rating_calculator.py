@@ -19,6 +19,7 @@ HARD RULES:
 """
 
 import logging
+import math
 from datetime import datetime, timedelta
 
 from app.models.health_rating import (
@@ -37,6 +38,11 @@ WEIGHTS = {
     "fault_burden": 0.15,
     "trend_momentum": 0.10,
 }
+
+# Converts a rollup-history z-slope (σ/day) into health-score points/day for
+# calculate_trend_momentum. ~25 pts/σ is the mean local sensitivity of the
+# Gaussian alignment kernel over the active 1σ-3σ region.
+Z_SLOPE_TO_POINTS = 25.0
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
@@ -73,6 +79,34 @@ class HealthRatingCalculator:
         if deviation_percent is None:
             return 85.0
         return _clamp(100 - 2 * deviation_percent)
+
+    @staticmethod
+    def calculate_baseline_alignment_z(z_score: float | None) -> float:
+        """σ-driven baseline alignment score from structured service readings.
+
+        z = (current − baseline_mean) / baseline_sigma against the active
+        rollup baseline (equipment_baselines {value, sigma, n} shape).
+        A Gaussian kernel with a 2σ half-width keeps normal visit-to-visit
+        noise (|z| ≤ 1) in the healthy band while real outliers fall off fast:
+
+          |z| = 0 → 100    |z| = 2 → 60.7    |z| = 4 → 13.5
+          |z| = 1 → 88.2   |z| = 3 → 32.5
+
+        A raw Φ(−z) / p-value transform is deliberately NOT used: p-values are
+        uniform under the null, so healthy equipment would average a score of
+        50 and an on-baseline reading would anchor at 50 instead of 100.
+
+        Args:
+            z_score: Signed worst-element z-score. None (no rollup baseline
+                or no structured readings) returns the same 85.0 healthy
+                floor as calculate_baseline_alignment(None).
+
+        Returns:
+            Score in [0, 100]. Smaller |z| = higher score.
+        """
+        if z_score is None:
+            return 85.0
+        return _clamp(100.0 * math.exp(-(z_score * z_score) / 8.0))
 
     # ------------------------------------------------------------------
     # Component 2: Service Compliance (weight 0.20)
@@ -323,8 +357,11 @@ class HealthRatingCalculator:
 
         # --- Gather component inputs ---
 
-        # 1. Baseline alignment: deviation from baseline_comparisons
-        deviation_percent = await self._get_baseline_deviation(equipment_id)
+        # 1. Baseline alignment: σ-driven z against the active rollup baseline
+        #    when structured service readings exist; legacy percent-deviation
+        #    from baseline_comparisons otherwise.
+        baseline_z = await self._get_baseline_z(equipment_id)
+        deviation_percent = None if baseline_z is not None else await self._get_baseline_deviation(equipment_id)
 
         # 2. Service compliance: days since last service
         days_since_service = await self._get_days_since_service(equipment_id)
@@ -342,7 +379,10 @@ class HealthRatingCalculator:
         slope = await self._get_trend_slope(equipment_id)
 
         # --- Calculate component scores ---
-        baseline_score = self.calculate_baseline_alignment(deviation_percent)
+        if baseline_z is not None:
+            baseline_score = self.calculate_baseline_alignment_z(baseline_z)
+        else:
+            baseline_score = self.calculate_baseline_alignment(deviation_percent)
         service_score = self.calculate_service_compliance(days_since_service, service_interval)
         runtime_score = self.calculate_runtime_age(age_years, expected_life, runtime_hours)
         fault_score = self.calculate_fault_burden(critical_faults, warning_faults)
@@ -503,6 +543,117 @@ class HealthRatingCalculator:
     # Data Gathering Helpers (with try/except per source)
     # ------------------------------------------------------------------
 
+    async def _get_baseline_z(self, equipment_id: str) -> float | None:
+        """Worst signed z-score of the latest structured service readings.
+
+        Compares the most recent service_readings against the active rollup
+        baseline (equipment_baselines new {value, sigma} element shape,
+        with legacy tolerance as the σ proxy). Returns None when the
+        equipment has no active baseline or no structured readings, so the
+        caller can fall back to the legacy percent-deviation path.
+        """
+        try:
+            from app.database.repositories.baseline_repository import BaselineRepository
+
+            repo = BaselineRepository()
+            baseline = await repo.get_active_equipment_baseline(equipment_id)
+            if not baseline:
+                return None
+            elements = self._sigma_elements(baseline.baseline_values)
+            if not elements:
+                return None
+            readings = await self._get_latest_service_readings(equipment_id)
+            if not readings:
+                return None
+
+            worst: float | None = None
+            for element_id, (mean, sigma) in elements.items():
+                current = readings.get(element_id)
+                if current is None or sigma <= 0:
+                    continue
+                z = (current - mean) / sigma
+                if worst is None or abs(z) > abs(worst):
+                    worst = z
+            return worst
+        except Exception as e:
+            logger.debug(f"Could not get baseline z for {equipment_id}: {e}")
+            return None
+
+    @staticmethod
+    def _sigma_elements(baseline_values: dict | None) -> dict[str, tuple[float, float]]:
+        """Parse baseline_values into {element_id: (mean, sigma)}.
+
+        New rollup shape uses {value, sigma, ...}; legacy {value, tolerance}
+        elements fall back to tolerance as the σ proxy. Elements without a
+        usable positive σ are skipped.
+        """
+        if not isinstance(baseline_values, dict):
+            return {}
+        parsed: dict[str, tuple[float, float]] = {}
+        for element_id, element in baseline_values.items():
+            if not isinstance(element, dict):
+                continue
+            try:
+                mean = float(element["value"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            sigma_raw = element.get("sigma")
+            if sigma_raw in (None, 0, 0.0):
+                sigma_raw = element.get("tolerance")
+            try:
+                sigma = float(sigma_raw) if sigma_raw is not None else 0.0
+            except (TypeError, ValueError):
+                continue
+            if sigma > 0:
+                parsed[str(element_id)] = (mean, sigma)
+        return parsed
+
+    async def _get_latest_service_readings(self, equipment_id: str) -> dict[str, float] | None:
+        """Latest numeric service readings per element for equipment.
+
+        Walks the most recent service records (newest first) and returns the
+        first one that carries numeric readings, keyed by element_id.
+        """
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            client = get_supabase_client()
+            records = (
+                client.table("service_records")
+                .select("id")
+                .eq("equipment_id", equipment_id)
+                .order("completed_at", desc=True)
+                .order("created_at", desc=True)
+                .limit(3)
+                .execute()
+            )
+            for record in records.data or []:
+                rows = (
+                    client.table("service_readings")
+                    .select("*")
+                    .eq("service_record_id", record["id"])
+                    .order("captured_at", desc=True)
+                    .execute()
+                )
+                values: dict[str, float] = {}
+                for row in rows.data or []:
+                    element_id = row.get("element_id") or row.get("reading_type")
+                    if not element_id or str(element_id) in values:
+                        continue  # newest reading per element wins
+                    raw = row.get("numeric_value")
+                    if raw is None:
+                        raw = row.get("value")
+                    try:
+                        if raw is not None:
+                            values[str(element_id)] = float(raw)
+                    except (TypeError, ValueError):
+                        continue
+                if values:
+                    return values
+        except Exception as e:
+            logger.debug(f"Could not get latest service readings for {equipment_id}: {e}")
+        return None
+
     async def _get_baseline_deviation(self, equipment_id: str) -> float | None:
         """Get max deviation % from baseline_comparisons table."""
         try:
@@ -586,7 +737,15 @@ class HealthRatingCalculator:
         return 0, 0
 
     async def _get_trend_slope(self, equipment_id: str) -> float | None:
-        """Get the health score trend slope (points per day)."""
+        """Get the health score trend slope (points per day).
+
+        Prefers the slope measured from successive baseline rollups
+        (structured service readings); falls back to ElementTrendService
+        when the equipment has no usable rollup history.
+        """
+        rollup_slope = await self._get_rollup_trend_slope(equipment_id)
+        if rollup_slope is not None:
+            return rollup_slope
         try:
             from app.services.element_trend_service import ElementTrendService
 
@@ -599,3 +758,79 @@ class HealthRatingCalculator:
         except Exception as e:
             logger.debug(f"Could not get trend slope for {equipment_id}: {e}")
         return None
+
+    async def _get_rollup_trend_slope(self, equipment_id: str) -> float | None:
+        """Degradation slope (points/day) from successive baseline rollups.
+
+        For each element, |z| drift relative to the oldest rollup in the
+        window ((value_t − value_0) / σ_0) is regressed against days; the
+        steepest element slope is converted to health-score points/day via
+        Z_SLOPE_TO_POINTS. Positive = degrading (drifting away from the
+        reference), matching calculate_trend_momentum's contract. Requires
+        at least 3 rollup rows with σ-shaped values.
+        """
+        try:
+            from app.database.repositories.baseline_repository import BaselineRepository
+
+            repo = BaselineRepository()
+            history = await repo.get_equipment_baseline_history(equipment_id, limit=8)
+        except Exception as e:
+            logger.debug(f"Could not get rollup history for {equipment_id}: {e}")
+            return None
+
+        rows: list[tuple[datetime, dict[str, tuple[float, float]]]] = []
+        for baseline in history or []:
+            elements = self._sigma_elements(baseline.baseline_values)
+            if not elements:
+                continue
+            raw_date = getattr(baseline, "baseline_date", None)
+            if raw_date is None:
+                continue
+            try:
+                date = (
+                    raw_date
+                    if isinstance(raw_date, datetime)
+                    else datetime.fromisoformat(str(raw_date).replace("Z", "+00:00"))
+                )
+            except ValueError:
+                continue
+            rows.append((date, elements))
+
+        if len(rows) < 3:
+            return None
+        rows.sort(key=lambda r: r[0])
+
+        ref_date, ref_elements = rows[0]
+        worst_slope: float | None = None
+        for element_id, (ref_mean, ref_sigma) in ref_elements.items():
+            if ref_sigma <= 0:
+                continue
+            points = [
+                ((date - ref_date).total_seconds() / 86400.0, abs((elements[element_id][0] - ref_mean) / ref_sigma))
+                for date, elements in rows
+                if element_id in elements
+            ]
+            if len(points) < 3:
+                continue
+            slope = self._least_squares_slope(points)
+            if slope is None:
+                continue
+            if worst_slope is None or slope > worst_slope:
+                worst_slope = slope
+
+        if worst_slope is None:
+            return None
+        return worst_slope * Z_SLOPE_TO_POINTS
+
+    @staticmethod
+    def _least_squares_slope(points: list[tuple[float, float]]) -> float | None:
+        """Ordinary least-squares slope for (x, y) points; None if x is degenerate."""
+        n = len(points)
+        if n < 2:
+            return None
+        mean_x = sum(x for x, _ in points) / n
+        mean_y = sum(y for _, y in points) / n
+        denom = sum((x - mean_x) ** 2 for x, _ in points)
+        if denom <= 0:
+            return None
+        return sum((x - mean_x) * (y - mean_y) for x, y in points) / denom

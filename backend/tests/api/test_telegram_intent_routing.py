@@ -337,6 +337,102 @@ class TestTelegramCallbackEndpoint:
             assert "Acknowledged" in mock_sender.send_text.await_args.kwargs["text"]
 
     @pytest.mark.asyncio
+    async def test_work_order_info_callback_sends_logical_advisory_brief(self):
+        from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
+
+        mock_sender = _make_mock_sender()
+        mock_repo = MagicMock()
+        mock_repo.get_work_order_by_code = AsyncMock(
+            return_value={
+                "code": "WO-2026-0016",
+                "title": "SENTINEL Advisory Action: SITE-002-HVAC-ZONE-SCOPE",
+                "status": "scheduled",
+                "assigned_to": "John Smith",
+                "assigned_team": "electrical",
+                "equipment_id": "SITE-002-HVAC-ZONE-SCOPE",
+                "action_value": "Block blanket site HVAC shutdown; use scoped zone/floor control only.",
+                "recommendation_id": "bc89adc4-272c-486e-b916-ec00aea4bffb",
+            }
+        )
+
+        with (
+            patch("app.services.telegram_message_sender.TelegramMessageSender", return_value=mock_sender),
+            patch(
+                "app.database.repositories.work_order_repository.WorkOrderRepository",
+                return_value=mock_repo,
+            ),
+            patch(
+                "app.api.sentry_webhooks._load_recommendation_for_work_order",
+                AsyncMock(
+                    return_value={
+                        "id": "bc89adc4-272c-486e-b916-ec00aea4bffb",
+                        "target_equipment": "SITE-002-HVAC-ZONE-SCOPE",
+                        "action": {"value": "Block blanket site HVAC shutdown"},
+                        "reason": "Occupancy signals conflict.",
+                    }
+                ),
+            ),
+            patch("app.services.telegram_flow_handlers.route_to_handler") as mock_route,
+        ):
+            result = await handle_telegram_callback(
+                TelegramCallbackPayload(
+                    callback_query_id="cbq-woinfo",
+                    chat_id="123",
+                    user_id="456",
+                    message_id=789,
+                    data="woinfo:WO-2026-0016",
+                ),
+                x_sentry_secret=_TEST_WEBHOOK_SECRET,
+            )
+
+            assert result["success"] is True
+            assert result["intent"] == "work_order_info"
+            assert result["confirmed"] is True
+            mock_route.assert_not_called()
+            sent_text = mock_sender.send_text.await_args.kwargs["text"]
+            assert "Logical SENTINEL advisory scope" in sent_text
+            assert "What to do" in sent_text
+            assert "Block blanket site HVAC shutdown" in sent_text
+            assert "Do not perform a blanket HVAC shutdown" in sent_text
+            assert "bc89adc4-272c-486e-b916-ec00aea4bffb" not in sent_text
+            assert "Recommendation:" not in sent_text
+
+    @pytest.mark.asyncio
+    async def test_legacy_info_callback_for_logical_target_uses_work_order_info(self):
+        from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
+
+        mock_sender = _make_mock_sender()
+
+        with (
+            patch("app.services.telegram_message_sender.TelegramMessageSender", return_value=mock_sender),
+            patch(
+                "app.api.sentry_webhooks._find_latest_logical_work_order_code",
+                AsyncMock(return_value="WO-2026-0016"),
+            ) as mock_find,
+            patch(
+                "app.api.sentry_webhooks._handle_work_order_info_callback",
+                AsyncMock(return_value={"success": True, "intent": "work_order_info", "confirmed": True}),
+            ) as mock_info,
+            patch("app.services.telegram_flow_handlers.route_to_handler") as mock_route,
+        ):
+            result = await handle_telegram_callback(
+                TelegramCallbackPayload(
+                    callback_query_id="cbq-info",
+                    chat_id="123",
+                    user_id="456",
+                    message_id=789,
+                    data="/info-SITE-002-HVAC-ZONE-SCOPE",
+                ),
+                x_sentry_secret=_TEST_WEBHOOK_SECRET,
+            )
+
+            assert result["success"] is True
+            assert result["intent"] == "work_order_info"
+            mock_find.assert_awaited_once_with("SITE-002-HVAC-ZONE-SCOPE")
+            mock_info.assert_awaited_once_with("123", "WO-2026-0016", mock_sender)
+            mock_route.assert_not_called()
+
+    @pytest.mark.asyncio
     async def test_supervised_no_write_control_gate_approval_records_approval(self):
         from app.api.sentry_webhooks import TelegramCallbackPayload, handle_telegram_callback
 

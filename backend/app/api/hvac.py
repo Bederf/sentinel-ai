@@ -293,50 +293,34 @@ async def get_hvac_overview(
     chillers = [eq for eq in equipment_rows if eq.get("type", "").lower() in ("chiller", "hvac_chiller")]
     chillers_running = sum(1 for c in chillers if c.get("status") in ("running", "normal"))
 
-    # Fetch live site power from ML feeder bridge buffers (bridge data, not DB)
-    site_power = None
+    # Query latest power readings from equipment_sensor_readings (Supabase source of truth)
     try:
-        from app.services.sentinel_data_sync import get_sentinel_data_sync
+        from app.database.supabase_client import get_supabase_client
 
-        sync = get_sentinel_data_sync(site_id=site_id)
-        site_power = sync.ml_feeder.get_latest_site_power()
+        sb = get_supabase_client()
+        sensor_types = {"hvac_kw", "lighting_kw", "total_kw"}
+        power_readings = {}
+        for sensor_type in sensor_types:
+            result = (
+                sb.table("equipment_sensor_readings")
+                .select("value")
+                .eq("site_id", site_id)
+                .eq("sensor_type", sensor_type)
+                .order("recorded_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if result.data:
+                power_readings[sensor_type] = float(result.data[0]["value"])
+        hvac_kw = power_readings.get("hvac_kw", 0.0)
+        lighting_kw = power_readings.get("lighting_kw", 0.0)
+        total_kw = power_readings.get("total_kw", 0.0)
+        raw_telemetry_status = "live" if total_kw > 0 else "unavailable"
     except Exception:
-        pass
-
-    if site_power:
-        hvac_kw = site_power["hvac_kw"]
-        lighting_kw = site_power["lighting_kw"]
-        total_kw = site_power["total_kw"]
-        raw_telemetry_status = "live"
-    else:
-        # Fallback: query latest power readings from equipment_sensor_readings
-        try:
-            from app.database.supabase_client import get_supabase_client
-
-            sb = get_supabase_client()
-            sensor_types = {"hvac_kw", "lighting_kw", "total_kw"}
-            power_readings = {}
-            for sensor_type in sensor_types:
-                result = (
-                    sb.table("equipment_sensor_readings")
-                    .select("value")
-                    .eq("site_id", site_id)
-                    .eq("sensor_type", sensor_type)
-                    .order("recorded_at", desc=True)
-                    .limit(1)
-                    .execute()
-                )
-                if result.data:
-                    power_readings[sensor_type] = float(result.data[0]["value"])
-            hvac_kw = power_readings.get("hvac_kw", 0.0)
-            lighting_kw = power_readings.get("lighting_kw", 0.0)
-            total_kw = power_readings.get("total_kw", 0.0)
-            raw_telemetry_status = "live" if total_kw > 0 else "unavailable"
-        except Exception:
-            hvac_kw = 0.0
-            lighting_kw = 0.0
-            total_kw = 0.0
-            raw_telemetry_status = "unavailable"
+        hvac_kw = 0.0
+        lighting_kw = 0.0
+        total_kw = 0.0
+        raw_telemetry_status = "unavailable"
 
     # Fetch alerts for this site
     from app.database.supabase_client import get_supabase_client

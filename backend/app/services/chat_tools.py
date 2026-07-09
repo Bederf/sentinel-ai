@@ -4982,7 +4982,7 @@ TOOL_HANDLERS = {
     "process_recommendation": process_recommendation,
     # Write/action tools (role-gated to operator+)
     "adjust_setpoint": adjust_setpoint,
-    # close_work_order removed — WOs must be closed via the guided inspection checklist (done #WO-XXXX)
+    # close_work_order removed — WOs must be closed via the guided inspection checklist (/done-WO-XXXX)
     "create_work_order": create_work_order_chat,
     "approve_recommendation": approve_recommendation_chat,
     "reject_recommendation": reject_recommendation_chat,

@@ -51,7 +51,7 @@ def _resolve_epicenter_equipment(site_id: str) -> dict | None:
 
         result = (
             sb.table("equipment")
-            .select("code, type, location, health_score, zone_key")
+            .select("code, type, location, health_score, health_confidence, operating_data, zone_key")
             .eq("site_id", site_uuid)
             .execute()
         )
@@ -62,13 +62,17 @@ def _resolve_epicenter_equipment(site_id: str) -> dict | None:
     if not result.data:
         return None
 
-    scoreable = [
-        eq
-        for eq in result.data
-        if eq.get("type", "").lower() in EQUIPMENT_CRITICALITY
-        and isinstance(eq.get("health_score"), (int, float))
-        and eq["health_score"] <= 65
-    ]
+    scoreable = []
+    for eq in result.data:
+        if eq.get("type", "").lower() not in EQUIPMENT_CRITICALITY:
+            continue
+        if not isinstance(eq.get("health_score"), (int, float)) or eq["health_score"] > 65:
+            continue
+        has_operating_data = bool(eq.get("operating_data") or {})
+        health_confidence = str(eq.get("health_confidence") or "").lower()
+        if health_confidence == "low" and not has_operating_data:
+            continue
+        scoreable.append(eq)
     if not scoreable:
         return None
 

@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { BookOpen, Save, Upload, FileText } from "lucide-react";
 import { authorizedFetch } from "../../lib/api/client";
 
-const SENTRY_BMS_SECRET = "sentry-bms-phase-41";
-const SENTRY_BOT_API_KEY = "sentry-bot-RncXWQCYticUnuG06L4qnSUj-heKAeV0NnMdHOvIlKM3TNUv";
-
 interface BuildingHandbookSettingsProps {
   siteId?: string;
   onError?: (error: string) => void;
@@ -28,8 +25,7 @@ export function BuildingHandbookSettings({
     setLoading(true);
     try {
       const response = await authorizedFetch(
-        `/api/sentry/building-handbook?site_id=${encodeURIComponent(siteId)}`,
-        { headers: { "X-Sentry-API-Key": SENTRY_BOT_API_KEY, "X-Sentry-Secret": SENTRY_BMS_SECRET } }
+        `/api/sentry/building-handbook?site_id=${encodeURIComponent(siteId)}`
       );
       if (!response.ok) throw new Error("Failed to fetch handbook");
       const data = await response.json();
@@ -52,8 +48,6 @@ export function BuildingHandbookSettings({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Sentry-API-Key": SENTRY_BOT_API_KEY,
-          "X-Sentry-Secret": SENTRY_BMS_SECRET,
         },
         body: JSON.stringify({
           site_id: siteId,

@@ -130,21 +130,27 @@ function DataRow({ label, value, valueColor }: { label: string; value: string; v
   );
 }
 
-export function OccupancyEnergyCorrelationPage() {
+interface OccupancyEnergyCorrelationPageProps {
+  siteId?: string;
+}
+
+export function OccupancyEnergyCorrelationPage({ siteId: propSiteId }: OccupancyEnergyCorrelationPageProps) {
   const [correlationData, setCorrelationData] = useState<CorrelationResponse | null>(null);
   const [scenariosData, setScenariosData] = useState<ScenariosResponse | null>(null);
   const [savingsData, setSavingsData] = useState<SavingsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const siteId = propSiteId || 'bld-002';
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
         const [corrRes, scenRes, savRes] = await Promise.all([
-          authorizedFetch('/api/occupancy-energy/correlation?site_id=bld-002'),
-          authorizedFetch('/api/occupancy-energy/scenarios?site_id=bld-002'),
-          authorizedFetch('/api/occupancy-energy/savings-potential?site_id=bld-002'),
+          authorizedFetch(`/api/occupancy-energy/correlation?site_id=${encodeURIComponent(siteId)}`),
+          authorizedFetch(`/api/occupancy-energy/scenarios?site_id=${encodeURIComponent(siteId)}`),
+          authorizedFetch(`/api/occupancy-energy/savings-potential?site_id=${encodeURIComponent(siteId)}`),
         ]);
 
         if (!corrRes.ok || !scenRes.ok || !savRes.ok) {
@@ -163,7 +169,7 @@ export function OccupancyEnergyCorrelationPage() {
       }
     };
     fetchData();
-  }, []);
+  }, [siteId]);
 
   return (
     <div className="h-full overflow-y-auto" style={{ background: "var(--color-sentinel-bg-canvas)" }}>

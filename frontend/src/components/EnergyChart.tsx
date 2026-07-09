@@ -90,6 +90,7 @@ export function EnergyChart({
     { hvac: 0, lighting: 0, other: 0 }
   );
   const grandTotal = totals.hvac + totals.lighting + totals.other;
+  const otherUnmetered = grandTotal > 0 && totals.other === 0;
 
   // Loading skeleton
   if (loading) {
@@ -218,7 +219,7 @@ export function EnergyChart({
             className="text-xs"
             style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
-            Total consumption
+            {otherUnmetered ? "Measured categories" : "Total consumption"}
           </span>
           {/* Energy efficiency benchmark for SA commercial office */}
           {grandTotal > 0 && days > 0 && (
@@ -233,7 +234,6 @@ export function EnergyChart({
                 // TODO: Pull site-specific GLA from building metadata API
                 const BENCHMARK_EFFICIENT = 10.0  // 120/12
                 const BENCHMARK_TYPICAL = 14.2    // 170/12
-                const BENCHMARK_POOR = 19.2       // 230/12
 
                 const areaSqm = 5400 // S002 GLA (not gross building area)
                 const daysInMonth = 30
@@ -373,13 +373,13 @@ export function EnergyChart({
               fontVariantNumeric: "tabular-nums",
             }}
           >
-            {totals.other.toLocaleString()}
+            {otherUnmetered ? "Unmetered" : totals.other.toLocaleString()}
           </div>
           <span
             className="text-xs"
             style={{ color: "var(--color-sentinel-text-disabled)" }}
           >
-            kWh
+            {otherUnmetered ? "No load point" : "kWh"}
           </span>
         </div>
       </div>

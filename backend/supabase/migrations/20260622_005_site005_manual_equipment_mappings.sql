@@ -201,13 +201,13 @@ BEGIN
         updated_at = NOW()
     FROM tmp_site005_manual_equipment_map m
     WHERE e.site_id = v_site_id
-      AND e.code = m.code;
+      AND (e.code = m.code OR e.raw_code = m.code);
 
     DELETE FROM public.equipment_zone_relationships ez
     USING public.equipment e, tmp_site005_manual_equipment_map m
     WHERE ez.equipment_id = e.id
       AND e.site_id = v_site_id
-      AND e.code = m.code
+      AND (e.code = m.code OR e.raw_code = m.code)
       AND ez.source = 'site005_manual_mapping_seed'
       AND ez.zone_id <> m.canonical_zone_id;
 
@@ -237,7 +237,7 @@ BEGIN
         'suggested',
         jsonb_build_object('reason', 'reviewed_manual_mapping', 'source', 'bridge_site005_unmapped_report') || m.metadata
     FROM public.equipment e
-    JOIN tmp_site005_manual_equipment_map m ON m.code = e.code
+    JOIN tmp_site005_manual_equipment_map m ON m.code = e.code OR m.code = e.raw_code
     WHERE e.site_id = v_site_id
       AND e.code <> m.canonical_code
     ON CONFLICT (site_id, alias_code) DO UPDATE
@@ -266,7 +266,7 @@ BEGIN
         'suggested',
         jsonb_build_object('reason', 'reviewed_manual_mapping', 'source', 'bridge_site005_unmapped_report') || m.metadata
     FROM public.equipment e
-    JOIN tmp_site005_manual_equipment_map m ON m.code = e.code
+    JOIN tmp_site005_manual_equipment_map m ON m.code = e.code OR m.code = e.raw_code
     WHERE e.site_id = v_site_id
       AND m.canonical_zone_id IS NOT NULL
       AND m.relationship_type IS NOT NULL

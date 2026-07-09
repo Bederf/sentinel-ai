@@ -3,7 +3,7 @@ import { useSiteThresholds } from "../../hooks/useHealthThresholds";
 import { useModules } from "../../contexts/ModuleHooks";
 import { useBuildingsList } from "../../hooks/useBuildingsList";
 import { setStoredSelectedSite } from "../../lib/siteSelection";
-import { authorizedFetch, getAccessToken } from "@/lib/api";
+import { getAccessToken } from "@/lib/api";
 import {
   type FeatureToggleCard,
 } from "./settingsCatalog";
@@ -42,65 +42,6 @@ function useSaveSuccessState(): SaveSuccessState {
   }, []);
 
   return { saveSuccess, showSaveSuccess };
-}
-
-function useMlTrainingSettings(
-  isAdmin: boolean,
-  settingsPageUnlocked: boolean,
-  onError?: (error: string) => void,
-  onSaveSuccess?: (durationMs: number) => void
-) {
-  const [mlTrainingEnabled, setMlTrainingEnabled] = useState(false);
-  const [mlTrainingLoading, setMlTrainingLoading] = useState(true);
-
-  useEffect(() => {
-    authorizedFetch("/api/settings/ml-training")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((data) => {
-        if (data) setMlTrainingEnabled(!!data.enabled);
-      })
-      .catch(() => {})
-      .finally(() => setMlTrainingLoading(false));
-  }, []);
-
-  const handleMlTrainingToggle = useCallback(async () => {
-    if (!isAdmin && !settingsPageUnlocked) {
-      onError?.("Settings page is locked. Click 'Unlock to Edit' at the top to make changes.");
-      return;
-    }
-    if (!isAdmin) {
-      onError?.("Only admins can change ML training settings.");
-      return;
-    }
-
-    const newValue = !mlTrainingEnabled;
-    setMlTrainingLoading(true);
-    try {
-      const response = await authorizedFetch("/api/settings/ml-training", {
-        method: "PUT",
-        body: JSON.stringify({ enabled: newValue }),
-      });
-      if (!response.ok) throw new Error("Failed to update ML training setting");
-      setMlTrainingEnabled(newValue);
-      onSaveSuccess?.(2000);
-    } catch (error) {
-      onError?.(error instanceof Error ? error.message : "Failed to update ML training setting");
-    } finally {
-      setMlTrainingLoading(false);
-    }
-  }, [
-    isAdmin,
-    mlTrainingEnabled,
-    onError,
-    onSaveSuccess,
-    settingsPageUnlocked,
-  ]);
-
-  return {
-    handleMlTrainingToggle,
-    mlTrainingEnabled,
-    mlTrainingLoading,
-  };
 }
 
 function useFeatureToggleActions({
@@ -214,12 +155,6 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     ).catch(() => {});
   }, [buildings, selectedSiteId, setModuleSite]);
 
-  const { handleMlTrainingToggle, mlTrainingEnabled, mlTrainingLoading } = useMlTrainingSettings(
-    currentUserRole === "admin",
-    settingsPageUnlocked,
-    onError,
-    showSaveSuccess
-  );
   const { handleFeatureToggle, togglingCardId } = useFeatureToggleActions({
     activateModule,
     canManageFeatureAccess,
@@ -261,7 +196,6 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     currentUserEmail,
     currentUserRole,
     handleFeatureToggle,
-    handleMlTrainingToggle,
     handleSaveSiteThresholds,
     handleSiteChange,
     handleSuccess,
@@ -271,8 +205,6 @@ export function useSettingsController({ siteId, onError }: UseSettingsController
     siteThresholds,
     isModuleActive,
     loading,
-    mlTrainingEnabled,
-    mlTrainingLoading,
     readOnly,
     saveSuccess,
     selectedSiteId,

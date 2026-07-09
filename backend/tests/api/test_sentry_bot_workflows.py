@@ -160,6 +160,92 @@ async def test_staff_bot_call_log_creates_work_order_and_notifies_technician(sen
 
 
 @pytest.mark.asyncio
+async def test_sentry_work_order_creation_resolves_chiller_equipment_and_notifies_service_record(
+    sentry_headers, monkeypatch
+):
+    """Sentry WO creation should link the canonical chiller equipment and pass it into the notifier."""
+
+    captured_work_order: dict = {}
+    captured_notify: dict = {}
+
+    class _FakeWorkOrderRepository:
+        async def create_work_order(self, payload):
+            captured_work_order.update(payload)
+            return {"id": "wo-chiller-id", "code": "WO-2026-0017", **payload}
+
+    class _FakeTechRepo:
+        async def get_all_technicians(self, active_only=True):
+            return [
+                {
+                    "id": "tech-1",
+                    "name": "John Smith",
+                    "specialty": "electrical",
+                    "telegram_id": "8359288792",
+                    "email": "john@example.com",
+                }
+            ]
+
+        async def get_technician_for_equipment_code(self, equipment_code):
+            return {
+                "id": "tech-1",
+                "name": "John Smith",
+                "specialty": "electrical",
+                "telegram_id": "8359288792",
+                "email": "john@example.com",
+            }
+
+    class _FakeNotifier:
+        async def notify_technician(self, payload):
+            captured_notify.update(payload)
+            return {"success": True}
+
+    monkeypatch.setattr(
+        "app.database.repositories.work_order_repository.get_work_order_repository",
+        lambda: _FakeWorkOrderRepository(),
+    )
+    monkeypatch.setattr(
+        "app.database.repositories.technician_repository.get_technician_repository",
+        lambda: _FakeTechRepo(),
+    )
+    monkeypatch.setattr(
+        "app.api.sentry_webhooks.resolve_equipment_reference",
+        AsyncMock(
+            return_value={
+                "id": "e69bcd53-3e4c-44c6-a42a-e8c7113e210e",
+                "code": "S002-CHILLER-B1-001",
+                "site_id": "site-002",
+                "type": "chiller",
+                "name": "Main Chiller 1",
+            }
+        ),
+    )
+    monkeypatch.setattr("app.api.sentry_webhooks.work_order_notifier", _FakeNotifier())
+
+    from app.api.sentry_webhooks import SentryWorkOrderRequest, sentry_create_work_order
+
+    data = await sentry_create_work_order(
+        SentryWorkOrderRequest(
+            equipment_code="S002-CHILLER-B1",
+            title="Maintenance — S002-CHILLER-B1",
+            description="Maintenance work order for S002-CHILLER-B1.",
+            priority="medium",
+            created_by="telegram:user:123",
+            operator_password=_TEST_OPERATOR_PASSWORD,
+        ),
+        x_sentry_secret=sentry_headers["X-Sentry-Secret"],
+    )
+
+    assert data["success"] is True
+    assert captured_work_order["equipment_id"] == "e69bcd53-3e4c-44c6-a42a-e8c7113e210e"
+    assert captured_work_order["equipment_code"] == "S002-CHILLER-B1-001"
+    assert captured_notify["equipment_id"] == "e69bcd53-3e4c-44c6-a42a-e8c7113e210e"
+    assert captured_notify["equipment_code"] == "S002-CHILLER-B1-001"
+    assert captured_notify["equipment_name"] == "Main Chiller 1"
+    assert captured_notify["site_id"] == "site-002"
+    assert captured_notify["technician_id"] == "8359288792"
+
+
+@pytest.mark.asyncio
 async def test_staff_bot_status_checks_progress_for_reporter_logged_work_order(sentry_headers, monkeypatch):
     """Staff bot: status lookup shows progress only for the staff member who logged the WO."""
 
@@ -321,8 +407,148 @@ async def test_technician_bot_notification_uses_tech_bot_and_done_button(monkeyp
     assert captured["payload"]["chat_id"] == "8359288792"
     assert "Work Order Created #WO-2026-9105" in captured["payload"]["text"]
     keyboard = captured["payload"]["reply_markup"]["inline_keyboard"]
-    assert keyboard[-1][0]["callback_data"] == "done #WO-2026-9105"
+    assert keyboard[-1][0]["callback_data"] == "/done-WO-2026-9105"
     notifier._log_delivery.assert_awaited_once()
+
+
+def test_work_order_notifier_email_includes_closeout_feedback(monkeypatch):
+    """Work order email should show the same feedback items used at closeout."""
+
+    from app.services.sentry_integration.work_order_notifier import WorkOrderNotifier
+
+    class _FakeFeedbackTemplate:
+        template_name = "Chiller Service Closeout"
+        required_items = ["service_sheet", "compressor_audio", "sight_glass_photo"]
+        optional_items = ["oil_sight_glass", "thermal_image"]
+        prompts = {
+            "service_sheet": "Send chiller service sheet with pressures and temperatures",
+            "compressor_audio": "Record 30 seconds of compressor running",
+            "sight_glass_photo": "Photo of refrigerant sight glass (check for bubbles/moisture)",
+            "oil_sight_glass": "Photo of oil sight glass (if accessible)",
+            "thermal_image": "Thermal image of compressor and electrical connections",
+        }
+
+    class _FakeFeedbackService:
+        def get_template(self, equipment_type, service_type):
+            assert equipment_type == "chiller"
+            assert service_type == "callout"
+            return _FakeFeedbackTemplate()
+
+    monkeypatch.setattr(
+        "app.services.feedback_collection_service.get_feedback_collection_service",
+        lambda: _FakeFeedbackService(),
+    )
+
+    notifier = WorkOrderNotifier()
+    body = notifier._build_email_body(
+        {
+            "technician_name": "John Smith",
+            "criticality": "medium",
+            "service_type": "callout",
+            "title": "Maintenance — S002-CHILLER-B1",
+            "description": "Maintenance work order for S002-CHILLER-B1.",
+            "equipment_code": "S002-CHILLER-B1-001",
+            "equipment_name": "chiller Basement",
+            "equipment_type": "chiller",
+            "site_name": "Site 002",
+            "site_code": "site-002",
+        },
+        {"code": "SR-2026-906C21", "status": "notified", "service_type": "callout"},
+        {
+            "code": "WO-2026-0017",
+            "equipment": {"code": "S002-CHILLER-B1-001", "type": "chiller"},
+            "sites": {"name": "Site 002", "code": "site-002"},
+            "title": "Maintenance — S002-CHILLER-B1",
+            "description": "Maintenance work order for S002-CHILLER-B1.",
+        },
+    )
+
+    html_body = notifier._build_email_body_html(
+        {
+            "technician_name": "John Smith",
+            "criticality": "medium",
+            "service_type": "callout",
+            "title": "Maintenance — S002-CHILLER-B1",
+            "description": "Maintenance work order for S002-CHILLER-B1.",
+            "equipment_code": "S002-CHILLER-B1-001",
+            "equipment_name": "chiller Basement",
+            "equipment_type": "chiller",
+            "site_name": "Site 002",
+            "site_code": "site-002",
+        },
+        {"code": "SR-2026-906C21", "status": "notified", "service_type": "callout"},
+        {
+            "code": "WO-2026-0017",
+            "equipment": {"code": "S002-CHILLER-B1-001", "type": "chiller"},
+            "sites": {"name": "Site 002", "code": "site-002"},
+            "title": "Maintenance — S002-CHILLER-B1",
+            "description": "Maintenance work order for S002-CHILLER-B1.",
+        },
+    )
+
+    assert "CLOSEOUT FEEDBACK" in body
+    assert "These are the exact items the closeout flow will ask you to report." in body
+    assert "📋 Chiller Service Closeout" in body
+    assert "Send chiller service sheet with pressures and temperatures" in body
+    assert "Record 30 seconds of compressor running" in body
+    assert "Closeout Feedback" in html_body
+    assert "Chiller Service Closeout" in html_body
+
+
+@pytest.mark.asyncio
+async def test_maintenance_closeout_checklist_uses_service_feedback(monkeypatch):
+    """Generic maintenance closeouts should not generate inspection checklists."""
+
+    from app.api.sentry_webhooks import get_inspection_checklist_for_telegram
+
+    class _FakeChecklistService:
+        async def generate_checklist(self, *args, **kwargs):  # pragma: no cover - should not be called
+            raise AssertionError("generic maintenance closeout should bypass dynamic inspection generation")
+
+        def get_template_for_inspection(self, *args, **kwargs):  # pragma: no cover - should not be called
+            raise AssertionError("service feedback template should be used before inspection fallback")
+
+    class _FakeFeedbackTemplate:
+        required_items = ["service_sheet", "compressor_audio", "sight_glass_photo"]
+        optional_items = ["thermal_image"]
+        prompts = {
+            "service_sheet": "Send chiller service sheet with pressures and temperatures",
+            "compressor_audio": "Record 30 seconds of compressor running",
+            "sight_glass_photo": "Photo of refrigerant sight glass",
+            "thermal_image": "Thermal image of compressor and electrical connections",
+        }
+        audio_duration_seconds = 30
+
+    class _FakeFeedbackService:
+        def get_template(self, equipment_type, service_type):
+            assert equipment_type == "chiller"
+            assert service_type == "callout"
+            return _FakeFeedbackTemplate()
+
+    monkeypatch.setattr("app.services.checklist_service.get_checklist_service", lambda: _FakeChecklistService())
+    monkeypatch.setattr(
+        "app.services.feedback_collection_service.get_feedback_collection_service",
+        lambda: _FakeFeedbackService(),
+    )
+
+    result = await get_inspection_checklist_for_telegram(
+        "chiller",
+        description="Maintenance work order for S002-CHILLER-B1.",
+    )
+
+    assert result["found"] is True
+    assert result["template_name"] == "Chiller Service Closeout"
+    assert "Send chiller service sheet with pressures and temperatures" in result["checklist_text"]
+    assert result["items"][0]["item_id"] == "service_sheet"
+
+    result = await get_inspection_checklist_for_telegram(
+        "chiller",
+        description="S002-CHILLER-B1",
+    )
+
+    assert result["found"] is True
+    assert result["template_name"] == "Chiller Service Closeout"
+    assert result["items"][0]["item_id"] == "service_sheet"
 
 
 @pytest.mark.asyncio
@@ -441,6 +667,119 @@ async def test_technician_bot_work_order_detail_returns_closeout_tier(sentry_hea
     assert data["work_order_type"] == "Staff comfort complaint"
     assert data["closeout_tier"] == "comfort"
     assert data["technician_status"] == "open"
+
+
+@pytest.mark.asyncio
+async def test_technician_bot_woinfo_callback_returns_chiller_brief(sentry_headers, monkeypatch):
+    """Technician bot: woinfo callback shows the chiller work-order brief."""
+
+    class _FakeWorkOrderRepository:
+        async def get_work_order_by_code(self, code):
+            assert code == "WO-2026-0017"
+            return {
+                "id": "30cdcda1-ebb2-479c-99f1-d13cfc426958",
+                "code": "WO-2026-0017",
+                "status": "scheduled",
+                "priority": "medium",
+                "title": "Maintenance — S002-CHILLER-B1",
+                "description": "Maintenance work order for S002-CHILLER-B1.",
+                "assigned_to": "John Smith",
+                "assigned_team": "TECH-001",
+                "equipment_id": "e69bcd53-3e4c-44c6-a42a-e8c7113e210e",
+                "work_type": "repair",
+                "work_order_type": "Equipment fault",
+                "closeout_tier": "equipment",
+            }
+
+    class _FakeServiceRecordRepository:
+        async def list(self, filters=None):
+            assert filters == {"work_order_id": "30cdcda1-ebb2-479c-99f1-d13cfc426958"}
+            return [
+                {
+                    "code": "SR-2026-906C21",
+                    "status": "notified",
+                    "service_type": "callout",
+                    "technician_name": "John Smith",
+                }
+            ]
+
+    class _FakeSupabase:
+        def table(self, name):
+            assert name == "equipment"
+            return self
+
+        def select(self, *args, **kwargs):
+            return self
+
+        def eq(self, field, value):
+            assert field in {"id", "code"}
+            assert value == "e69bcd53-3e4c-44c6-a42a-e8c7113e210e"
+            return self
+
+        def limit(self, *args, **kwargs):
+            return self
+
+        def execute(self):
+            return MagicMock(
+                data=[
+                    {
+                        "id": "e69bcd53-3e4c-44c6-a42a-e8c7113e210e",
+                        "code": "S002-CHILLER-B1-001",
+                        "name": "chiller Basement",
+                        "type": "chiller",
+                        "status": "normal",
+                    }
+                ]
+            )
+
+    class _FakeFeedbackTemplate:
+        template_name = "Chiller Service Closeout"
+        required_items = ["service_sheet", "compressor_audio", "sight_glass_photo"]
+        optional_items = ["oil_sight_glass", "thermal_image"]
+        prompts = {
+            "service_sheet": "Send chiller service sheet with pressures and temperatures",
+            "compressor_audio": "Record 30 seconds of compressor running",
+            "sight_glass_photo": "Photo of refrigerant sight glass (check for bubbles/moisture)",
+            "oil_sight_glass": "Photo of oil sight glass (if accessible)",
+            "thermal_image": "Thermal image of compressor and electrical connections",
+        }
+
+    class _FakeFeedbackService:
+        def get_template(self, equipment_type, service_type):
+            assert equipment_type == "chiller"
+            assert service_type == "callout"
+            return _FakeFeedbackTemplate()
+
+    class _FakeSender:
+        def __init__(self):
+            self.send_text = AsyncMock(return_value={"ok": True})
+
+    monkeypatch.setattr(
+        "app.database.repositories.work_order_repository.WorkOrderRepository",
+        _FakeWorkOrderRepository,
+    )
+    monkeypatch.setattr(
+        "app.database.repositories.service_record_repository.ServiceRecordRepository",
+        _FakeServiceRecordRepository,
+    )
+    monkeypatch.setattr("app.database.supabase_client.get_supabase_client", lambda: _FakeSupabase())
+    monkeypatch.setattr(
+        "app.services.feedback_collection_service.get_feedback_collection_service",
+        lambda: _FakeFeedbackService(),
+    )
+
+    from app.api.sentry_webhooks import _handle_work_order_info_callback
+
+    sender = _FakeSender()
+    result = await _handle_work_order_info_callback("chat-1", "WO-2026-0017", sender)
+
+    assert result["confirmed"] is True
+    sender.send_text.assert_awaited_once()
+    sent_text = sender.send_text.await_args.kwargs["text"]
+    assert "Work Order Info: WO-2026-0017" in sent_text
+    assert "Equipment Type: chiller" in sent_text
+    assert "Service Record: SR-2026-906C21" in sent_text
+    assert "Chiller Service Closeout" in sent_text
 
 
 @pytest.mark.asyncio
@@ -753,6 +1092,81 @@ async def test_manager_bot_reassigns_work_order_and_notifies_new_technician(sent
     assert sent["token"] == "test-tech-token"
     assert sent["chat_id"] == "999888777"
     assert "reassigned to you" in sent["text"]
+
+
+@pytest.mark.asyncio
+async def test_work_order_assignment_notifies_resolved_technician(sentry_headers, monkeypatch):
+    """Dashboard assignment resolves the technician record and notifies their Telegram."""
+
+    existing = {
+        "id": "wo-assign-id",
+        "code": "WO-2026-0017",
+        "title": "CHW pump fault",
+        "site_id": "site-002",
+        "equipment_id": "equip-001",
+        "priority": "medium",
+        "status": "draft",
+        "assigned_to": "Unassigned",
+    }
+    updated_payload = {}
+    sent = {}
+
+    class _FakeWorkOrderRepository:
+        async def get_work_order_by_id(self, wo_id):
+            assert wo_id == "wo-assign-id"
+            return existing
+
+        async def update_work_order(self, wo_id, payload):
+            assert wo_id == "wo-assign-id"
+            updated_payload.update(payload)
+            return {**existing, **payload}
+
+    class _FakeTechnicianRepository:
+        async def get_all_technicians(self, active_only=True):
+            assert active_only is True
+            return [
+                {
+                    "id": "tech-1",
+                    "code": "TECH-001",
+                    "name": "John Smith",
+                    "telegram_id": "8359288792",
+                    "specialty": "electrical",
+                }
+            ]
+
+    class _FakeSender:
+        def __init__(self, token):
+            sent["token"] = token
+
+        async def send_text(self, chat_id, text, parse_mode=None):
+            sent.update({"chat_id": chat_id, "text": text, "parse_mode": parse_mode})
+            return {"ok": True}
+
+    monkeypatch.setattr(
+        "app.database.repositories.work_order_repository.get_work_order_repository",
+        lambda: _FakeWorkOrderRepository(),
+    )
+    monkeypatch.setattr(
+        "app.database.repositories.technician_repository.get_technician_repository",
+        lambda: _FakeTechnicianRepository(),
+    )
+
+    with patch("app.services.telegram_message_sender.TelegramMessageSender", _FakeSender):
+        from app.api.work_orders import assign_technician_work_order
+
+        data = await assign_technician_work_order(
+            "wo-assign-id",
+            technician_id="TECH-001",
+            auth=MagicMock(user_id="manager"),
+        )
+
+    assert data["technician_id"] == "John Smith"
+    assert updated_payload["assigned_to"] == "John Smith"
+    assert updated_payload["assigned_team"] == "electrical"
+    assert updated_payload["notified_technician_telegram_id"] == 8359288792
+    assert sent["token"] == "test-tech-token"
+    assert sent["chat_id"] == "8359288792"
+    assert "Work Order Assigned #WO-2026-0017" in sent["text"]
 
 
 @pytest.mark.asyncio

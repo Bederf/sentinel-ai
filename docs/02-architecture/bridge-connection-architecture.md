@@ -52,6 +52,29 @@ wg show
 | POST | `/api/telemetry/read` | Bearer token |
 | POST | `/api/telemetry/write` | Bearer token |
 
+## Discovery Session Attestation
+
+Every discovery run through `GET /api/simbiot/sites/{site_id}/capabilities` is now **persisted** with a unique `discovery_id`:
+
+```json
+{
+  "site_id": "site-005",
+  "discovery_id": "550e8400-e29b-41d4-a716-446655440000",
+  "discovered_at": "2026-07-06T14:30:00Z",
+  "adapter_type": "bridge",
+  "summary": { "devices": 1, "points": 1078, "writable_points": 45 },
+  "devices": [ ... ]
+}
+```
+
+The `discovery_id` is a **permit** that:
+- Proves the data came from a real scan (not fabricated)
+- Expires after **10 minutes** (prevents stale commits)
+- Can only be used **once** (marked `committed` after use)
+- Must match the **site_id** (prevents cross-site replay)
+
+This replaces the old "trust whatever JSON the frontend sends" model with cryptographic-like attestation without the crypto.
+
 ## Point Discovery and Writeability
 
 For bridge-connected sites, the bridge object catalog is the source of truth for point existence and writeability.
@@ -188,11 +211,47 @@ Configured sites as of 2026-05-28:
 ### New site onboarding flow
 
 1. SIMBIOT Connection Wizard creates the site (Supabase + disk)
-2. Wizard discovers 1006+ points via bridge API
-3. Bridge adapter config saved with `enabled: false` (disabled by default)
-4. User toggles bridge ON in Settings → SIMBIOT Bridge
-5. Site starts at `commissioning` phase → 10% poll sampling
-6. Phase auto-promotes to `shadow_live` when quality gates pass (≥24h, ≥50 polls, quality ≥ 0.7)
-7. User can optionally generate a **building twin** via Step 5 of the wizard
+2. Wizard discovers points via bridge API → receives `discovery_id`
+3. **Atomic commit** via `POST /api/onboarding/bridge-review/{site_id}/commit`
+   - Includes `discovery_id` for attestation
+   - Postgres RPC performs all upserts in one transaction
+   - Equipment + mappings + modules + bridge status + state transition
+   - **All-or-nothing**: if any step fails, nothing is committed
+4. Bridge adapter config saved with `enabled: false` (disabled by default)
+5. User toggles bridge ON in Settings → SIMBIOT Bridge
+6. Site starts at `commissioning` phase → 10% poll sampling
+7. Phase auto-promotes to `shadow_live` when quality gates pass (≥24h, ≥50 polls, quality ≥ 0.7)
+8. User can optionally generate a **building twin** via Step 5 of the wizard
 
-Site-005 (Example Hospital Private Hospital, Umhlanga) is configured on the bridge (Niagara/Tridium, oBIX protocol) but not yet in `site_adapter_config`.
+### Onboarding State Machine
+
+The `site_onboarding_state` table tracks where a site is in the pipeline:
+
+| State | Meaning |
+|-------|---------|
+| `created` | Site exists, nothing discovered yet |
+| `discovered` | Points enumerated, awaiting review |
+| `synced` | Capability sync completed |
+| `canonical` | Equipment + mappings committed atomically |
+| `live` | Modules active, data collection started |
+
+A site can only be in one state at a time. The atomic commit transitions `discovered` → `canonical` in one transaction. If the commit fails, the site stays in `discovered` and the operator can retry.
+
+### Atomic Commit (Postgres RPC)
+
+The `commit_bridge_review()` function performs 11 steps in a single transaction:
+
+1. Validate `discovery_id` (exists, matches site, active, <10 min old)
+2. Upsert all `equipment` rows
+3. Upsert all `point_asset_mappings` rows
+4. Update `sites.equipment_count`
+5. Upsert `site_module_configs`
+6. Upsert `site_modules` (with `phase_override='shadow'`)
+7. Mark `bridge_discovered_equipment` as `onboarded`
+8. Mark discovery session `committed`
+9. Transition `site_onboarding_state` → `canonical`
+10. Return summary JSONB
+
+If any step fails, **Postgres rolls back everything**. No more half-finished sites with orphaned equipment or missing mappings.
+
+Site-005 (Busamed Gateway Private Hospital, Umhlanga) is configured on the bridge (Niagara/Tridium, oBIX protocol) and now uses the atomic commit path.

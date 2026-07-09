@@ -65,9 +65,13 @@ interface PeakHoursData {
   recommendations: string[];
 }
 
-export function OccupancyAnalyticsPage() {
+interface OccupancyAnalyticsPageProps {
+  siteId?: string;
+}
+
+export function OccupancyAnalyticsPage({ siteId: propSiteId }: OccupancyAnalyticsPageProps) {
   const { siteId: contextSiteId } = useModules();
-  const [siteId] = useState(contextSiteId || '');
+  const siteId = propSiteId || contextSiteId || '';
   const [days, setDays] = useState<1 | 7 | 30>(1);
 
   const simulatedHour = new Date().getHours();
@@ -107,15 +111,17 @@ export function OccupancyAnalyticsPage() {
   const chartData = useMemo(() => {
     if (!trendData) return [];
 
-    return trendData.hours.map((hour) => {
-      const index = trendData.hours.indexOf(hour);
+    const hours = trendData.hours ?? [];
+    const zones = trendData.zones ?? { office: [], meeting: [], common: [], utility: [], entry: [] };
+
+    return hours.map((hour, index) => {
       return {
         hour: `${hour}:00`,
-        office: trendData.zones.office[index] ?? 0,
-        meeting: trendData.zones.meeting[index] ?? 0,
-        common: trendData.zones.common[index] ?? 0,
-        utility: trendData.zones.utility[index] ?? 0,
-        entry: trendData.zones.entry[index] ?? 0,
+        office: zones.office[index] ?? 0,
+        meeting: zones.meeting[index] ?? 0,
+        common: zones.common[index] ?? 0,
+        utility: zones.utility[index] ?? 0,
+        entry: zones.entry[index] ?? 0,
       };
     });
   }, [trendData]);
@@ -124,26 +130,29 @@ export function OccupancyAnalyticsPage() {
   const { averageOccupancy, currentHourOccupancy } = useMemo(() => {
     if (!trendData) return { averageOccupancy: 0, currentHourOccupancy: 0 };
 
+    const hours = trendData.hours ?? [];
+    const zones = trendData.zones ?? { office: [], meeting: [], common: [], utility: [], entry: [] };
+
     const allValues = [
-      ...trendData.zones.office,
-      ...trendData.zones.meeting,
-      ...trendData.zones.common,
-      ...trendData.zones.utility,
-      ...trendData.zones.entry,
+      ...zones.office,
+      ...zones.meeting,
+      ...zones.common,
+      ...zones.utility,
+      ...zones.entry,
     ];
-    const avg = Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length);
+    const avg = allValues.length ? Math.round(allValues.reduce((a, b) => a + b, 0) / allValues.length) : 0;
 
     // Get current hour occupancy from live data
     let currentOccupancy = avg;
     if (simulatedHour !== undefined) {
-      const hourIndex = trendData.hours.indexOf(simulatedHour);
+      const hourIndex = hours.indexOf(simulatedHour);
       if (hourIndex !== -1) {
         const hourValues = [
-          trendData.zones.office[hourIndex] ?? 0,
-          trendData.zones.meeting[hourIndex] ?? 0,
-          trendData.zones.common[hourIndex] ?? 0,
-          trendData.zones.utility[hourIndex] ?? 0,
-          trendData.zones.entry[hourIndex] ?? 0,
+          zones.office[hourIndex] ?? 0,
+          zones.meeting[hourIndex] ?? 0,
+          zones.common[hourIndex] ?? 0,
+          zones.utility[hourIndex] ?? 0,
+          zones.entry[hourIndex] ?? 0,
         ];
         currentOccupancy = Math.round(hourValues.reduce((a, b) => a + b, 0) / hourValues.length);
       }

@@ -254,10 +254,13 @@ If you have a Niagara/BACnet BMS:
 1. Navigate to the **SIMBIOT** tab in the building view
 2. Follow the 4-step wizard:
    - **Step 1:** Enter Niagara oBIX connection details
-   - **Step 2:** Discover BACnet points
+   - **Step 2:** Discover BACnet points → wizard receives `discovery_id`
    - **Step 3:** AI auto-classifies discovered points
-   - **Step 4:** Review and approve mappings
-3. Equipment will appear in the dashboard automatically
+   - **Step 4:** Review and approve mappings (must complete within 10 minutes of discovery)
+3. The commit is **atomic** — all equipment, mappings, and modules are created in one transaction
+4. Equipment will appear in the dashboard automatically
+
+**Important:** Discovery sessions expire after 10 minutes. If the user takes longer than 10 minutes to review, they must click **Rescan & Reload Review** to get a fresh `discovery_id` before approving.
 
 If no BMS yet, use `DEMO_MODE=true` to explore with sample data.
 

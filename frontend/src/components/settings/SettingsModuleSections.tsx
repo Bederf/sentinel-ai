@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
-import { Brain, ChevronDown, ChevronRight, Cpu, Gauge, Link, Sparkles } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, Gauge, Link, Sparkles } from "lucide-react";
 import {
   getAddonToggleCards,
   getBuildingSystemCards,
@@ -11,46 +11,6 @@ import {
 import type { useSettingsController } from "./useSettingsController";
 import type { ModuleDefinition } from "../../lib/api/modules";
 import { AegisSettings } from "./AegisSettings";
-
-function MLTrainingCard({ controller }: { controller: ReturnType<typeof useSettingsController> }) {
-  const disabled = controller.mlTrainingLoading || !controller.canToggleModules;
-
-  return (
-    <div className="mt-4 rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-secondary)", border: "1px solid var(--glass-border)" }}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <div className="p-1.5 rounded" style={{ background: "rgba(168, 85, 247, 0.15)", color: "rgb(168, 85, 247)" }}>
-            <Brain className="h-4 w-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>ML Background Training</h3>
-            <p className="mt-1 text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
-              Periodic model retraining, drift detection, and feedback loops. CPU-intensive — disable on resource-constrained servers.
-            </p>
-            <p className="mt-1 text-[10px]" style={{ color: "var(--color-sentinel-text-tertiary, var(--color-sentinel-text-secondary))" }}>
-              Takes effect on next service restart.
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={() => void controller.handleMlTrainingToggle()}
-          disabled={disabled}
-          className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0"
-          style={{
-            background: controller.mlTrainingEnabled ? "var(--color-sentinel-green)" : "var(--color-sentinel-bg-hover)",
-            border: `1px solid ${controller.mlTrainingEnabled ? "var(--color-sentinel-green)" : "var(--glass-border)"}`,
-            cursor: disabled ? "not-allowed" : "pointer",
-            opacity: disabled ? 0.6 : 1,
-          }}
-          aria-label="Toggle ML background training"
-          type="button"
-        >
-          <span className="inline-block h-4 w-4 rounded-full bg-white transition-transform" style={{ transform: controller.mlTrainingEnabled ? "translateX(22px)" : "translateX(2px)" }} />
-        </button>
-      </div>
-    </div>
-  );
-}
 
 function ModuleCard({
   children,
@@ -289,7 +249,6 @@ function ModulesCard({ controller }: { controller: ReturnType<typeof useSettings
         </div>
       )}
 
-      <MLTrainingCard controller={controller} />
     </ModuleCard>
   );
 }

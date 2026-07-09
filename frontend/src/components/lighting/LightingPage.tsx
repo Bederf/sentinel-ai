@@ -66,6 +66,7 @@ interface LightingPageProps {
 }
 
 export function LightingPage({ siteId: propSiteId }: LightingPageProps) {
+  const { isModuleActive } = useModules();
   const showBuildingSelector = !propSiteId;
   const [sites, setSites] = useState<Site[]>([]);
   const [selectedSiteId, setSelectedSiteId] = useState<string>(propSiteId ?? "");
@@ -145,7 +146,12 @@ export function LightingPage({ siteId: propSiteId }: LightingPageProps) {
     return () => { mounted = false; };
   }, [selectedSiteId]);
 
-  // Compute lighting zones from current system context + Supabase zones
+  // Determine if manual controls should be active
+  const selectedSite = sites.find((s) => s.id === selectedSiteId);
+  const sitePhase = selectedSite?.onboarding_phase;
+  const controlsActive =
+    isModuleActive("lighting_control") &&
+    (sitePhase === "supervised" || sitePhase === "auto");
   const zones: LightingZone[] = useMemo(() => {
     if (rawZones.length === 0) return [];
 
@@ -290,7 +296,7 @@ export function LightingPage({ siteId: propSiteId }: LightingPageProps) {
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {floorZones.map((zone) => (
-                <LightingZoneCard key={zone.id} zone={zone} />
+                <LightingZoneCard key={zone.id} zone={zone} controlsActive={controlsActive} />
               ))}
             </div>
           </div>
@@ -301,10 +307,8 @@ export function LightingPage({ siteId: propSiteId }: LightingPageProps) {
 }
 
 // Lighting Zone Card Component
-function LightingZoneCard({ zone }: { zone: LightingZone }) {
+function LightingZoneCard({ zone, controlsActive }: { zone: LightingZone; controlsActive: boolean }) {
   const [brightness, setBrightness] = useState(zone.brightness);
-  const { isModuleActive } = useModules();
-  const controlEnabled = isModuleActive('lighting_control');
 
   // Sync when zone brightness updates
   useEffect(() => {
@@ -368,8 +372,8 @@ function LightingZoneCard({ zone }: { zone: LightingZone }) {
         />
       </div>
 
-      {/* Brightness Slider — only when lighting_control is active */}
-      {controlEnabled && (
+      {/* Brightness Slider — only when lighting_control is active and site is supervised/auto */}
+      {controlsActive && (
       <div className="space-y-2">
         <label className="text-xs" style={{ color: "var(--color-sentinel-text-secondary)" }}>
           Manual Override

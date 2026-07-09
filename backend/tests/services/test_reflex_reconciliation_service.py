@@ -29,15 +29,6 @@ class FakeResolver:
         return ZoneResolution(zone_id, None, "unresolved", "test_unresolved")
 
 
-class FakeNotifier:
-    def __init__(self):
-        self.sent = []
-
-    async def notify_schedule_defect(self, rec, finding):
-        self.sent.append((rec, finding))
-        return True
-
-
 class FakeReflexRepository:
     def __init__(self):
         self.fcu_rows = []
@@ -200,15 +191,14 @@ class FakeReflexRepository:
         return rec
 
 
-def _service(repo=None, notifier=None):
+def _service(repo=None):
     repo = repo or FakeReflexRepository()
-    notifier = notifier or FakeNotifier()
-    return ReflexReconciliationService(repository=repo, resolver=FakeResolver(), notifier=notifier), repo, notifier
+    return ReflexReconciliationService(repository=repo, resolver=FakeResolver()), repo
 
 
 @pytest.mark.asyncio
 async def test_empty_zone_hvac_running_creates_operational_mismatch():
-    svc, repo, _notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [
         {
             "zone_id": "Zone-101",
@@ -230,7 +220,7 @@ async def test_empty_zone_hvac_running_creates_operational_mismatch():
 
 @pytest.mark.asyncio
 async def test_occupied_zone_hvac_idle_outside_comfort_creates_comfort_risk():
-    svc, repo, _notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [
         {
             "zone_id": "Zone-201",
@@ -250,7 +240,7 @@ async def test_occupied_zone_hvac_idle_outside_comfort_creates_comfort_risk():
 
 @pytest.mark.asyncio
 async def test_lighting_rule_uses_lighting_telemetry_not_equipment_status():
-    svc, repo, _notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": False}]
     repo.lighting_rows = [
         {
@@ -269,7 +259,7 @@ async def test_lighting_rule_uses_lighting_telemetry_not_equipment_status():
 
 @pytest.mark.asyncio
 async def test_no_lighting_telemetry_creates_no_lighting_finding_even_with_lighting_equipment():
-    svc, repo, _notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": False}]
     repo.equipment_by_zone = {"Zone-101": [{"code": "S002-LTG-101", "type": "lighting_panel", "status": "normal"}]}
 
@@ -279,8 +269,8 @@ async def test_no_lighting_telemetry_creates_no_lighting_finding_even_with_light
 
 
 @pytest.mark.asyncio
-async def test_repeated_resolved_occurrence_same_bucket_promotes_to_schedule_defect_and_notifies_once():
-    svc, repo, notifier = _service()
+async def test_repeated_resolved_occurrence_same_bucket_promotes_to_schedule_defect():
+    svc, repo = _service()
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
     sunday_evening = datetime(2026, 6, 21, 18, 30, tzinfo=UTC)
 
@@ -304,12 +294,11 @@ async def test_repeated_resolved_occurrence_same_bucket_promotes_to_schedule_def
         "operational_mismatch",
         "schedule_defect",
     ]
-    assert len(notifier.sent) == 1
 
 
 @pytest.mark.asyncio
 async def test_repeated_same_day_bucket_does_not_promote_to_schedule_defect():
-    svc, repo, notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
     sunday_evening = datetime(2026, 6, 21, 18, 30, tzinfo=UTC)
 
@@ -318,12 +307,11 @@ async def test_repeated_same_day_bucket_does_not_promote_to_schedule_defect():
     await svc.reconcile_site("site-002", now=sunday_evening + timedelta(minutes=10))
 
     assert [row[0] for row in repo.created] == ["operational_mismatch"]
-    assert notifier.sent == []
 
 
 @pytest.mark.asyncio
 async def test_persistent_same_condition_updates_one_active_row_without_new_occurrences():
-    svc, repo, notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [
         {
             "zone_id": "Zone-101",
@@ -345,12 +333,11 @@ async def test_persistent_same_condition_updates_one_active_row_without_new_occu
     assert len(active_rows) == 1
     assert active_rows[0]["metadata"]["observation_count"] == 10
     assert len(repo.occurrence_calls) == 1
-    assert notifier.sent == []
 
 
 @pytest.mark.asyncio
 async def test_continuous_condition_across_recurrence_window_does_not_promote_schedule_defect():
-    svc, repo, notifier = _service()
+    svc, repo = _service()
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
     sunday_evening = datetime(2026, 6, 21, 18, 30, tzinfo=UTC)
 
@@ -362,12 +349,11 @@ async def test_continuous_condition_across_recurrence_window_does_not_promote_sc
     assert [row[0] for row in repo.created] == ["operational_mismatch"]
     assert active_rows[0]["metadata"]["observation_count"] == 3
     assert len(repo.occurrence_calls) == 1
-    assert notifier.sent == []
 
 
 @pytest.mark.asyncio
 async def test_condition_resolves_then_recurs_closes_old_row_and_opens_new_occurrence():
-    svc, repo, _notifier = _service()
+    svc, repo = _service()
     start = datetime(2026, 6, 21, 18, 0, tzinfo=UTC)
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]
 
@@ -391,7 +377,7 @@ async def test_single_cycle_occupancy_flap_does_not_resolve_advisory():
     """One noisy clear cycle (fused occupancy spiking past 5%) must not churn
     the advisory — observed 2026-07-05: 4 create/resolve episodes per zone on
     a closed Sunday while the physical condition never cleared."""
-    svc, repo, _notifier = _service()
+    svc, repo = _service()
     start = datetime(2026, 6, 21, 18, 0, tzinfo=UTC)
 
     repo.fcu_rows = [{"zone_id": "Zone-101", "occupancy_pct": 0, "fcu_inferred_running": True}]

@@ -546,7 +546,7 @@ class SolarIngestionService:
 
                 logger.debug(f"Solar overview from snapshot: {total_pv_kw:.1f} kW, SOC {bess_soc:.1f}%")
             else:
-                # === Fallback: live connectors ===
+                # === Fallback: live connectors or bridge telemetry ===
                 for _key, connector in site.connectors.items():
                     if not connector.is_connected():
                         try:
@@ -570,7 +570,20 @@ class SolarIngestionService:
                 meters = await self.get_meter_readings(site_id)
                 grid_import_kw = sum(m.import_kw for m in meters)
                 grid_export_kw = sum(m.export_kw for m in meters)
-                data_source = "live_connectors"
+
+                # Detect actual data source: if connectors produced valid data,
+                # it's live_connectors; otherwise it's bridge telemetry
+                has_valid_connector_bess = False
+                for _key, connector in site.connectors.items():
+                    if connector.is_connected():
+                        try:
+                            cb = await connector.read_bess(site.config.get("bess", {}).get("container_id", ""))
+                            if cb and cb.soc_pct > 0:
+                                has_valid_connector_bess = True
+                                break
+                        except Exception:
+                            continue
+                data_source = "live_connectors" if has_valid_connector_bess else "bridge_telemetry"
 
             # Compute derived values
             performance_ratio = (total_pv_kw / total_capacity_kwp * 100) if total_capacity_kwp > 0 else 0
@@ -748,19 +761,27 @@ class SolarIngestionService:
     # === Inverter detail ===
 
     async def get_inverters(self, site_id: str) -> list[SolarInverter]:
-        """Get all inverters for a site with current readings."""
+        """Get all inverters for a site with current readings.
+
+        Priority:
+        1. Live connectors (Modbus TCP / simulation)
+        2. Bridge telemetry (equipment_sensor_readings from Desigo CC)
+        """
         site = self._sites.get(site_id)
         if not site:
             return []
 
-        inverters = []
+        inverters: list[SolarInverter] = []
+        # Track which inverter IDs we've already populated
+        populated_ids: set[str] = set()
+
+        # --- 1. Try live connectors first ---
         for key, connector in site.connectors.items():
             if not connector.is_connected():
                 try:
                     await connector.connect()
                 except Exception:
                     continue
-            # Read inverters based on the config
             for plant_cfg in site.config.get("plants", []):
                 for inv_cfg in plant_cfg.get("inverters", []):
                     mfr = inv_cfg.get("manufacturer", "").lower()
@@ -769,8 +790,83 @@ class SolarIngestionService:
                             inv = await connector.read_inverter(inv_cfg["id"])
                             if inv:
                                 inverters.append(inv)
+                                populated_ids.add(inv_cfg["id"])
                         except Exception as e:
                             logger.error(f"Failed to read inverter {inv_cfg['id']}: {e}")
+
+        # --- 2. Fallback: bridge telemetry for any missing inverters ---
+        for plant_cfg in site.config.get("plants", []):
+            for inv_cfg in plant_cfg.get("inverters", []):
+                inv_id = inv_cfg["id"]
+                if inv_id in populated_ids:
+                    continue
+
+                bridge_readings = await self._get_bridge_readings(site_id, inv_id)
+                if bridge_readings:
+                    # Map bridge sensor_types to inverter fields
+                    ac_power = bridge_readings.get("ac_output_power_kw", 0)
+                    dc_power = bridge_readings.get("dc_input_power_kw", 0)
+                    efficiency = bridge_readings.get("inverter_efficiency_percent", 0)
+                    temp = bridge_readings.get("inverter_temperature_c", 25)
+                    daily_yield = bridge_readings.get("daily_yield_kwh", 0)
+                    status = "online" if ac_power > 0.01 else "standby"
+
+                    inv = SolarInverter(
+                        inverter_id=inv_id,
+                        plant_id=plant_cfg.get("plant_id", ""),
+                        site_id=site_id,
+                        name=inv_cfg.get("name", inv_id),
+                        manufacturer=inv_cfg.get("manufacturer", "Unknown"),
+                        model=inv_cfg.get("model", ""),
+                        rated_power_kva=inv_cfg.get("rated_kva", 100),
+                        serial=inv_cfg.get("serial", ""),
+                        mppt_count=inv_cfg.get("mppt_count", 1),
+                        dc_power_kw=round(dc_power, 2),
+                        ac_power_kw=round(ac_power, 2),
+                        efficiency_pct=round(efficiency, 1),
+                        temp_c=round(temp, 1),
+                        status=status,
+                        daily_yield_kwh=round(daily_yield, 1),
+                        last_poll=datetime.now(UTC).isoformat(),
+                    )
+                    inverters.append(inv)
+                    populated_ids.add(inv_id)
+
+        # --- 3. Auto-discover bridge inverters not in config ---
+        bridge_inv_ids = await self._discover_bridge_solar_equipment(site_id, "S%-PV-INV-%")
+        for inv_id in bridge_inv_ids:
+            if inv_id in populated_ids:
+                continue
+            bridge_readings = await self._get_bridge_readings(site_id, inv_id)
+            if bridge_readings:
+                ac_power = bridge_readings.get("ac_output_power_kw", 0)
+                dc_power = bridge_readings.get("dc_input_power_kw", 0)
+                efficiency = bridge_readings.get("inverter_efficiency_percent", 0)
+                temp = bridge_readings.get("inverter_temperature_c", 25)
+                daily_yield = bridge_readings.get("daily_yield_kwh", 0)
+                status = "online" if ac_power > 0.01 else "standby"
+
+                inv = SolarInverter(
+                    inverter_id=inv_id,
+                    plant_id=site.config.get("plants", [{}])[0].get("plant_id", ""),
+                    site_id=site_id,
+                    name=inv_id,
+                    manufacturer="Unknown",
+                    model="",
+                    rated_power_kva=100,
+                    serial="",
+                    mppt_count=1,
+                    dc_power_kw=round(dc_power, 2),
+                    ac_power_kw=round(ac_power, 2),
+                    efficiency_pct=round(efficiency, 1),
+                    temp_c=round(temp, 1),
+                    status=status,
+                    daily_yield_kwh=round(daily_yield, 1),
+                    last_poll=datetime.now(UTC).isoformat(),
+                )
+                inverters.append(inv)
+                populated_ids.add(inv_id)
+
         return inverters
 
     async def get_inverter_detail(self, site_id: str, inverter_id: str) -> dict | None:
@@ -795,10 +891,43 @@ class SolarIngestionService:
                 }
         return None
 
+    async def _discover_bridge_solar_equipment(self, site_id: str, pattern: str) -> list[str]:
+        """Discover equipment IDs from bridge telemetry matching a pattern."""
+        try:
+            client = get_supabase_client()
+        except Exception:
+            return []
+
+        try:
+            result = (
+                client.table("equipment_sensor_readings")
+                .select("equipment_id")
+                .eq("site_id", site_id)
+                .ilike("equipment_id", pattern)
+                .limit(100)
+                .execute()
+            )
+            seen: set[str] = set()
+            ids: list[str] = []
+            for row in result.data or []:
+                eq_id = row.get("equipment_id", "")
+                if eq_id and eq_id not in seen:
+                    ids.append(eq_id)
+                    seen.add(eq_id)
+            return ids
+        except Exception as e:
+            logger.debug(f"Bridge solar discovery failed for {site_id}/{pattern}: {e}")
+            return []
+
     # === BESS ===
 
     async def get_bess_status(self, site_id: str) -> BESSContainer | None:
-        """Get BESS container status for a site."""
+        """Get BESS container status for a site.
+
+        Priority:
+        1. Live connectors (Modbus TCP / simulation)
+        2. Bridge telemetry (equipment_sensor_readings from Desigo CC)
+        """
         site = self._sites.get(site_id)
         if not site:
             return None
@@ -808,6 +937,8 @@ class SolarIngestionService:
             return None
 
         container_id = bess_cfg.get("container_id", "")
+
+        # --- 1. Try live connectors first ---
         for _key, connector in site.connectors.items():
             if not connector.is_connected():
                 try:
@@ -815,21 +946,63 @@ class SolarIngestionService:
                 except Exception:
                     continue
             bess = await connector.read_bess(container_id)
-            if bess:
+            # Validate connector data: reject all-zero/fallback artifacts
+            if bess and bess.soc_pct > 0:
                 return bess
+
+        # --- 2. Fallback: bridge telemetry ---
+        bridge_readings = await self._get_bridge_readings(site_id, container_id)
+        if bridge_readings:
+            soc = bridge_readings.get("soc_pct", 0)
+            power = bridge_readings.get("power_kw", 0)
+            temp = bridge_readings.get("temp_max_c", 25)
+
+            # Derive mode from power sign
+            if power > 0.1:
+                mode = "discharging"
+            elif power < -0.1:
+                mode = "charging"
+            else:
+                mode = "idle"
+
+            return BESSContainer(
+                container_id=container_id,
+                site_id=site_id,
+                name=bess_cfg.get("name", container_id),
+                manufacturer=bess_cfg.get("manufacturer", "Huawei"),
+                model=bess_cfg.get("model", ""),
+                capacity_kwh=bess_cfg.get("capacity_kwh", 200),
+                rated_power_kw=bess_cfg.get("rated_power_kw", 100),
+                soc_pct=round(soc, 1),
+                temp_c=round(temp, 1),
+                charge_power_kw=abs(power) if mode == "charging" else 0,
+                discharge_power_kw=power if mode == "discharging" else 0,
+                mode=mode,
+                last_poll=datetime.now(UTC).isoformat(),
+            )
+
         return None
 
     # === Meters ===
 
     async def get_meter_readings(self, site_id: str) -> list[GridMeter]:
-        """Get all meter readings for a site."""
+        """Get all meter readings for a site.
+
+        Priority:
+        1. Live connectors (Modbus TCP / simulation)
+        2. Bridge telemetry (equipment_sensor_readings from Desigo CC)
+        """
         site = self._sites.get(site_id)
         if not site:
             return []
 
-        meters = []
+        meters: list[GridMeter] = []
+        populated_ids: set[str] = set()
+
         for mtr_cfg in site.config.get("meters", []):
             meter_id = mtr_cfg["meter_id"]
+
+            # --- 1. Try live connectors first ---
             for _key, connector in site.connectors.items():
                 if not connector.is_connected():
                     try:
@@ -839,8 +1012,79 @@ class SolarIngestionService:
                 mtr = await connector.read_meter(meter_id)
                 if mtr:
                     meters.append(mtr)
-                    break  # found it, don't ask other connectors
+                    populated_ids.add(meter_id)
+                    break
+
+            if meter_id in populated_ids:
+                continue
+
+            # --- 2. Fallback: bridge telemetry ---
+            bridge_readings = await self._get_bridge_readings(site_id, meter_id)
+            if bridge_readings:
+                # Bridge uses active_power_kw: positive = import, negative = export
+                active_power = bridge_readings.get("active_power_kw", 0)
+                import_kw = active_power if active_power > 0 else 0
+                export_kw = abs(active_power) if active_power < 0 else 0
+                voltage = bridge_readings.get("voltage_v", 400)
+                current = bridge_readings.get("current_a", 0)
+                frequency = bridge_readings.get("frequency_hz", 50)
+                pf = bridge_readings.get("power_factor", 1)
+
+                meters.append(
+                    GridMeter(
+                        meter_id=meter_id,
+                        site_id=site_id,
+                        name=mtr_cfg.get("name", meter_id),
+                        manufacturer=mtr_cfg.get("manufacturer", ""),
+                        model=mtr_cfg.get("model", ""),
+                        import_kw=round(import_kw, 2),
+                        export_kw=round(export_kw, 2),
+                        voltage_v=round(voltage, 1),
+                        current_a=round(current, 2),
+                        frequency_hz=round(frequency, 2),
+                        power_factor=round(pf, 3),
+                    )
+                )
+                populated_ids.add(meter_id)
+
         return meters
+
+    # === Bridge / equipment_sensor_readings fallback ===
+
+    async def _get_bridge_readings(self, site_id: str, equipment_id_pattern: str) -> dict[str, float]:
+        """Read latest sensor values from equipment_sensor_readings (bridge telemetry).
+
+        Queries the latest row per sensor_type for equipment matching the pattern.
+        Returns a flat dict of {sensor_type: value}.
+        """
+        try:
+            client = get_supabase_client()
+        except Exception:
+            return {}
+
+        try:
+            # Use a subquery to get the latest reading per sensor_type
+            result = (
+                client.table("equipment_sensor_readings")
+                .select("equipment_id, sensor_type, value")
+                .eq("site_id", site_id)
+                .ilike("equipment_id", equipment_id_pattern)
+                .order("recorded_at", desc=True)
+                .limit(100)
+                .execute()
+            )
+
+            readings: dict[str, float] = {}
+            seen_types: set[str] = set()
+            for row in result.data or []:
+                st = row.get("sensor_type", "")
+                if st not in seen_types:
+                    readings[st] = float(row.get("value", 0))
+                    seen_types.add(st)
+            return readings
+        except Exception as e:
+            logger.debug(f"Bridge readings query failed for {site_id}/{equipment_id_pattern}: {e}")
+            return {}
 
     # === Normalised readings ===
 

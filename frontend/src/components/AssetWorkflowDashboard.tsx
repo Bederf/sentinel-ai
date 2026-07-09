@@ -722,6 +722,125 @@ export function AssetWorkflowDashboard() {
   );
 }
 
+const BASELINE_STATE_LABELS: Record<string, string> = {
+  none: 'No baseline — capture baseline readings to enable predictions',
+  seed_only: 'Seed baseline only — first PPM readings activate the rolling baseline',
+  rolling_active: 'Rolling baseline active',
+  locked: 'Baseline locked',
+};
+
+function PPMSettingsPanel({ metadata }: { metadata: EquipmentMetadata }) {
+  const [intervalInput, setIntervalInput] = useState<string>(
+    metadata.service_interval_days != null ? String(metadata.service_interval_days) : ''
+  );
+  const [saving, setSaving] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setIntervalInput(metadata.service_interval_days != null ? String(metadata.service_interval_days) : '');
+    setSaveMessage(null);
+    setSaveError(null);
+  }, [metadata.id, metadata.service_interval_days]);
+
+  const handleSave = async () => {
+    const trimmed = intervalInput.trim();
+    const parsed = trimmed === '' ? null : Number(trimmed);
+    if (parsed !== null && (!Number.isInteger(parsed) || parsed < 1 || parsed > 365)) {
+      setSaveError('Interval must be a whole number of days between 1 and 365');
+      return;
+    }
+    setSaving(true);
+    setSaveError(null);
+    setSaveMessage(null);
+    try {
+      const result = await api.setEquipmentServiceInterval(metadata.id, parsed);
+      setSaveMessage(result.message);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to save PPM interval');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const baselineState = metadata.baseline_state ?? 'none';
+  const baselineActive = baselineState === 'rolling_active' || baselineState === 'locked';
+
+  return (
+    <div
+      className="rounded-lg overflow-hidden"
+      style={{
+        background: 'var(--color-sentinel-bg-panel)',
+        border: '1px solid var(--color-sentinel-border)',
+      }}
+    >
+      <div className="p-4" style={{ borderBottom: '1px solid var(--color-sentinel-border)' }}>
+        <h3 className="font-medium text-sm" style={{ color: 'var(--color-sentinel-text-primary)' }}>
+          Preventive Maintenance
+        </h3>
+      </div>
+      <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div>
+          <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>Baseline State</span>
+          <p
+            className="font-medium mt-0.5"
+            style={{ color: baselineActive ? 'var(--color-sentinel-green)' : 'var(--color-sentinel-amber)' }}
+          >
+            {BASELINE_STATE_LABELS[baselineState] ?? baselineState}
+          </p>
+          {metadata.last_rollup_at && (
+            <p className="mt-0.5" style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+              Last rollup: {new Date(metadata.last_rollup_at).toLocaleDateString('en-ZA')}
+            </p>
+          )}
+        </div>
+        <div>
+          <label style={{ color: 'var(--color-sentinel-text-secondary)' }}>
+            PPM Interval (days) — drives the automated preventive work order
+          </label>
+          <div className="flex items-center gap-2 mt-1">
+            <input
+              value={intervalInput}
+              onChange={(e) => setIntervalInput(e.target.value)}
+              type="number"
+              min={1}
+              max={365}
+              placeholder="Type default"
+              className="w-28 rounded-lg px-3 py-2 text-sm"
+              style={{
+                background: 'var(--color-sentinel-bg-secondary)',
+                border: '1px solid var(--color-sentinel-border)',
+                color: 'var(--color-sentinel-text-primary)',
+              }}
+            />
+            <button
+              onClick={() => void handleSave()}
+              disabled={saving}
+              className="px-3 py-2 text-xs rounded-lg transition-colors disabled:opacity-60"
+              style={{
+                background: 'rgba(16, 185, 129, 0.2)',
+                border: '1px solid rgba(16, 185, 129, 0.45)',
+                color: 'var(--color-sentinel-green)',
+              }}
+            >
+              {saving ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+          <p className="mt-1" style={{ color: 'var(--color-sentinel-text-disabled)' }}>
+            Leave blank to use the equipment-type default.
+          </p>
+          {saveMessage && (
+            <p className="mt-1" style={{ color: 'var(--color-sentinel-green)' }}>{saveMessage}</p>
+          )}
+          {saveError && (
+            <p className="mt-1" style={{ color: 'var(--color-sentinel-red)' }}>{saveError}</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EquipmentWorkflowDetail({
   workflowState,
   metadata,
@@ -903,6 +1022,9 @@ function EquipmentWorkflowDetail({
           </div>
         </div>
       )}
+
+      {/* Preventive Maintenance — per-asset PPM cadence + baseline lifecycle */}
+      {maintenanceActive && metadata && <PPMSettingsPanel metadata={metadata} />}
 
       {/* Service Records */}
       {serviceRecords.length > 0 && (

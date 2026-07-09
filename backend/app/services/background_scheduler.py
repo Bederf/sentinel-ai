@@ -1487,9 +1487,10 @@ class BackgroundSchedulerService:
                                 current_occ = fused_verdict.occupancy_count  # override with fused count
                             except Exception:
                                 logger.debug("Occupancy fusion unavailable for %s, using bridge telemetry", site_id)
-                            h = datetime.now().hour
+                            now_sast = datetime.now(SAST)
+                            h = now_sast.hour
                             current_tariff = "peak" if (7 <= h < 10) or (17 <= h < 20) else "off_peak"
-                            is_occupied = datetime.now().weekday() < 5 and 7 <= datetime.now().hour < 18
+                            is_occupied = now_sast.weekday() < 5 and 7 <= now_sast.hour < 18
 
                             prev = self._last_conditions.get(site_id, {})
                             prev_kw = prev.get("total_kw")
@@ -3495,6 +3496,102 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error(f"Failed to run prediction generation: {e}")
 
+    def add_ml_accuracy_job(self, interval_seconds: int = 86400):
+        """
+        Add the measured ML accuracy + drift job (Phase 236-03).
+
+        Joins logged predictions (ml_prediction_log) to telemetry_hourly
+        actuals, writes rolling MAE/R² per model, and raises report-only
+        drift findings. Report-only — never retrains or activates a model.
+        Default 24h.
+
+        Args:
+            interval_seconds: How often to run (default: 86400s = 24h).
+        """
+        if self.scheduler.get_job("ml_accuracy"):
+            self.scheduler.remove_job("ml_accuracy")
+            logger.info("Removed existing ML accuracy job")
+
+        first_run = datetime.now() + timedelta(seconds=interval_seconds)
+
+        self.scheduler.add_job(
+            func=self._run_ml_accuracy,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="ml_accuracy",
+            name="ML Accuracy — measured drift from prediction vs actual",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(f"Added ML accuracy job with {interval_seconds}s interval")
+
+    @track_job_metrics("ml_accuracy")
+    def _run_ml_accuracy(self):
+        """Wrapper to run the measured accuracy/drift pass (runs in background)."""
+        try:
+            import asyncio
+
+            from app.services.ml_accuracy_service import get_ml_accuracy_service
+
+            logger.info("Running scheduled ML accuracy pass...")
+            service = get_ml_accuracy_service()
+            result = asyncio.run_coroutine_threadsafe(service.compute_rolling_accuracy(), self._main_loop).result(
+                timeout=300
+            )
+            logger.info(
+                f"ML accuracy pass complete: rows={result.get('accuracy_rows')} "
+                f"models={result.get('models')} findings={result.get('findings')}"
+            )
+        except Exception as e:
+            logger.error(f"ML accuracy pass failed: {e}")
+
+    def add_pinned_signal_job(self, interval_seconds: int = 21600):
+        """
+        Add the pinned-signal integrity detection job (Phase 236-02).
+
+        Evaluates telemetry_hourly per site for plausible-but-frozen signals,
+        persists per-point verdicts, and manages data_integrity findings.
+        Default 6h — pinned states change slowly.
+
+        Args:
+            interval_seconds: How often to run (default: 21600s = 6h).
+        """
+        if self.scheduler.get_job("pinned_signal_detection"):
+            self.scheduler.remove_job("pinned_signal_detection")
+            logger.info("Removed existing pinned-signal detection job")
+
+        first_run = datetime.now() + timedelta(seconds=600)  # 10 min after startup
+
+        self.scheduler.add_job(
+            func=self._run_pinned_signal_detection,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="pinned_signal_detection",
+            name="Pinned Signal Detection — flag frozen telemetry feeds",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+        )
+        logger.info(f"Added pinned-signal detection job with {interval_seconds}s interval")
+
+    @track_job_metrics("pinned_signal_detection")
+    def _run_pinned_signal_detection(self):
+        """Wrapper to run pinned-signal detection (runs in background)."""
+        try:
+            import asyncio
+
+            from app.services.pinned_signal_detector import get_pinned_signal_detector
+
+            logger.info("Running scheduled pinned-signal detection...")
+            detector = get_pinned_signal_detector()
+            result = asyncio.run_coroutine_threadsafe(detector.tick(), self._main_loop).result(timeout=300)
+            logger.info(
+                f"Pinned-signal detection complete: sites={result.get('sites')} "
+                f"points={result.get('points')} pinned={result.get('pinned')} "
+                f"findings={result.get('findings')}"
+            )
+        except Exception as e:
+            logger.error(f"Pinned-signal detection failed: {e}")
+
     def add_ppm_emission_job(self, interval_seconds: int = 86400):
         """
         Add a job to emit preventive WOs for big equipment whose last rollup
@@ -4884,9 +4981,13 @@ class BackgroundSchedulerService:
             and bool(action.get("execution_blocked"))
             and metadata.get("execution_status") in {"non_executable_advisory", "manual_action_required"}
         )
-        if is_non_executable_advisory and not (rec.target_equipment and rec.reason and action.get("value") is not None):
-            logger.warning(f"[NOTIFY] Suppressed — incomplete non-executable advisory: {rec.target_equipment}")
-            return False
+        if is_non_executable_advisory:
+            # In advisory mode the lack of a writable point is expected —
+            # the operator still needs to see the rec to action it manually.
+            if not (rec.target_equipment and rec.reason):
+                logger.warning(f"[NOTIFY] Suppressed — incomplete non-executable advisory: {rec.target_equipment}")
+                return False
+            return True
         if (
             not is_maintenance_advisory
             and not is_non_executable_advisory
@@ -6813,14 +6914,18 @@ class BackgroundSchedulerService:
             self.scheduler.remove_job(job_id)
             logger.info("Removed existing health snapshot job")
 
+        first_run = datetime.now(UTC) + timedelta(seconds=30)  # 30s warmup
         self.scheduler.add_job(
             func=self._run_health_snapshot,
             trigger=IntervalTrigger(seconds=interval_seconds),
             id=job_id,
             name="System Health Snapshot",
             replace_existing=True,
+            next_run_time=first_run,
         )
-        logger.info(f"Added health snapshot job with {interval_seconds}s interval")
+        logger.info(
+            f"Added health snapshot job with {interval_seconds}s interval (first run at {first_run.isoformat()})"
+        )
 
     @track_job_metrics("health_snapshot")
     def _run_health_snapshot(self):
@@ -6838,12 +6943,29 @@ class BackgroundSchedulerService:
             logger.error(f"Failed to store health snapshot: {e}", exc_info=True)
 
     async def _run_health_snapshot_async(self):
-        """Store current health snapshot to database."""
+        """Store current health snapshot to database (global + per-site)."""
         from app.services.system_health_service import SystemHealthService
 
         health_service = SystemHealthService()
+        # Global snapshot (no site_id)
         snapshot = await health_service.get_current_health()
         await health_service.store_health_snapshot(snapshot)
+
+        # Per-site snapshots for active commercial sites
+        try:
+            supabase = __import__(
+                "app.database.supabase_client", fromlist=["get_supabase_client"]
+            ).get_supabase_client()
+            sites = supabase.table("sites").select("code").eq("sentinel_processing_enabled", True).execute()
+            for row in sites.data or []:
+                code = str(row.get("code", ""))
+                if not code.startswith("site-"):
+                    continue
+                site_snapshot = await health_service.get_current_health(site_id=code)
+                await health_service.store_health_snapshot(site_snapshot)
+        except Exception as e:
+            logger.warning(f"Per-site health snapshot storage failed: {e}")
+
         logger.debug("Health snapshot stored successfully")
 
     # ── Equipment Health Snapshot jobs ──────────────────────────────────
@@ -9214,7 +9336,7 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
         async def _send():
             from app.config.settings import settings
             from app.database.supabase_client import get_supabase_client
-            from app.services.telegram_message_sender import TelegramMessageSender
+            from app.services.telegram_message_sender import InlineButton, InlineKeyboard, TelegramMessageSender
 
             def _record_delivery(status: str, message: str, chat: str | None = None, error: str | None = None) -> None:
                 try:
@@ -9787,6 +9909,36 @@ def _run_recommendation_digest_sync(site_id: str = "site-002"):
                 error = str(result)
                 logger.warning("[DIGEST] Morning digest Telegram send failed for %s: %s", site_id, error)
                 _record_delivery("failed", digest, chat=str(chat_id), error=error[:1000])
+
+            # Send schedule_defect interactive cards with WO buttons — one message per defect
+            if schedule_defects:
+                for rec in schedule_defects:
+                    rec_id = str(rec.get("id") or "")
+                    zone = rec.get("target_equipment") or "?"
+                    reason = _trim_digest_text(rec.get("reason"), 200)
+                    defect_text = (
+                        f"*Schedule Defect — {zone}*\n"
+                        f"{reason}\n\n"
+                        "This is a recurring BMS timer/schedule issue. "
+                        "SENTINEL cannot write schedules on this bridge yet."
+                    )
+                    keyboard = InlineKeyboard(
+                        rows=[
+                            [
+                                InlineButton(
+                                    label=f"🛠 Create WO — {zone}",
+                                    callback_data=f"wo:rec_id:{rec_id}",
+                                )
+                            ]
+                        ]
+                    )
+                    await sender.send_text(
+                        str(chat_id),
+                        defect_text,
+                        parse_mode="Markdown",
+                        keyboard=keyboard,
+                    )
+                logger.info("[DIGEST] Sent %d schedule defect card(s) for %s", len(schedule_defects), site_id)
 
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)

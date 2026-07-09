@@ -192,6 +192,18 @@ class TestEvaluate:
         assert "manual_source_pct" not in result.failed_rules
         assert "manual_source_pct" not in result.warn_rules
 
+    def test_runtime_none_metric_is_na_and_not_blocking(self, evaluator, all_pass_live_control_metrics):
+        """A metric collector can mark an inapplicable live metric as runtime NA."""
+        all_pass_live_control_metrics["mv_accuracy_7d_pct"] = None
+
+        result = evaluator.evaluate("live_control", all_pass_live_control_metrics)
+
+        mv_rule = next(r for r in result.rule_results if r.metric == "mv_accuracy_7d_pct")
+        assert mv_rule.value is None
+        assert mv_rule.state == RuleState.NA
+        assert "mv_accuracy_7d_pct" not in result.failed_rules
+        assert result.overall == GateStatus.PASS
+
     def test_rule_results_count(self, evaluator, all_pass_simulation_metrics):
         """All 14 metrics produce rule results."""
         result = evaluator.evaluate("simulation", all_pass_simulation_metrics)

@@ -77,6 +77,31 @@ def _make_gate_result_with_details(
     )
 
 
+def _make_gate_result_with_runtime_na(
+    overall: GateStatus = GateStatus.PASS,
+    enforcement: EnforcementAction = EnforcementAction.NORMAL,
+    mode: str = "advisory",
+) -> QualityGateResult:
+    """Build a QualityGateResult containing a runtime-NA metric."""
+    return QualityGateResult(
+        overall=overall,
+        rule_results=[
+            MetricRuleResult(
+                metric="mv_accuracy_7d_pct",
+                value=None,
+                state=RuleState.NA,
+                threshold=MetricThreshold(pass_bound=65, warn_bound=55, direction="higher_is_better"),
+            )
+        ],
+        failed_rules=[],
+        warn_rules=[],
+        enforcement=enforcement,
+        reason_codes=[],
+        mode=mode,
+        evaluated_at=datetime.utcnow().isoformat(),
+    )
+
+
 @pytest.fixture
 def app():
     """Create a minimal FastAPI app with the quality gate router."""
@@ -203,6 +228,34 @@ async def test_quality_gate_response_structure(client):
         assert "metric" in detail
         assert "value" in detail
         assert "state" in detail
+
+
+@pytest.mark.asyncio
+async def test_quality_gate_serializes_runtime_na_metric(client):
+    """Runtime NA metrics are returned as state=na with value=null."""
+    mock_metrics = {"mv_accuracy_7d_pct": None}
+    mock_result = _make_gate_result_with_runtime_na()
+
+    mock_settings = MagicMock()
+    mock_settings.resolved_ingestion_mode.value = "advisory"
+
+    with (
+        patch("app.api.optimization_quality.QualityGateEvaluator") as MockEvaluator,
+        patch("app.api.optimization_quality.settings", mock_settings),
+    ):
+        instance = MockEvaluator.return_value
+        instance.collect_metrics = AsyncMock(return_value=mock_metrics)
+        instance.evaluate = MagicMock(return_value=mock_result)
+
+        response = await client.get("/api/optimization/quality-gate/site-002")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["metric_values"]["mv_accuracy_7d_pct"] is None
+    assert data["rule_results"][0]["metric"] == "mv_accuracy_7d_pct"
+    assert data["rule_results"][0]["value"] is None
+    assert data["rule_results"][0]["state"] == "na"
+    assert data["failed_rules"] == []
 
 
 # ---------------------------------------------------------------------------

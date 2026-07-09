@@ -320,10 +320,8 @@ def _enrich_cascade_summary(item: _NormalizedIssue, zone_count: int = 0) -> _Nor
     source='ai' (SENTINEL inference) and given predictive root-cause framing.
     Single-member items and small groups pass through unchanged.
 
-    zone_count: known zone count for the site.  When > 0, CO2 cascade counts are
-    capped at zone_count — BACnet alerts carry no zone_id, so member_count reflects
-    distinct sensor points (many per zone).  min(sensor_points, zone_count) gives
-    the correct "zones affected" display count.
+    zone_count: known zone count for the site.  Used only as a fallback when no
+    fresh CO2 condition summary is available.
     """
     if not item.issue.is_group or item.issue.member_count < CASCADE_PROMOTE_THRESHOLD:
         return item
@@ -355,6 +353,56 @@ def _enrich_cascade_summary(item: _NormalizedIssue, zone_count: int = 0) -> _Nor
 
     return _NormalizedIssue(
         issue=item.issue.model_copy(update={"title": new_title, "summary": new_summary, "source": "ai"}),
+        priority=item.priority,
+        dedupe_key=item.dedupe_key,
+        updated_at=item.updated_at,
+    )
+
+
+def _enrich_cascade_summary_with_conditions(
+    item: _NormalizedIssue,
+    zone_count: int = 0,
+    co2_condition: dict[str, Any] | None = None,
+) -> _NormalizedIssue:
+    """Promote cascade groups using current telemetry where the wording claims current condition."""
+    if not item.issue.is_group or item.issue.member_count < CASCADE_PROMOTE_THRESHOLD:
+        return item
+
+    group_type_lower = (item.issue.group_type or "").lower()
+    is_co2_group = "co2" in group_type_lower or "unsigned_range" in group_type_lower
+    if not is_co2_group or not co2_condition:
+        return _enrich_cascade_summary(item, zone_count=zone_count)
+
+    elevated_zone_ids = [str(z) for z in co2_condition.get("elevated_zone_ids") or [] if z]
+    count = len(elevated_zone_ids)
+    if count < CASCADE_PROMOTE_THRESHOLD:
+        return _NormalizedIssue(
+            issue=item.issue.model_copy(update={"member_count": count}),
+            priority=item.priority,
+            dedupe_key=item.dedupe_key,
+            updated_at=item.updated_at,
+        )
+
+    threshold = co2_condition.get("threshold_ppm") or 800
+    fresh_zone_count = co2_condition.get("fresh_zone_count") or count
+    new_title = f"Fresh air disruption — {count} zones affected"
+    new_summary = (
+        f"CO2 is elevated across {count} of {fresh_zone_count} fresh zones "
+        f"(>= {threshold:g} ppm). "
+        f"Root cause: fresh air supply interrupted — inspect AHUs and cooling plant. "
+        f"Comfort breach risk increases with each additional 30-minute window."
+    )
+
+    return _NormalizedIssue(
+        issue=item.issue.model_copy(
+            update={
+                "title": new_title,
+                "summary": new_summary,
+                "source": "ai",
+                "member_count": count,
+                "location": item.issue.location.model_copy(update={"zone_ids": elevated_zone_ids, "asset_ids": []}),
+            }
+        ),
         priority=item.priority,
         dedupe_key=item.dedupe_key,
         updated_at=item.updated_at,
@@ -426,6 +474,7 @@ class CockpitTableProcessor:
         recommendations: list[dict[str, Any]] | None = None,
         onboarding_phase: str = "supervised",
         zone_count: int = 0,
+        co2_condition: dict[str, Any] | None = None,
     ) -> tuple[list[CockpitIssue], list[CockpitIssue], list[CockpitSourceStatus], list[CockpitActionAudit], str | None]:
         """Combine issue sources into a deduplicated, grouped, rail-limited feed.
 
@@ -464,7 +513,10 @@ class CockpitTableProcessor:
         # Phase 224 — cascade grouping
         grouped = _group_cascades(echo_filtered)
         # Phase 225 — enrich BACnet cascade groups into SENTINEL intelligence
-        enriched = [_enrich_cascade_summary(item, zone_count=zone_count) for item in grouped]
+        enriched = [
+            _enrich_cascade_summary_with_conditions(item, zone_count=zone_count, co2_condition=co2_condition)
+            for item in grouped
+        ]
         # Phase 225 — advisory mode filter: raw echoes out, interpreted insights in
         filtered = _filter_advisory_echoes(enriched, onboarding_phase)
         primary_items, overflow_items = _apply_rail_limit(filtered)

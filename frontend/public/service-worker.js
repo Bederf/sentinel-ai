@@ -8,7 +8,7 @@
  * - Network-first with cached fallback for decision payloads.
  */
 
-const APP_VERSION = "v4";
+const APP_VERSION = "v6";
 const APP_SHELL_CACHE = `sentinel-shell-${APP_VERSION}`;
 const STATIC_CACHE = `sentinel-static-${APP_VERSION}`;
 const PAYLOAD_CACHE = `sentinel-payload-${APP_VERSION}`;
@@ -106,13 +106,52 @@ async function networkFirstStatic(request) {
 
   try {
     const networkResponse = await fetch(request);
-    if (networkResponse.ok) {
+    if (networkResponse.ok && isExpectedStaticResponse(request, networkResponse)) {
       cache.put(request, networkResponse.clone());
+      return networkResponse;
     }
-    return networkResponse;
+
+    const cachedResponse = await cache.match(request);
+    if (cachedResponse) {
+      return cachedResponse;
+    }
+
+    return new Response("Static asset not found.", {
+      status: 404,
+      headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
+    });
   } catch (_networkError) {
-    return (await cache.match(request)) || Response.error();
+    return (
+      (await cache.match(request)) ||
+      new Response("Static asset unavailable.", {
+        status: 503,
+        headers: { "Content-Type": "text/plain", "Cache-Control": "no-store" },
+      })
+    );
   }
+}
+
+function isExpectedStaticResponse(request, response) {
+  const destination = request.destination;
+  const contentType = response.headers.get("Content-Type") || "";
+
+  if (destination === "script") {
+    return contentType.includes("javascript");
+  }
+  if (destination === "style") {
+    return contentType.includes("css");
+  }
+  if (destination === "image") {
+    return contentType.startsWith("image/");
+  }
+  if (destination === "audio") {
+    return contentType.startsWith("audio/");
+  }
+  if (request.url.endsWith("/manifest.json")) {
+    return contentType.includes("json") || contentType.includes("manifest");
+  }
+
+  return !contentType.includes("text/html");
 }
 
 /**

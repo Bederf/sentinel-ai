@@ -6,6 +6,7 @@ responses in service records.
 """
 
 import asyncio
+import html
 import json
 import logging
 import os
@@ -21,8 +22,10 @@ from app.database.repositories.service_record_repository import ServiceRecordRep
 from app.database.repositories.work_order_repository import get_work_order_repository
 from app.models.notification import ChannelType, NotificationDeliveryLog, NotificationStatus
 from app.models.service_record import ServiceStatus
+from app.services.equipment_reference_resolver import resolve_equipment_reference
 from app.services.ml_template_service import MLTemplateService
 from app.services.popia_consent_guard import evaluate_ingress_processing_consent
+from app.services.work_order_info_renderer import render_service_feedback_checklist
 
 logger = logging.getLogger(__name__)
 
@@ -101,102 +104,58 @@ class WorkOrderNotifier:
         return None
 
     @staticmethod
-    def _get_inspection_checklist(equipment_type: str) -> str:
-        """Get the inspection checklist for an equipment type as plain text for email.
-
-        Returns formatted checklist string, or empty string if no checklist exists.
-        """
+    def _get_closeout_feedback_checklist(equipment_type: str, service_type: str) -> str:
+        """Get the technician closeout feedback checklist as plain text for email."""
         if not equipment_type or equipment_type == "n/a":
             return ""
         try:
-            from app.services.checklist_service import get_checklist_service
+            from app.services.feedback_collection_service import get_feedback_collection_service
 
-            svc = get_checklist_service()
-            template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
+            svc = get_feedback_collection_service()
+            template = svc.get_template(equipment_type.lower(), service_type.lower())
+            if not template and service_type.lower() == "callout":
+                template = svc.get_template(equipment_type.lower(), "minor")
             if not template:
                 return ""
 
-            items = template.get("checklist_items", [])
-            name = template.get("template_name", f"{equipment_type.upper()} Inspection")
-            duration = template.get("estimated_duration_minutes", 30)
-
-            lines = [f"{name} (est. {duration} min)", ""]
-            current_category = None
-
-            for item in items:
-                cat = item.get("category", "General")
-                if cat != current_category:
-                    current_category = cat
-                    lines.append(f"  {cat}:")
-
-                q = item.get("question") or item.get("description") or ""
-                if not q:
-                    continue
-                item_type = item.get("item_type", "")
-                options = item.get("options", [])
-                method = item.get("method", "")
-                acceptance = item.get("acceptance_criteria", "")
-
-                if item_type == "measurement":
-                    unit = item.get("unit", "")
-                    tmin = item.get("tolerance_min")
-                    tmax = item.get("tolerance_max")
-                    tol = f" (acceptable: {tmin}-{tmax} {unit})" if tmin is not None else ""
-                    lines.append(f"    [ ] {q}{tol}")
-                elif options:
-                    opts_str = " / ".join(o.get("label", "") for o in options)
-                    lines.append(f"    [ ] {q} ({opts_str})")
-                elif acceptance:
-                    lines.append(f"    [ ] {q}")
-                    lines.append(f"         Criteria: {acceptance}")
-                else:
-                    lines.append(f"    [ ] {q}")
-
-                if method and method != "visual_inspection":
-                    lines.append(f"         Method: {method.replace('_', ' ')}")
-
-                photos = item.get("photos_required") or ("photo" in (item.get("recording_required") or []))
-                if photos:
-                    lines.append("         ^ Photo required")
-
-            return "\n".join(lines)
+            return render_service_feedback_checklist(
+                {
+                    "template_name": template.template_name,
+                    "required_items": template.required_items,
+                    "optional_items": template.optional_items,
+                    "prompts": template.prompts,
+                }
+            )
         except Exception as e:
-            logger.warning(f"Could not load checklist for {equipment_type}: {e}")
+            logger.warning(f"Could not load closeout feedback for {equipment_type}/{service_type}: {e}")
             return ""
 
     @staticmethod
-    def _get_telegram_checklist_summary(equipment_type: str, max_items: int = 6) -> str:
-        """Return a compact technician checklist for Telegram assignment messages."""
+    def _get_telegram_checklist_summary(equipment_type: str, service_type: str, max_items: int = 6) -> str:
+        """Return a compact technician closeout summary for Telegram assignment messages."""
         if not equipment_type or equipment_type == "n/a":
             return ""
         try:
-            from app.services.checklist_service import get_checklist_service
+            from app.services.feedback_collection_service import get_feedback_collection_service
 
-            svc = get_checklist_service()
-            template = svc.get_template_for_inspection(equipment_type.lower(), "routine")
+            svc = get_feedback_collection_service()
+            template = svc.get_template(equipment_type.lower(), service_type.lower())
+            if not template and service_type.lower() == "callout":
+                template = svc.get_template(equipment_type.lower(), "minor")
             if not template:
                 return ""
 
             lines = []
-            for item in template.get("checklist_items", [])[:max_items]:
-                question = item.get("question") or item.get("description") or ""
-                if not question:
-                    continue
-                options = item.get("options", [])
-                if options:
-                    option_text = " / ".join(str(o.get("label") or "").strip() for o in options if o.get("label"))
-                    suffix = f" ({option_text})" if option_text else ""
-                elif item.get("item_type") == "measurement":
-                    unit = item.get("unit", "")
-                    tmin = item.get("tolerance_min")
-                    tmax = item.get("tolerance_max")
-                    suffix = f" ({tmin}-{tmax} {unit})" if tmin is not None else ""
-                else:
-                    suffix = ""
-                lines.append(f"- {question}{suffix}")
+            prompt_items = [(item, False) for item in template.required_items] + [
+                (item, True) for item in template.optional_items
+            ]
+            for item, is_optional in prompt_items[:max_items]:
+                prompt = template.prompts.get(item) or item.replace("_", " ").title()
+                prefix = "- Optional: " if is_optional else "- "
+                lines.append(f"{prefix}{prompt}")
             return "\n".join(lines)
         except Exception as e:
-            logger.warning(f"Could not load Telegram checklist for {equipment_type}: {e}")
+            logger.warning(f"Could not load Telegram closeout feedback for {equipment_type}/{service_type}: {e}")
             return ""
 
     async def _load_work_order_context(self, work_order_id: str) -> dict[str, Any]:
@@ -340,11 +299,19 @@ class WorkOrderNotifier:
                 ]
             )
 
-        # Load equipment-specific inspection checklist
-        checklist_text = self._get_inspection_checklist(equipment_type.lower())
+        # Load equipment-specific checklist used by both info and closeout.
+        service_type = str(work_order_data.get("service_type") or service_record.get("service_type") or "minor").lower()
+        checklist_text = self._get_closeout_feedback_checklist(equipment_type.lower(), service_type)
 
         if checklist_text:
-            lines.extend(["", "INSPECTION CHECKLIST", checklist_text])
+            lines.extend(
+                [
+                    "",
+                    "CLOSEOUT FEEDBACK",
+                    "These are the exact items the closeout flow will ask you to report.",
+                    checklist_text,
+                ]
+            )
         elif instructions:
             lines.extend(["", "FIELD INSTRUCTIONS", instructions])
         else:
@@ -359,25 +326,25 @@ class WorkOrderNotifier:
                 ]
             )
 
-        # Telegram equipment code for commands (dashes → underscores)
-        tg_code = equipment_code.replace("-", "_") if equipment_code != "N/A" else ""
+        # Telegram equipment code for commands (keep dashed slash-command form)
+        tg_code = equipment_code if equipment_code != "N/A" else ""
         tg_commands = ""
         if tg_code:
             tg_commands = (
                 f"\nTELEGRAM COMMANDS\n"
                 f"  /info-{tg_code} — Equipment status & readings\n"
                 f"  /note-{tg_code} — Add a note during inspection\n"
-                f"  done #{wo_ref} — Submit inspection findings"
+                f"  /done-{wo_ref} — Submit closeout feedback"
             )
 
         lines.extend(
             [
                 "",
                 "HOW TO REPORT",
-                "When you have completed the inspection, open Telegram and type:",
-                f"  done #{wo_ref}",
+                "When you have completed the closeout, open Telegram and type:",
+                f"  /done-{wo_ref}",
                 "",
-                "Sentry will guide you through each checklist item one at a time.",
+                "Sentry will ask the same closeout feedback items shown above, one at a time.",
                 "Your answers are saved to the service record automatically.",
                 tg_commands,
                 "",
@@ -459,27 +426,25 @@ class WorkOrderNotifier:
         }
         priority_color = priority_colors.get(priority, "#1a73e8")
 
-        # Inspection checklist - build HTML list
-        checklist_raw = self._get_inspection_checklist(equipment_type.lower())
+        # Closeout feedback checklist - reuse the same text as the technician Info flow.
+        checklist_raw = self._get_closeout_feedback_checklist(equipment_type.lower(), service_type)
         if checklist_raw:
-            checklist_items = [f"<li>{line.strip()}</li>" for line in checklist_raw.split("\n") if line.strip()]
-            checklist_html = f"<ul>{''.join(checklist_items)}</ul>"
+            checklist_html = f'<pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">{html.escape(checklist_raw)}</pre>'
         elif instructions:
-            instruction_items = [f"<li>{line.strip()}</li>" for line in instructions.split("\n") if line.strip()]
-            checklist_html = f"<ul>{''.join(instruction_items)}</ul>"
+            checklist_html = f'<pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">{html.escape(instructions)}</pre>'
         else:
             checklist_html = (
-                "<ul>"
-                "<li>Verify site safety controls before touching equipment.</li>"
-                "<li>Inspect the faulted subsystem and capture photos/readings.</li>"
-                "<li>Run diagnostics and record measured values.</li>"
-                "<li>Identify likely root cause and required corrective action.</li>"
-                "</ul>"
+                '<pre style="white-space: pre-wrap; margin: 0; font-family: inherit;">'
+                "1. Verify site safety controls before touching equipment.\n"
+                "2. Inspect the faulted subsystem and capture photos/readings.\n"
+                "3. Run diagnostics and record measured values.\n"
+                "4. Identify likely root cause and required corrective action."
+                "</pre>"
             )
 
         tg_code = equipment_code.replace("-", "_") if equipment_code != "N/A" else ""
 
-        html = f"""<!DOCTYPE html>
+        html_body = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -552,26 +517,27 @@ class WorkOrderNotifier:
     <div class="description">{description}</div>"""
 
         if diagnostics_text:
-            html += f"""
+            html_body += f"""
     <h2>Diagnostic Context</h2>
     <div class="description" style="font-family: monospace; font-size: 12px; white-space: pre-wrap;">{diagnostics_text}</div>"""
 
-        html += f"""
-    <h2>Inspection Checklist</h2>
+        html_body += f"""
+    <h2>Closeout Feedback</h2>
+    <p>This is the same feedback the closeout flow will ask you to provide.</p>
     <div class="checklist">{checklist_html}</div>
 
     <div class="telegram-section">
       <p><strong>How to Report Completion</strong></p>"""
 
         if tg_code:
-            html += f"""      <p>Open Telegram and use these commands:</p>
+            html_body += f"""      <p>Open Telegram and use these commands:</p>
       <p><code>/info-{tg_code}</code> — Equipment status &amp; readings</p>
       <p><code>/note-{tg_code}</code> — Add a note during inspection</p>
-      <p><code>done #{wo_ref}</code> — Submit inspection findings</p>"""
+      <p><code>/done-{wo_ref}</code> — Submit closeout feedback</p>"""
         else:
-            html += f"""      <p>When you have completed the inspection, type: <code>done #{wo_ref}</code></p>"""
+            html_body += f"""      <p>When you have completed the closeout, type: <code>/done-{wo_ref}</code></p>"""
 
-        html += f"""    </div>
+        html_body += f"""    </div>
   </div>
     <div class="footer">
     <p><span class="brand">{site_name}</span> · Facilities Management</p>
@@ -580,7 +546,7 @@ class WorkOrderNotifier:
 </div>
 </body>
 </html>"""
-        return html
+        return html_body
 
     async def _send_email_via_local_gmail_helper(self, to_email: str, subject: str, body: str) -> bool:
         """Fallback delivery via local gmail helper, still triggered from API flow."""
@@ -708,6 +674,23 @@ class WorkOrderNotifier:
                         equipment_id_val = eqs.get("id") if eqs else None
                     except Exception:
                         equipment_id_val = None
+
+            if not equipment_id_val and work_order_data.get("equipment_code"):
+                try:
+                    equipment = await resolve_equipment_reference(
+                        str(work_order_data.get("equipment_code")),
+                        site_id=str(work_order_data.get("site_id") or ""),
+                    )
+                    if equipment:
+                        equipment_id_val = equipment.get("id")
+                        if equipment.get("code"):
+                            work_order_data["equipment_code"] = equipment["code"]
+                        if equipment.get("name"):
+                            work_order_data["equipment_name"] = equipment["name"]
+                        if equipment.get("site_id"):
+                            work_order_data["site_id"] = equipment["site_id"]
+                except Exception as exc:
+                    logger.warning("Could not resolve equipment reference for service record: %s", exc)
 
             # Create service record only if real equipment is involved
             create_sr = work_order_data.get("create_service_record", True)
@@ -915,7 +898,8 @@ class WorkOrderNotifier:
                 lines.append("")
                 lines.append(problem)
             checklist_summary = self._get_telegram_checklist_summary(
-                (work_order_data.get("equipment_type") or "").lower()
+                (work_order_data.get("equipment_type") or "").lower(),
+                str(work_order_data.get("service_type") or service_record.get("service_type") or "minor").lower(),
             )
             if checklist_summary:
                 lines.append("")
@@ -926,12 +910,11 @@ class WorkOrderNotifier:
             msg = "\n".join(lines)
 
             code_dashed = equipment_code.replace("_", "-") if equipment_code else ""
-            desk_number = work_order_data.get("desk_number", "")
-            info_ref = code_dashed or (desk_number if desk_number.isdigit() else "")
+            info_ref = wo_ref
             note_ref = code_dashed or ""
-            info_value = f"/info-{info_ref}" if info_ref else ""
+            info_value = f"woinfo:{info_ref}" if info_ref else ""
             note_value = f"/note-{note_ref}" if note_ref else ""
-            done_value = f"done #{wo_ref}"
+            done_value = f"/done-{wo_ref}"
             inline_keyboard = []
             row = []
             if info_value:

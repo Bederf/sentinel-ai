@@ -132,6 +132,16 @@ def test_freshness_alert_message_groups_stale_stream_samples():
     assert "S002-VAV-L1-A (vav)" in text
 
 
+def test_telemetry_stream_database_url_falls_back_to_local_postgres(monkeypatch):
+    monitor = DataFreshnessMonitor()
+
+    monkeypatch.setattr("app.services.data_freshness_monitor.settings.database_url", "")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    monkeypatch.delenv("DATABASE_URL_DIRECT", raising=False)
+
+    assert monitor._database_url() == "postgresql://postgres:postgres@127.0.0.1:55322/postgres"
+
+
 @pytest.mark.asyncio
 async def test_freshness_alert_does_not_fall_back_to_global_chat(monkeypatch):
     monitor = DataFreshnessMonitor()

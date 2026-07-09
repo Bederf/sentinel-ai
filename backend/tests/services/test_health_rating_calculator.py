@@ -74,6 +74,186 @@ class TestBaselineAlignment:
         assert result == 100.0
 
 
+class TestBaselineAlignmentZ:
+    """Tests for σ-driven calculate_baseline_alignment_z."""
+
+    def test_zero_z_is_perfect(self, calc):
+        """On-baseline reading (z=0) = 100, not 50 — the score anchors at 100."""
+        assert calc.calculate_baseline_alignment_z(0.0) == 100.0
+
+    def test_one_sigma_within_noise_band(self, calc):
+        """1σ is normal visit-to-visit noise → stays near the healthy band."""
+        assert calc.calculate_baseline_alignment_z(1.0) == pytest.approx(88.25, abs=0.01)
+
+    def test_two_sigma_watch_zone(self, calc):
+        """2σ deviation → 60.65 (warning-band contribution)."""
+        assert calc.calculate_baseline_alignment_z(2.0) == pytest.approx(60.65, abs=0.01)
+
+    def test_three_sigma_alarm(self, calc):
+        """3σ (control-chart out-of-control) → 32.47."""
+        assert calc.calculate_baseline_alignment_z(3.0) == pytest.approx(32.47, abs=0.01)
+
+    def test_four_sigma_near_zero(self, calc):
+        """4σ → 13.53, heading to 0."""
+        assert calc.calculate_baseline_alignment_z(4.0) == pytest.approx(13.53, abs=0.01)
+
+    def test_signed_symmetry(self, calc):
+        """Deviation below the baseline mean scores the same as above."""
+        assert calc.calculate_baseline_alignment_z(-2.0) == calc.calculate_baseline_alignment_z(2.0)
+
+    def test_none_returns_healthy_floor(self, calc):
+        """None (no rollup baseline) keeps the 85 healthy-floor semantics."""
+        assert calc.calculate_baseline_alignment_z(None) == 85.0
+
+    def test_monotonic_decreasing(self, calc):
+        """Score strictly decreases as |z| grows."""
+        scores = [calc.calculate_baseline_alignment_z(z) for z in (0.0, 0.5, 1.0, 2.0, 3.0, 5.0)]
+        assert scores == sorted(scores, reverse=True)
+
+
+class TestSigmaElements:
+    """Tests for _sigma_elements baseline_values parsing."""
+
+    def test_new_rollup_shape(self, calc):
+        """New {value, sigma, n} shape parses mean and sigma."""
+        parsed = calc._sigma_elements({"vibration_mm_s": {"value": 2.5, "sigma": 0.3, "n": 8}})
+        assert parsed == {"vibration_mm_s": (2.5, 0.3)}
+
+    def test_legacy_tolerance_fallback(self, calc):
+        """Legacy {value, tolerance} shape uses tolerance as the σ proxy."""
+        parsed = calc._sigma_elements({"filter_dp": {"value": 250, "tolerance": 50}})
+        assert parsed == {"filter_dp": (250.0, 50.0)}
+
+    def test_zero_sigma_falls_back_to_tolerance(self, calc):
+        """sigma=0 (first rollup, n<2, no prior tolerance) uses tolerance if present."""
+        parsed = calc._sigma_elements({"amps": {"value": 12.0, "sigma": 0.0, "tolerance": 1.5}})
+        assert parsed == {"amps": (12.0, 1.5)}
+
+    def test_no_usable_sigma_skipped(self, calc):
+        """Elements without a positive σ are skipped."""
+        assert calc._sigma_elements({"amps": {"value": 12.0, "sigma": 0.0}}) == {}
+
+    def test_non_dict_values_skipped(self, calc):
+        """Legacy scalar elements and junk are skipped without raising."""
+        parsed = calc._sigma_elements(
+            {"note": "ok", "amps": {"value": "bad", "sigma": 1}, "good": {"value": 1, "sigma": 1}}
+        )
+        assert parsed == {"good": (1.0, 1.0)}
+
+    def test_none_input(self, calc):
+        """None baseline_values → empty dict."""
+        assert calc._sigma_elements(None) == {}
+
+
+class TestLeastSquaresSlope:
+    """Tests for the OLS slope helper."""
+
+    def test_perfect_line(self, calc):
+        assert calc._least_squares_slope([(0.0, 0.0), (7.0, 1.0), (14.0, 2.0)]) == pytest.approx(1.0 / 7.0)
+
+    def test_flat_line(self, calc):
+        assert calc._least_squares_slope([(0.0, 1.0), (5.0, 1.0), (10.0, 1.0)]) == pytest.approx(0.0)
+
+    def test_degenerate_x_returns_none(self, calc):
+        assert calc._least_squares_slope([(3.0, 1.0), (3.0, 2.0)]) is None
+
+    def test_single_point_returns_none(self, calc):
+        assert calc._least_squares_slope([(0.0, 1.0)]) is None
+
+
+def _baseline_row(date_iso: str, values: dict):
+    """Minimal stand-in for an EquipmentBaseline model row."""
+    from types import SimpleNamespace
+
+    return SimpleNamespace(baseline_date=date_iso, baseline_values=values)
+
+
+@pytest.mark.asyncio
+class TestRollupTrendSlope:
+    """Tests for _get_rollup_trend_slope over rollup history."""
+
+    async def test_rising_element_produces_degrading_slope(self, calc):
+        """Vibration drifting 1σ per week → positive points/day slope (25/7)."""
+        history = [
+            _baseline_row("2026-07-15T00:00:00+00:00", {"vib": {"value": 12.0, "sigma": 1.2}}),
+            _baseline_row("2026-07-08T00:00:00+00:00", {"vib": {"value": 11.0, "sigma": 1.1}}),
+            _baseline_row("2026-07-01T00:00:00+00:00", {"vib": {"value": 10.0, "sigma": 1.0}}),
+        ]
+        with patch("app.database.repositories.baseline_repository.BaselineRepository") as mock_repo_cls:
+            mock_repo = MagicMock()
+
+            async def _history(equipment_id, limit=10):
+                return history
+
+            mock_repo.get_equipment_baseline_history = _history
+            mock_repo_cls.return_value = mock_repo
+
+            slope = await calc._get_rollup_trend_slope("EQ-1")
+
+        # |z| vs oldest rollup (σ0=1.0): 0, 1, 2 over days 0, 7, 14 → 1/7 σ/day × 25
+        assert slope == pytest.approx(25.0 / 7.0, abs=1e-6)
+
+    async def test_fewer_than_three_rollups_returns_none(self, calc):
+        history = [
+            _baseline_row("2026-07-08T00:00:00+00:00", {"vib": {"value": 11.0, "sigma": 1.0}}),
+            _baseline_row("2026-07-01T00:00:00+00:00", {"vib": {"value": 10.0, "sigma": 1.0}}),
+        ]
+        with patch("app.database.repositories.baseline_repository.BaselineRepository") as mock_repo_cls:
+            mock_repo = MagicMock()
+
+            async def _history(equipment_id, limit=10):
+                return history
+
+            mock_repo.get_equipment_baseline_history = _history
+            mock_repo_cls.return_value = mock_repo
+
+            assert await calc._get_rollup_trend_slope("EQ-1") is None
+
+
+@pytest.mark.asyncio
+class TestGetBaselineZ:
+    """Tests for _get_baseline_z worst-element selection."""
+
+    async def test_worst_element_by_magnitude_keeps_sign(self, calc):
+        baseline = _baseline_row(
+            "2026-07-01T00:00:00+00:00",
+            {
+                "amps": {"value": 10.0, "sigma": 1.0},
+                "temp": {"value": 5.0, "sigma": 1.0},
+            },
+        )
+        with patch("app.database.repositories.baseline_repository.BaselineRepository") as mock_repo_cls:
+            mock_repo = MagicMock()
+
+            async def _active(equipment_id):
+                return baseline
+
+            mock_repo.get_active_equipment_baseline = _active
+            mock_repo_cls.return_value = mock_repo
+
+            with patch.object(calc, "_get_latest_service_readings") as mock_readings:
+
+                async def _readings(equipment_id):
+                    return {"amps": 12.0, "temp": 2.0}  # z=+2 and z=−3
+
+                mock_readings.side_effect = _readings
+                z = await calc._get_baseline_z("EQ-1")
+
+        assert z == pytest.approx(-3.0)
+
+    async def test_no_active_baseline_returns_none(self, calc):
+        with patch("app.database.repositories.baseline_repository.BaselineRepository") as mock_repo_cls:
+            mock_repo = MagicMock()
+
+            async def _active(equipment_id):
+                return None
+
+            mock_repo.get_active_equipment_baseline = _active
+            mock_repo_cls.return_value = mock_repo
+
+            assert await calc._get_baseline_z("EQ-1") is None
+
+
 # ======================================================================
 # Component 2: Service Compliance (weight 0.20)
 # ======================================================================
@@ -495,8 +675,13 @@ class TestSnapshotServiceImport:
         """Service falls back to in-memory when Supabase unavailable."""
         from app.services.health_snapshot_service import HealthSnapshotService
 
-        svc = HealthSnapshotService()
-        # In test environment, Supabase is likely unavailable
+        # Hermetic: force the availability probe to fail regardless of
+        # whether the box has a live Supabase (production hosts do).
+        with patch(
+            "app.database.supabase_client.get_supabase_client",
+            side_effect=RuntimeError("unavailable"),
+        ):
+            svc = HealthSnapshotService()
         assert svc._use_memory is True
 
 

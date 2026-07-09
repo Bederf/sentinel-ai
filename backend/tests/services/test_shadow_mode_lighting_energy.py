@@ -3,6 +3,8 @@ from datetime import UTC, datetime
 from app.services.shadow_mode_polling import (
     _is_dali_lighting_mapping,
     _lighting_energy_payload_from_state,
+    _site_aggregate_occupancy_summary,
+    _zone_sensor_state_from_bridge_zone,
 )
 
 
@@ -25,7 +27,7 @@ def test_dali_lighting_mapping_rejects_config_points():
     assert not _is_dali_lighting_mapping(
         {
             "extracted_asset_id": "S002-DALI-101",
-            "parameter_name": "firmware_version",
+            "parameter_name": "building_id",
         }
     )
 
@@ -62,3 +64,32 @@ def test_lighting_energy_payload_rejects_unmapped_zone():
     )
 
     assert payload is None
+
+
+def test_zone_sensor_state_uses_canonical_zone_equipment_code():
+    equipment_id, state = _zone_sensor_state_from_bridge_zone(
+        site_prefix="S002",
+        zone_id="Zone-102",
+        zone={
+            "temperature_c": 22,
+            "co2_ppm": 450,
+        },
+        occupancy_pct=0,
+    )
+
+    assert equipment_id == "S002-ZONE-102"
+    assert state == {
+        "type": "zone_sensor",
+        "sensor_readings": {
+            "room_temp_c": 22.0,
+            "co2_ppm": 450.0,
+            "occupancy": 0.0,
+        },
+    }
+
+
+def test_site_aggregate_occupancy_summary_counts_non_zero_zone_samples():
+    occupied_zones, peak_zone_density = _site_aggregate_occupancy_summary([0.0, 20.0, 100.0, 0.0])
+
+    assert occupied_zones == 2
+    assert peak_zone_density == 100.0

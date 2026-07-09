@@ -86,7 +86,7 @@ const STATUS_CONFIG: Record<StatusKey, StatusConfig> = {
 };
 
 interface StatusBadgeProps {
-  status: StatusKey;
+  status: StatusKey | string | null | undefined;
   label?: string;
   className?: string;
 }
@@ -96,7 +96,8 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
   label,
   className = '',
 }) => {
-  const cfg = STATUS_CONFIG[status];
+  const safeStatus = status || 'unknown';
+  const cfg = STATUS_CONFIG[safeStatus as StatusKey] ?? N;
   return (
     <Badge
       className={className}
@@ -106,7 +107,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
         border: `1px solid ${cfg.bdr}`,
       }}
     >
-      {label ?? status.replace(/_/g, ' ')}
+      {label ?? safeStatus.replace(/_/g, ' ')}
     </Badge>
   );
 };

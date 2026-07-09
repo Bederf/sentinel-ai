@@ -432,7 +432,14 @@ async def get_site_ai_policy_settings(
     auth: AuthContext = Depends(require_site_access("site_id")),
 ) -> dict[str, Any]:
     """Get site-scoped AI runtime policy. Requires site access."""
-    return get_site_ai_policy(site_id)
+    from app.services.site_ai_policy_service import get_ml_training_readiness
+
+    policy = get_site_ai_policy(site_id)
+    readiness = await get_ml_training_readiness(site_id)
+    return {
+        **policy,
+        "ml_training_readiness": readiness,
+    }
 
 
 @router.put("/settings/ai-policy/{site_id}")
@@ -443,9 +450,38 @@ async def update_site_ai_policy_settings(
     auth: AuthContext = Depends(require_role(4)),
 ) -> dict[str, Any]:
     """Update site-scoped AI runtime policy. Requires ADMIN."""
+    from app.services.site_ai_policy_service import get_ml_training_readiness
+
+    current_policy = get_site_ai_policy(site_id)
+    requested_policy = payload.model_dump()
+    if requested_policy.get("ml_training_enabled") and not current_policy.get("ml_training_enabled"):
+        readiness = await get_ml_training_readiness(site_id)
+        if not readiness.get("ready", False):
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "ml_training_not_ready",
+                    "message": "ML training cannot be enabled until telemetry readiness passes.",
+                    "readiness": readiness,
+                },
+            )
+
     stored = set_site_ai_policy(site_id, payload.model_dump())
     source_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else None)
-    audit_config_change(f"settings.ai-policy.{site_id}", user=auth.user_id, source_ip=source_ip)
+    # Build human-readable change detail
+    old_vals = {k: v for k, v in current_policy.items() if k in requested_policy}
+    changed_parts = []
+    for k in requested_policy:
+        if k in old_vals and requested_policy[k] != old_vals[k]:
+            changed_parts.append(f"{k}: {old_vals[k]} → {requested_policy[k]}")
+    audit_config_change(
+        f"settings.ai-policy.{site_id}",
+        user=auth.user_id,
+        source_ip=source_ip,
+        old_value=current_policy,
+        new_value=requested_policy,
+        snippet="; ".join(changed_parts) if changed_parts else "no changes",
+    )
     return stored
 
 
@@ -534,6 +570,7 @@ class SiteAiPolicyUpdate(BaseModel):
     chat_local_ai_only: bool = False
     allow_tool_calling: bool = True
     show_recommendations_in_shadow: bool = False
+    ml_training_enabled: bool = False
 
 
 class SiteModeUpdate(BaseModel):

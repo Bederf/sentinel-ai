@@ -91,6 +91,7 @@ const PROVIDER_COLORS: Record<string, string> = {
   bulksms: "rgb(251, 146, 60)",
   telegram: "rgb(0, 136, 204)",
   eskomsepush: "rgb(239, 68, 68)",
+  firecrawl: "rgb(255, 112, 67)",
 };
 
 export function AiCostTracker({ siteId, onError }: AiCostTrackerProps) {

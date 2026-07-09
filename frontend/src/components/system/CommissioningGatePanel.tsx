@@ -46,7 +46,7 @@ const QUALITY_GATE_LABELS: Record<string, string> = {
 };
 
 const ENFORCEMENT_LABELS: Record<string, string> = {
-  normal: 'Normal — auto-execute enabled',
+  normal: 'Normal — no additional gate action',
   cap_confidence: 'Confidence Capped — reduced autonomous authority',
   suppress_tier3: 'Tier3 Suppressed — pending approval required',
   block_writes: 'Write Blocked — log-only mode active',
@@ -67,7 +67,7 @@ const LOWER_IS_BETTER_METRICS = new Set([
 /* Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-function formatValue(metric: string, value: number): string {
+function formatValue(metric: string, value: number | null): string {
   if (value === null || value === undefined) return 'N/A';
   if (metric === 'freshness_minutes') return `${value.toFixed(0)}m`;
   if (metric === 'label_lag_p95_hours') return `${value.toFixed(1)}h`;
@@ -102,6 +102,13 @@ function ruleThresholdText(rule: { metric: string; pass_bound: number | null }):
   if (rule.pass_bound === null || rule.pass_bound === undefined) return null;
   const operator = LOWER_IS_BETTER_METRICS.has(rule.metric) ? '<=' : '>=';
   return `needs ${operator} ${formatValue(rule.metric, rule.pass_bound)}`;
+}
+
+function metricTone(color: 'green' | 'orange' | 'red' | 'gray'): string {
+  if (color === 'green') return 'var(--color-sentinel-green)';
+  if (color === 'orange') return 'var(--color-sentinel-orange)';
+  if (color === 'red') return 'var(--color-sentinel-red)';
+  return 'var(--color-sentinel-text-disabled)';
 }
 
 /* ------------------------------------------------------------------ */
@@ -363,7 +370,6 @@ export function CommissioningGatePanel({ commissioning, qualityGate }: Commissio
               {/* Metrics grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
                 {(qualityGate.rule_results ?? []).map((rule) => {
-                  if (rule.state === 'na') return null;
                   const color = stateColor(rule.state);
                   return (
                     <div
@@ -372,16 +378,15 @@ export function CommissioningGatePanel({ commissioning, qualityGate }: Commissio
                       style={{
                         background: 'var(--color-sentinel-bg-secondary)',
                         border: '1px solid var(--glass-border)',
-                        color:
-                          color === 'green' ? 'var(--color-sentinel-green)' :
-                          color === 'orange' ? 'var(--color-sentinel-orange)' :
-                          'var(--color-sentinel-red)',
+                        color: metricTone(color),
                       }}
                     >
                       {rule.state === 'pass' ? (
                         <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
                       ) : rule.state === 'warn' ? (
                         <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" />
+                      ) : rule.state === 'na' ? (
+                        <Shield className="w-3.5 h-3.5 flex-shrink-0" />
                       ) : (
                         <XCircle className="w-3.5 h-3.5 flex-shrink-0" />
                       )}

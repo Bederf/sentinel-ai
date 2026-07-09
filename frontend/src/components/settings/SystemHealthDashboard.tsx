@@ -57,11 +57,12 @@ interface PhaseReadinessResponse {
 }
 
 interface SystemHealthDashboardProps {
+  siteId?: string;
   onError?: (error: string) => void;
   onNavigate?: (view: import("../../lib/navigation").View) => void;
 }
 
-export function SystemHealthDashboard({ onError, onNavigate }: SystemHealthDashboardProps) {
+export function SystemHealthDashboard({ siteId, onError, onNavigate }: SystemHealthDashboardProps) {
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [drStatus, setDrStatus] = useState<DrStatus | null>(null);
   const [phaseReadiness, setPhaseReadiness] = useState<PhaseReadinessResponse | null>(null);
@@ -73,10 +74,10 @@ export function SystemHealthDashboard({ onError, onNavigate }: SystemHealthDashb
       if (res.ok) setBackup(await res.json());
       const dr = await authorizedFetch("/api/system/dr-status");
       if (dr.ok) setDrStatus(await dr.json());
-      const phase = await authorizedFetch("/api/system/phase-readiness");
+      const phase = await authorizedFetch(`/api/system/phase-readiness${siteId ? `?site_id=${siteId}` : ""}`);
       if (phase.ok) setPhaseReadiness(await phase.json());
     } catch { /* ignore */ }
-  }, []);
+  }, [siteId]);
 
   const handleTriggerBackup = async () => {
     setBackupTriggering(true);

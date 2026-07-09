@@ -98,7 +98,7 @@ function SettingsSections({
         onError={onError}
         onSuccess={controller.handleSuccess}
       />
-      <SystemHealthDashboard onError={onError} onNavigate={onNavigate} />
+      <SystemHealthDashboard key={`health-${controller.selectedSiteId}`} siteId={controller.selectedSiteId ?? undefined} onError={onError} onNavigate={onNavigate} />
       <AiCostTracker key={`ai-${controller.selectedSiteId}`} onError={onError} siteId={controller.selectedSiteId ?? undefined} />
       <AiRuntimePolicySettings
         key={`policy-${controller.selectedSiteId}`}

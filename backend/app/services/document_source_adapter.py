@@ -172,6 +172,8 @@ class DocumentSourceAdapter(ABC):
         """Map adapter provenance into the constrained documents.source values."""
         if self.source_system.value == "manual_upload":
             return "user_upload"
+        if self.source_system.value == "oem_manual":
+            return "oem_manual"
         return "service_history"
 
     async def _upsert(self, record: DocumentRecord) -> str:
@@ -214,6 +216,18 @@ class DocumentSourceAdapter(ABC):
         if record.source_url:
             data["source_url"] = record.source_url
 
+        if record.asset_id:
+            data["asset_id"] = record.asset_id
+
+        if isinstance(record.extra, dict):
+            for source_key, target_key in (
+                ("manufacturer", "manufacturer"),
+                ("model", "model"),
+            ):
+                value = record.extra.get(source_key)
+                if value:
+                    data[target_key] = str(value)
+
         # raw_file_path maps to source_file_path
         if record.raw_file_path:
             data["source_file_path"] = record.raw_file_path
@@ -240,6 +254,15 @@ class DocumentSourceAdapter(ABC):
         ):
             if field:
                 keywords.append(str(field))
+        if isinstance(record.extra, dict):
+            for field in (
+                record.extra.get("equipment_code"),
+                record.extra.get("manufacturer"),
+                record.extra.get("model"),
+                record.extra.get("manual_source"),
+            ):
+                if field:
+                    keywords.append(str(field))
         if keywords:
             data["keywords"] = keywords
 

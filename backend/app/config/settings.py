@@ -427,6 +427,7 @@ class Settings(BaseSettings):
     rooms_imap_username: str = ""
     rooms_imap_password: str = ""
     rooms_imap_folder: str = "INBOX"
+    n8n_enabled: bool = Field(default=True, validation_alias="N8N_ENABLED")
 
     # Edge mode: disables ML training, simulation queue, and AEGIS evidence jobs
     # for resource-constrained deployments (Jetson, lightweight VPS)
@@ -447,7 +448,6 @@ class Settings(BaseSettings):
     )
 
     # ML Background Training (retraining, drift detection, feedback retraining)
-    # Disable on resource-constrained VPS — models are pre-trained and stable
     ml_background_training_enabled: bool = True
 
     # Block Booking Detection

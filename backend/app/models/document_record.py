@@ -37,6 +37,7 @@ class DocumentType(StrEnum):
     CERTIFICATE = "certificate"
     TEST_REPORT = "test_report"
     MANUAL = "manual"
+    EQUIPMENT_MANUAL = "equipment_manual"
     UNKNOWN = "unknown"
 
 

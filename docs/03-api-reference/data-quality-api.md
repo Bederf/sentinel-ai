@@ -149,3 +149,31 @@ Assess if sufficient quality data exists for ML model training.
 ### GET `/api/data-quality/quality-levels`
 
 Get quality level definitions and thresholds (excellent, good, fair, poor).
+
+## Background Integrity Detection (Phase 236-02)
+
+The **pinned-signal detector** (`backend/app/services/pinned_signal_detector.py`)
+is a scheduled background job (6h cadence), not an HTTP endpoint. It catches the
+telemetry failure class neither the quality gate (impossible values) nor
+cross-signal conflict detection covers: signals that are individually **plausible
+but frozen** — bridge defaults, dead point mappings, saturated sensors.
+
+It evaluates `telemetry_hourly` per site in two window tiers:
+
+| Tier | Fires when |
+|------|-----------|
+| `structural_7d` | a point shows a single distinct value (or <1% relative range) across the week — nonzero only (a constant-zero reads as "equipment off", not stuck) |
+| `frozen_24h` | a point whose week of history proves it normally varies collapses to one distinct value over the last 24h |
+
+Constant-by-design points (`fault_state`, `equipment_online`, `status`,
+`run_status`, `staging_state`, `*_anomaly_score`) are excluded via
+`backend/app/data/pinned_signal_exclusions.json` (per-site overrides supported).
+
+**Outputs:**
+- Per-point verdicts persisted to `pinned_signal_state` (consumed by inference —
+  the FCU running-inference treats a pinned `fan_speed`/`valve_position` as
+  unavailable; verdicts older than 18h are ignored so a decayed verdict fails open).
+- A `data_integrity` advisory recommendation per affected equipment, rolled up to
+  a single site-level finding (`{SITE}-TELEMETRY-INTEGRITY`) when the majority of
+  a site's points are frozen (a systemic feed fault, not N sensor failures).
+  Deduplicated with an 8h clear-debounce, auto-resolved when variance returns.

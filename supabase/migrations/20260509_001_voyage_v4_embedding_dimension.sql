@@ -286,8 +286,8 @@ BEGIN
     END IF;
 END;
 $$;
-COMMENT ON FUNCTION match_document_chunks IS 'Semantic search for document chunks using Voyage v4 1024d cosine similarity';
-COMMENT ON FUNCTION match_equipment_knowledge IS 'Semantic search for equipment knowledge using Voyage v4 1024d cosine similarity';
-COMMENT ON FUNCTION hybrid_search_chunks IS 'Hybrid search with Voyage v4 1024d semantic vectors and adaptive chunk metadata';
+COMMENT ON FUNCTION match_document_chunks(vector, integer, text, text, text, uuid, numeric) IS 'Semantic search for document chunks using Voyage v4 1024d cosine similarity';
+COMMENT ON FUNCTION match_equipment_knowledge(vector, integer, text, text, numeric) IS 'Semantic search for equipment knowledge using Voyage v4 1024d cosine similarity';
+COMMENT ON FUNCTION hybrid_search_chunks(text, vector, integer, text, uuid, numeric, numeric) IS 'Hybrid search with Voyage v4 1024d semantic vectors and adaptive chunk metadata';
 
 COMMIT;

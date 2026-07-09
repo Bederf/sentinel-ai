@@ -123,6 +123,13 @@ ML_TRAINING_SCHEDULES: list[RetentionSchedule] = [
         date_column="created_at",
         description="SENTINEL ML predictions — keep 1 year (telemetry-retention-partitioning.md)",
     ),
+    RetentionSchedule(
+        table_name="ml_prediction_log",
+        retention_days=60,
+        tier="ML_TRAINING",
+        date_column="predicted_at",
+        description="Phase 236-03 inference-time prediction log — 60d = 2x the 30d rolling accuracy window",
+    ),
 ]
 
 SNAPSHOT_SCHEDULES: list[RetentionSchedule] = [

@@ -73,6 +73,7 @@ class CockpitIssueFusionService:
 
         onboarding_phase = self._fetch_onboarding_phase(site_id)
         zone_count = self._fetch_zone_count(site_id)
+        co2_condition = self._fetch_co2_condition(site_id)
         bridge_last_updated = self._fetch_bridge_last_updated(site_id)
         return CockpitTableProcessor.fuse(
             alerts,
@@ -84,6 +85,7 @@ class CockpitIssueFusionService:
             recommendations=recommendations,
             onboarding_phase=onboarding_phase,
             zone_count=zone_count,
+            co2_condition=co2_condition,
         )
 
     # ------------------------------------------------------------------
@@ -184,6 +186,52 @@ class CockpitIssueFusionService:
             return rows.count or 0
         except Exception:
             return 0
+
+    def _fetch_co2_condition(self, site_id: str) -> dict[str, Any] | None:
+        """Return current fresh CO2 condition by zone for cockpit snapshot wording."""
+        try:
+            client = self.alert_repo.client
+            if not client:
+                return None
+
+            threshold_ppm = 800.0
+            fresh_after = (datetime.now(UTC) - timedelta(minutes=30)).isoformat()
+            site_prefix = site_id.upper().replace("SITE-", "S")
+            rows = (
+                client.table("equipment_sensor_readings")
+                .select("equipment_id, value, recorded_at")
+                .eq("site_id", site_id)
+                .eq("sensor_type", "co2_ppm")
+                .like("equipment_id", f"{site_prefix}-ZONE-%")
+                .gte("recorded_at", fresh_after)
+                .order("recorded_at", desc=True)
+                .limit(500)
+                .execute()
+            )
+
+            latest_by_zone: dict[str, dict[str, Any]] = {}
+            for row in rows.data or []:
+                equipment_id = row.get("equipment_id")
+                if not equipment_id or equipment_id in latest_by_zone:
+                    continue
+                latest_by_zone[equipment_id] = row
+
+            elevated_zone_ids: list[str] = []
+            for equipment_id, row in latest_by_zone.items():
+                try:
+                    value = float(row.get("value"))  # type: ignore[arg-type]  # None/non-numeric caught below
+                except (TypeError, ValueError):
+                    continue
+                if value >= threshold_ppm:
+                    elevated_zone_ids.append(equipment_id.replace(f"{site_prefix}-", ""))
+
+            return {
+                "fresh_zone_count": len(latest_by_zone),
+                "elevated_zone_ids": sorted(elevated_zone_ids),
+                "threshold_ppm": threshold_ppm,
+            }
+        except Exception:
+            return None
 
     def _fetch_onboarding_phase(self, site_id: str) -> str:
         """Return the site's onboarding_phase; defaults to 'supervised' on any error."""

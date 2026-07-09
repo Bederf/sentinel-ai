@@ -372,6 +372,7 @@ def audit_config_change(
     source_ip: str | None = None,
     old_value: Any = None,
     new_value: Any = None,
+    snippet: str | None = None,
 ) -> str:
     """Audit a configuration change."""
     metadata: dict[str, Any] = {"setting_key": setting_key}
@@ -383,6 +384,7 @@ def audit_config_change(
         "CONFIG_CHANGE",
         user=user,
         source_ip=source_ip,
+        snippet=snippet,
         metadata=metadata,
     )
 

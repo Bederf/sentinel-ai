@@ -21,6 +21,10 @@ GATE_BLOCKED_PRE_CUTOVER = "blocked_pre_cutover"
 GATE_SAFETY_UNRESOLVED = "safety_class_unresolved"
 
 SAFETY_ORDER = {"LOW": 1, "MEDIUM": 2, "HIGH": 3}
+POSITIVE_PHASE188_OUTCOMES = {"real_fault_confirmed", "sensor_fault_confirmed", "alarm_cleared"}
+NEGATIVE_PHASE188_OUTCOMES = {"false_positive"}
+INCONCLUSIVE_PHASE188_OUTCOMES = {"inconclusive"}
+OPEN_WORK_ORDER_STATUSES = {"open", "pending", "assigned", "in_progress", "scheduled", "draft"}
 
 
 @dataclass(frozen=True)
@@ -63,6 +67,8 @@ class ThresholdConfig:
 class EvidenceCounts:
     generated: int = 0
     measured_outcomes: int = 0
+    linked_work_orders: int = 0
+    open_work_orders: int = 0
     positive: int = 0
     negative: int = 0
     false_positive: int = 0
@@ -94,7 +100,9 @@ class Phase188OutcomeValidationService(SupabaseRepository):
             .select(
                 "id,site_id,action_type,target_equipment,action,expected_impact,status,"
                 "outcome_validated,outcome_notes,actual_saving_kwh,actual_saving_zar,"
-                "metadata,phase188_evidence_epoch"
+                "metadata,phase188_evidence_epoch,phase188_outcome_status,"
+                "phase188_linked_work_order_id,phase188_outcome_recorded_at,"
+                "phase188_outcome_recorded_by,phase188_outcome_source,phase188_outcome_notes"
             )
             .eq("site_id", site_id)
             .order("timestamp", desc=True)
@@ -421,8 +429,14 @@ def resolve_threshold(
 
 
 def apply_outcome(counts: EvidenceCounts, row: dict[str, Any]) -> None:
-    status = str(row.get("outcome_status") or "").strip().lower()
-    if not status:
+    if row.get("phase188_linked_work_order_id"):
+        counts.linked_work_orders += 1
+        work_order_status = str(row.get("phase188_work_order_status") or "").strip().lower()
+        if work_order_status in OPEN_WORK_ORDER_STATUSES:
+            counts.open_work_orders += 1
+
+    status = str(row.get("phase188_outcome_status") or row.get("outcome_status") or "").strip().lower()
+    if status in POSITIVE_PHASE188_OUTCOMES | NEGATIVE_PHASE188_OUTCOMES | INCONCLUSIVE_PHASE188_OUTCOMES or not status:
         status = derive_outcome_status(row)
     if status == "positive":
         counts.positive += 1
@@ -441,6 +455,13 @@ def apply_outcome(counts: EvidenceCounts, row: dict[str, Any]) -> None:
 
 
 def derive_outcome_status(row: dict[str, Any]) -> str:
+    phase188_status = str(row.get("phase188_outcome_status") or "").strip().lower()
+    if phase188_status in POSITIVE_PHASE188_OUTCOMES:
+        return "positive"
+    if phase188_status in NEGATIVE_PHASE188_OUTCOMES:
+        return "false_positive"
+    if phase188_status in INCONCLUSIVE_PHASE188_OUTCOMES:
+        return "inconclusive"
     if row.get("outcome_validated") is True:
         return "positive"
     if row.get("outcome_validated") is False and row.get("outcome_notes"):
@@ -459,6 +480,8 @@ def evaluate_counts(
         if safety_class == "HIGH":
             return GATE_BLOCKED_QUALITY_FAILURE, "Missing threshold config for HIGH safety class"
         return GATE_NOT_ENOUGH_EVIDENCE, "Missing threshold config"
+    if counts.open_work_orders > 0 and counts.validated < threshold.min_validated_recommendations:
+        return GATE_NOT_ENOUGH_EVIDENCE, "Human outcome pending on linked work order"
     if counts.validated < threshold.min_validated_recommendations:
         return GATE_NOT_ENOUGH_EVIDENCE, "Validated recommendation sample floor not met"
     if counts.measured_outcomes < threshold.min_measured_outcomes:
@@ -500,6 +523,8 @@ def counts_to_dict(counts: EvidenceCounts) -> dict[str, int]:
         "generated": counts.generated,
         "validated": counts.validated,
         "measured_outcomes": counts.measured_outcomes,
+        "linked_work_orders": counts.linked_work_orders,
+        "open_work_orders": counts.open_work_orders,
         "positive": counts.positive,
         "negative": counts.negative,
         "false_positive": counts.false_positive,

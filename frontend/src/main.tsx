@@ -6,6 +6,11 @@ import './index.css'
 import App from './App.tsx'
 import { queryClient } from './lib/queryClient'
 
+window.addEventListener("vite:preloadError", (event) => {
+  event.preventDefault();
+  window.location.reload();
+});
+
 // PWA foundation — caches last decision payload for offline/kiosk resilience
 if ("serviceWorker" in navigator) {
   let refreshing = false;

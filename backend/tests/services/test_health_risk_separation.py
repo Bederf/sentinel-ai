@@ -194,7 +194,7 @@ class TestSeparationInvariants:
             timestamp="2026-02-20T10:00:00Z",
             recommendations=[
                 {
-                    "equipment_id": "S002-AHU-101",
+                    "target_equipment": "S002-AHU-101",
                     "action": "reduce_setpoint",
                     "confidence": 0.85,
                 }
@@ -217,7 +217,7 @@ class TestSeparationInvariants:
             from app.services.ai_optimizer import AIOptimizerService
 
             optimizer = AIOptimizerService()
-            enriched = await optimizer._enrich_with_health_features(rec)
+            enriched = await optimizer._enrich_with_health_features("S002", rec)
 
             rec_dict = enriched.recommendations[0]
 
@@ -446,12 +446,12 @@ class TestRegressionUnchanged:
         assert hasattr(PredictionGeneratorService, "_get_at_risk_equipment")
 
     def test_health_threshold_service_unchanged(self):
-        """Health threshold defaults should be 90/70/50."""
-        from app.services.health_threshold_service import DEFAULT_THRESHOLDS
+        """Health threshold defaults should match the Phase 221 unified contract (85/65/40)."""
+        from app.services.health_threshold_service import DEFAULT_HEALTH
 
-        assert DEFAULT_THRESHOLDS["healthy"] == 90
-        assert DEFAULT_THRESHOLDS["warning"] == 70
-        assert DEFAULT_THRESHOLDS["critical"] == 50
+        assert DEFAULT_HEALTH["healthy"] == 85
+        assert DEFAULT_HEALTH["warning"] == 65
+        assert DEFAULT_HEALTH["critical"] == 40
 
     def test_quality_gate_evaluator_still_works(self):
         """QualityGateEvaluator class structure should be unchanged."""

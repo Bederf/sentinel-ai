@@ -918,6 +918,18 @@ class ShadowModePollingService:
             # Without this the FCU state tracker can never infer running state.
             fcu_telemetry_by_equip = self._load_fcu_telemetry()
 
+            # Phase 236-02: a pinned fan_speed/valve_position (frozen feed —
+            # bridge default or dead point mapping) must not drive the running
+            # inference. Verdicts come from the pinned-signal detector per
+            # site; no verdict rows yet = fail open (trust the signal).
+            pinned_points: set[tuple[str, str]] = set()
+            try:
+                from app.services.pinned_signal_detector import get_pinned_signal_detector
+
+                pinned_points = await get_pinned_signal_detector().get_pinned_points(self.site_id)
+            except Exception as e:
+                logger.debug(f"[SHADOW] Pinned-signal verdicts unavailable (fail-open): {e}")
+
             for z in zones:
                 zone_id: str = z.get("zone_id", "")
                 if zone_id not in self._valid_bridge_zone_ids:
@@ -988,6 +1000,11 @@ class ShadowModePollingService:
                 # rides ±2°C inter-poll sensor noise.
                 fan_speed = fcu_telemetry.get("fan_speed")
                 valve_pct = fcu_telemetry.get("valve_position")
+                # Phase 236-02: pinned inputs are unavailable, not evidence.
+                if (equip_code, "fan_speed") in pinned_points:
+                    fan_speed = None
+                if (equip_code, "valve_position") in pinned_points:
+                    valve_pct = None
                 if fan_speed is not None:
                     fcu_running = fan_speed > 0.0
                 elif valve_pct is not None:
