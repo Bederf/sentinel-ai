@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -76,6 +77,25 @@ class EvaluationResult:
 
 
 # ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+_DB_URL: str = os.getenv(
+    "DATABASE_URL",
+    "postgresql://postgres:postgres@127.0.0.1:55322/postgres",
+)
+"""Database URL used for direct SQL gate queries."""
+
+
+async def _connect():
+    """Open an asyncpg connection using the configured database URL."""
+    import asyncpg
+
+    return await asyncpg.connect(_DB_URL)
+
+
+# ---------------------------------------------------------------------------
 # Gate evaluation helpers
 # ---------------------------------------------------------------------------
 
@@ -98,11 +118,8 @@ async def _check_wizard_complete(site_id: str) -> GateResult:
          ``canonicalization_status != 'needs_review'``), and
       c) hierarchy has been ingested (wizard Step 5 ran).
     """
-    import asyncpg
 
-    from app.config.settings import settings
-
-    conn = await asyncpg.connect(settings.database_url)
+    conn = await _connect()
     try:
         # (a) Bridge review committed — at least one equipment row
         #     exists for this site (any canonicalization status proves
@@ -155,13 +172,10 @@ async def _check_aggregation_fresh(site_id: str) -> GateResult:
     of the three-tier aggregation pipeline).  It is consumed by ML
     inference, the pinned-signal detector, and cockpit dashboards.
     """
-    import asyncpg
-
-    from app.config.settings import settings
 
     cutoff = datetime.now(UTC) - _TELEMETRY_AGGREGATION_MAX_AGE
 
-    conn = await asyncpg.connect(settings.database_url)
+    conn = await _connect()
     try:
         row = await conn.fetchrow(
             """SELECT count(*)     AS cnt,
@@ -209,13 +223,10 @@ async def _check_history_fresh(site_id: str) -> GateResult:
     Falls back to a direct query of ``equipment_sensor_readings`` if
     no cached row exists yet (first-run / new site).
     """
-    import asyncpg
-
-    from app.config.settings import settings
 
     raw_cutoff = datetime.now(UTC) - _RAW_TELEMETRY_MAX_AGE
 
-    conn = await asyncpg.connect(settings.database_url)
+    conn = await _connect()
     try:
         # Attempt cached freshness first
         row = await conn.fetchrow(
@@ -274,11 +285,7 @@ async def _check_history_fresh(site_id: str) -> GateResult:
 
 async def _check_operating_hours_set(site_id: str) -> GateResult:
     """Check that ``sites.operating_hours`` is non-null."""
-    import asyncpg
-
-    from app.config.settings import settings
-
-    conn = await asyncpg.connect(settings.database_url)
+    conn = await _connect()
     try:
         row = await conn.fetchrow(
             """SELECT operating_hours FROM sites WHERE code = $1""",
