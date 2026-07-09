@@ -124,8 +124,11 @@ async def _check_wizard_complete(site_id: str) -> GateResult:
         # (a) Bridge review committed — at least one equipment row
         #     exists for this site (any canonicalization status proves
         #     the wizard bridge-review commit RPC ran).
+        #     equipment.site_id is a UUID FK to sites.id, so JOIN.
         row = await conn.fetchrow(
-            "SELECT count(*) AS cnt FROM equipment WHERE site_id = $1",
+            """SELECT count(*) AS cnt FROM equipment e
+               JOIN sites s ON e.site_id = s.id
+               WHERE s.code = $1""",
             site_id,
         )
         has_equipment = row and row["cnt"] > 0
@@ -133,18 +136,22 @@ async def _check_wizard_complete(site_id: str) -> GateResult:
         # (b) Canonicalization — at least one equipment row is
         #     past needs_review.
         row = await conn.fetchrow(
-            """SELECT count(*) AS cnt FROM equipment
-               WHERE site_id = $1
-                 AND (canonicalization_status IS NULL
-                      OR canonicalization_status != 'needs_review')""",
+            """SELECT count(*) AS cnt FROM equipment e
+               JOIN sites s ON e.site_id = s.id
+               WHERE s.code = $1
+                 AND (e.canonicalization_status IS NULL
+                      OR e.canonicalization_status != 'needs_review')""",
             site_id,
         )
         has_canonicalization = row and row["cnt"] > 0
 
         # (c) Hierarchy ingestion — the wizard endpoint creates
         #     zone/hierarchy rows.  Check for zones or building tables.
+        #     zones.site_id is also a UUID FK.
         row = await conn.fetchrow(
-            """SELECT count(*) AS cnt FROM zones WHERE site_id = $1""",
+            """SELECT count(*) AS cnt FROM zones z
+               JOIN sites s ON z.site_id = s.id
+               WHERE s.code = $1""",
             site_id,
         )
         has_hierarchy = row and row["cnt"] > 0
