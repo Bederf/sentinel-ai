@@ -1407,22 +1407,85 @@ async def toggle_site_processing(
     site_id: str,
     request: ProcessingToggleRequest,
     auth: AuthContext = Depends(require_site_access("site_id", auth_level=AuthLevel.OPERATOR)),
+    override: bool = Query(False, description="Admin override — bypass acceptance gates with audit trail"),
 ) -> ProcessingToggleResponse:
     """Toggle SENTINEL processing for a site.
 
     When disabled, SENTINEL stops ML feeding, health monitoring, alerts, and
     recommendations for this building. Data persistence (Supabase writes for
     dashboard) continues regardless.
-    """
-    enabled = request.enabled
-    supabase_ok = False
 
-    # Always try Supabase first — dashboard reads building record directly
+    **Enabling processing** (``enabled=true``):
+    Before the toggle is applied the request runs through four acceptance
+    gates (wizard_complete, aggregation_fresh, history_fresh,
+    operating_hours_set).  If any gate fails the request is rejected with
+    HTTP 409 and a per-gate breakdown.
+
+    The ``override=true`` query parameter bypasses failing gates but
+    requires ``AuthLevel.ADMIN`` and writes a ``CONFIG_CHANGE`` security
+    audit event with the overridden gate names.
+
+    **Disabling processing** is never gated — turning processing OFF is
+    always allowed.
+
+    **Concurrency guard**: the enable update includes
+    ``WHERE sentinel_processing_enabled = false`` so a concurrent request
+    cannot silently re-enable after a gate pass.
+    """
+    from app.security.audit_events import audit_config_change
+
+    enabled = request.enabled
+
+    # --- Gate enforcement (enable only) ---
+    if enabled:
+        from app.services.wizard_acceptance_gates import evaluate
+
+        result = await evaluate(site_id)
+
+        if not result.all_passed:
+            # Override path — requires ADMIN auth
+            if override:
+                if auth.role != SentinelRole.ADMIN:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Admin override requires ADMIN role",
+                    )
+                # Log which gates were overridden
+                failing = [g.name for g in result.gates if not g.passed]
+                audit_config_change(
+                    "sentinel_processing_enabled.override",
+                    user=auth.user_id,
+                    source_ip=auth.source_ip,
+                    old_value=False,
+                    new_value=True,
+                    snippet=f"Admin override of acceptance gates: {', '.join(failing)} for {site_id}",
+                )
+                logger.info(
+                    "Admin override: enabling processing for %s despite failing gates: %s",
+                    site_id,
+                    ", ".join(failing),
+                )
+            else:
+                detail = {
+                    "site_id": site_id,
+                    "sentinel_processing_enabled": False,
+                    "gates": [{"name": g.name, "passed": g.passed, "reason": g.reason} for g in result.gates],
+                }
+                raise HTTPException(status_code=409, detail=detail)
+
+    # --- Persist ---
+    supabase_ok = False
     try:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
-        client.table("sites").update({"sentinel_processing_enabled": enabled}).eq("code", site_id).execute()
+        # Concurrency guard for enable: only update if currently disabled
+        if enabled:
+            client.table("sites").update({"sentinel_processing_enabled": True}).eq("code", site_id).eq(
+                "sentinel_processing_enabled", False
+            ).execute()
+        else:
+            client.table("sites").update({"sentinel_processing_enabled": False}).eq("code", site_id).execute()
         supabase_ok = True
         logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id}")
     except Exception as e:
@@ -1434,6 +1497,16 @@ async def toggle_site_processing(
     _save_processing_state(state)
     if not supabase_ok:
         logger.info(f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id} (JSON fallback only)")
+
+    # --- Audit the toggle ---
+    audit_config_change(
+        f"sentinel_processing_enabled.{'enable' if enabled else 'disable'}",
+        user=auth.user_id,
+        source_ip=auth.source_ip,
+        old_value=not enabled,
+        new_value=enabled,
+        snippet=f"SENTINEL processing {'enabled' if enabled else 'disabled'} for {site_id}",
+    )
 
     return ProcessingToggleResponse(site_id=site_id, sentinel_processing_enabled=enabled)
 

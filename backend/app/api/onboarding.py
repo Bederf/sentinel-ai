@@ -322,6 +322,30 @@ async def ingest_onboarding_hierarchy(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
+@router.get("/acceptance-status/{site_id}")
+async def get_acceptance_status(
+    site_id: str,
+    auth: AuthContext = Depends(require_auth()),
+) -> dict:
+    """Return per-gate acceptance status for a site.
+
+    Evaluates all four acceptance gates (wizard_complete, aggregation_fresh,
+    history_fresh, operating_hours_set) and returns a per-gate pass/fail
+    breakdown plus ``all_passed``.  Useful for the onboarding wizard to
+    show which conditions are blocking ``sentinel_processing_enabled``.
+    """
+    _check_site_access(auth, site_id)
+
+    from app.services.wizard_acceptance_gates import evaluate
+
+    result = await evaluate(site_id)
+    return {
+        "site_id": site_id,
+        "all_passed": result.all_passed,
+        "gates": [{"name": g.name, "passed": g.passed, "reason": g.reason} for g in result.gates],
+    }
+
+
 @router.get("/baseline-eligibility")
 async def check_baseline_eligibility(
     site_id: str,
