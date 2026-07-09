@@ -10,6 +10,7 @@ training always uses the real BMS points — not hardcoded global defaults.
 """
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
@@ -19,6 +20,8 @@ logger = logging.getLogger(__name__)
 # Thresholds
 MAX_MODEL_AGE_DAYS = 30
 MIN_R2_SCORE = 0.65
+MIN_CLASSIFIER_CV_ACCURACY = 0.65
+MAX_AE_VAL_ERROR_THRESHOLD_RATIO = 1.0
 EQUIPMENT_TYPES = ["chiller", "ahu", "fcu", "vav", "generator", "ups", "pump"]
 MODEL_TYPES = ["lstm", "autoencoder", "classifier"]
 
@@ -34,6 +37,7 @@ class RetrainResult:
     reason: str
     site_id: str | None = None
     success: bool = False
+    queued: bool = False
     new_model_id: str | None = None
     metrics: dict[str, float] = field(default_factory=dict)
     error: str | None = None
@@ -48,6 +52,7 @@ class RetrainingScheduler:
     def __init__(self):
         self._history: list[RetrainResult] = []
         self._last_discovery_at: datetime | None = None
+        self._executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="ml-retraining")
 
     def refresh_features_for_active_sites(self, force: bool = False) -> dict[str, dict[str, list[str]]]:
         """Discover and register ML features for all supervised/autonomous sites.
@@ -94,7 +99,12 @@ class RetrainingScheduler:
         from ml.model_config import discover_site_ml_features
 
         all_results: dict[str, dict[str, list[str]]] = {}
+        from app.services.site_ai_policy_service import is_site_ml_training_enabled
+
         for site_id in active_sites:
+            if not is_site_ml_training_enabled(site_id):
+                logger.info("[ML DISCOVER] Skipping %s — site ML training disabled", site_id)
+                continue
             logger.info("[ML DISCOVER] Running feature discovery for %s", site_id)
             try:
                 result = discover_site_ml_features(site_id)
@@ -111,6 +121,106 @@ class RetrainingScheduler:
         self._last_discovery_at = now
         return all_results
 
+    def _iter_model_slots(self, registry: Any, site_id: str | None = None) -> list[tuple[str, str, str | None]]:
+        """Return global slots plus active site-scoped slots that need health checks."""
+        from app.services.site_ai_policy_service import is_site_ml_training_enabled
+
+        slots: set[tuple[str, str, str | None]] = set()
+
+        if site_id is not None:
+            for model_type in MODEL_TYPES:
+                for equipment_type in EQUIPMENT_TYPES:
+                    slots.add((model_type, equipment_type, site_id))
+            return sorted(slots, key=lambda slot: (slot[0], slot[1], slot[2] or ""))
+
+        for model_type in MODEL_TYPES:
+            for equipment_type in EQUIPMENT_TYPES:
+                slots.add((model_type, equipment_type, None))
+
+        for model_id in registry.registry.get("active", {}).values():
+            model = registry.registry.get("models", {}).get(model_id)
+            if not model:
+                continue
+            model_site_id = model.get("site_id") or model.get("metadata", {}).get("site_id")
+            if model_site_id and not is_site_ml_training_enabled(model_site_id):
+                continue
+            if model_site_id:
+                slots.add((model["model_type"], model["equipment_type"], model_site_id))
+
+        return sorted(slots, key=lambda slot: (slot[0], slot[1], slot[2] or ""))
+
+    def _quality_check(self, model_type: str, metrics: dict[str, Any]) -> dict[str, Any]:
+        """Resolve model-family-specific quality metrics without conflating them as R²."""
+        if model_type == "lstm":
+            for metric_name in ("r2_score", "val_r2", "r2_24h"):
+                value = metrics.get(metric_name)
+                if value is not None:
+                    score = float(value)
+                    return {
+                        "quality_metric": metric_name,
+                        "quality_score": score,
+                        "r2_score": score,
+                        "is_underperforming": score < MIN_R2_SCORE,
+                        "reason": f"{metric_name} {score:.3f} below {MIN_R2_SCORE} threshold",
+                    }
+
+        if model_type == "classifier":
+            value = metrics.get("cv_accuracy")
+            if value is not None:
+                score = float(value)
+                return {
+                    "quality_metric": "cv_accuracy",
+                    "quality_score": score,
+                    "r2_score": None,
+                    "is_underperforming": score < MIN_CLASSIFIER_CV_ACCURACY,
+                    "reason": (f"cv_accuracy {score:.3f} below {MIN_CLASSIFIER_CV_ACCURACY} threshold"),
+                }
+
+        if model_type == "autoencoder":
+            recall = metrics.get("recall")
+            if recall is not None:
+                score = float(recall)
+                return {
+                    "quality_metric": "recall",
+                    "quality_score": score,
+                    "r2_score": None,
+                    "is_underperforming": score < MIN_CLASSIFIER_CV_ACCURACY,
+                    "reason": f"recall {score:.3f} below {MIN_CLASSIFIER_CV_ACCURACY} threshold",
+                }
+
+            threshold = metrics.get("threshold")
+            val_error_mean = metrics.get("val_error_mean")
+            if threshold is not None and threshold != 0 and val_error_mean is not None:
+                score = float(val_error_mean) / float(threshold)
+                return {
+                    "quality_metric": "val_error_threshold_ratio",
+                    "quality_score": score,
+                    "r2_score": None,
+                    "is_underperforming": score > MAX_AE_VAL_ERROR_THRESHOLD_RATIO,
+                    "reason": (
+                        f"val_error_threshold_ratio {score:.3f} above {MAX_AE_VAL_ERROR_THRESHOLD_RATIO} threshold"
+                    ),
+                }
+
+        if model_type in MODEL_TYPES:
+            # Fail closed: a contract model whose metrics lack every recognized
+            # quality field must be flagged, not silently reported fresh.
+            return {
+                "quality_metric": None,
+                "quality_score": None,
+                "r2_score": None,
+                "is_underperforming": True,
+                "reason": f"no recognized quality metric in training metrics for {model_type}",
+            }
+
+        return {
+            "quality_metric": None,
+            "quality_score": None,
+            "r2_score": None,
+            "is_underperforming": False,
+            "reason": "",
+        }
+
     def check_all_models(self, site_id: str | None = None) -> list[dict[str, Any]]:
         """Check freshness and performance of all active models.
 
@@ -122,63 +232,65 @@ class RetrainingScheduler:
         registry = get_model_registry()
         results = []
 
-        for model_type in MODEL_TYPES:
-            for equipment_type in EQUIPMENT_TYPES:
-                model = registry.get_active_model(model_type, equipment_type, site_id=site_id)
+        for model_type, equipment_type, slot_site_id in self._iter_model_slots(registry, site_id=site_id):
+            model = registry.get_active_model(model_type, equipment_type, site_id=slot_site_id)
 
-                if model is None:
-                    results.append(
-                        {
-                            "model_type": model_type,
-                            "equipment_type": equipment_type,
-                            "site_id": site_id,
-                            "status": "missing",
-                            "age_days": None,
-                            "r2_score": None,
-                            "needs_retrain": True,
-                            "reason": "No active model found",
-                        }
-                    )
-                    continue
-
-                # Calculate age
-                registered_at = model.get("registered_at", "")
-                try:
-                    reg_date = datetime.fromisoformat(registered_at)
-                    age_days = (datetime.now() - reg_date).days
-                except (ValueError, TypeError):
-                    age_days = 999  # Treat unparseable as very old
-
-                # Get R² score from metrics
-                metrics = model.get("metrics", {})
-                r2_score = metrics.get("r2_score", metrics.get("val_r2", metrics.get("cv_accuracy", None)))
-
-                # Determine status
-                is_stale = age_days > MAX_MODEL_AGE_DAYS
-                is_underperforming = r2_score is not None and r2_score < MIN_R2_SCORE
-                needs_retrain = is_stale or is_underperforming
-
-                reasons = []
-                if is_stale:
-                    reasons.append(f"Model age {age_days}d exceeds {MAX_MODEL_AGE_DAYS}d threshold")
-                if is_underperforming:
-                    reasons.append(f"R² score {r2_score:.3f} below {MIN_R2_SCORE} threshold")
-
-                status = "stale" if is_stale else ("underperforming" if is_underperforming else "fresh")
-
+            if model is None:
                 results.append(
                     {
                         "model_type": model_type,
                         "equipment_type": equipment_type,
-                        "site_id": site_id or model.get("site_id") or model.get("metadata", {}).get("site_id"),
-                        "model_id": model.get("model_id"),
-                        "status": status,
-                        "age_days": age_days,
-                        "r2_score": r2_score,
-                        "needs_retrain": needs_retrain,
-                        "reason": "; ".join(reasons) if reasons else "Model is fresh and performing well",
+                        "site_id": slot_site_id,
+                        "status": "missing",
+                        "age_days": None,
+                        "r2_score": None,
+                        "quality_metric": None,
+                        "quality_score": None,
+                        "needs_retrain": True,
+                        "reason": "No active model found",
                     }
                 )
+                continue
+
+            # Calculate age
+            registered_at = model.get("registered_at", "")
+            try:
+                reg_date = datetime.fromisoformat(registered_at)
+                age_days = (datetime.now() - reg_date).days
+            except (ValueError, TypeError):
+                age_days = 999  # Treat unparseable as very old
+
+            metrics = model.get("metrics", {})
+            quality = self._quality_check(model_type, metrics)
+
+            # Determine status
+            is_stale = age_days > MAX_MODEL_AGE_DAYS
+            is_underperforming = quality["is_underperforming"]
+            needs_retrain = is_stale or is_underperforming
+
+            reasons = []
+            if is_stale:
+                reasons.append(f"Model age {age_days}d exceeds {MAX_MODEL_AGE_DAYS}d threshold")
+            if is_underperforming and quality["reason"]:
+                reasons.append(quality["reason"])
+
+            status = "stale" if is_stale else ("underperforming" if is_underperforming else "fresh")
+
+            results.append(
+                {
+                    "model_type": model_type,
+                    "equipment_type": equipment_type,
+                    "site_id": slot_site_id or model.get("site_id") or model.get("metadata", {}).get("site_id"),
+                    "model_id": model.get("model_id"),
+                    "status": status,
+                    "age_days": age_days,
+                    "r2_score": quality["r2_score"],
+                    "quality_metric": quality["quality_metric"],
+                    "quality_score": quality["quality_score"],
+                    "needs_retrain": needs_retrain,
+                    "reason": "; ".join(reasons) if reasons else "Model is fresh and performing well",
+                }
+            )
 
         return results
 
@@ -195,6 +307,23 @@ class RetrainingScheduler:
         LSTMTrainer or AutoencoderTrainer. For now, registers the intent
         and returns the result.
         """
+        if site_id is not None:
+            from app.services.site_ai_policy_service import is_site_ml_training_enabled
+
+            if not is_site_ml_training_enabled(site_id):
+                result = RetrainResult(
+                    model_id=f"{site_id}_{model_type}_{equipment_type}",
+                    model_type=model_type,
+                    equipment_type=equipment_type,
+                    triggered_at=datetime.now().isoformat(),
+                    reason=reason,
+                    site_id=site_id,
+                    success=False,
+                    error="ML training is disabled for this site.",
+                )
+                self._history.append(result)
+                return result
+
         result = RetrainResult(
             model_id=f"{site_id + '_' if site_id else ''}{model_type}_{equipment_type}",
             model_type=model_type,
@@ -216,6 +345,8 @@ class RetrainingScheduler:
                     epochs=50,
                     use_demo_data=False,
                     site_id=site_id,
+                    auto_activate=False,
+                    allow_synthetic_fallback=False,
                 )
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
@@ -229,6 +360,8 @@ class RetrainingScheduler:
                     epochs=50,
                     use_demo_data=False,
                     site_id=site_id,
+                    auto_activate=False,
+                    allow_synthetic_fallback=False,
                 )
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
@@ -237,7 +370,7 @@ class RetrainingScheduler:
                 from ml.classifier.train import ClassifierTrainer
 
                 trainer = ClassifierTrainer()
-                train_result = trainer.train_equipment_type(equipment_type)
+                train_result = trainer.train_equipment_type(equipment_type, auto_activate=False)
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
                 result.new_model_id = train_result.get("model_id", "")
@@ -251,6 +384,58 @@ class RetrainingScheduler:
         self._history.append(result)
         return result
 
+    def queue_retraining(
+        self,
+        model_type: str,
+        equipment_type: str,
+        reason: str = "manual",
+        site_id: str | None = None,
+    ) -> RetrainResult:
+        """Queue retraining outside the scheduler thread."""
+        queued = RetrainResult(
+            model_id=f"{site_id + '_' if site_id else ''}{model_type}_{equipment_type}",
+            model_type=model_type,
+            equipment_type=equipment_type,
+            triggered_at=datetime.now().isoformat(),
+            reason=reason,
+            site_id=site_id,
+            success=True,
+            queued=True,
+        )
+
+        future = self._executor.submit(
+            self.trigger_retraining,
+            model_type=model_type,
+            equipment_type=equipment_type,
+            reason=reason,
+            site_id=site_id,
+        )
+
+        def _log_done(done_future):
+            try:
+                result = done_future.result()
+                if result.success:
+                    logger.info(
+                        "Queued retraining completed: %s/%s site=%s -> %s",
+                        result.model_type,
+                        result.equipment_type,
+                        result.site_id,
+                        result.new_model_id,
+                    )
+                else:
+                    logger.error(
+                        "Queued retraining failed: %s/%s site=%s - %s",
+                        result.model_type,
+                        result.equipment_type,
+                        result.site_id,
+                        result.error,
+                    )
+            except Exception as exc:
+                logger.error("Queued retraining crashed: %s", exc, exc_info=True)
+
+        future.add_done_callback(_log_done)
+        return queued
+
     def auto_retrain_stale(self) -> list[RetrainResult]:
         """Check all models and retrain the first stale one found.
 
@@ -262,10 +447,11 @@ class RetrainingScheduler:
 
         for check in checks:
             if check["needs_retrain"] and check["status"] != "missing":
-                result = self.trigger_retraining(
+                result = self.queue_retraining(
                     model_type=check["model_type"],
                     equipment_type=check["equipment_type"],
                     reason=check.get("reason", "auto_stale"),
+                    site_id=check.get("site_id"),
                 )
                 results.append(result)
                 break  # Only retrain one per cycle to avoid overload
@@ -282,6 +468,7 @@ class RetrainingScheduler:
                 "triggered_at": r.triggered_at,
                 "reason": r.reason,
                 "success": r.success,
+                "queued": r.queued,
                 "new_model_id": r.new_model_id,
                 "metrics": r.metrics,
                 "error": r.error,

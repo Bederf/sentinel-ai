@@ -101,6 +101,8 @@ firmware/**/*.bin
 # Space intelligence runtime data
 backend/app/data/onboarding_phase_state.json
 backend/app/data/visit_store.lock
+# ML registry runtime concurrency lock (empty, created by registry cross-worker reload)
+backend/ml/models/registry.json.lock
 backend/app/data/space/node_room_mapping.json
 backend/app/data/space/_local_node_mapping.json
 backend/app/data/space/node_room_mapping.local.json

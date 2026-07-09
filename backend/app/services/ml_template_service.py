@@ -118,8 +118,8 @@ class MLTemplateService:
         # Get service-specific template
         template = equipment_templates.get(service_type)
         if not template:
-            # Fallback to minor service if major not defined
-            if service_type == "major":
+            # Fallback to minor service when a callout/major template is not defined.
+            if service_type in {"major", "callout"}:
                 template = equipment_templates.get("minor")
 
         return template

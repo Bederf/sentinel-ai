@@ -10,7 +10,7 @@ from pathlib import Path
 
 from ml.classifier.data_prep import ClassifierDataPrep
 from ml.classifier.model import FailureClassifier
-from ml.registry import ModelRegistry
+from ml.registry import ModelRegistry, build_input_contract_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -31,13 +31,20 @@ class ClassifierTrainer:
 
         self.registry = ModelRegistry()
 
-    def train_equipment_type(self, equipment_type: str, n_estimators: int = 100, max_depth: int = 10) -> dict:
+    def train_equipment_type(
+        self,
+        equipment_type: str,
+        n_estimators: int = 100,
+        max_depth: int = 10,
+        auto_activate: bool = True,
+    ) -> dict:
         """Train classifier for an equipment type.
 
         Args:
             equipment_type: Type of equipment (chiller, ahu, etc.)
             n_estimators: Number of trees in Random Forest
             max_depth: Maximum tree depth
+            auto_activate: Set trained classifier active immediately
 
         Returns:
             Training result dictionary
@@ -77,8 +84,17 @@ class ClassifierTrainer:
             return {"equipment_type": equipment_type, "error": f"Save failed: {e}", "status": "failed"}
 
         # Register in model registry
+        model_id = None
         try:
-            self.registry.register_model(
+            input_contract = build_input_contract_metadata(
+                site_id=None,
+                equipment_type=equipment_type,
+                model_type="classifier",
+                required_features=list(X.columns),
+                target="failure_type",
+                inference_scope="equipment_type",
+            )
+            model_id = self.registry.register_model(
                 model_type="classifier",
                 equipment_type=equipment_type,
                 model_path=str(model_path),
@@ -95,7 +111,11 @@ class ClassifierTrainer:
                     "max_depth": max_depth,
                     "trained_at": datetime.now().isoformat(),
                     "use_demo_data": True,
+                    "feature_names": list(X.columns),
+                    "target": "failure_type",
+                    **input_contract,
                 },
+                auto_activate=auto_activate,
             )
             logger.info("Model registered in registry")
         except Exception as e:
@@ -110,6 +130,7 @@ class ClassifierTrainer:
             "n_classes": metrics["n_classes"],
             "classes": metrics["classes"],
             "model_path": str(model_path),
+            "model_id": model_id,
             "feature_importance": metrics["feature_importance"][:5],  # Top 5
         }
 

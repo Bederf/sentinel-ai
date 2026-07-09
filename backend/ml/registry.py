@@ -11,12 +11,15 @@ are handled transparently at load time.
 
 import json
 import logging
+import os
+import tempfile
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-CONTRACT_MODEL_TYPES = {"lstm", "autoencoder"}
+CONTRACT_MODEL_TYPES = {"lstm", "autoencoder", "classifier"}
 VALID_INFERENCE_SCOPES = {"equipment_type", "equipment_id"}
 VALID_MISSING_FEATURE_POLICIES = {"fail_closed"}
 REQUIRED_INPUT_CONTRACT_FIELDS = {
@@ -93,23 +96,101 @@ class ModelRegistry:
             registry_path = Path(__file__).parent / "models" / "registry.json"
         self.registry_path = Path(registry_path)
         self._models_base_dir = self.registry_path.parent
+        self.backup_path = self.registry_path.with_suffix(self.registry_path.suffix + ".bak")
+        self.lock_path = self.registry_path.with_suffix(self.registry_path.suffix + ".lock")
         self.registry = self._load_registry()
-        self._generation: int = 0
+        self._registry_mtime_ns: int = self._stat_mtime_ns()
+        self._generation_counter: int = 0
+
+    @contextmanager
+    def _file_lock(self):
+        """Serialize registry file access across backend workers on Linux."""
+        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_file = self.lock_path.open("a+")
+        try:
+            try:
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+            except (ImportError, OSError):
+                logger.warning("Registry file lock unavailable; continuing without cross-process lock")
+            yield
+        finally:
+            try:
+                import fcntl
+
+                fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+            except (ImportError, OSError):
+                pass
+            lock_file.close()
+
+    def _read_registry_file(self, path: Path) -> dict:
+        return json.loads(path.read_text())
 
     def _load_registry(self) -> dict:
         """Load registry from disk."""
-        if self.registry_path.exists():
-            try:
-                return json.loads(self.registry_path.read_text())
-            except json.JSONDecodeError:
-                logger.warning("Corrupted registry, starting fresh")
-                return {"models": {}, "active": {}}
+        with self._file_lock():
+            if self.registry_path.exists():
+                try:
+                    return self._read_registry_file(self.registry_path)
+                except json.JSONDecodeError:
+                    if self.backup_path.exists():
+                        logger.error("Corrupted registry %s; recovering from %s", self.registry_path, self.backup_path)
+                        return self._read_registry_file(self.backup_path)
+                    logger.error("Corrupted registry %s and no backup available; starting fresh", self.registry_path)
+                    return {"models": {}, "active": {}}
         return {"models": {}, "active": {}}
+
+    def _stat_mtime_ns(self) -> int:
+        try:
+            return self.registry_path.stat().st_mtime_ns
+        except OSError:
+            return 0
+
+    def _maybe_reload(self) -> None:
+        """Reload from disk if another worker changed the registry file.
+
+        Each backend worker holds its own in-memory copy; without this, an
+        activation in one worker is invisible to the others until restart.
+        """
+        mtime_ns = self._stat_mtime_ns()
+        if mtime_ns == self._registry_mtime_ns:
+            return
+        self.registry = self._load_registry()
+        # Store the pre-load stat: if the file changed again mid-reload we
+        # detect it on the next call rather than serving the missed write.
+        self._registry_mtime_ns = mtime_ns
+        self._generation_counter += 1
+        logger.info(f"Registry changed on disk; reloaded (generation {self._generation_counter})")
+
+    @property
+    def _generation(self) -> int:
+        """Cache-invalidation counter; bumps on local activation or cross-worker change."""
+        self._maybe_reload()
+        return self._generation_counter
+
+    def _atomic_write_json(self, path: Path, payload: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+        try:
+            with os.fdopen(fd, "w") as tmp:
+                tmp.write(payload)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+            os.replace(tmp_name, path)
+        finally:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
 
     def _save_registry(self):
         """Save registry to disk."""
-        self.registry_path.parent.mkdir(parents=True, exist_ok=True)
-        self.registry_path.write_text(json.dumps(self.registry, indent=2, default=str))
+        payload = json.dumps(self.registry, indent=2, default=str)
+        with self._file_lock():
+            self._atomic_write_json(self.registry_path, payload)
+            self._atomic_write_json(self.backup_path, payload)
+            # Stat under the lock so our own write isn't mistaken for a
+            # cross-worker change on the next read.
+            self._registry_mtime_ns = self._stat_mtime_ns()
 
     def _to_relative_path(self, path_str: str) -> str:
         """Convert an absolute path to relative (relative to models base dir).
@@ -168,7 +249,7 @@ class ModelRegistry:
         model_path: str,
         metrics: dict,
         metadata: dict | None = None,
-        auto_activate: bool = True,
+        auto_activate: bool = False,
         site_id: str | None = None,
     ) -> str:
         """
@@ -185,6 +266,7 @@ class ModelRegistry:
         Returns:
             Model ID
         """
+        self._maybe_reload()
         version = datetime.now().strftime("%Y%m%d_%H%M%S")
         site_part = f"{site_id}_" if site_id else ""
         model_id = f"{model_type}_{site_part}{equipment_type}_{version}"
@@ -221,6 +303,7 @@ class ModelRegistry:
 
     def set_active(self, model_id: str, site_id: str | None = None):
         """Set a model as the active version for inference."""
+        self._maybe_reload()
         if model_id not in self.registry["models"]:
             raise ValueError(f"Model {model_id} not found in registry")
 
@@ -239,16 +322,17 @@ class ModelRegistry:
         if model_site_id:
             self.registry["models"][model_id].setdefault("metadata", {})["site_id"] = model_site_id
         self.registry["models"][model_id]["status"] = "active"
-        self._generation += 1
+        self._generation_counter += 1
         self._save_registry()
 
-        logger.info(f"Activated model: {model_id} (registry generation {self._generation})")
+        logger.info(f"Activated model: {model_id} (registry generation {self._generation_counter})")
 
     def get_active_model(self, model_type: str, equipment_type: str, site_id: str | None = None) -> dict | None:
         """Get the currently active model for inference.
 
         Returns a copy with paths resolved to absolute.
         """
+        self._maybe_reload()
         key = self._active_key(model_type, equipment_type, site_id)
         model_id = self.registry["active"].get(key)
 
@@ -267,6 +351,7 @@ class ModelRegistry:
 
         Returns copies with paths resolved to absolute.
         """
+        self._maybe_reload()
         models = list(self.registry["models"].values())
 
         if model_type:
@@ -289,6 +374,7 @@ class ModelRegistry:
 
         Returns a copy with paths resolved to absolute.
         """
+        self._maybe_reload()
         entry = self.registry["models"].get(model_id)
         if entry is not None:
             return self._resolve_model_paths(entry)
@@ -296,6 +382,7 @@ class ModelRegistry:
 
     def delete_model(self, model_id: str) -> bool:
         """Delete a model from registry (does not delete files)."""
+        self._maybe_reload()
         if model_id not in self.registry["models"]:
             return False
 

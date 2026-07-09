@@ -437,10 +437,15 @@ class TestModeAwareTrainingReadiness:
         assert result_live.days_of_data == 200
 
     def test_training_readiness_default_mode_from_settings(self):
-        """When mode is None, reads from settings (DEMO_MODE=true -> simulation)."""
-        svc = self._make_service()
-        result = svc.check_training_readiness("chiller")
+        """When mode is None, reads settings.resolved_ingestion_mode (patched — must not depend on host env)."""
+        from unittest.mock import PropertyMock
 
-        # In demo mode, resolved_ingestion_mode is simulation
+        from app.config.settings import IngestionMode, settings
+
+        svc = self._make_service()
+        with patch.object(type(settings), "resolved_ingestion_mode", new_callable=PropertyMock) as mode_prop:
+            mode_prop.return_value = IngestionMode.SIMULATION
+            result = svc.check_training_readiness("chiller")
+
         assert result.mode == "simulation"
         assert result.thresholds_used["min_quality"] == 50.0

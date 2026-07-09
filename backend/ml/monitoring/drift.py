@@ -48,8 +48,17 @@ _SA_HOLIDAYS_2026 = frozenset(
 
 
 def _is_sa_holiday(target_date: date) -> bool:
-    """Return True if target_date is a SA public holiday."""
-    return target_date.isoformat() in _SA_HOLIDAYS_2026
+    """Return True if target_date is a SA public holiday.
+
+    Delegates to the dynamic per-year calendar (Easter-aware, no year lock);
+    the frozen 2026 list is only a fallback if the app service is unavailable.
+    """
+    try:
+        from app.services.site_holiday_service import _get_sa_public_holidays_cached
+
+        return target_date.isoformat() in {h["date"] for h in _get_sa_public_holidays_cached(target_date.year)}
+    except Exception:
+        return target_date.isoformat() in _SA_HOLIDAYS_2026
 
 
 def _get_occupancy_mode(ts: datetime | str) -> str:
@@ -424,23 +433,36 @@ class DriftDetector:
         Returns:
             Dict with model drift detection results.
         """
-        recent_accuracy = self._get_recent_accuracy(model_type, days=7)
-        historical_accuracy = self._get_historical_accuracy(model_type)
+        # Phase 236-03: verdicts derive ONLY from measured rolling accuracy
+        # (ml_model_accuracy, written by the daily accuracy job). No measured
+        # data → insufficient_data, never a fake verdict. The previous
+        # hardcoded 0.89/0.85 baselines and demo fallbacks could never fire
+        # and are removed.
+        verdict_row = self._latest_measured_verdict(model_type)
 
-        drift_detected = recent_accuracy < (historical_accuracy * threshold)
-        degradation_pct = (
-            round((1.0 - recent_accuracy / max(historical_accuracy, 0.001)) * 100, 1)
-            if historical_accuracy > 0
-            else 0.0
-        )
+        if verdict_row is None:
+            result = {
+                "model_type": model_type,
+                "detected_at": datetime.now().isoformat(),
+                "recent_accuracy": None,
+                "historical_accuracy": None,
+                "drift_detected": False,
+                "verdict": "insufficient_data",
+                "degradation_pct": None,
+                "threshold": threshold,
+            }
+            self._detection_history.append(result)
+            return result
 
         result = {
             "model_type": model_type,
             "detected_at": datetime.now().isoformat(),
-            "recent_accuracy": round(recent_accuracy, 3),
-            "historical_accuracy": round(historical_accuracy, 3),
-            "drift_detected": drift_detected,
-            "degradation_pct": degradation_pct,
+            "model_id": verdict_row.get("model_id"),
+            "recent_accuracy": verdict_row.get("measured"),
+            "historical_accuracy": verdict_row.get("baseline"),
+            "drift_detected": verdict_row.get("drift_verdict") == "drift_suspected",
+            "verdict": verdict_row.get("drift_verdict"),
+            "degradation_pct": verdict_row.get("degradation_pct"),
             "threshold": threshold,
         }
 
@@ -591,30 +613,66 @@ class DriftDetector:
             return _generate_current_stats(equipment_type, drift_amount=0.0)
         return current
 
-    def _get_recent_accuracy(self, model_type: str, days: int = 7) -> float:
-        """Get recent prediction accuracy for model type.
+    def _latest_measured_verdict(self, model_type: str) -> dict[str, Any] | None:
+        """Latest measured drift verdict for a model type from ml_model_accuracy.
 
-        In production, this would query actual prediction outcomes.
+        Phase 236-03: the real drift signal. Returns None when no measured
+        accuracy row exists for the model kind (cold start / no logged
+        predictions joined yet) so the caller fails closed to
+        insufficient_data instead of inventing a number.
+
+        model_type is the drift-loop label ('lstm'/'autoencoder'); the
+        accuracy table keys by model_kind ('lstm_forecast'/'ae_score').
         """
+        model_kind = {"lstm": "lstm_forecast", "autoencoder": "ae_score"}.get(model_type)
+        if model_kind is None:
+            return None
         try:
-            from ml.monitoring.performance_monitor import get_performance_monitor
+            from app.database.supabase_client import get_supabase_client
 
-            monitor = get_performance_monitor()
-            result = monitor.evaluate_predictions(days_back=days)
-            metrics = result.get("metrics", {})
-            return metrics.get("accuracy", 0.85)
-        except Exception:
-            # Demo seeded accuracy values
-            base_accuracy = {"lstm": 0.87, "autoencoder": 0.83}
-            return base_accuracy.get(model_type, 0.80)
+            client = get_supabase_client()
+            # This is a COARSE per-kind summary: with several models of the same
+            # kind, the authoritative signal is the per-model finding raised in
+            # ml_accuracy_service.reconcile_drift_findings. Here we surface the
+            # most recent run and, within it, prefer a drift_suspected row so the
+            # summary never hides a drifting model behind an arbitrary healthy one.
+            result = (
+                client.table("ml_model_accuracy")
+                .select("*")
+                .eq("model_kind", model_kind)
+                .eq("window_days", 7)
+                .order("computed_at", desc=True)
+                .limit(50)
+                .execute()
+            )
+        except Exception as e:
+            logger.debug("Measured verdict lookup failed for %s: %s", model_type, e)
+            return None
 
-    def _get_historical_accuracy(self, model_type: str) -> float:
-        """Get historical baseline accuracy for model type.
+        rows = result.data or []
+        if not rows:
+            return None
+        latest_ts = rows[0].get("computed_at")
+        latest_run = [r for r in rows if r.get("computed_at") == latest_ts]
+        drifting = [r for r in latest_run if r.get("drift_verdict") == "drift_suspected"]
+        candidate = drifting[0] if drifting else latest_run[0]
+        if candidate.get("drift_verdict") == "insufficient_data":
+            return None
+        row = candidate
 
-        In production, this would be stored during model validation.
-        """
-        baseline_accuracy = {"lstm": 0.89, "autoencoder": 0.85}
-        return baseline_accuracy.get(model_type, 0.82)
+        if model_kind == "lstm_forecast":
+            measured, baseline = row.get("mae"), row.get("baseline_mae")
+            degradation = round((measured / baseline - 1.0) * 100, 1) if measured is not None and baseline else None
+        else:
+            measured, baseline = row.get("score_median"), row.get("baseline_threshold")
+            degradation = None
+        return {
+            "model_id": row.get("model_id"),
+            "measured": measured,
+            "baseline": baseline,
+            "drift_verdict": row.get("drift_verdict"),
+            "degradation_pct": degradation,
+        }
 
 
 # Singleton

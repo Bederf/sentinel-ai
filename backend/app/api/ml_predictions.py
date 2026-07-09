@@ -461,11 +461,11 @@ async def get_model_readiness(site_id: str):
 
     Returns readiness status with model counts and equipment coverage.
     """
-    from app.config.settings import settings
+    from app.services.site_ai_policy_service import is_site_ml_training_enabled
     from ml.registry import get_model_registry
 
     site_id = site_id.strip().lower()
-    training_enabled = settings.ml_background_training_enabled
+    training_enabled = is_site_ml_training_enabled(site_id)
 
     if not training_enabled:
         return ModelReadinessResponse(
@@ -475,7 +475,7 @@ async def get_model_readiness(site_id: str):
             active_model_count=0,
             equipment_types_covered=[],
             last_training_at=None,
-            message="ML background training is disabled.",
+            message="ML training is disabled for this site.",
         )
 
     registry = get_model_registry()

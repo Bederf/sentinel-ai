@@ -149,6 +149,142 @@ class TestStaleModelRetrain:
             assert chiller_check["needs_retrain"] is True
             assert chiller_check["age_days"] >= 30
 
+    def test_site_scoped_active_model_is_checked_when_no_site_filter(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry_data = {
+            "models": {
+                "lstm_site-002_chiller_old": {
+                    "model_id": "lstm_site-002_chiller_old",
+                    "model_type": "lstm",
+                    "equipment_type": "chiller",
+                    "site_id": "site-002",
+                    "model_path": "/tmp/site-model.h5",
+                    "metrics": {"r2_24h": 0.72},
+                    "metadata": {"site_id": "site-002"},
+                    "registered_at": (datetime.now() - timedelta(days=60)).isoformat(),
+                    "status": "active",
+                }
+            },
+            "active": {"site-002_lstm_chiller": "lstm_site-002_chiller_old"},
+        }
+        registry_path.write_text(json.dumps(registry_data))
+        registry = ModelRegistry(registry_path=str(registry_path))
+
+        with patch("ml.registry.get_model_registry", return_value=registry):
+            scheduler = RetrainingScheduler()
+            checks = scheduler.check_all_models()
+
+        chiller_check = next(
+            (
+                c
+                for c in checks
+                if c["model_type"] == "lstm" and c["equipment_type"] == "chiller" and c["site_id"] == "site-002"
+            ),
+            None,
+        )
+        assert chiller_check is not None
+        assert chiller_check["status"] == "stale"
+        assert chiller_check["needs_retrain"] is True
+        assert chiller_check["quality_metric"] == "r2_24h"
+
+    def test_auto_retrain_stale_queues_site_scoped_retraining(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry_data = {
+            "models": {
+                "lstm_site-002_chiller_old": {
+                    "model_id": "lstm_site-002_chiller_old",
+                    "model_type": "lstm",
+                    "equipment_type": "chiller",
+                    "site_id": "site-002",
+                    "model_path": "/tmp/site-model.h5",
+                    "metrics": {"r2_24h": 0.72},
+                    "metadata": {"site_id": "site-002"},
+                    "registered_at": (datetime.now() - timedelta(days=60)).isoformat(),
+                    "status": "active",
+                }
+            },
+            "active": {"site-002_lstm_chiller": "lstm_site-002_chiller_old"},
+        }
+        registry_path.write_text(json.dumps(registry_data))
+        registry = ModelRegistry(registry_path=str(registry_path))
+
+        with patch("ml.registry.get_model_registry", return_value=registry):
+            scheduler = RetrainingScheduler()
+            queued = []
+            scheduler.queue_retraining = lambda **kwargs: queued.append(kwargs) or MagicMock(success=True)
+
+            scheduler.auto_retrain_stale()
+
+        assert queued == [
+            {
+                "model_type": "lstm",
+                "equipment_type": "chiller",
+                "reason": "Model age 60d exceeds 30d threshold",
+                "site_id": "site-002",
+            }
+        ]
+
+
+class TestModelQualityMetrics:
+    def test_classifier_uses_cv_accuracy_quality_metric(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry_data = {
+            "models": {
+                "classifier_chiller_low": {
+                    "model_id": "classifier_chiller_low",
+                    "model_type": "classifier",
+                    "equipment_type": "chiller",
+                    "model_path": "/tmp/model.joblib",
+                    "metrics": {"cv_accuracy": 0.50},
+                    "metadata": {},
+                    "registered_at": datetime.now().isoformat(),
+                    "status": "active",
+                }
+            },
+            "active": {"classifier_chiller": "classifier_chiller_low"},
+        }
+        registry_path.write_text(json.dumps(registry_data))
+        registry = ModelRegistry(registry_path=str(registry_path))
+
+        with patch("ml.registry.get_model_registry", return_value=registry):
+            scheduler = RetrainingScheduler()
+            checks = scheduler.check_all_models()
+
+        chiller = next(c for c in checks if c["model_type"] == "classifier" and c["equipment_type"] == "chiller")
+        assert chiller["needs_retrain"] is True
+        assert chiller["quality_metric"] == "cv_accuracy"
+        assert chiller["quality_score"] == 0.50
+        assert chiller["r2_score"] is None
+
+    def test_autoencoder_gates_reconstruction_error_ratio_when_available(self, tmp_path):
+        registry_path = tmp_path / "registry.json"
+        registry_data = {
+            "models": {
+                "autoencoder_ahu_bad": {
+                    "model_id": "autoencoder_ahu_bad",
+                    "model_type": "autoencoder",
+                    "equipment_type": "ahu",
+                    "model_path": "/tmp/model.h5",
+                    "metrics": {"threshold": 0.5, "val_error_mean": 0.75},
+                    "metadata": {},
+                    "registered_at": datetime.now().isoformat(),
+                    "status": "active",
+                }
+            },
+            "active": {"autoencoder_ahu": "autoencoder_ahu_bad"},
+        }
+        registry_path.write_text(json.dumps(registry_data))
+        registry = ModelRegistry(registry_path=str(registry_path))
+
+        with patch("ml.registry.get_model_registry", return_value=registry):
+            scheduler = RetrainingScheduler()
+            checks = scheduler.check_all_models()
+
+        ahu = next(c for c in checks if c["model_type"] == "autoencoder" and c["equipment_type"] == "ahu")
+        assert ahu["needs_retrain"] is True
+        assert ahu["quality_metric"] == "val_error_threshold_ratio"
+        assert ahu["quality_score"] == 1.5
+
 
 class TestMissingModel:
     """A model slot with no active model should be reported as missing."""
@@ -254,3 +390,57 @@ class TestPerformanceMonitorMetrics:
             assert "evaluated_at" in result
             assert "confusion_matrix" in result
             assert result["confusion_matrix"]["true_positives"] == 1
+
+
+class TestQualityCheckFailsClosed:
+    """A contract model with no recognized quality metric must be flagged, not reported fresh."""
+
+    def _registry_with_metrics(self, tmp_path, model_type, metrics):
+        registry_path = tmp_path / "registry.json"
+        registry_data = {
+            "models": {
+                f"{model_type}_chiller_x": {
+                    "model_id": f"{model_type}_chiller_x",
+                    "model_type": model_type,
+                    "equipment_type": "chiller",
+                    "model_path": "/tmp/model.h5",
+                    "metrics": metrics,
+                    "metadata": {},
+                    "registered_at": datetime.now().isoformat(),
+                    "status": "active",
+                }
+            },
+            "active": {f"{model_type}_chiller": f"{model_type}_chiller_x"},
+        }
+        registry_path.write_text(json.dumps(registry_data))
+        return ModelRegistry(registry_path=str(registry_path))
+
+    @pytest.mark.parametrize("model_type", ["lstm", "autoencoder", "classifier"])
+    def test_missing_quality_metric_flags_retrain(self, tmp_path, model_type):
+        registry = self._registry_with_metrics(tmp_path, model_type, {"unrelated": 1.0})
+
+        with patch("ml.registry.get_model_registry", return_value=registry):
+            scheduler = RetrainingScheduler()
+            checks = scheduler.check_all_models()
+
+        chiller = next(c for c in checks if c["model_type"] == model_type and c["equipment_type"] == "chiller")
+        assert chiller["needs_retrain"] is True
+        assert chiller["status"] == "underperforming"
+        assert chiller["quality_metric"] is None
+        assert "no recognized quality metric" in chiller["reason"]
+
+    def test_autoencoder_with_val_error_ratio_still_passes(self, tmp_path):
+        registry = self._registry_with_metrics(tmp_path, "autoencoder", {"threshold": 1.0, "val_error_mean": 0.5})
+
+        with patch("ml.registry.get_model_registry", return_value=registry):
+            scheduler = RetrainingScheduler()
+            checks = scheduler.check_all_models()
+
+        chiller = next(c for c in checks if c["model_type"] == "autoencoder" and c["equipment_type"] == "chiller")
+        assert chiller["needs_retrain"] is False
+        assert chiller["status"] == "fresh"
+
+    def test_non_contract_model_type_is_not_failed_closed(self):
+        scheduler = RetrainingScheduler()
+        quality = scheduler._quality_check("survival", {"c_index": 0.7})
+        assert quality["is_underperforming"] is False

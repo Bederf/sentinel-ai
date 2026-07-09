@@ -390,7 +390,7 @@ class LSTMInferenceService:
         else:
             predictions = predictions_raw
 
-        return {
+        result = {
             "equipment_id": equipment_id,
             "equipment_type": equipment_type,
             "site_id": site_id,
@@ -407,6 +407,12 @@ class LSTMInferenceService:
                 "input_contract": _model_input_contract(model_info),
             },
         }
+
+        # Phase 236-03: log site-scoped forecasts for the measured drift signal.
+        from app.services.ml_prediction_logger import log_lstm_prediction
+
+        log_lstm_prediction(result, model_info)
+        return result
 
     def get_trend(
         self,
@@ -598,7 +604,7 @@ class AnomalyDetectionService:
         score = float(scores[0])
         threshold = float(model.threshold)
 
-        return {
+        result = {
             "equipment_id": equipment_id,
             "equipment_type": equipment_type,
             "site_id": site_id,
@@ -614,6 +620,12 @@ class AnomalyDetectionService:
                 "input_contract": _model_input_contract(model_info),
             },
         }
+
+        # Phase 236-03: log site-scoped AE scores for the measured drift signal.
+        from app.services.ml_prediction_logger import log_ae_score
+
+        log_ae_score(result, model_info)
+        return result
 
     def _classify_severity(self, score: float, threshold: float) -> str:
         """Classify anomaly severity based on score vs threshold."""

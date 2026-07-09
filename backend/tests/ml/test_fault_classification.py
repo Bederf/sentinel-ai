@@ -330,7 +330,7 @@ class TestRetrainingSchedulerClassifier:
             assert chiller_check["status"] == "fresh"
 
     def test_cv_accuracy_recognized_for_staleness(self, tmp_path):
-        """Scheduler recognizes cv_accuracy as the performance metric."""
+        """Scheduler recognizes cv_accuracy as classifier quality without calling it R²."""
         registry_path = tmp_path / "registry.json"
         registry_data = {
             "models": {
@@ -359,9 +359,10 @@ class TestRetrainingSchedulerClassifier:
                 None,
             )
             assert chiller is not None
-            # cv_accuracy 0.50 < MIN_R2_SCORE 0.65 → underperforming
             assert chiller["needs_retrain"] is True
-            assert chiller["r2_score"] == 0.50
+            assert chiller["quality_metric"] == "cv_accuracy"
+            assert chiller["quality_score"] == 0.50
+            assert chiller["r2_score"] is None
 
 
 # === 7. Data Prep Tests ===

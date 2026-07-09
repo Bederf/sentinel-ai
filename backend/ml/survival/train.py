@@ -97,6 +97,7 @@ class SurvivalTrainer:
                 "feature_cols": model.feature_cols,
                 "trained_at": datetime.now().isoformat(),
             },
+            auto_activate=True,
         )
 
         logger.info(f"Registered model: {model_id}")
