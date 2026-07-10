@@ -266,6 +266,17 @@ async def commit_bridge_review_mappings(
         # Infer modules (same logic as before, but passed to RPC)
         read_only_modules = _bridge_read_only_modules(site_id, equipment_array)
 
+        # ── PLS: capability sync before commit ─────────────────────────
+        # The wizard goes discovery → review → approve, skipping the
+        # explicit sync step.  Auto-sync here so canonicalize doesn't fail
+        # with PSMS_ILLEGAL_TRANSITION from `discovered`.
+        try:
+            from app.services.site_onboarding_lifecycle import capability_sync
+
+            await capability_sync(site_id)
+        except Exception as sync_exc:
+            logger.warning("capability_sync skipped for %s: %s", site_id, sync_exc)
+
         result = client.rpc(
             "commit_bridge_review",
             {
