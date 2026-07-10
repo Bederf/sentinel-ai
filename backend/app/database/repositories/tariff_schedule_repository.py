@@ -52,11 +52,12 @@ class TariffScheduleRepository:
                 if active_date:
                     query = query.lte("effective_date", active_date.isoformat())
                 result = query.execute()
-                return result.data or []
+                if result.data:
+                    return result.data
             except Exception as exc:
-                logger.error("Error listing tariff schedules: %s", exc)
-                return []
+                logger.warning("Supabase query failed, falling back to JSON: %s", exc)
 
+        # Fallback: JSON file
         data = self._load_json()
         tariffs = data.get("tariffs", [])
         filtered = []
@@ -106,11 +107,12 @@ class TariffScheduleRepository:
         if self.client:
             try:
                 result = self.client.table("municipal_tariff_schedules").upsert(payload).execute()
-                return result.data[0] if result.data else None
+                if result.data:
+                    return result.data[0] if isinstance(result.data, list) else result.data
             except Exception as exc:
-                logger.error("Error upserting tariff schedule: %s", exc)
-                return None
+                logger.warning("Supabase upsert failed, falling back to JSON: %s", exc)
 
+        # Fallback: JSON file
         data = self._load_json()
         tariffs = data.get("tariffs", [])
         updated = False

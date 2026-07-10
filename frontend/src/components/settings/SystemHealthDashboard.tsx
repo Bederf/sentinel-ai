@@ -56,6 +56,28 @@ interface PhaseReadinessResponse {
   sites: PhaseReadinessSite[];
 }
 
+interface SiteProgressGate {
+  name: string;
+  passed: boolean;
+  detail: string;
+  action: string | null;
+}
+
+interface SiteProgressStage {
+  stage: string;
+  status: "completed" | "in_progress" | "blocked" | "not_reached";
+  gates: SiteProgressGate[];
+}
+
+interface SiteProgressResponse {
+  site_id: string;
+  pls: SiteProgressStage;
+  onboarding: SiteProgressStage;
+  phase_promotion: SiteProgressStage;
+  integrity: SiteProgressStage;
+  next_actions: string[];
+}
+
 interface SystemHealthDashboardProps {
   siteId?: string;
   onError?: (error: string) => void;
@@ -66,6 +88,7 @@ export function SystemHealthDashboard({ siteId, onError, onNavigate }: SystemHea
   const [backup, setBackup] = useState<BackupStatus | null>(null);
   const [drStatus, setDrStatus] = useState<DrStatus | null>(null);
   const [phaseReadiness, setPhaseReadiness] = useState<PhaseReadinessResponse | null>(null);
+  const [siteProgress, setSiteProgress] = useState<Record<string, SiteProgressResponse>>({});
   const [backupTriggering, setBackupTriggering] = useState(false);
 
   const fetchBackupStatus = useCallback(async () => {
@@ -76,6 +99,18 @@ export function SystemHealthDashboard({ siteId, onError, onNavigate }: SystemHea
       if (dr.ok) setDrStatus(await dr.json());
       const phase = await authorizedFetch(`/api/system/phase-readiness${siteId ? `?site_id=${siteId}` : ""}`);
       if (phase.ok) setPhaseReadiness(await phase.json());
+
+      // ── Fetch progress for each site ──────────────────────
+      const progressMap: Record<string, SiteProgressResponse> = {};
+      const siteIds = siteId ? [siteId] : ["site-001", "site-002", "site-004", "site-005"];
+      for (const sid of siteIds) {
+        const res = await authorizedFetch(`/api/system/sites/${sid}/progress`);
+        if (res.ok) {
+          const data: SiteProgressResponse = await res.json();
+          progressMap[sid] = data;
+        }
+      }
+      if (Object.keys(progressMap).length > 0) setSiteProgress(progressMap);
     } catch { /* ignore */ }
   }, [siteId]);
 
@@ -240,6 +275,77 @@ export function SystemHealthDashboard({ siteId, onError, onNavigate }: SystemHea
                       {drStatus.local_restore_target.table_count ?? 0} tables · {Object.keys(drStatus.local_restore_target.critical_row_counts ?? {}).length} checks
                     </p>
                   </div>
+                </div>
+              </div>
+            )}
+            {Object.keys(siteProgress).length > 0 && (
+              <div className="mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <Activity className="h-4 w-4" style={{ color: "var(--color-sentinel-text-secondary)" }} />
+                  <h3 className="text-xs font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>Site Progress</h3>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {Object.values(siteProgress).map((sp) => {
+                    const stages = [sp.pls, sp.onboarding, sp.phase_promotion, sp.integrity];
+                    const blocked = stages.filter((s) => s.status === "blocked");
+                    const overall = blocked.length === 0 ? "✅" : "⚠️";
+                    return (
+                      <div key={sp.site_id} className="p-3 rounded" style={{ background: "var(--color-sentinel-bg-secondary)" }}>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                            {overall} {sp.site_id}
+                          </p>
+                        </div>
+                        {stages.map((stage) => {
+                          const dots: Record<string, string> = {
+                            completed: "✅", in_progress: "🔄", blocked: "❌", not_reached: "○",
+                          };
+                          const failed = stage.gates.filter((g) => !g.passed);
+                          return (
+                            <div key={stage.stage} className="mb-2 last:mb-0">
+                              <div className="flex items-center gap-1.5 mb-1">
+                                <span className="text-[11px]">{dots[stage.status] || "○"}</span>
+                                <span className="text-[11px] font-medium truncate" style={{ color: "var(--color-sentinel-text-primary)" }}>
+                                  {stage.stage}
+                                </span>
+                                {failed.length > 0 && (
+                                  <span className="text-[10px] ml-auto" style={{ color: "var(--color-sentinel-amber)" }}>
+                                    {failed.length}/{stage.gates.length}
+                                  </span>
+                                )}
+                              </div>
+                              {failed.length > 0 && (
+                                <div className="ml-4 space-y-0.5">
+                                  {failed.map((gate) => (
+                                    <div key={gate.name}>
+                                      <p className="text-[10px]" style={{ color: "var(--color-sentinel-red)" }}>
+                                        ✗ {gate.name.replace(/_/g, " ")}
+                                      </p>
+                                      {gate.action && (
+                                        <p className="text-[9px] ml-2" style={{ color: "var(--color-sentinel-amber)" }}>
+                                          → {gate.action}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                        {sp.next_actions.length > 0 && (
+                          <div className="mt-2 pt-2 border-t" style={{ borderColor: "var(--color-sentinel-border)" }}>
+                            <p className="text-[9px] font-medium mb-1" style={{ color: "var(--color-sentinel-text-secondary)" }}>Next actions:</p>
+                            {sp.next_actions.map((a, i) => (
+                              <p key={i} className="text-[9px]" style={{ color: "var(--color-sentinel-text-secondary)" }}>
+                                {i + 1}. {a}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}

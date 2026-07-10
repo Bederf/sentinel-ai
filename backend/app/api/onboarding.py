@@ -215,13 +215,42 @@ async def commit_bridge_review_mappings(
     performs all upserts in a single transaction.
     """
     _check_site_access(auth, site_id)
-    _validate_discovery_session(site_id, body.discovery_id)
+
+    # Resolve discovery_id: use the one from the request, or find the latest active
+    resolved_discovery_id = body.discovery_id
+    if not resolved_discovery_id:
+        try:
+            from app.database.supabase_client import get_supabase_client
+
+            latest = (
+                get_supabase_client()
+                .table("site_discovery_sessions")
+                .select("discovery_id")
+                .eq("site_id", site_id)
+                .eq("status", "active")
+                .order("discovered_at", desc=True)
+                .limit(1)
+                .execute()
+            )
+            if latest.data:
+                resolved_discovery_id = str(latest.data[0]["discovery_id"])
+                logger.info("Resolved discovery_id for %s: %s", site_id, resolved_discovery_id)
+        except Exception as exc:
+            logger.warning("Failed to resolve discovery_id for %s: %s", site_id, exc)
+
+    try:
+        _validate_discovery_session(site_id, resolved_discovery_id)
+    except HTTPException:
+        logger.error("commit_bridge_review: discovery validation failed for %s (discovery_id=%s)", site_id, resolved_discovery_id)
+        raise
+
     try:
         from app.database.supabase_client import get_supabase_client
 
         client = get_supabase_client()
         equipment = body.mappings.get("equipment") if isinstance(body.mappings, dict) else None
         if not isinstance(equipment, list):
+            logger.error("commit_bridge_review: mappings missing equipment list for %s (mappings keys: %s)", site_id, list(body.mappings.keys()) if isinstance(body.mappings, dict) else type(body.mappings).__name__)
             raise HTTPException(status_code=400, detail="Bridge review mappings must include equipment[]")
 
         # Build equipment array for RPC
@@ -281,7 +310,7 @@ async def commit_bridge_review_mappings(
             "commit_bridge_review",
             {
                 "p_site_id": site_id,
-                "p_discovery_id": body.discovery_id,
+                "p_discovery_id": resolved_discovery_id,
                 "p_approved_by": body.approved_by,
                 "p_modules": read_only_modules,
                 "p_equipment": equipment_array,
@@ -290,6 +319,7 @@ async def commit_bridge_review_mappings(
         ).execute()
 
         if not result.data:
+            logger.error("commit_bridge_review RPC returned no data for %s", site_id)
             raise HTTPException(status_code=500, detail="commit_bridge_review returned no data")
 
         summary = result.data if isinstance(result.data, dict) else result.data[0]
