@@ -146,6 +146,20 @@ async def load_equipment_from_supabase() -> list[dict]:
     return devices
 
 
+def _map_point_type_from_mapping(parameter_type: str) -> str:
+    """Map SIMBIOT parameter_type to a DevicePoint-compatible point_type string."""
+    lower = parameter_type.lower()
+    if lower.startswith("setpoint"):
+        return "setpoint"
+    if lower.startswith("command"):
+        return "command"
+    if lower.startswith("writable"):
+        return "command"
+    if "analogoutput" in lower or "binaryoutput" in lower or "multistateoutput" in lower:
+        return "command"
+    return "sensor"
+
+
 async def load_device_manager_devices_from_supabase() -> list[dict]:
     """Load protocol devices for DeviceManager using Supabase inventory as source of truth.
 
@@ -198,6 +212,76 @@ async def load_device_manager_devices_from_supabase() -> list[dict]:
                 "metadata": metadata,
             }
         )
+
+    # ── Enrich writable points from point_asset_mappings ────────────────
+    # Local JSON files capture a subset of writable control points.
+    # point_asset_mappings (SIMBIOT verified) has the full set.
+    try:
+        writable_by_equipment: dict[str, list[dict]] = {}
+        site_codes = {d.get("site_id", "") for d in devices if d.get("site_id")}
+        if site_codes:
+            sites_resp2 = client.table("sites").select("id, code").execute()
+            code_to_uuid = {s["code"]: s["id"] for s in sites_resp2.data or []}
+            for sc in site_codes:
+                suuid = code_to_uuid.get(sc)
+                if not suuid:
+                    continue
+                mappings_resp = (
+                    client.table("point_asset_mappings")
+                    .select("extracted_asset_id,parameter_name,bms_point_id,parameter_type")
+                    .eq("site_id", suuid)
+                    .eq("is_verified", True)
+                    .execute()
+                )
+                for mapping in mappings_resp.data or []:
+                    if not AIOptimizerService._mapping_type_is_writable(mapping.get("parameter_type")):
+                        continue
+                    asset_id = (mapping.get("extracted_asset_id") or "").strip()
+                    if asset_id:
+                        writable_by_equipment.setdefault(asset_id, []).append(mapping)
+
+        enriched_count = 0
+        for dev in devices:
+            dev_id = dev.get("id", "")
+            mappings = writable_by_equipment.get(dev_id)
+            if not mappings:
+                continue
+            points = dev.get("points", {})
+            for m in mappings:
+                pname = (m.get("parameter_name") or "").strip()
+                if not pname or pname in points:
+                    continue
+                ptype = m.get("parameter_type") or ""
+                unit = ptype.rsplit(":", 1)[-1] if ":" in ptype else ""
+                mapped_ptype = _map_point_type_from_mapping(ptype)
+                points[pname] = {
+                    "name": pname,
+                    "point_type": mapped_ptype,
+                    "description": f"{pname} (from point_asset_mappings)",
+                    "unit": unit,
+                    "writable": True,
+                    "metadata": {
+                        "bacnet_ref": m.get("bms_point_id", ""),
+                        "source": "point_asset_mappings",
+                    },
+                }
+                enriched_count += 1
+
+        if enriched_count:
+            logger.info(
+                "Enriched %d devices with %d missing writable points from point_asset_mappings",
+                sum(
+                    1
+                    for d in devices
+                    if any(
+                        p.get("metadata", {}).get("source") == "point_asset_mappings"
+                        for p in d.get("points", {}).values()
+                    )
+                ),
+                enriched_count,
+            )
+    except Exception as e:
+        logger.warning("Failed to enrich writable points from point_asset_mappings: %s", e)
 
     logger.info(
         "Loaded %d DeviceManager devices from Supabase inventory with local point metadata "
@@ -1020,6 +1104,44 @@ class AIOptimizerService:
                     if row and row.get("value") is not None:
                         site_agg[sensor] = float(row["value"])
                         site_agg[f"{sensor}_recorded_at"] = row.get("recorded_at")
+
+                # Fallback: if total_occupancy is 0 but entry_count shows activity,
+                # query equipment_sensor_readings directly. The security_badge_events
+                # table may be empty (bridge doesn't write to it), but entry_count
+                # is written by the CCURE security server to equipment_sensor_readings.
+                if site_agg.get("total_occupancy", 0) == 0:
+                    try:
+                        from app.database.supabase_client import get_supabase_client as _sb_cli
+                        from datetime import timezone as _tz
+
+                        _sb = _sb_cli()
+                        # Use timezone-aware timestamp to match DB values (+00:00)
+                        _cutoff = (datetime.now(_tz.utc) - timedelta(minutes=30)).isoformat()
+                        _resp = (
+                            _sb.table("equipment_sensor_readings")
+                            .select("value, recorded_at")
+                            .eq("site_id", site_id)
+                            .eq("sensor_type", "entry_count")
+                            .gte("recorded_at", _cutoff)
+                            .order("recorded_at", desc=True)
+                            .limit(1)
+                            .execute()
+                        )
+                        if _resp.data:
+                            _entry_val = float(_resp.data[0]["value"])
+                            if _entry_val > 10:
+                                # Use 30% of entries as rough current occupancy
+                                # (Friday morning, 785 entries → ≈235 people)
+                                site_agg["total_occupancy"] = max(1.0, round(_entry_val * 0.3, 1))
+                                site_agg["total_occupancy_recorded_at"] = _resp.data[0].get("recorded_at")
+                                site_agg["_occupancy_source"] = "entry_count_fallback"
+                                logger.info(
+                                    "[OCC] entry_count=%s → estimated occupancy=%s (entry_count_fallback)",
+                                    _entry_val,
+                                    site_agg["total_occupancy"],
+                                )
+                    except Exception as _ec_err:
+                        logger.debug("entry_count fallback query failed: %s", _ec_err)
 
                 if site_agg:
                     conditions["site_aggregate"] = site_agg
@@ -3027,12 +3149,16 @@ EQUIPMENT CODES — use ONLY codes from the valid equipment list provided.
 Do not modify, abbreviate, or invent equipment codes.
 If unsure of the exact code, use the closest match from the valid list.
 
-CONTROL ACTIONS — use ONLY exact point names listed under writable control points.
+CONTROL ACTIONS — use ONLY exact point names listed in the "Verified SIMBIOT Writable Control Points" section below. The "All Available Control Points" section may be incomplete — SIMBIOT is authoritative.
 All equipment telemetry may be used as evidence, but read-only sensors must never
 be returned as action points. If the best intervention has no verified writable
-point, you may still create a non-executable operational advisory with point=null
-and a human-readable recommended_value. It must clearly say the user must make
+point, you MUST still create a non-executable operational advisory with point=null
+and a human-readable recommended_value. Say the operator must make
 the change manually in the BMS until a writable point is verified.
+
+IMPORTANT: "No verified writable control points" is NOT a valid no_action_reason.
+If you lack a writable point for the optimal intervention, create a point=null
+advisory anyway — that IS the actionable output.
 
 Meters, sensors, calculated demand points, and read-only telemetry are context
 only. Never target a meter or sensor as the equipment to adjust.
@@ -3681,7 +3807,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         "recommended_value": 0,
                         "unit": "",
                         "system": "hvac",
-                        "action_type": "ai_optimization",
+                        "action_type": "hvac_setpoint_change",
                         "action": {
                             "point": "plant_enable",
                             "value": 0,
@@ -3766,7 +3892,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 "recommended_value": ("Shut down or setback non-critical HVAC plant according to the site profile"),
                 "unit": "kW",
                 "system": "hvac",
-                "action_type": "ai_optimization",
+                "action_type": "hvac_setpoint_change",
                 "action": {
                     "point": None,
                     "value": "Shut down or setback non-critical HVAC plant according to the site profile",
@@ -3872,7 +3998,18 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         presence of a fused occupied/uncertain verdict should not merely remove
         the shutdown recommendation. It is itself an operator-visible condition
         because the aggregate trigger is unsafe to act on.
+
+        During scheduled operating hours, zone-level empty-zone recommendations
+        are handled by the zone-scope decomposer. This conflict context only
+        fires outside operating hours when aggregate tells us to shut down
+        but fused occupancy disagrees.
         """
+        # Phase C fix: do not fire conflict context during operating hours.
+        # Zone-level empty-zone handling is sufficient during the day.
+        current_time = self._current_conditions_time(current_conditions)
+        if not self._is_outside_site_operating_hours(site_id, current_time):
+            return None
+
         fused = current_conditions.get("_fused_occupancy")
         if fused is None or getattr(fused, "may_suppress", False):
             return None
@@ -3896,10 +4033,6 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             and float(zone_count) > 0
         )
         if not aggregate_zero:
-            return None
-
-        current_time = self._current_conditions_time(current_conditions)
-        if self._is_outside_site_operating_hours(site_id, current_time):
             return None
 
         active_safety_constraints = current_conditions.get("active_safety_constraints") or current_conditions.get(
@@ -3979,7 +4112,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             ),
             "unit": "kW",
             "system": "hvac",
-            "action_type": "ai_optimization",
+            "action_type": "hvac_setpoint_change",
             "risk_level": "medium",
             "action": {
                 "point": None,
@@ -4010,7 +4143,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 ],
                 "legacy_rule": "after_hours_zero_occupancy_hvac_load",
                 "advisory_type": "occupancy_conflict_control_gate",
-                "outside_operating_hours": False,
+                "outside_operating_hours": True,
                 "total_occupancy": context["total_occupancy"],
                 "occupied_zones": context["occupied_zones"],
                 "zone_count": context["zone_count"],
@@ -4440,7 +4573,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             "recommended_value": "Verify whether this HVAC equipment should be running before tuning delivery",
             "unit": "",
             "system": "hvac",
-            "action_type": "ai_optimization",
+            "action_type": "hvac_setpoint_change",
             "action": {
                 "point": None,
                 "value": "Verify served-zone operating state before applying runtime tuning",
@@ -4785,7 +4918,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
             "recommended_value": None,
             "unit": "",
             "system": "hvac",
-            "action_type": "ai_optimization",
+            "action_type": "hvac_setpoint_change",
             "action": {
                 "point": None,
                 "value": "Resolve active fault before tuning",
@@ -4945,9 +5078,13 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         occupied_zones: Any,
         zone_count: Any,
     ) -> bool:
-        """Return True when site-level occupancy is low enough for after-hours setback policy."""
+        """Return True when site-level occupancy is low enough for after-hours setback policy.
+        total_occupancy=0 means literally empty — not incidental. Incidental is 1 person
+        (e.g., a cleaner or security guard), which still justifies HVAC setback. Zero with a
+        fused-occupied verdict is a signal conflict that must block blanket shutdown.
+        """
         try:
-            if total_occupancy is not None and float(total_occupancy) <= 1:
+            if total_occupancy is not None and 0 < float(total_occupancy) <= 1:
                 return True
         except (TypeError, ValueError):
             pass
@@ -4955,7 +5092,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
         try:
             occupied = float(occupied_zones)
             zones = float(zone_count)
-            if zones > 0 and (occupied / zones * 100.0) <= AFTER_HOURS_INCIDENTAL_OCCUPANCY_MAX_PCT:
+            if zones > 0 and occupied > 0 and (occupied / zones * 100.0) <= AFTER_HOURS_INCIDENTAL_OCCUPANCY_MAX_PCT:
                 return True
         except (TypeError, ValueError, ZeroDivisionError):
             pass
@@ -5244,6 +5381,38 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                 "metadata": metadata,
             }
             result.append(canonical)
+
+        # Inject action_type per recommendation based on system type.
+        # This is critical for the progression engine — without a distinct
+        # action_type per domain, all recommendations get validation_class="other"
+        # and per-class readiness tracking collapses.
+        _SYSTEM_ACTION_MAP = {
+            "hvac": "hvac_setpoint_change",
+            "fcu": "hvac_setpoint_change",
+            "ahu": "hvac_setpoint_change",
+            "vav": "hvac_setpoint_change",
+            "boiler": "hvac_setpoint_change",
+            "chiller": "chiller_setpoint_adjust",
+            "lighting": "lighting_dim",
+            "dali": "lighting_dim",
+            "solar": "energy_optimization",
+            "bess": "bess_dispatch",
+            "power": "energy_optimization",
+            "meter": "energy_optimization",
+            "generator": "maintenance_inspection",
+            "ups": "maintenance_inspection",
+            "pump": "maintenance_inspection",
+            "cooling_tower": "chiller_setpoint_adjust",
+            "water": "energy_optimization",
+            "fire": "maintenance_inspection",
+            "security": "maintenance_inspection",
+        }
+        for r in result:
+            sys = (r.get("system") or "").lower()
+            r["action_type"] = _SYSTEM_ACTION_MAP.get(sys, "generic")
+            if "action" not in r:
+                r["action"] = {"point": r.get("point_name", ""), "value": r.get("value")}
+            r.setdefault("expected_impact", {})
 
         logger.warning(
             f"[PARSE] _parse_holistic_recommendations returned {len(result)} recs "
@@ -6771,7 +6940,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                             "recommended_value": 0,
                             "unit": "",
                             "system": "hvac",
-                            "action_type": "ai_optimization",
+                            "action_type": "hvac_setpoint_change",
                             "action": {
                                 "point": "plant_enable",
                                 "value": 0,
@@ -6827,7 +6996,7 @@ If no appropriate equipment exists in this list, do not generate a recommendatio
                         ),
                         "unit": "kW",
                         "system": "hvac",
-                        "action_type": "ai_optimization",
+                        "action_type": "hvac_setpoint_change",
                         "action": {
                             "point": None,
                             "value": "Shut down or setback non-critical HVAC plant according to the site profile",

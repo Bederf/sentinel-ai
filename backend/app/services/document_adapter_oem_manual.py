@@ -11,6 +11,7 @@ import hashlib
 import logging
 from datetime import datetime
 from urllib.parse import urlparse
+from uuid import UUID
 
 from app.models.document_record import DocumentRecord, DocumentType, ExtractionStatus
 from app.models.document_source import SourceSystem
@@ -128,10 +129,45 @@ class OEMManualAdapter(DocumentSourceAdapter):
             },
         )
 
-    async def upsert_manual(self, **manual_metadata) -> str:
-        """Normalise and upsert a manual record. Returns the document id or empty string."""
+    async def upsert_manual(
+        self,
+        *,
+        trigger_index: bool = False,
+        doc_class: str = "site",
+        **manual_metadata,
+    ) -> str:
+        """Normalise and upsert a manual record. Returns the document id or empty string.
+
+        Args:
+            trigger_index: If True, index the document immediately after upsert.
+            doc_class: "site" or "system" — passed through to DocumentIndexingService.
+            **manual_metadata: Forwarded to normalise_manual().
+        """
         record = self.normalise_manual(**manual_metadata)
-        return await self._upsert(record)
+        doc_id = await self._upsert(record)
+        if trigger_index and doc_id:
+            try:
+                from app.services.document_indexing_service import (
+                    DocumentIndexingService,
+                    IndexingStatus,
+                )
+
+                svc = DocumentIndexingService(db=self.db)
+                result = await svc.index_document_by_id(
+                    document_id=UUID(doc_id),
+                    doc_class=doc_class,  # type: ignore[arg-type]
+                    source_system="oem_manual",
+                )
+                if result.status != IndexingStatus.COMPLETE:
+                    logger.warning(
+                        "Indexing triggered for OEM manual %s but returned %s: %s",
+                        doc_id,
+                        result.status,
+                        result.error,
+                    )
+            except Exception as exc:
+                logger.error("Indexing failed for OEM manual %s: %s", doc_id, exc)
+        return doc_id
 
     def _reconstruct(self, row: dict) -> DocumentRecord:
         keywords = row.get("keywords") or []

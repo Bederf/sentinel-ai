@@ -9,8 +9,11 @@ from __future__ import annotations
 import contextlib
 import hashlib
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+
+logger = logging.getLogger(__name__)
 
 from app.core.site_resolver import get_registered_site_ids
 from app.database.supabase_client import get_supabase_client
@@ -18,6 +21,15 @@ from app.middleware.auth_middleware import require_auth
 from app.models.auth import AuthContext, AuthLevel
 from app.services.simbiot import BmsConnectionConfig, create_bms_adapter
 from app.services.simbiot_capability_sync_service import sync_site_capabilities_to_supabase
+from app.services.site_onboarding_lifecycle import (
+    begin_discovery,
+    capability_sync,
+    discovery_completed,
+    discovery_failed,
+    EntityNotFound,
+    TransitionDenied,
+    VersionConflict,
+)
 
 router = APIRouter(prefix="/api/simbiot", tags=["simbiot-capabilities"])
 
@@ -46,6 +58,21 @@ async def get_site_capabilities(
             "token": password or username or "",
         },
     )
+
+    # ── PLS: begin discovery intent ──────────────────────────
+    pls_intent_id: str | None = None
+    try:
+        pls_res = await begin_discovery(
+            site_id,
+            actor="system",
+            actor_type="service",
+            reason="Capability discovery via API",
+        )
+        pls_intent_id = pls_res.get("intent_id")
+    except (TransitionDenied, EntityNotFound, VersionConflict) as exc:
+        logger.info("PLS skip for %s: %s", site_id, exc)
+    except Exception as exc:
+        logger.warning("PLS begin_discovery failed for %s: %s", site_id, exc)
 
     try:
         status = await adapter.connect(cfg)
@@ -130,6 +157,22 @@ async def get_site_capabilities(
 
             logging.getLogger(__name__).warning("Failed to persist discovery session for %s: %s", site_id, exc)
 
+        # ---- PLS: complete discovery outcome ------------------------
+        if pls_intent_id:
+            try:
+                await discovery_completed(
+                    site_id,
+                    intent_id=pls_intent_id,
+                    evidence_ref={
+                        "devices": len(out_devices),
+                        "points": total_points,
+                        "writable_points": writable_points,
+                        "discovery_id": str(discovery_id) if discovery_id else None,
+                    },
+                )
+            except Exception as pls_exc:
+                logger.warning("PLS discovery_completed failed for %s: %s", site_id, pls_exc)
+
         return {
             "site_id": site_id,
             "discovery_id": discovery_id,
@@ -154,12 +197,24 @@ async def get_site_capabilities(
             "devices": out_devices,
         }
     except HTTPException:
+        if pls_intent_id:
+            with contextlib.suppress(Exception):
+                await discovery_failed(site_id, intent_id=pls_intent_id, reason="Capability discovery rejected")
         raise
     except PermissionError as exc:
+        if pls_intent_id:
+            with contextlib.suppress(Exception):
+                await discovery_failed(site_id, intent_id=pls_intent_id, reason=str(exc))
         raise HTTPException(status_code=403, detail=str(exc)) from exc
     except ConnectionError as exc:
+        if pls_intent_id:
+            with contextlib.suppress(Exception):
+                await discovery_failed(site_id, intent_id=pls_intent_id, reason=str(exc))
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:
+        if pls_intent_id:
+            with contextlib.suppress(Exception):
+                await discovery_failed(site_id, intent_id=pls_intent_id, reason=str(exc))
         raise HTTPException(status_code=500, detail=f"Capability discovery failed: {exc}") from exc
     finally:
         with contextlib.suppress(Exception):
@@ -176,13 +231,19 @@ async def sync_site_capabilities(
 ) -> dict:
     """Backfill existing site equipment with latest SIMBIOT capability snapshot."""
     try:
-        return await sync_site_capabilities_to_supabase(
+        result = await sync_site_capabilities_to_supabase(
             site_code=site_id,
             bms_vendor=bms_vendor,
             host=host,
             port=port,
             commissioning=commissioning,
         )
+        # ---- PLS: capability sync transition -----------------------
+        try:
+            await capability_sync(site_id)
+        except Exception as pls_exc:
+            logger.warning("PLS capability_sync failed for %s: %s", site_id, pls_exc)
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except PermissionError as exc:

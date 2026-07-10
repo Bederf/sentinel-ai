@@ -114,6 +114,70 @@ class DocumentIndexingService:
 
         return IndexingResult(document_id=document_id, status=IndexingStatus.COMPLETE, chunks=chunks)
 
+    async def index_document_by_id(
+        self,
+        document_id: UUID,
+        doc_class: DocClass,
+        source_system: str = "oem_manual",
+    ) -> IndexingResult:
+        """Index a document that already has full_text in the DB (no file_bytes needed).
+
+        Used by the OEM manual adapter path where text is stored directly
+        in the documents row rather than extracted from raw file bytes.
+        """
+        result = self.db.table("documents").select("id,full_text").eq("id", str(document_id)).execute()
+        if not result.data:
+            return IndexingResult(
+                document_id=document_id,
+                status=IndexingStatus.FAILED,
+                error=f"document {document_id} not found",
+            )
+
+        full_text = (result.data[0].get("full_text") or "").strip()
+        if not full_text:
+            self._update_document(
+                document_id,
+                indexing_status=IndexingStatus.FAILED,
+                indexing_error="document has no full_text — ingest via index_document() with file_bytes",
+            )
+            return IndexingResult(
+                document_id=document_id,
+                status=IndexingStatus.FAILED,
+                error="document has no full_text",
+            )
+
+        self._update_document(
+            document_id,
+            indexing_status=IndexingStatus.EXTRACTING,
+            indexing_error=None,
+            source_system=source_system,
+        )
+
+        self._update_document(
+            document_id,
+            indexing_status=IndexingStatus.EMBEDDING,
+            indexing_error=None,
+            ocr_extracted=False,
+        )
+
+        try:
+            self.db.table("document_chunks").delete().eq("document_id", str(document_id)).execute()
+            chunks = self.vector_db.chunk_and_embed_markdown(
+                document_id=str(document_id),
+                doc_class=doc_class,
+            )
+        except Exception as exc:
+            error = str(exc)
+            logger.warning("Document embedding failed for %s: %s", document_id, error)
+            self._update_document(
+                document_id,
+                indexing_status=IndexingStatus.FAILED,
+                indexing_error=error,
+            )
+            return IndexingResult(document_id=document_id, status=IndexingStatus.FAILED, error=error)
+
+        return IndexingResult(document_id=document_id, status=IndexingStatus.COMPLETE, chunks=chunks)
+
     def sweep_stuck_documents(self, older_than_minutes: int = 30) -> int:
         """Fail documents left in transient indexing statuses."""
         cutoff = datetime.now(UTC) - timedelta(minutes=older_than_minutes)

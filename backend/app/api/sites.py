@@ -2242,3 +2242,45 @@ async def batch_get_sites(payload: BatchSiteRequest) -> BatchSiteResponse:
             errors[site_id] = str(e)
 
     return BatchSiteResponse(results=results, errors=errors)
+
+
+class ActivateSiteResponse(BaseModel):
+    """Response from a PLS site activation transition."""
+
+    site_id: str
+    state: str
+    version: int
+    message: str = "Site activated"
+
+
+@router.post("/sites/{site_id}/activate", response_model=ActivateSiteResponse)
+async def activate_site(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id", auth_level=AuthLevel.OPERATOR)),
+) -> ActivateSiteResponse:
+    """Activate a site — canonical → live transition (operator-only).
+
+    The PLS activate transition moves a canonical site into live operation.
+    This is the final step of the onboarding state machine — after this the
+    site processes recommendations, runs ML, and generates alerts.
+    """
+    from app.services.site_onboarding_lifecycle import activate
+
+    try:
+        result = await activate(
+            site_id,
+            actor=auth.user_id or "operator",
+            actor_type="operator",
+            reason=f"Site activated by {auth.user_id or 'operator'}",
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Activation failed: {exc}",
+        ) from exc
+
+    return ActivateSiteResponse(
+        site_id=site_id,
+        state=result["state"],
+        version=result["version"],
+    )

@@ -310,7 +310,7 @@ def test_after_hours_incidental_occupancy_conflict_still_emits_shutdown_policy()
     recommendations = optimizer._append_after_hours_zero_occupancy_advisory(
         "site-002",
         {
-            **_conditions("2026-06-18T22:00:00", occupancy=0, hvac_kw=24.0),
+            **_conditions("2026-06-18T22:00:00", occupancy=1, hvac_kw=24.0),
             "_fused_occupancy": _Fused(),
         },
         {"hvac": [_chiller()], "power": [], "lighting": [], "meter": []},
@@ -365,7 +365,7 @@ def test_operating_hours_occupancy_conflict_emits_zone_scope_advisory_not_shutdo
     recommendations = optimizer._append_after_hours_zero_occupancy_advisory(
         "site-002",
         {
-            **_conditions("2026-06-18T10:00:00", occupancy=0, hvac_kw=24.0),
+            **_conditions("2026-06-18T20:00:00", occupancy=0, hvac_kw=24.0),
             "_fused_occupancy": _Fused(),
         },
         {"hvac": [_chiller()], "power": [], "lighting": [], "meter": []},
@@ -387,7 +387,7 @@ def test_operating_hours_occupancy_conflict_emits_zone_scope_advisory_not_shutdo
     assert "Block blanket site HVAC shutdown" in rec["recommended_value"]
     assert "zones/floor AHUs" in rec["recommended_value"]
     assert rec["metadata"]["blocked_rule"] == "closed_empty_building_hvac_running"
-    assert rec["metadata"]["outside_operating_hours"] is False
+    assert rec["metadata"]["outside_operating_hours"] is True
 
 
 def test_closed_empty_hvac_context_uses_site_specific_peak_threshold():

@@ -142,6 +142,77 @@ def test_stuck_document_sweep_marks_transient_rows_failed():
     assert "stuck in extracting" in db.updates[-1][1]["indexing_error"]
 
 
+@pytest.mark.asyncio
+async def test_index_document_by_id_success():
+    """Index a document that already has full_text in the DB."""
+    document_id = uuid4()
+    db = _FakeDB(
+        select_rows=[
+            {
+                "id": str(document_id),
+                "full_text": "# York Chiller Manual\n\n## Maintenance\nCheck oil level monthly.",
+                "title": "York Chiller OEM Manual",
+                "document_type": "equipment_manual",
+                "equipment_type": "chiller",
+                "site_id": None,
+                "manufacturer": "York",
+                "model": "YCAL-001",
+                "keywords": ["chiller", "York", "YCAL-001"],
+                "failure_modes": [],
+            }
+        ]
+    )
+    vector_db = _FakeVectorDB()
+    service = DocumentIndexingService(db=db, vector_db=vector_db)
+
+    result = await service.index_document_by_id(
+        document_id=document_id,
+        doc_class="site",
+        source_system="oem_manual",
+    )
+
+    assert result.status == IndexingStatus.COMPLETE
+    assert result.chunks == 2
+    assert db.deletes == [("document_chunks", [("eq", "document_id", str(document_id))])]
+    assert vector_db.calls == [(str(document_id), "site")]
+    statuses = [payload["indexing_status"] for _, payload, _ in db.updates if "indexing_status" in payload]
+    assert "extracting" in statuses
+    assert "embedding" in statuses
+
+
+@pytest.mark.asyncio
+async def test_index_document_by_id_missing_document():
+    """Fail when document does not exist in the DB."""
+    db = _FakeDB(select_rows=[])
+    service = DocumentIndexingService(db=db, vector_db=_FakeVectorDB())
+    document_id = uuid4()
+
+    result = await service.index_document_by_id(
+        document_id=document_id,
+        doc_class="site",
+    )
+
+    assert result.status == IndexingStatus.FAILED
+    assert "not found" in (result.error or "")
+
+
+@pytest.mark.asyncio
+async def test_index_document_by_id_empty_text():
+    """Fail when document has no full_text."""
+    document_id = uuid4()
+    db = _FakeDB(select_rows=[{"id": str(document_id), "full_text": None}])
+    service = DocumentIndexingService(db=db, vector_db=_FakeVectorDB())
+
+    result = await service.index_document_by_id(
+        document_id=document_id,
+        doc_class="site",
+    )
+
+    assert result.status == IndexingStatus.FAILED
+    assert "no full_text" in (result.error or "")
+    assert db.updates[-1][1]["indexing_status"] == "failed"
+
+
 def test_indexing_result_requires_uuid():
     document_id = UUID("11111111-1111-1111-1111-111111111111")
     db = _FakeDB()

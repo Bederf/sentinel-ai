@@ -42,6 +42,7 @@ from app.services.module_registry_service import module_registry
 from app.services.mv_verification_service import get_mv_verification_service
 from app.services.optimization_tier_router import get_tier_router
 from app.services.profile_service import get_profile_service
+from app.services.progression_engine_service import get_progression_engine_service
 from app.services.routing_adapters import optimization_routing_to_tier_result
 from app.utils.ai_provenance import attach_ai_provenance, get_ml_provenance
 
@@ -1748,6 +1749,28 @@ async def save_sites(sites: list[dict[str, Any]]):
         logger.error(f"Failed to save sites to Supabase: {e}")
 
 
+# Map equipment system type (from Claude's rec_item) to recommendation
+# validation class for trust-level routing (Phase B / Path B).
+_SYSTEM_TO_CLASS: dict[str, str] = {
+    "hvac": "hvac_setpoint_change",
+    "fcu": "hvac_setpoint_change",
+    "ahu": "hvac_setpoint_change",
+    "vav": "hvac_setpoint_change",
+    "boiler": "hvac_setpoint_change",
+    "chiller": "chiller_setpoint_adjust",
+    "lighting": "lighting_dim",
+    "dali": "lighting_dim",
+    "solar": "energy_optimization",
+    "bess": "bess_dispatch",
+    "power": "energy_optimization",
+    "meter": "energy_optimization",
+    "generator": "maintenance_inspection",
+    "ups": "maintenance_inspection",
+    "pump": "maintenance_inspection",
+    "cooling_tower": "chiller_setpoint_adjust",
+}
+
+
 @router.post("/optimization/analyze")
 async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
     """
@@ -1809,6 +1832,8 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
             site_profile=site,
             optimization_settings=type("_Opts", (), {"mode": site_mode})(),
         )
+        # Phase B / Path B: Progression engine for per-class trust-level routing
+        prog_engine = get_progression_engine_service()
 
         routing_decisions = []
         recommendations_list = rec_dict.get("recommendations", [])
@@ -1836,6 +1861,9 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
             point = rec_item.get("point_name", rec_item.get("setpoint", ""))
             confidence = rec_item.get("confidence", recommendation.confidence)
             target_eq = rec_item.get("equipment_code", rec_item.get("equipment", ""))
+            # Phase B: derive class_name from system type and fetch class_readiness
+            class_name = _SYSTEM_TO_CLASS.get(system.lower(), "generic")
+            class_readiness = await prog_engine.get_class_readiness(request.site_id, class_name)
 
             # Hard gate: never store recommendation for equipment with active urgent WO
             if target_eq and target_eq in urgent_equipment:
@@ -1900,6 +1928,7 @@ async def analyze_optimization(request: AnalyzeRequest) -> dict[str, Any]:
                 point_name=point,
                 site_id=request.site_id,
                 control_tier=control_tier,
+                class_readiness=class_readiness,  # Phase B: pass per-class trust context
             )
             routing_decisions.append(decision)
 

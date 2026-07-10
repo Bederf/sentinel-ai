@@ -65,6 +65,7 @@ class ReasonCode(StrEnum):
     MV_ACCURACY_FAIL = "mv_accuracy_fail"
     FEEDBACK_COVERAGE_FAIL = "feedback_coverage_fail"
     DRIFT_CRITICAL_FAIL = "drift_critical_fail"
+    PINNED_SIGNAL_FAIL = "pinned_signal_fail"
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +88,7 @@ METRIC_REASON_CODES: dict[str, ReasonCode] = {
     "comfort_violation_rate_7d_pct": ReasonCode.QUALITY_GATE_BLOCK,
     "rollback_rate_7d_pct": ReasonCode.QUALITY_GATE_BLOCK,
     "label_lag_p95_hours": ReasonCode.QUALITY_GATE_BLOCK,
+    "pinned_signal_pct": ReasonCode.PINNED_SIGNAL_FAIL,
 }
 
 
@@ -185,6 +187,7 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "simulation"): MetricThreshold(
             pass_bound=2, warn_bound=None, direction="lower_is_better"
         ),
+        ("pinned_signal_pct", "simulation"): MetricThreshold(na=True),
         # ===================================================================
         # SHADOW_LIVE mode
         # ===================================================================
@@ -229,6 +232,9 @@ class QualityGatePolicy:
         ),
         ("drift_critical_alerts_24h", "shadow_live"): MetricThreshold(
             pass_bound=0, warn_bound=1, direction="lower_is_better"
+        ),
+        ("pinned_signal_pct", "shadow_live"): MetricThreshold(
+            pass_bound=80, warn_bound=90, direction="lower_is_better"
         ),
         # ===================================================================
         # LIVE_CONTROL mode
@@ -275,6 +281,9 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "live_control"): MetricThreshold(
             pass_bound=0, warn_bound=None, direction="lower_is_better"
         ),
+        ("pinned_signal_pct", "live_control"): MetricThreshold(
+            pass_bound=20, warn_bound=35, direction="lower_is_better"
+        ),
         # ===================================================================
         # COMMISSIONING mode — lenient (system is learning)
         # ===================================================================
@@ -310,6 +319,9 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "commissioning"): MetricThreshold(
             pass_bound=2, warn_bound=None, direction="lower_is_better"
         ),
+        ("pinned_signal_pct", "commissioning"): MetricThreshold(
+            pass_bound=80, warn_bound=90, direction="lower_is_better"
+        ),
         # ===================================================================
         # ADVISORY mode — moderate (recommendations visible, no auto-control)
         # ===================================================================
@@ -339,6 +351,7 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "advisory"): MetricThreshold(
             pass_bound=1, warn_bound=3, direction="lower_is_better"
         ),
+        ("pinned_signal_pct", "advisory"): MetricThreshold(pass_bound=40, warn_bound=60, direction="lower_is_better"),
         # ===================================================================
         # SUPERVISED mode — fairly strict (human-in-loop, active control)
         # ===================================================================
@@ -380,6 +393,7 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "supervised"): MetricThreshold(
             pass_bound=0, warn_bound=1, direction="lower_is_better"
         ),
+        ("pinned_signal_pct", "supervised"): MetricThreshold(pass_bound=20, warn_bound=35, direction="lower_is_better"),
         # ===================================================================
         # AUTOMATIC mode — strictest (full autonomy)
         # ===================================================================
@@ -413,6 +427,7 @@ class QualityGatePolicy:
         ("drift_critical_alerts_24h", "automatic"): MetricThreshold(
             pass_bound=0, warn_bound=None, direction="lower_is_better"
         ),
+        ("pinned_signal_pct", "automatic"): MetricThreshold(pass_bound=10, warn_bound=25, direction="lower_is_better"),
     }
 
     # All 14 metric names (ordered for consistent iteration)

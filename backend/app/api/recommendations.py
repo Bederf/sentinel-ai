@@ -382,12 +382,30 @@ async def record_recommendation_quality_exception(
             source=body.source,
             metadata=metadata,
         )
+        # Phase C: If critical exception type, trigger immediate demotion check
+        demotions_applied = 0
+        try:
+            critical_types = {"equipment_damage", "comfort_violation"}
+            if body.quality_exception_type in critical_types:
+                from app.services.progression_engine_service import (
+                    get_progression_engine_service,
+                )
+
+                prog = get_progression_engine_service()
+                demotions = await prog.check_demotion_triggers(rec.site_id)
+                if demotions:
+                    await prog.apply_demotions(rec.site_id, demotions)
+                    demotions_applied = len(demotions)
+        except Exception as demotion_err:
+            logger.warning("Quality exception demotion check failed: %s", demotion_err)
+
         return attach_ai_provenance(
             {
                 "success": True,
                 "recommendation_id": rec.id,
                 "linked_recommendation_id": rec.id,
                 "event": event,
+                "demotions_applied": demotions_applied,
             },
             get_ml_provenance("recommendation-accountability-v1"),
         )

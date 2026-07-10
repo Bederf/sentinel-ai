@@ -4,7 +4,7 @@ type: "guide"
 status: "draft"
 version: "1.0.0"
 created: "2026-04-05"
-updated: "2026-04-05"
+updated: "2026-07-10"
 author: "Sentinel Development Team"
 tags: ["documents", "intake", "adapters", "ocr", "mri", "sharepoint"]
 related:
@@ -140,6 +140,14 @@ class SourceSystem(str, Enum):
     CONCEPT_MRI = "concept_mri"
     SHAREPOINT = "sharepoint"
     MANUAL_UPLOAD = "manual_upload"
+    OEM_MANUAL = "oem_manual"  # Phase 234: OEM equipment manuals
+```
+
+### DocumentType (document category — used for chunk filtering)
+
+```python
+class DocumentType(str, Enum):
+    EQUIPMENT_MANUAL = "equipment_manual"  # Phase 234: OEM equipment manual
 ```
 
 Identifies which adapter ingested the document. Composite upsert key with `source_document_id`.
@@ -183,6 +191,57 @@ APScheduler job: `document_mri_sync`, runs every 4h in shadow mode (`ENABLE_SITE
 ### SharePointAdapter (Phase 182 — planned)
 
 Future adapter for SharePoint document libraries.
+
+### OEMManualAdapter (Phase 234-02/03)
+
+File: `backend/app/services/document_adapter_oem_manual.py`
+
+Ingests OEM equipment manuals (PDF/DOCX) from uploads, URLs, or Firecrawl results. Normalises site/equipment/manufacturer/model metadata into canonical `DocumentRecord` rows:
+
+```python
+record = adapter.normalise_manual(
+    site_id="site-002",
+    equipment_code="S002-CHILLER-B1-001",
+    equipment_type="chiller",
+    manufacturer="York",
+    model="YCIV",
+    source_url="https://example.com/york-yciv-manual.pdf",
+    ocr_text="York YCIV maintenance instructions...",
+)
+```
+
+`upsert_manual()` accepts an optional `trigger_index=True` flag to automatically index the document after upsert:
+
+```python
+doc_id = await adapter.upsert_manual(
+    trigger_index=True,
+    doc_class="site",
+    ...
+)
+# → upserts to documents table, then calls
+#   DocumentIndexingService.index_document_by_id()
+```
+
+Key behaviours:
+- `source_system = "oem_manual"`, `source = "oem_manual"`, `document_type = "equipment_manual"`
+- Stable source IDs via SHA-256 fingerprint of site/equipment/manufacturer/model/URL
+- Manufacturer and model written as dedicated `documents.manufacturer` / `documents.model` columns
+- `trigger_index=False` by default for backwards compatibility
+- Indexing failures are logged but don't block upsert return (non-blocking)
+- Phase 234-03: `DocumentIndexingService.index_document_by_id()` enables indexing via DB-stored `full_text` (no `file_bytes` required)
+
+## DocumentIndexingService
+
+File: `backend/app/services/document_indexing_service.py`
+
+Two indexing paths:
+
+| Method | Input | Use case |
+|--------|-------|----------|
+| `index_document()` | `file_bytes` + extract | User uploads, service reports |
+| `index_document_by_id()` | Document already in DB with `full_text` | OEM manual adapter path |
+
+`index_document_by_id()` fetches the document row, validates `full_text`, deletes stale chunks, then delegates to `VectorDB.chunk_and_embed_markdown()`. The `_build_chunk_record()` method copies `equipment_type`, `document_type`, `site_id`, `manufacturer`, `model`, `keywords`, `failure_modes` from the parent document row into each chunk — enabling search filtering by these fields without any additional wiring.
 
 ## Phase 181: OCR + LLM Extraction Pipeline
 

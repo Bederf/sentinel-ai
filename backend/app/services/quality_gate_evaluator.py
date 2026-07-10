@@ -458,6 +458,37 @@ class QualityGateEvaluator:
             )
             metrics["drift_critical_alerts_24h"] = float(drift_count)
 
+        async def _collect_pinned_signals():
+            """Query pinned_signal_state for frozen signal percentage."""
+            try:
+                from app.database.supabase_client import get_supabase_client
+
+                sb = get_supabase_client()
+                total_q = (
+                    sb.table("pinned_signal_state")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .limit(1)
+                    .execute()
+                )
+                total = int(total_q.count or 0)
+                if total <= 0:
+                    metrics["pinned_signal_pct"] = 0.0
+                    return
+
+                pinned_q = (
+                    sb.table("pinned_signal_state")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .eq("pinned", True)
+                    .limit(1)
+                    .execute()
+                )
+                pinned = int(pinned_q.count or 0)
+                metrics["pinned_signal_pct"] = round((pinned / total) * 100.0, 1)
+            except Exception as exc:
+                logger.warning("Failed to collect pinned signal metrics: %s", exc)
+
         # Run all collectors concurrently; each wrapped in try/except
         collectors = [
             ("monitoring", _collect_monitoring),
@@ -466,6 +497,7 @@ class QualityGateEvaluator:
             ("comfort_violations", _collect_comfort_violations),
             ("ml_feedback", _collect_ml_feedback),
             ("drift_alerts", _collect_drift_alerts),
+            ("pinned_signals", _collect_pinned_signals),
         ]
 
         async def _safe_collect(name: str, coro_fn):

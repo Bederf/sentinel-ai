@@ -715,6 +715,13 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ Orphan alert cleanup job initialization failed: {e}")
 
+    # PLS discovery timeout sweep — transition stale discovering sites to discovery_timed_out
+    try:
+        scheduler_service.add_discovery_timeout_sweep_job(interval_seconds=300)
+        _logger.info("✅ PLS discovery timeout sweep initialized (every 5 min)")
+    except Exception as e:
+        _logger.warning(f"⚠️ PLS discovery timeout sweep initialization failed: {e}")
+
     # Morning recommendation digest — top 5 pending by severity, sent to FM Telegram at 07:00 SAST Mon-Fri
     try:
         scheduler_service.add_recommendation_digest_job()

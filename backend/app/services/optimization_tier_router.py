@@ -62,7 +62,20 @@ class OptimizationTierRouter:
         - human_in_loop: tier3/tier2 -> "pending_approval", tier1 -> "advisory"
         - auto_execute:  tier3 -> "auto_execute", tier2 -> "pending_approval", tier1 -> "advisory"
         - blocked:       always "blocked" regardless of control tier
+
+    Phase B — Trust-level thresholds:
+        When class_readiness is provided, confidence thresholds are reweighted
+        based on the class's effective trust level. The router remains sync and
+        stateless; the caller fetches class_readiness and passes it in.
     """
+
+    # Confidence thresholds by effective trust level (Phase B).
+    # Format: (block_min, tier2_min, tier3_min)
+    _THRESHOLDS_BY_LEVEL: dict[int, tuple[float, float, float]] = {
+        1: (0.30, 0.60, 1.00),  # Advisory: tier3 unreachable
+        2: (0.30, 0.60, 0.60),  # Supervised proven class: tier3 = tier2
+        3: (0.30, 0.60, 0.75),  # Autonomous: tier3 at 0.75
+    }
 
     def __init__(self, settings: Any | None = None):
         """Initialize with optional settings object.
@@ -90,6 +103,7 @@ class OptimizationTierRouter:
         point_name: str,
         site_id: str,
         control_tier: str,
+        class_readiness: dict | None = None,
     ) -> RoutingDecision:
         """Route a single recommendation to the appropriate tier and action.
 
@@ -99,24 +113,42 @@ class OptimizationTierRouter:
             point_name: BACnet/oBIX point name.
             site_id: Site identifier.
             control_tier: One of "monitor", "supervised", "auto_execute".
+            class_readiness: Optional dict with 'current_trust_level' key.
+                             When provided, confidence thresholds are adjusted
+                             based on the class's trust level (Phase B).
+                             When None (backward compatible), behaves as Level 1.
 
         Returns:
             RoutingDecision with tier, action, and metadata.
         """
         original_confidence = confidence
 
-        # FCU confidence cap
+        # FCU confidence cap — safety limit, applies before trust-level logic
         if self._is_fcu(system):
             confidence = min(confidence, self._fcu_cap)
 
-        # Determine tier from effective confidence
-        tier = self._confidence_to_tier(confidence)
+        # Phase B: When class_readiness is provided, extract trust level and
+        # override confidence thresholds. When absent (backward compatible),
+        # use the instance defaults (self._*_min) unchanged.
+        effective_level = 1
+        if class_readiness is not None:
+            effective_level = self._effective_class_level(class_readiness)
+
+        if class_readiness is not None:
+            # Use trust-level thresholds
+            block_min, tier2_min, tier3_min = self._thresholds_for_trust_level(effective_level)
+            tier = self._confidence_to_tier(confidence, block_min, tier2_min, tier3_min)
+        else:
+            # Backward compatible: use instance defaults (self._*_min)
+            tier = self._confidence_to_tier(confidence)
 
         # Determine action from tier + control tier matrix
         action = self._resolve_action(tier, control_tier)
 
         # Build reason string
-        reason = self._build_reason(tier, action, original_confidence, confidence, system, control_tier)
+        reason = self._build_reason(
+            tier, action, original_confidence, confidence, system, control_tier, effective_level=effective_level
+        )
 
         return RoutingDecision(
             tier=tier,
@@ -141,6 +173,9 @@ class OptimizationTierRouter:
             - system (str)
             - point_name (str)
 
+        Optionally each dict may include 'class_readiness' (dict with
+        'current_trust_level') to apply per-class trust-level thresholds.
+
         Returns:
             List of RoutingDecision objects.
         """
@@ -152,6 +187,7 @@ class OptimizationTierRouter:
                 point_name=rec.get("point_name", ""),
                 site_id=site_id,
                 control_tier=control_tier,
+                class_readiness=rec.get("class_readiness"),
             )
             decisions.append(decision)
         return decisions
@@ -240,18 +276,63 @@ class OptimizationTierRouter:
     # Private helpers
     # ------------------------------------------------------------------
 
+    # ------------------------------------------------------------------
+    # Phase B: Trust-level threshold resolution
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _thresholds_for_trust_level(level: int) -> tuple[float, float, float]:
+        """Return (block_min, tier2_min, tier3_min) for the given trust level.
+
+        Falls back to Level 1 (advisory) for unknown levels.
+        """
+        return OptimizationTierRouter._THRESHOLDS_BY_LEVEL.get(level, (0.30, 0.60, 1.00))
+
+    @staticmethod
+    def _effective_class_level(class_readiness: dict | None) -> int:
+        """Extract effective trust level from class_readiness dict.
+
+        Returns 1 (advisory) if class_readiness is None or missing the key.
+        """
+        if class_readiness is None:
+            return 1
+        return class_readiness.get("current_trust_level", 1)
+
+    # ------------------------------------------------------------------
+    # Private helpers
+    # ------------------------------------------------------------------
+
     @staticmethod
     def _is_fcu(system: str) -> bool:
         """Check if system is an FCU (case-insensitive)."""
         return system.upper().startswith("FCU")
 
-    def _confidence_to_tier(self, confidence: float) -> RoutingTier:
-        """Map effective confidence to a routing tier."""
-        if confidence < self._block_min:
+    def _confidence_to_tier(
+        self,
+        confidence: float,
+        block_min: float | None = None,
+        tier2_min: float | None = None,
+        tier3_min: float | None = None,
+    ) -> RoutingTier:
+        """Map effective confidence to a routing tier.
+
+        Args:
+            confidence: Effective confidence (after FCU cap).
+            block_min/tier2_min/tier3_min: Override thresholds.
+                When None, falls back to the instance defaults (self._*_min).
+
+        Returns:
+            RoutingTier enum value.
+        """
+        _block = self._block_min if block_min is None else block_min
+        _tier2 = self._tier2_min if tier2_min is None else tier2_min
+        _tier3 = self._tier3_min if tier3_min is None else tier3_min
+
+        if confidence < _block:
             return RoutingTier.BLOCKED
-        if confidence < self._tier2_min:
+        if confidence < _tier2:
             return RoutingTier.TIER1_ADVISORY
-        if confidence < self._tier3_min:
+        if confidence < _tier3:
             return RoutingTier.TIER2_APPROVAL
         return RoutingTier.TIER3_AUTO_EXECUTE
 
@@ -277,7 +358,7 @@ class OptimizationTierRouter:
         if control_tier == "monitor":
             return "log_only"
 
-        if control_tier == "supervised":
+        if control_tier in ("supervised", "human_in_loop"):
             if tier == RoutingTier.TIER1_ADVISORY:
                 return "advisory"
             # tier2 and tier3 both go to pending_approval
@@ -302,6 +383,7 @@ class OptimizationTierRouter:
         effective_confidence: float,
         system: str,
         control_tier: str,
+        effective_level: int | None = None,
     ) -> str:
         """Build a human-readable reason string."""
         parts = [f"Tier={tier.value}, action={action}"]
@@ -314,6 +396,10 @@ class OptimizationTierRouter:
             parts.append(f"confidence={effective_confidence:.2f}")
 
         parts.append(f"control_tier={control_tier}")
+
+        if effective_level is not None and effective_level > 1:
+            parts.append(f"class_level={effective_level}")
+
         return "; ".join(parts)
 
 

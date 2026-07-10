@@ -172,12 +172,12 @@ class TestResolveControlTier:
         result = OptimizationTierRouter.resolve_control_tier({"control_tier": "auto_execute"})
         assert result == "auto_execute"
 
-    def test_fallback_supervised_to_human_in_loop(self):
+    def test_fallback_supervised(self):
         from app.models.optimization import OptimizationSettings
 
         settings = OptimizationSettings(mode="supervised")
         result = OptimizationTierRouter.resolve_control_tier(None, settings)
-        assert result == "human_in_loop"
+        assert result == "supervised"
 
     def test_fallback_automatic_to_auto_execute(self):
         from app.models.optimization import OptimizationSettings
@@ -186,9 +186,9 @@ class TestResolveControlTier:
         result = OptimizationTierRouter.resolve_control_tier(None, settings)
         assert result == "auto_execute"
 
-    def test_default_human_in_loop(self):
+    def test_default_supervised(self):
         result = OptimizationTierRouter.resolve_control_tier(None)
-        assert result == "human_in_loop"
+        assert result == "supervised"
 
 
 # ------------------------------------------------------------------

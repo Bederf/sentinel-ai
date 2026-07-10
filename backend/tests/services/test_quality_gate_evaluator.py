@@ -357,7 +357,7 @@ class TestCollectMetrics:
             mock_settings.resolved_ingestion_mode = IngestionMode.SIMULATION
             metrics = await evaluator.collect_metrics("S002")
             # Verify all defaults are present
-            assert len(metrics) == 14
+            assert len(metrics) == 15
             for key in _SIMULATION_DEFAULTS:
                 assert key in metrics
 

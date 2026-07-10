@@ -42,6 +42,30 @@ APPROVED_NO_WRITE_CONTROL_GATE_SUPPRESSION_HOURS = 24
 
 logger = logging.getLogger(__name__)
 
+# Map system type to action_type for progression engine class readiness tracking.
+# Used by _run_optimization_analysis when persisting holistic recommendations.
+_SYSTEM_ACTION_MAP: dict[str, str] = {
+    "hvac": "hvac_setpoint_change",
+    "fcu": "hvac_setpoint_change",
+    "ahu": "hvac_setpoint_change",
+    "vav": "hvac_setpoint_change",
+    "boiler": "hvac_setpoint_change",
+    "chiller": "chiller_setpoint_adjust",
+    "lighting": "lighting_dim",
+    "dali": "lighting_dim",
+    "solar": "energy_optimization",
+    "bess": "bess_dispatch",
+    "power": "energy_optimization",
+    "meter": "energy_optimization",
+    "generator": "maintenance_inspection",
+    "ups": "maintenance_inspection",
+    "pump": "maintenance_inspection",
+    "cooling_tower": "chiller_setpoint_adjust",
+    "water": "energy_optimization",
+    "fire": "maintenance_inspection",
+    "security": "maintenance_inspection",
+}
+
 SAST = timezone(timedelta(hours=2))
 WEEKDAY_NAMES = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
@@ -1604,11 +1628,14 @@ class BackgroundSchedulerService:
                                 )
                                 skipped_count += 1
                                 continue
+                            # Derive action_type from system field for progression engine tracking
+                            _hrec_sys = str(hrec.get("system", "")).lower()
+                            _hrec_action_type = _SYSTEM_ACTION_MAP.get(_hrec_sys, "generic")
                             try:
                                 hrec_model = Recommendation(
                                     site_id=site_id,
                                     timestamp=datetime.utcnow(),
-                                    action_type="ai_optimization",
+                                    action_type=_hrec_action_type,
                                     risk_level=ActionRiskLevel.MEDIUM,
                                     target_equipment=hrec_equipment,
                                     action=hrec_action,
@@ -4264,6 +4291,63 @@ class BackgroundSchedulerService:
 
         return deleted
 
+    @track_job_metrics("discovery_timeout_sweep")
+    def _run_discovery_timeout_sweep_sync(self):
+        """Sync wrapper for discovery timeout sweep."""
+        try:
+            timed_out = asyncio.run_coroutine_threadsafe(
+                self._run_discovery_timeout_sweep_async(),
+                self._main_loop,
+            ).result(timeout=60)
+            if timed_out:
+                logger.info("[PLS-SWEEP] Timed out %d stale discovering sites", timed_out)
+        except Exception as e:
+            logger.error("Discovery timeout sweep job failed: %s", e)
+
+    async def _run_discovery_timeout_sweep_async(self) -> int:
+        """Transition stale discovering sites to discovery_timed_out.
+
+        Queries site_onboarding_state for entities stuck in 'discovering'
+        longer than the machine-defined timeout (900s) and transitions each
+        via the PLS RPC with actor='scheduler', actor_type='system'.
+
+        Returns:
+            Number of sites successfully timed out.
+        """
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+        cutoff = datetime.now(UTC) - timedelta(seconds=900)
+        timed_out = 0
+
+        try:
+            result = await asyncio.to_thread(
+                lambda: (
+                    sb.table("site_onboarding_state")
+                    .select("site_id, version")
+                    .eq("state", "discovering")
+                    .lt("updated_at", cutoff.isoformat())
+                    .limit(50)
+                    .execute()
+                )
+            )
+        except Exception as e:
+            logger.warning("[PLS-SWEEP] Failed to query stale discovering sites: %s", e)
+            return 0
+
+        for row in result.data or []:
+            site_id = row["site_id"]
+            try:
+                from app.services.site_onboarding_lifecycle import discovery_timeout
+
+                await discovery_timeout(site_id)
+                timed_out += 1
+                logger.info("[PLS-SWEEP] Site %s → discovery_timed_out", site_id)
+            except Exception as e:
+                logger.warning("[PLS-SWEEP] Failed to timeout site %s: %s", site_id, e)
+
+        return timed_out
+
     async def _run_recommendation_expiry_async(self) -> tuple[int, int]:
         """Expire stale pending recommendations and dedup noisy duplicates.
 
@@ -5180,6 +5264,32 @@ class BackgroundSchedulerService:
             coalesce=True,
         )
         logger.info("orphan_alert_cleanup job registered — every %d min", interval_minutes)
+
+    def add_discovery_timeout_sweep_job(self, interval_seconds: int = 300):
+        """Transition stale discovering sites to discovery_timed_out via PLS.
+
+        Scans for site_onboarding_state entries stuck in 'discovering' for
+        longer than the machine-defined 900s timeout. Runs every 5 minutes
+        and uses actor='scheduler', actor_type='system'.
+
+        Args:
+            interval_seconds: How often to run (default 300 = 5 min).
+        """
+        if self.scheduler.get_job("discovery_timeout_sweep"):
+            self.scheduler.remove_job("discovery_timeout_sweep")
+
+        first_run = datetime.now() + timedelta(minutes=1)
+        self.scheduler.add_job(
+            func=self._run_discovery_timeout_sweep_sync,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="discovery_timeout_sweep",
+            name="PLS Discovery Timeout Sweep (5min)",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("discovery_timeout_sweep job registered — every %d s", interval_seconds)
 
     def add_rag_doc_sync_job(self, interval_hours: int = 12):
         """
@@ -9120,6 +9230,36 @@ class BackgroundSchedulerService:
         except Exception as e:
             logger.error("[BACNET-DISCOVERY] Failed for %s: %s", site_id, e, exc_info=True)
 
+    # ------------------------------------------------------------------
+    # Phase C: Progression engine — demotion check (every 12h)
+    # ------------------------------------------------------------------
+
+    def add_progression_demotion_check_job(self, interval_hours: int = 12):
+        """Evaluate all sites for class-level demotion conditions.
+
+        Runs check_demotion_triggers() + apply_demotions() for each site.
+        Registered to fire every `interval_hours` (default 12).
+
+        Args:
+            interval_hours: How often to evaluate (default 12).
+        """
+        from apscheduler.triggers.interval import IntervalTrigger
+
+        job_id = "progression_demotion_check"
+        if self.scheduler.get_job(job_id):
+            self.scheduler.remove_job(job_id)
+            logger.info("Removed existing progression demotion check job")
+
+        self.scheduler.add_job(
+            func=_run_progression_demotion_check_sync,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id=job_id,
+            name="Progression: Demotion Check",
+            replace_existing=True,
+            misfire_grace_time=600,
+        )
+        logger.info("Added progression demotion check job: every %dh", interval_hours)
+
 
 # Sync wrapper — APScheduler passes sync functions to job executors
 @track_job_metrics("compiler_worker")
@@ -9196,6 +9336,61 @@ def _run_rooms_email_intake_poll():
 
 
 @track_job_metrics("daily_health_sweep")
+def _run_progression_demotion_check_sync():
+    """Sync wrapper — check all sites for class demotion conditions.
+
+    APScheduler-compatible module-level function.
+    Calls ProgressionEngineService.check_demotion_triggers() + apply_demotions()
+    for every site with recommendation_class_readiness rows.
+    """
+    import asyncio
+
+    logger = logging.getLogger(__name__)
+
+    async def _run():
+        from app.database.supabase_client import get_supabase_client
+        from app.services.progression_engine_service import (
+            get_progression_engine_service,
+        )
+
+        prog = get_progression_engine_service()
+        sb = get_supabase_client()
+
+        # Fetch distinct sites that have class readiness rows
+        sites_resp = sb.table("recommendation_class_readiness").select("site_id").execute()
+        if not sites_resp.data:
+            logger.debug("Progression demotion check: no sites with class readiness data")
+            return
+
+        site_ids = set(row["site_id"] for row in sites_resp.data)
+        results = {
+            "checked_sites": 0,
+            "demotions_applied": 0,
+            "alerts_sent": 0,
+            "errors": [],
+        }
+
+        for site_id in sorted(site_ids):
+            try:
+                demotions = await prog.check_demotion_triggers(site_id)
+                if demotions:
+                    msg_ids = await prog.apply_demotions(site_id, demotions)
+                    results["demotions_applied"] += len(demotions)
+                    results["alerts_sent"] += len(msg_ids)
+                results["checked_sites"] += 1
+            except Exception as e:
+                results["errors"].append({"site_id": site_id, "error": str(e)})
+                logger.error("Progression demotion check failed for %s: %s", site_id, e)
+
+        logger.info("Progression demotion check complete: %s", results)
+
+    try:
+        asyncio.run(_run())
+    except Exception as e:
+        logger.critical("Progression demotion check job failed: %s", e, exc_info=True)
+        raise
+
+
 def _run_daily_health_sweep_sync():
     """Sync wrapper for daily health sweep — evaluates sites for promotion gates.
 

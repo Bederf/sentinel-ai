@@ -6,7 +6,7 @@ Gracefully falls back to JSON-only when Supabase is unavailable.
 
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -555,9 +555,15 @@ class SecurityRepository:
     # ========================================================================
 
     def get_occupancy(self, site: str) -> dict[str, Any]:
-        """Get current building occupancy from security badge events."""
+        """Get current building occupancy from security badge events.
+
+        Uses cumulative count from midnight (start of day) rather than a
+        30-minute window so that net occupancy accumulates as people arrive
+        throughout the morning. Falls back to 30-minute window if midnight
+        data is unavailable.
+        """
         try:
-            thirty_min_ago = (datetime.now() - timedelta(minutes=30)).isoformat()
+            midnight = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
             zones = [z.get("zone_id") for z in self.get_zones(site) if z.get("zone_id")]
             if not zones:
                 return {"total_occupancy": 0, "last_updated": datetime.now().isoformat()}
@@ -566,7 +572,7 @@ class SecurityRepository:
                 self.client.table("security_badge_events")
                 .select("zone_id,direction,granted,timestamp")
                 .in_("zone_id", zones)
-                .gte("timestamp", thirty_min_ago)
+                .gte("timestamp", midnight)
                 .order("timestamp", desc=True)
                 .execute()
             )

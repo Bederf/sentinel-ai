@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -120,3 +120,46 @@ class TestOEMManualAdapter:
         assert result == b"manual bytes"
         first_eq = mock_db.table.return_value.select.return_value.eq
         assert first_eq.call_args.args == ("source_system", "oem_manual")
+
+    @pytest.mark.asyncio
+    async def test_upsert_manual_with_trigger_index_calls_indexing_service(self):
+        """trigger_index=True calls index_document_by_id after upsert."""
+        doc_id = "00000000-0000-0000-0000-000000000001"
+        with patch("app.services.document_source_adapter._get_supabase"):
+            adapter = OEMManualAdapter()
+            adapter._upsert = AsyncMock(return_value=doc_id)  # type: ignore[misc]
+
+            with patch("app.services.document_indexing_service.DocumentIndexingService") as MockIdxSvc:
+                mock_svc = MagicMock()
+                mock_svc.index_document_by_id = AsyncMock(return_value=MagicMock(status="complete", chunks=2))
+                MockIdxSvc.return_value = mock_svc
+
+                result = await adapter.upsert_manual(
+                    trigger_index=True,
+                    doc_class="site",
+                    site_id="site-002",
+                    equipment_code="S002-CHILLER-B1-001",
+                    equipment_type="chiller",
+                    manufacturer="York",
+                    model="YCIV",
+                )
+
+        assert result == doc_id
+        mock_svc.index_document_by_id.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_upsert_manual_without_trigger_index_skips_indexing(self):
+        """trigger_index=False (default) does not call indexing service."""
+        with patch("app.services.document_source_adapter._get_supabase"):
+            adapter = OEMManualAdapter()
+            adapter._upsert = AsyncMock(return_value="doc-123")  # type: ignore[misc]
+
+            with patch("app.services.document_indexing_service.DocumentIndexingService") as MockIdxSvc:
+                result = await adapter.upsert_manual(
+                    site_id="site-002",
+                    equipment_code="S002-CHILLER-B1-001",
+                    equipment_type="chiller",
+                )
+
+        assert result == "doc-123"
+        MockIdxSvc.assert_not_called()

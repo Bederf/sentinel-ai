@@ -4,7 +4,7 @@ type: "architecture"
 status: "draft"
 version: "1.0.0"
 created: "2026-03-31"
-updated: "2026-03-31"
+updated: "2026-07-10"
 tags: ["sentinel", "documentation"]
 related: []
 domain: "bms"
@@ -36,6 +36,7 @@ Use this table first. It is the single canonical naming reference for document/r
 | Technician Intake Pipeline | Telegram/field raw file intake and metadata capture | "intake RAG", "upload RAG" |
 | Service Sheet OCR Pipeline | OCR extraction of service-sheet images to structured data | "OCR RAG" |
 | Municipal Invoice Processing Pipeline | Municipal invoice parsing and reconciliation flow | "billing RAG", "invoice RAG" |
+| OEM Manual Pipeline | OEM equipment manual ingestion, indexing, and checklist extraction | "manual scraping", "OEM RAG" |
 | Shared Infrastructure | Reusable components used by one or more surfaces | Using infra names as product-surface names |
 
 ### Team usage rule
@@ -312,6 +313,7 @@ Use the following rules when describing a surface:
 - **Technician Intake Pipeline**
 - **Service Sheet OCR Pipeline**
 - **Municipal Invoice Processing Pipeline**
+- **OEM Manual Pipeline** — equipment manual ingestion (Phase 234); indexed and searchable through Canonical Document RAG filters, not a separate retrieval system
 
 ---
 
@@ -324,6 +326,7 @@ Use the following rules when describing a surface:
 - Technician Intake Pipeline
 - Service Sheet OCR Pipeline
 - Municipal Invoice Processing Pipeline
+- OEM Manual Pipeline
 
 ### Avoid
 
