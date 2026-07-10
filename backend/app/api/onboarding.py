@@ -283,6 +283,19 @@ async def commit_bridge_review_mappings(
 
         summary = result.data if isinstance(result.data, dict) else result.data[0]
         summary["equipment_received"] = len(equipment)
+
+        # ── Seed tariff schedule based on site municipality ──────────────
+        try:
+            from app.services.tariff_wizard_service import seed_site_tariff
+
+            tariff_result = await seed_site_tariff(site_id)
+            if tariff_result:
+                summary["tariff_seeded"] = tariff_result.get("tariff_name")
+                logger.info("Tariff seeded for %s: %s", site_id, tariff_result.get("tariff_name"))
+        except Exception as tariff_exc:
+            logger.warning("Tariff seeding skipped for %s: %s", site_id, tariff_exc)
+            summary["tariff_seeded"] = None
+
         return summary
     except HTTPException:
         raise

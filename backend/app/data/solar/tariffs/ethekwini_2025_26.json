@@ -1,0 +1,46 @@
+{
+  "utility": "eThekwini Municipality",
+  "tariff_name": "Bulk Consumer LV Three Phase Demand (TOU)",
+  "effective_date": "2025-07-01",
+  "expiry_date": "2026-06-30",
+  "currency": "ZAR",
+  "vat_inclusive": true,
+  "sseg_feed_in": null,
+  "notes": "Applicable to large consumers >80A/phase, typical for hospitals, industrial sites. NERSA-approved 12.72% increase from 2024/25. Source: EthekwiniTariffApplicationReportA_2025_2026-1.pdf",
+  "energy_charge_c_kwh": {
+    "winter": {
+      "peak": 805.01,
+      "standard": 307.95,
+      "off_peak": 164.57
+    },
+    "summer": {
+      "peak": 637.53,
+      "standard": 285.41,
+      "off_peak": 164.57
+    }
+  },
+  "demand_charge_r_kva": {
+    "winter": 106.31,
+    "summer": 106.31
+  },
+  "network_access_charge_r_kva": {
+    "winter": 55.86,
+    "summer": 55.86
+  },
+  "fixed_charge_r_month": 4436.70,
+  "service_charge_r_month": 0,
+  "voltage_rebate_pct": 2.0,
+  "voltage_rebate_threshold_v": 1000,
+  "time_bands": {
+    "winter": {
+      "peak": ["07:00-10:00", "18:00-20:00"],
+      "standard": ["06:00-07:00", "10:00-18:00", "20:00-22:00"],
+      "off_peak": ["22:00-06:00", "weekend"]
+    },
+    "summer": {
+      "peak": ["07:00-10:00", "18:00-20:00"],
+      "standard": ["06:00-07:00", "10:00-18:00", "20:00-22:00"],
+      "off_peak": ["22:00-06:00", "weekend"]
+    }
+  }
+}

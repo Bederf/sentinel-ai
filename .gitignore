@@ -137,3 +137,6 @@ backend/app/data/bacnet_audit/*.jsonl
 .serena/
 site_id Building Document Sub Class Docu.tsv
 *.bak
+
+# Runtime artifact — created by TariffScheduleRepository when Supabase unavailable
+municipal_tariff_schedules.json
