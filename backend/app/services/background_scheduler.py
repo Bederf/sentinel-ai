@@ -4348,6 +4348,96 @@ class BackgroundSchedulerService:
 
         return timed_out
 
+    @track_job_metrics("onboarding_integrity_sweep")
+    def _run_integrity_sweep_sync(self):
+        """Sync wrapper for PLS integrity sweep."""
+        try:
+            divergent = asyncio.run_coroutine_threadsafe(
+                self._run_integrity_sweep_async(),
+                self._main_loop,
+            ).result(timeout=120)
+            if divergent:
+                logger.critical("[INTEGRITY-SWEEP] %d site(s) with PLS replay divergence! Alerts created.", divergent)
+        except Exception as e:
+            logger.error("PLS integrity sweep job failed: %s", e)
+
+    async def _run_integrity_sweep_async(self) -> int:
+        """Verify PLS replay integrity for all sites.
+
+        Calls check_onboarding_integrity() RPC which compares entity state
+        against replay-derived state for every site in site_onboarding_state.
+
+        If any row is returned, the entity and replay have diverged —
+        that is a platform integrity incident. A CRITICAL alert is created
+        for each divergent site.
+
+        Returns:
+            Number of divergent sites found.
+        """
+        from app.database.supabase_client import get_supabase_client
+
+        sb = get_supabase_client()
+
+        try:
+            result = await asyncio.to_thread(lambda: sb.rpc("check_onboarding_integrity").execute())
+        except Exception as e:
+            logger.warning("[INTEGRITY-SWEEP] Integrity check query failed: %s", e)
+            return 0
+
+        rows = result.data or []
+        if not rows:
+            logger.info("[INTEGRITY-SWEEP] All sites pass replay integrity ✅")
+            return 0
+
+        logger.critical(
+            "[INTEGRITY-SWEEP] REPLAY DIVERGENCE: %d site(s)",
+            len(rows),
+        )
+
+        # Resolve site codes to UUIDs for alert creation
+        site_codes = [r["site_id"] for r in rows]
+        try:
+            site_map_result = await asyncio.to_thread(
+                lambda: sb.table("sites").select("code, id").in_("code", site_codes).execute()
+            )
+            site_uuid_map = {r["code"]: r["id"] for r in site_map_result.data or []}
+        except Exception as e:
+            logger.warning("[INTEGRITY-SWEEP] Failed to resolve site UUIDs: %s", e)
+            site_uuid_map = {}
+
+        alert_count = 0
+        for row in rows:
+            site_id = row["site_id"]
+            site_uuid = site_uuid_map.get(site_id)
+            divergence = "STATE_MISMATCH" if row["recorded_state"] != row["replayed_state"] else "VERSION_MISMATCH"
+            try:
+                alert_payload = {
+                    "site_id": site_uuid,
+                    "type": "system",
+                    "severity": "critical",
+                    "status": "active",
+                    "title": f"PLS Replay Divergence: {site_id}",
+                    "message": (
+                        f"Site {site_id}: recorded state={row['recorded_state']} (v{row['recorded_version']}), "
+                        f"replayed state={row['replayed_state']} (v{row['replayed_version']}). "
+                        f"Divergence: {divergence}. "
+                        f"Entity state and transition log are out of sync — "
+                        f"this is a platform integrity incident."
+                    ),
+                    "source": "pls_integrity_sweep",
+                    "source_dedupe_key": f"integrity-{site_id}-{row['recorded_version']}",
+                }
+                def _insert_alert(p: dict) -> Any:
+                    return sb.table("alerts").insert(p).execute()
+
+                await asyncio.to_thread(_insert_alert, alert_payload)
+                alert_count += 1
+                logger.error("[INTEGRITY-SWEEP] Created alert for %s: %s", site_id, divergence)
+            except Exception as e:
+                logger.warning("[INTEGRITY-SWEEP] Failed to create alert for %s: %s", site_id, e)
+
+        return alert_count
+
     async def _run_recommendation_expiry_async(self) -> tuple[int, int]:
         """Expire stale pending recommendations and dedup noisy duplicates.
 
@@ -5290,6 +5380,33 @@ class BackgroundSchedulerService:
             coalesce=True,
         )
         logger.info("discovery_timeout_sweep job registered — every %d s", interval_seconds)
+
+    def add_integrity_sweep_job(self, interval_hours: int = 6):
+        """Verify PLS replay integrity for all sites.
+
+        Runs the check_onboarding_integrity() function against every site
+        in site_onboarding_state. If replay diverges from entity state,
+        creates a CRITICAL alert per divergent site and logs a Sentry
+        incident. This is the governance observation mechanism (INV-9).
+
+        Args:
+            interval_hours: How often to run (default 6).
+        """
+        if self.scheduler.get_job("onboarding_integrity_sweep"):
+            self.scheduler.remove_job("onboarding_integrity_sweep")
+
+        first_run = datetime.now() + timedelta(minutes=3)
+        self.scheduler.add_job(
+            func=self._run_integrity_sweep_sync,
+            trigger=IntervalTrigger(hours=interval_hours),
+            id="onboarding_integrity_sweep",
+            name="PLS Integrity Sweep (6h)",
+            replace_existing=True,
+            next_run_time=first_run,
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info("onboarding_integrity_sweep job registered — every %d h", interval_hours)
 
     def add_rag_doc_sync_job(self, interval_hours: int = 12):
         """

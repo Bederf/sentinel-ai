@@ -722,6 +722,13 @@ async def startup_event(_: FastAPI) -> None:
     except Exception as e:
         _logger.warning(f"⚠️ PLS discovery timeout sweep initialization failed: {e}")
 
+    # PLS integrity sweep — verify replay vs entity state divergence (INV-9)
+    try:
+        scheduler_service.add_integrity_sweep_job(interval_hours=6)
+        _logger.info("✅ PLS integrity sweep initialized (every 6 h)")
+    except Exception as e:
+        _logger.warning(f"⚠️ PLS integrity sweep initialization failed: {e}")
+
     # Morning recommendation digest — top 5 pending by severity, sent to FM Telegram at 07:00 SAST Mon-Fri
     try:
         scheduler_service.add_recommendation_digest_job()

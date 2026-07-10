@@ -315,6 +315,8 @@ CREATE OR REPLACE FUNCTION public.site_onboarding_replay(
 RETURNS TABLE (state TEXT, version BIGINT)
 LANGUAGE plpgsql
 STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
 AS $$
 DECLARE
     v_last_state TEXT;
@@ -682,5 +684,35 @@ BEGIN
     END IF;
 END;
 $$;
+
+-- Runtime integrity check function for the recurring sweep
+CREATE OR REPLACE FUNCTION public.check_onboarding_integrity()
+RETURNS TABLE(
+    site_id TEXT,
+    recorded_state TEXT,
+    recorded_version BIGINT,
+    replayed_state TEXT,
+    replayed_version BIGINT
+)
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+BEGIN
+    RETURN QUERY
+    SELECT o.site_id::text,
+           o.state::text,
+           o.version::bigint,
+           r.state::text,
+           r.version::bigint
+    FROM site_onboarding_state o
+    CROSS JOIN LATERAL site_onboarding_replay(o.site_id) r
+    WHERE o.state <> r.state OR o.version <> r.version
+    ORDER BY o.site_id;
+END;
+$function$;
+
+GRANT EXECUTE ON FUNCTION public.check_onboarding_integrity() TO service_role;
 
 COMMIT;
