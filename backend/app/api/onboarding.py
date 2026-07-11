@@ -241,7 +241,9 @@ async def commit_bridge_review_mappings(
     try:
         _validate_discovery_session(site_id, resolved_discovery_id)
     except HTTPException:
-        logger.error("commit_bridge_review: discovery validation failed for %s (discovery_id=%s)", site_id, resolved_discovery_id)
+        logger.error(
+            "commit_bridge_review: discovery validation failed for %s (discovery_id=%s)", site_id, resolved_discovery_id
+        )
         raise
 
     try:
@@ -250,7 +252,11 @@ async def commit_bridge_review_mappings(
         client = get_supabase_client()
         equipment = body.mappings.get("equipment") if isinstance(body.mappings, dict) else None
         if not isinstance(equipment, list):
-            logger.error("commit_bridge_review: mappings missing equipment list for %s (mappings keys: %s)", site_id, list(body.mappings.keys()) if isinstance(body.mappings, dict) else type(body.mappings).__name__)
+            logger.error(
+                "commit_bridge_review: mappings missing equipment list for %s (mappings keys: %s)",
+                site_id,
+                list(body.mappings.keys()) if isinstance(body.mappings, dict) else type(body.mappings).__name__,
+            )
             raise HTTPException(status_code=400, detail="Bridge review mappings must include equipment[]")
 
         # Build equipment array for RPC
@@ -363,12 +369,47 @@ async def ingest_onboarding_hierarchy(
     _check_site_access(auth, site_id)
     try:
         service = OnboardingHierarchyService()
-        return await service.ingest_site_hierarchy(
+        result = await service.ingest_site_hierarchy(
             site_id,
             hierarchy=body.hierarchy,
             commit=body.commit,
             auto_fetch=body.auto_fetch,
         )
+
+        # If hierarchy ingested successfully, check acceptance gates and
+        # auto-enable processing if all pass.
+        if body.commit or body.auto_fetch:
+            try:
+                from app.services.wizard_acceptance_gates import evaluate as check_gates
+                from app.database.supabase_client import get_supabase_client
+
+                gate_result = await check_gates(site_id)
+                if gate_result.all_passed:
+                    sb = get_supabase_client()
+                    sb.table("sites").update(
+                        {
+                            "sentinel_processing_enabled": True,
+                            "ml_training_enabled": True,
+                        }
+                    ).eq("code", site_id).execute()
+                    logger.info(
+                        "All gates passed for %s — sentinel_processing_enabled + ml_training_enabled auto-set",
+                        site_id,
+                    )
+                    result["processing_enabled"] = True
+                else:
+                    logger.info(
+                        "Acceptance gates not yet all passed for %s — processing remains disabled",
+                        site_id,
+                    )
+                    result["processing_enabled"] = False
+                    result["gate_results"] = [
+                        {"name": g.name, "passed": g.passed, "reason": g.reason} for g in gate_result.gates
+                    ]
+            except Exception as gate_err:
+                logger.warning("Gate check after hierarchy ingestion failed for %s: %s", site_id, gate_err)
+
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:

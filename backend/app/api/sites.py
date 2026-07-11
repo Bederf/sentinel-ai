@@ -1048,8 +1048,33 @@ async def create_site(request: CreateSiteRequest) -> CreateSiteResponse:
                     "onboarding_phase": "commissioning",
                     "sentinel_processing_enabled": False,
                 }
-                client.table("sites").insert(site_record).execute()
+                result = client.table("sites").insert(site_record).execute()
+                site_uuid = result.data[0]["id"] if result.data else None
                 logger.info(f"Created building in Supabase: {site_id}")
+
+                # Auto-create zone records for each floor
+                if site_uuid and request.floors:
+                    zone_type = "clinical" if request.type == "hospital" else "open_office"
+                    zone_rows = []
+                    for floor in request.floors:
+                        floor_clean = floor.strip()
+                        if not floor_clean:
+                            continue
+                        zone_rows.append(
+                            {
+                                "site_id": site_uuid,
+                                "zone_id": floor_clean,
+                                "zone_name": f"Floor {floor_clean}",
+                                "floor": floor_clean,
+                                "zone_type": zone_type,
+                            }
+                        )
+                    if zone_rows:
+                        try:
+                            client.table("zones").insert(zone_rows).execute()
+                            logger.info("Created %d zone records for %s", len(zone_rows), site_id)
+                        except Exception as zone_err:
+                            logger.warning("Zone auto-creation failed for %s: %s", site_id, zone_err)
 
                 # Auto-seed municipal tariff schedule + account based on region
                 _seed_municipal_tariff_and_account(client, site_id, request.region)
