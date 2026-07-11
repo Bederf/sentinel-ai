@@ -287,21 +287,89 @@ class SentinelDataSync:
                         raise ValueError("DATABASE_URL not set (settings.database_url empty, env var missing)")
                     if persisted_hours is None:
                         raise ValueError("persisted_hours unavailable — calculate_actual_ml_hours failed")
+
                     conn = psycopg2.connect(database_url)
-                    conn.autocommit = True
+                    # Explicit transactions, not autocommit — allows rollback on error
+                    conn.autocommit = False
                     cur = conn.cursor()
-                    cur.execute(
-                        """
-                        UPDATE sites SET ml_hours_ingested = %s, updated_at = now()
-                        WHERE code = %s
-                        """,
-                        (persisted_hours, site_code_for_persist),
-                    )
-                    cur.close()
-                    conn.close()
-                    logger.info(
-                        f"[ML FEEDER] Persisted ml_hours_ingested={persisted_hours:.1f} (counter={self.ml_feeder.hours_ingested}) for site {self.site_id}"
-                    )
+
+                    try:
+                        # Query 1: Get latest telemetry timestamp
+                        cur.execute(
+                            "SELECT MAX(hour_bucket) FROM telemetry_hourly WHERE site_id = %s",
+                            (site_code_for_persist,),
+                        )
+                        latest_telemetry = cur.fetchone()[0]
+
+                        # Query 2: Get current ml_hours and accounted_until (for gate + audit trail)
+                        cur.execute(
+                            "SELECT ml_hours_ingested, ml_hours_accounted_until FROM sites WHERE code = %s",
+                            (site_code_for_persist,),
+                        )
+                        result = cur.fetchone()
+                        current_hours = result[0] if result else 0.0
+                        current_accounted = result[1] if result else None
+
+                        # Gate: persist only if new telemetry exists AND is newer than last checkpoint
+                        has_new_telemetry = latest_telemetry is not None and (
+                            current_accounted is None or latest_telemetry > current_accounted
+                        )
+
+                        if has_new_telemetry:
+                            # UPDATE sites: both ml_hours_ingested and accounted_until
+                            cur.execute(
+                                """
+                                UPDATE sites
+                                SET ml_hours_ingested = %s, ml_hours_accounted_until = %s, updated_at = now()
+                                WHERE code = %s
+                                """,
+                                (persisted_hours, latest_telemetry, site_code_for_persist),
+                            )
+
+                            # Log audit event with ACTUAL prior values (not hardcoded null)
+                            cur.execute(
+                                """
+                                INSERT INTO audit_log (timestamp, user_id, action, entity_type, entity_id,
+                                                      old_value, new_value, result)
+                                SELECT now(), %s, %s, %s, id,
+                                       jsonb_build_object('ml_hours_ingested', %s::numeric,
+                                                         'ml_hours_accounted_until', %s::text),
+                                       jsonb_build_object('ml_hours_ingested', %s::numeric,
+                                                         'ml_hours_accounted_until', %s::text),
+                                       %s
+                                FROM sites WHERE code = %s
+                                """,
+                                (
+                                    "system:ml-feeder",
+                                    "ml_hours_persisted",
+                                    "sites",
+                                    current_hours,  # Actual prior value (not hardcoded)
+                                    str(current_accounted),  # Actual prior value
+                                    persisted_hours,  # New value
+                                    str(latest_telemetry),  # New value
+                                    "success",
+                                    site_code_for_persist,
+                                ),
+                            )
+
+                            conn.commit()
+                            logger.info(
+                                f"[ML FEEDER] Persisted ml_hours_ingested={persisted_hours:.1f} "
+                                f"(accounted_until={latest_telemetry}) for site {self.site_id}"
+                            )
+                        else:
+                            logger.debug(
+                                f"[ML FEEDER] No new telemetry for {self.site_id} "
+                                f"(latest={latest_telemetry}, accounted={current_accounted}) — skipping persist"
+                            )
+                            conn.commit()  # No changes, but commit to end transaction
+                    except Exception as e:
+                        conn.rollback()  # Rollback on any error (UPDATE or INSERT failure)
+                        logger.error(f"[ML FEEDER] Transaction failed for {self.site_id}: {e}")
+                        raise
+                    finally:
+                        cur.close()
+                        conn.close()
                 except Exception as e:
                     logger.warning(f"[ML FEEDER] Could not persist ml_hours_ingested: {e}")
                     persisted_hours = None  # ensure scoring is also skipped

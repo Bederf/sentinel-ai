@@ -1018,29 +1018,20 @@ class SentinelMLFeeder:
         return results
 
     async def calculate_actual_ml_hours(self, site_id: str) -> float:
-        """Calculate cumulative ML training hours, surviving restarts.
+        """Calculate ML training hours based on incorporated telemetry evidence.
 
-        Reads the last persisted ml_hours_ingested from the sites table as the
-        cumulative base, then adds wall-clock time since this process started.
-        This compounds across restarts and is NOT capped by the 24h retention
-        on equipment_sensor_readings.
+        Does NOT accrue on wall-clock or process uptime.
+        Only accrues when new telemetry has arrived since last incorporation.
+
+        Implements Invariant I-1: No capability increases from elapsed time alone.
 
         Args:
             site_id: Site identifier (canonical format: 'site-002').
 
         Returns:
-            Cumulative hours of telemetry collection, or raises RuntimeError
-            if the DB read fails. We never fall back to the in-memory counter
-            on DB failure — for a fresh process that counter is 0, and a
-            silent reset to 0 would corrupt the persisted value on the
-            next persist call.
+            Cumulative learning hours (telemetry incorporation window, not process runtime).
+            Raises RuntimeError if DB read fails.
         """
-        if not hasattr(self, "_ml_session_start"):
-            self._ml_session_start = datetime.utcnow()
-
-        # Per CLAUDE.md: APScheduler subprocess contexts don't inherit env
-        # vars. Use the settings singleton (loaded from .env at import time)
-        # so the writer works in both the main process and any subprocess.
         from app.config.settings import settings
 
         database_url = settings.database_url or os.getenv("DATABASE_URL", "")
@@ -1048,8 +1039,7 @@ class SentinelMLFeeder:
             raise RuntimeError(
                 f"[ML FEEDER] Cannot calculate actual ML hours for {site_id}: "
                 "DATABASE_URL is not configured (settings.database_url empty, "
-                "DATABASE_URL env var missing). Refusing to fall back to "
-                "in-memory counter — would silently reset the persisted value."
+                "DATABASE_URL env var missing)."
             )
 
         site_code = site_id
@@ -1065,36 +1055,73 @@ class SentinelMLFeeder:
 
         try:
             cur = conn.cursor()
+
+            # Read current accumulated hours and the evidence incorporation timestamp.
             cur.execute(
-                "SELECT ml_hours_ingested FROM sites WHERE code = %s",
+                "SELECT ml_hours_ingested, ml_hours_accounted_until FROM sites WHERE code = %s",
                 (site_code,),
             )
             row = cur.fetchone()
-            cur.close()
-            if row and row[0] is not None:
-                base_hours = float(row[0])
-                session_delta = (datetime.utcnow() - self._ml_session_start).total_seconds() / 3600.0
-                total = base_hours + session_delta
-                logger.info(
-                    "[ML FEEDER] Cumulative ML hours for %s: %.1fh (base=%.1f + session=%.1f)",
-                    site_id,
-                    total,
-                    base_hours,
-                    session_delta,
-                )
-                return total
-            # No persisted base yet (first-ever call for this site) — return
-            # the session delta from process start so the very first
-            # persist writes a sensible value. This is the ONLY place we
-            # trust the in-memory counter, and only when the DB has no row
-            # to contradict it.
-            session_delta = (datetime.utcnow() - self._ml_session_start).total_seconds() / 3600.0
-            logger.info(
-                "[ML FEEDER] No persisted ml_hours_ingested for %s — returning session_delta=%.2fh as initial value",
-                site_id,
-                session_delta,
+
+            if not row:
+                raise RuntimeError(f"Site {site_code} not found")
+
+            base_hours = float(row[0]) if row[0] else 0.0
+            accounted_until = row[1]
+
+            # Find the newest telemetry timestamp for this site (evidence incorporation point).
+            cur.execute(
+                "SELECT MAX(hour_bucket) FROM telemetry_hourly WHERE site_id = %s",
+                (site_code,),
             )
-            return session_delta
+            latest_telemetry = cur.fetchone()[0]
+
+            if latest_telemetry is None:
+                logger.info(
+                    "[ML FEEDER] No telemetry for %s, returning base hours %.1fh",
+                    site_id,
+                    base_hours,
+                )
+                cur.close()
+                return base_hours
+
+            # Calculate delta only from evidence incorporation point to latest evidence.
+            if accounted_until is None:
+                # First time: use Method A (distinct observed hours from telemetry start to now).
+                cur.execute(
+                    "SELECT COUNT(DISTINCT hour_bucket) FROM telemetry_hourly WHERE site_id = %s",
+                    (site_code,),
+                )
+                delta_hours = float(cur.fetchone()[0] or 0)
+                logger.info(
+                    "[ML FEEDER] %s: First calculation (no accounted_until). Method A (distinct hours) = %.1fh",
+                    site_id,
+                    delta_hours,
+                )
+            else:
+                # Subsequent: delta using Method A (count new distinct hours since accounted_until).
+                cur.execute(
+                    "SELECT COUNT(DISTINCT hour_bucket) FROM telemetry_hourly WHERE site_id = %s AND hour_bucket > %s",
+                    (site_code, accounted_until),
+                )
+                new_distinct_hours = float(cur.fetchone()[0] or 0)
+                delta_hours = new_distinct_hours
+                logger.info(
+                    "[ML FEEDER] %s: Method A (new distinct hours since %s) = %.1fh",
+                    site_id,
+                    accounted_until,
+                    delta_hours,
+                )
+
+            total = base_hours + delta_hours
+            logger.info(
+                "[ML FEEDER] Cumulative ML hours for %s: %.1fh (base=%.1f + delta=%.1f)",
+                site_id,
+                total,
+                base_hours,
+                delta_hours,
+            )
+            return total
         finally:
             conn.close()
 
