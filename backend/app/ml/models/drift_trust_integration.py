@@ -248,3 +248,90 @@ def extract_equipment_verdicts_from_db(
             verdicts[eq_type] = ("UNEVALUABLE", None)
 
     return verdicts
+
+
+def query_drift_detection_log_latest_per_equipment(
+    site_id: str,
+    equipment_types: list[str] | None = None,
+) -> dict[str, dict]:
+    """Query drift_detection_log for latest verdicts per equipment.
+
+    Plan 2 helper: used by sustained drift demotion check to find all equipment
+    with DRIFT_DETECTED verdict and their timestamp for age calculation.
+
+    Args:
+        site_id: Site identifier
+        equipment_types: Optional list of equipment types to query. If None,
+                        queries all types: chiller, ahu, fcu, vav, generator, ups, pump
+
+    Returns:
+        Dict mapping equipment_type → {verdict, created_at, baseline_id}
+        e.g., {"chiller": {"verdict": "DRIFT_DETECTED", "created_at": "2026-07-13T...", ...}}
+    """
+    if equipment_types is None:
+        equipment_types = ["chiller", "ahu", "fcu", "vav", "generator", "ups", "pump"]
+
+    verdicts: dict[str, dict] = {}
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        if not client:
+            logger.warning("[DRIFT→TRUST] Supabase client unavailable for site %s", site_id)
+            return verdicts
+    except Exception as e:
+        logger.error("[DRIFT→TRUST] Failed to load Supabase client: %s", e)
+        return verdicts
+
+    # Query all recent verdicts and deduplicate client-side to latest per type
+    try:
+        result = (
+            client.table("drift_detection_log")
+            .select("equipment_type, verdict, recorded_at, baseline_id")
+            .eq("site_id", site_id)
+            .order("recorded_at", desc=True)
+            .limit(500)  # Get enough to ensure we have latest per type
+            .execute()
+        )
+
+        if not result.data:
+            logger.debug("[DRIFT→TRUST] No drift detection log entries found for %s", site_id)
+            return verdicts
+
+        # Deduplicate to latest per type
+        for row in result.data:
+            eq_type = row.get("equipment_type", "unknown")
+            if eq_type not in verdicts:  # First (most recent) per type
+                verdicts[eq_type] = {
+                    "verdict": row.get("verdict", "UNEVALUABLE"),
+                    "created_at": row.get("recorded_at"),
+                    "baseline_id": row.get("baseline_id"),
+                }
+                logger.debug(
+                    "[DRIFT→TRUST] Site %s, %s: verdict=%s, recorded_at=%s",
+                    site_id,
+                    eq_type,
+                    verdicts[eq_type]["verdict"],
+                    verdicts[eq_type]["created_at"],
+                )
+
+    except Exception as e:
+        logger.error("[DRIFT→TRUST] Failed to fetch drift verdicts for %s: %s", site_id, e)
+
+    return verdicts
+
+
+def count_drifting_equipment(verdicts: dict[str, dict]) -> int:
+    """Count equipment with DRIFT_DETECTED verdict.
+
+    Plan 2 helper: used by sustained drift demotion check to report
+    how many equipment are showing drift when demotion occurs.
+
+    Args:
+        verdicts: Dict mapping equipment_type → {verdict, created_at, ...}
+
+    Returns:
+        Count of equipment with verdict == "DRIFT_DETECTED"
+    """
+    return sum(1 for v in verdicts.values() if v.get("verdict", "").upper() == "DRIFT_DETECTED")

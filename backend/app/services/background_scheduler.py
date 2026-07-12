@@ -4427,6 +4427,7 @@ class BackgroundSchedulerService:
                     "source": "pls_integrity_sweep",
                     "source_dedupe_key": f"integrity-{site_id}-{row['recorded_version']}",
                 }
+
                 def _insert_alert(p: dict) -> Any:
                     return sb.table("alerts").insert(p).execute()
 
@@ -5782,6 +5783,375 @@ class BackgroundSchedulerService:
 
         except Exception as e:
             logger.error(f"Failed to run ML model retraining check: {e}", exc_info=True)
+
+    def add_sustained_drift_demotion_job(self, interval_seconds: int = 3600):
+        """
+        Add a job to monitor for sustained drift and auto-demote sites to advisory.
+
+        Detects when equipment shows DRIFT_DETECTED verdict for ≥24 hours and
+        automatically demotes the site to advisory (safe mode) to prevent further
+        autonomous execution of models that are degrading.
+
+        Runs every hour to catch sustained drift early before it impacts decisions.
+
+        Args:
+            interval_seconds: How often to check for sustained drift (default: 3600 = 1 hour)
+        """
+        # Remove existing job if it exists
+        if self.scheduler.get_job("sustained_drift_demotion_check"):
+            self.scheduler.remove_job("sustained_drift_demotion_check")
+            logger.info("Removed existing sustained drift demotion job")
+
+        # Add new job
+        self.scheduler.add_job(
+            func=self._run_sustained_drift_demotion_check,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="sustained_drift_demotion_check",
+            name="Sustained Drift Demotion Check",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
+        logger.info(f"Added sustained drift demotion job with {interval_seconds}s interval")
+
+    @track_job_metrics("sustained_drift_demotion_check")
+    def _run_sustained_drift_demotion_check(self):
+        """
+        Check each site for equipment with sustained DRIFT_DETECTED ≥24 hours.
+
+        If found, demote site to advisory mode with audit trail.
+        Idempotency check: skip if site was demoted due to drift in last 1 hour.
+        """
+        if self._shutdown_requested.is_set():
+            logger.info("Skipping sustained drift demotion check during scheduler shutdown")
+            return
+
+        try:
+            from app.core.site_resolver import get_registered_site_ids
+            from app.database.supabase_client import get_supabase_client
+
+            logger.debug("Running sustained drift demotion check...")
+
+            sites = get_registered_site_ids()
+            client = get_supabase_client()
+
+            if not client:
+                logger.warning("Supabase client unavailable for sustained drift demotion check")
+                return
+
+            demoted_count = 0
+
+            for site_id in sites:
+                try:
+                    # Check if drift is sustained (≥24h DRIFT_DETECTED)
+                    is_sustained = self._is_drift_sustained(site_id, client)
+
+                    if not is_sustained:
+                        logger.debug(
+                            "[DRIFT-DEMOTION] Site %s: no sustained drift detected (threshold: 24h)",
+                            site_id,
+                        )
+                        continue
+
+                    # Idempotency check: was site already demoted for drift recently?
+                    already_demoted = self._check_recent_drift_demotion(site_id, client)
+
+                    if already_demoted:
+                        logger.debug(
+                            "[DRIFT-DEMOTION] Site %s: already demoted for drift in last 1 hour, skipping",
+                            site_id,
+                        )
+                        continue
+
+                    # Count drifting equipment
+                    drift_count, verdicts = self._count_drifting_equipment(site_id, client)
+
+                    # Proceed with demotion
+                    self._demote_site_on_drift(site_id, drift_count, verdicts, client)
+                    demoted_count += 1
+
+                except Exception as site_err:
+                    logger.warning(
+                        "[DRIFT-DEMOTION] Check failed for %s: %s",
+                        site_id,
+                        site_err,
+                        exc_info=True,
+                    )
+
+            if demoted_count > 0:
+                logger.warning(
+                    "[DRIFT-DEMOTION] Completed: demoted %d site(s) due to sustained drift",
+                    demoted_count,
+                )
+            else:
+                logger.debug("[DRIFT-DEMOTION] No sites required demotion")
+
+        except Exception as e:
+            logger.error(
+                "[DRIFT-DEMOTION] Sustained drift demotion check failed: %s",
+                e,
+                exc_info=True,
+            )
+
+    def _is_drift_sustained(self, site_id: str, client) -> bool:
+        """
+        Return True if any equipment at site shows DRIFT_DETECTED for ≥24 hours.
+
+        Queries drift_detection_log for latest verdict per equipment type.
+        Checks if any verdict is DRIFT_DETECTED and older than 24 hours.
+        """
+        try:
+            # Get latest verdict for each equipment type
+            result = (
+                client.table("drift_detection_log")
+                .select("equipment_type, verdict, recorded_at")
+                .eq("site_id", site_id)
+                .order("recorded_at", desc=True)
+                .limit(50)  # Get enough to find latest per type
+                .execute()
+            )
+
+            if not result.data:
+                return False
+
+            # Deduplicate to get latest per equipment type
+            latest_per_type = {}
+            for row in result.data:
+                eq_type = row.get("equipment_type", "unknown")
+                if eq_type not in latest_per_type:
+                    latest_per_type[eq_type] = row
+
+            # Check if any equipment has DRIFT_DETECTED for ≥24h
+            now = datetime.now(UTC)
+            threshold_hours = 24
+
+            for eq_type, verdict_row in latest_per_type.items():
+                verdict = verdict_row.get("verdict", "").upper()
+                recorded_at_str = verdict_row.get("recorded_at")
+
+                if verdict != "DRIFT_DETECTED":
+                    continue
+
+                try:
+                    if isinstance(recorded_at_str, str):
+                        recorded_at = datetime.fromisoformat(recorded_at_str.replace("Z", "+00:00")).replace(tzinfo=UTC)
+                    else:
+                        recorded_at = recorded_at_str
+
+                    age_hours = (now - recorded_at).total_seconds() / 3600.0
+
+                    logger.debug(
+                        "[DRIFT-DEMOTION] Site %s, %s: DRIFT_DETECTED for %.1fh (threshold: %dh)",
+                        site_id,
+                        eq_type,
+                        age_hours,
+                        threshold_hours,
+                    )
+
+                    if age_hours >= threshold_hours:
+                        logger.info(
+                            "[DRIFT-DEMOTION] Site %s: sustained drift detected in %s (%.1fh old)",
+                            site_id,
+                            eq_type,
+                            age_hours,
+                        )
+                        return True
+
+                except (ValueError, TypeError) as parse_err:
+                    logger.warning(
+                        "[DRIFT-DEMOTION] Failed to parse recorded_at for %s/%s: %s",
+                        site_id,
+                        eq_type,
+                        parse_err,
+                    )
+
+            return False
+
+        except Exception as e:
+            logger.warning(
+                "[DRIFT-DEMOTION] Failed to check drift sustained for %s: %s",
+                site_id,
+                e,
+            )
+            return False
+
+    def _check_recent_drift_demotion(self, site_id: str, client) -> bool:
+        """
+        Return True if site was demoted for drift in last 1 hour (idempotency).
+
+        Queries phase_transition_log for recent demotion with drift-related reason.
+        """
+        try:
+            one_hour_ago = (datetime.now(UTC) - timedelta(hours=1)).isoformat()
+
+            result = (
+                client.table("phase_transition_log")
+                .select("id")
+                .eq("site_id", site_id)
+                .like("reason", "%sustained_drift%")
+                .gte("created_at", one_hour_ago)
+                .limit(1)
+                .execute()
+            )
+
+            return bool(result.data)
+
+        except Exception as e:
+            logger.warning(
+                "[DRIFT-DEMOTION] Failed to check recent demotion for %s: %s",
+                site_id,
+                e,
+            )
+            return False
+
+    def _count_drifting_equipment(self, site_id: str, client) -> tuple[int, list[str]]:
+        """
+        Count equipment with DRIFT_DETECTED verdict.
+
+        Returns:
+            (count, verdicts) where verdicts is list of equipment types with DRIFT_DETECTED
+        """
+        try:
+            result = (
+                client.table("drift_detection_log")
+                .select("equipment_type, verdict, recorded_at")
+                .eq("site_id", site_id)
+                .order("recorded_at", desc=True)
+                .limit(50)
+                .execute()
+            )
+
+            if not result.data:
+                return 0, []
+
+            # Deduplicate to latest per type
+            latest_per_type = {}
+            for row in result.data:
+                eq_type = row.get("equipment_type", "unknown")
+                if eq_type not in latest_per_type:
+                    latest_per_type[eq_type] = row
+
+            # Count DRIFT_DETECTED
+            drifting = [
+                eq_type
+                for eq_type, verdict_row in latest_per_type.items()
+                if verdict_row.get("verdict", "").upper() == "DRIFT_DETECTED"
+            ]
+
+            return len(drifting), drifting
+
+        except Exception as e:
+            logger.warning(
+                "[DRIFT-DEMOTION] Failed to count drifting equipment for %s: %s",
+                site_id,
+                e,
+            )
+            return 0, []
+
+    def _demote_site_on_drift(self, site_id: str, drift_count: int, drifting_equipment: list, client):
+        """
+        Atomically demote site to advisory and create audit trail.
+
+        Updates sites.onboarding_phase and creates phase_transition_log entry.
+        """
+        try:
+            from app.models.notification import AlertLevel
+            from app.services.notification_service import notification_service
+
+            # Get current phase
+            site_result = client.table("sites").select("onboarding_phase").eq("code", site_id).execute()
+
+            if not site_result.data:
+                logger.warning("[DRIFT-DEMOTION] Site %s not found in sites table", site_id)
+                return
+
+            current_phase = site_result.data[0].get("onboarding_phase")
+
+            # Don't demote if already in advisory (lowest safe phase)
+            if current_phase == "advisory":
+                logger.debug("[DRIFT-DEMOTION] Site %s already in advisory mode", site_id)
+                return
+
+            # Write audit entry
+            try:
+                client.table("phase_transition_log").insert(
+                    {
+                        "site_id": site_id,
+                        "from_phase": current_phase,
+                        "to_phase": "advisory",
+                        "changed_by": "system",
+                        "reason": "sustained_drift_degradation",
+                        "drift_verdict": "DRIFT_DETECTED",
+                        "drift_equipment_count": drift_count,
+                        "trust_delta": -0.2,  # Trust penalty for sustained drift
+                    }
+                ).execute()
+                logger.debug("[DRIFT-DEMOTION] Recorded phase transition for %s", site_id)
+            except Exception as audit_err:
+                logger.warning(
+                    "[DRIFT-DEMOTION] Failed to write phase_transition_log for %s: %s",
+                    site_id,
+                    audit_err,
+                )
+                # Don't fail the whole operation if audit fails
+                pass
+
+            # Update site phase
+            try:
+                client.table("sites").update({"onboarding_phase": "advisory"}).eq("code", site_id).execute()
+                logger.warning(
+                    "[DRIFT-DEMOTION] Site %s demoted to advisory: sustained drift detected (%d equipment)",
+                    site_id,
+                    drift_count,
+                )
+            except Exception as update_err:
+                logger.error(
+                    "[DRIFT-DEMOTION] Failed to update site phase for %s: %s",
+                    site_id,
+                    update_err,
+                )
+                return
+
+            # Send operator notification (run in main event loop if available)
+            try:
+                equipment_list = ", ".join(drifting_equipment[:5])
+                if len(drifting_equipment) > 5:
+                    equipment_list += f", +{len(drifting_equipment) - 5} more"
+
+                title = f"SENTINEL Safety Demotion — {site_id.upper()}"
+                body = (
+                    f"Site demoted to advisory: sustained model drift detected.\n"
+                    f"Equipment with degrading models: {equipment_list}\n"
+                    f"Drift duration: ≥24 hours\n"
+                    f"Previous mode: {current_phase} → advisory (safe)\n"
+                    f"Action required: investigate model drift before re-promotion."
+                )
+
+                # Run async notification in the main event loop
+                if self._main_loop and not self._main_loop.is_closed():
+                    asyncio.run_coroutine_threadsafe(
+                        notification_service.send_alert_direct(
+                            title=title,
+                            body=body,
+                            alert_level=AlertLevel.CRITICAL,
+                        ),
+                        self._main_loop,
+                    )
+                    # Don't block waiting for result; it will complete asynchronously
+                    logger.debug("[DRIFT-DEMOTION] Notification scheduled for %s", site_id)
+                else:
+                    logger.debug("[DRIFT-DEMOTION] Event loop unavailable; notification will not be sent")
+            except Exception as notify_err:
+                logger.debug("[DRIFT-DEMOTION] Notification failed for %s: %s", site_id, notify_err)
+
+        except Exception as e:
+            logger.error(
+                "[DRIFT-DEMOTION] Demotion failed for %s: %s",
+                site_id,
+                e,
+                exc_info=True,
+            )
 
     def add_mv_verification_job(self, interval_seconds: int = 900):
         """Add periodic M&V verification job for applied recommendations."""
