@@ -33,6 +33,9 @@ class PromotionResult:
     reason: str | None = None
     gates: list[GateResult] = field(default_factory=list)
     computed_at: str | None = None
+    trust_confidence: float | None = None
+    trust_breakdown: dict | None = None
+    equipment_findings: list[dict] = field(default_factory=list)
 
     def to_readiness_dict(self) -> dict:
         """Structured, explainable readiness breakdown (AC-1).
@@ -40,7 +43,7 @@ class PromotionResult:
         Never a bare eligible flag — every result carries satisfied /
         not_satisfied lists with values, thresholds, and reasons.
         """
-        return {
+        result: dict = {
             "eligible": self.eligible,
             "current_mode": self.from_phase,
             "eligible_mode": self.to_phase if self.eligible else None,
@@ -50,6 +53,16 @@ class PromotionResult:
             "satisfied": [g.to_dict() for g in self.gates if g.passed],
             "not_satisfied": [g.to_dict() for g in self.gates if not g.passed],
         }
+
+        # Add trust metrics if available (Phase 240 M2.3 drift integration)
+        if self.trust_confidence is not None:
+            result["trust_confidence"] = self.trust_confidence
+        if self.trust_breakdown is not None:
+            result["trust_breakdown"] = self.trust_breakdown
+        if self.equipment_findings:
+            result["equipment_findings"] = self.equipment_findings
+
+        return result
 
 
 class PhasePromotionEvaluator:
@@ -174,6 +187,9 @@ class PhasePromotionEvaluator:
         all_passed = all(g.passed for g in gate_results)
         target = gates_config["target"]
 
+        # Phase 240 M2.3: Compute trust confidence from drift verdicts
+        trust_confidence, trust_breakdown, equipment_findings = await self._compute_trust_metrics(site_id, gate_results)
+
         if all_passed:
             await self._set_ready_flag(site_id, current_phase, target, gate_results)
             return PromotionResult(
@@ -184,6 +200,9 @@ class PhasePromotionEvaluator:
                 reason="ready_for_manual_promotion",
                 gates=gate_results,
                 computed_at=computed_at,
+                trust_confidence=trust_confidence,
+                trust_breakdown=trust_breakdown,
+                equipment_findings=equipment_findings,
             )
 
         await self._clear_stale_ready_flag(site_id, current_phase, target, gate_results)
@@ -194,6 +213,9 @@ class PhasePromotionEvaluator:
             reason="eligibility_requirements_not_met",
             gates=gate_results,
             computed_at=computed_at,
+            trust_confidence=trust_confidence,
+            trust_breakdown=trust_breakdown,
+            equipment_findings=equipment_findings,
         )
 
     async def _clear_stale_ready_flag(
@@ -428,9 +450,6 @@ class PhasePromotionEvaluator:
 
                 if violation_count > 0:
                     # Critical failure: demote to advisory immediately
-                    sast = timezone(timedelta(hours=2))
-                    demoted_at = datetime.now(tz=sast).isoformat()
-
                     # Persist demotion to phase_transition_log
                     client.table("phase_transition_log").insert(
                         {
@@ -468,6 +487,72 @@ class PhasePromotionEvaluator:
 
             except Exception as e:
                 logger.debug("Demotion check failed for %s: %s", site_id, e)
+
+    async def _compute_trust_metrics(
+        self,
+        site_id: str,
+        gate_results: list[GateResult],
+    ) -> tuple[float, dict, list[dict]]:
+        """Compute trust confidence from gates and drift verdicts (Phase 240 M2.3).
+
+        Returns:
+            (trust_confidence, trust_breakdown, equipment_findings)
+        """
+        from app.ml.models.drift_trust_integration import (
+            compute_drift_penalty_for_site,
+            compute_trust_confidence,
+            create_findings_from_drift,
+            extract_equipment_verdicts_from_db,
+        )
+
+        # Base trust from gates
+        total_gates = len(gate_results)
+        gates_passed = sum(1 for g in gate_results if g.passed)
+        base_trust = gates_passed / total_gates if total_gates > 0 else 0.0
+
+        # Extract drift verdicts from database
+        equipment_verdicts = extract_equipment_verdicts_from_db(site_id)
+
+        # Compute drift penalty (max across equipment)
+        drift_penalty = compute_drift_penalty_for_site(site_id, {k: v[0] for k, v in equipment_verdicts.items()})
+
+        # Compute trust confidence
+        trust_confidence = compute_trust_confidence(base_trust, drift_penalty)
+
+        # Trust breakdown for operator visibility
+        trust_breakdown = {
+            "base_trust": round(base_trust, 4),
+            "drift_penalty": round(drift_penalty, 4),
+            "formula": "base_trust * (1.0 - drift_penalty)",
+        }
+
+        # Equipment findings
+        equipment_findings_list = create_findings_from_drift(site_id, equipment_verdicts)
+
+        # Convert findings to response format
+        equipment_findings = []
+        for f in equipment_findings_list:
+            eq_type = f.get("equipment_type", "unknown")
+            verdict_tuple = equipment_verdicts.get(eq_type, ("UNEVALUABLE", None))
+            equipment_findings.append(
+                {
+                    "equipment_id": f.get("equipment_id", "unknown"),
+                    "equipment_type": eq_type,
+                    "drift_verdict": verdict_tuple[0],
+                    "finding_type": f.get("finding_type"),
+                    "severity": f.get("severity", "low"),
+                }
+            )
+
+        logger.debug(
+            "[READINESS] Site %s: trust_confidence=%.4f, base_trust=%.4f, drift_penalty=%.4f",
+            site_id,
+            trust_confidence,
+            base_trust,
+            drift_penalty,
+        )
+
+        return trust_confidence, trust_breakdown, equipment_findings
 
     async def _evaluate_gates(
         self,
@@ -515,7 +600,11 @@ class PhasePromotionEvaluator:
         if gate.startswith("ml_hours_ingested >="):
             threshold = float(gate.split(">=")[1].strip())
             passed = ml_hours >= threshold
-            reason = f"{round(ml_hours, 1)}h {'≥' if passed else '<'} {threshold}h minimum" if passed else f"insufficient evidence: {round(ml_hours, 1)}h / {threshold}h"
+            reason = (
+                f"{round(ml_hours, 1)}h {'≥' if passed else '<'} {threshold}h minimum"
+                if passed
+                else f"insufficient evidence: {round(ml_hours, 1)}h / {threshold}h"
+            )
             return GateResult(
                 gate=gate,
                 passed=passed,
@@ -657,7 +746,9 @@ class PhasePromotionEvaluator:
 
                     token = resolve_site_bridge_token(site_id, cc)
                     if not token:
-                        return GateResult(gate=gate, passed=False, value=None, reason="check_error: no bridge token resolved")
+                        return GateResult(
+                            gate=gate, passed=False, value=None, reason="check_error: no bridge token resolved"
+                        )
                     resp = httpx.get(
                         f"{base_url}/api/sites/{site_id}/health",
                         headers={"Authorization": f"Bearer {token}"},
@@ -827,7 +918,9 @@ class PhasePromotionEvaluator:
         if gate.startswith("recommendations_generated >="):
             threshold = int(gate.split(">=")[1].strip())
             if not site_uuid:
-                return GateResult(gate=gate, passed=False, value=None, threshold=threshold, reason="site_uuid_not_found")
+                return GateResult(
+                    gate=gate, passed=False, value=None, threshold=threshold, reason="site_uuid_not_found"
+                )
             try:
                 rows = (
                     client.table("recommendations")
@@ -839,11 +932,17 @@ class PhasePromotionEvaluator:
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 passed = count >= threshold
-                reason = f"{count} recs {'≥' if passed else '<'} {threshold} minimum" if passed else f"insufficient recommendations: {count} / {threshold}"
+                reason = (
+                    f"{count} recs {'≥' if passed else '<'} {threshold} minimum"
+                    if passed
+                    else f"insufficient recommendations: {count} / {threshold}"
+                )
                 return GateResult(gate=gate, passed=passed, value=count, threshold=threshold, reason=reason)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold, reason=f"check_error: {e}")
+                return GateResult(
+                    gate=gate, passed=False, value=str(e), threshold=threshold, reason=f"check_error: {e}"
+                )
 
         # ── recommendations_acknowledged >= X ────────────────────────────
         if gate.startswith("recommendations_acknowledged >="):
@@ -869,20 +968,30 @@ class PhasePromotionEvaluator:
         if gate.startswith("time_in_advisory_days >="):
             threshold = int(gate.split(">=")[1].strip())
             if not site_uuid:
-                return GateResult(gate=gate, passed=False, value=None, threshold=threshold, reason="site_uuid_not_found")
+                return GateResult(
+                    gate=gate, passed=False, value=None, threshold=threshold, reason="site_uuid_not_found"
+                )
             try:
                 row = client.table("sites").select("advisory_started_at").eq("id", site_uuid).limit(1).execute()
                 advisory_start = row.data[0].get("advisory_started_at") if row.data else None
                 if not advisory_start:
-                    return GateResult(gate=gate, passed=False, value=None, threshold=threshold, reason="advisory_started_at_not_set")
+                    return GateResult(
+                        gate=gate, passed=False, value=None, threshold=threshold, reason="advisory_started_at_not_set"
+                    )
                 start = datetime.fromisoformat(advisory_start.replace("Z", "+00:00"))
                 days = (now - start).days
                 passed = days >= threshold
-                reason = f"{days}d in advisory {'≥' if passed else '<'} {threshold}d minimum" if passed else f"insufficient time: {days}d / {threshold}d"
+                reason = (
+                    f"{days}d in advisory {'≥' if passed else '<'} {threshold}d minimum"
+                    if passed
+                    else f"insufficient time: {days}d / {threshold}d"
+                )
                 return GateResult(gate=gate, passed=passed, value=days, threshold=threshold, reason=reason)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold, reason=f"check_error: {e}")
+                return GateResult(
+                    gate=gate, passed=False, value=str(e), threshold=threshold, reason=f"check_error: {e}"
+                )
 
         # ── recommendation_acceptance_rate >= X ──────────────────────
         if gate.startswith("recommendation_acceptance_rate >="):
@@ -1227,6 +1336,58 @@ class PhasePromotionEvaluator:
                 if "human_approved_autonomous" in str(e):
                     return GateResult(gate=gate, passed=False, value=None)
                 return GateResult(gate=gate, passed=False, value=str(e))
+
+        # ── drift_verdict(equipment_type) != VERDICT ─────────────────────
+        # Phase 240 M2.3: Gate on drift verdicts
+        # Pattern: drift_verdict(chiller) != DRIFT_DETECTED
+        if gate.startswith("drift_verdict("):
+            try:
+                from app.ml.models.drift_trust_integration import extract_equipment_verdicts_from_db
+
+                # Parse gate expression
+                # Format: drift_verdict(equipment_type) != EXPECTED_VERDICT
+                import re
+
+                match = re.match(r"drift_verdict\(([^)]+)\)\s*(!?=)\s*(.+)", gate)
+                if not match:
+                    return GateResult(
+                        gate=gate,
+                        passed=False,
+                        value=None,
+                        reason="Invalid drift_verdict gate expression",
+                    )
+
+                equipment_type = match.group(1).strip()
+                operator = match.group(2)  # "=" or "!="
+                expected_verdict = match.group(3).strip()
+
+                # Get actual verdict from database
+                verdicts = extract_equipment_verdicts_from_db(site_id, [equipment_type])
+                actual_verdict, equipment_id = verdicts.get(equipment_type, ("UNEVALUABLE", None))
+
+                # Evaluate gate
+                if operator == "!=":
+                    passed = actual_verdict != expected_verdict
+                else:
+                    passed = actual_verdict == expected_verdict
+
+                reason = f"{equipment_type} drift verdict: {actual_verdict} (expected: {operator} {expected_verdict})"
+
+                return GateResult(
+                    gate=gate,
+                    passed=passed,
+                    value=f"actual={actual_verdict}, expected={operator}{expected_verdict}",
+                    threshold=None,
+                    reason=reason,
+                )
+            except Exception as e:
+                logger.debug("Gate '%s' check failed: %s", gate, e)
+                return GateResult(
+                    gate=gate,
+                    passed=False,
+                    value=None,
+                    reason=f"drift_verdict_check_error: {e}",
+                )
 
         # Unknown gate — log and skip
         logger.warning("Unknown promotion gate: %s", gate)

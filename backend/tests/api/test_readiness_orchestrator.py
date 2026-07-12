@@ -123,3 +123,72 @@ async def test_demotion_executor_exists():
     evaluator = PhasePromotionEvaluator()
     # Should complete without error even if no demotions needed
     await evaluator.check_and_apply_demotions()
+
+
+@pytest.mark.asyncio
+async def test_drift_verdict_gate_evaluation():
+    """Phase 240 M2.3: Drift verdict gates evaluate correctly.
+
+    Tests gate pattern: drift_verdict(equipment_type) != EXPECTED_VERDICT
+    """
+    evaluator = PhasePromotionEvaluator()
+
+    # Create a test gate
+    gate = "drift_verdict(chiller) != DRIFT_DETECTED"
+
+    # Evaluate the gate for site-002
+    # This will fetch the latest drift verdict from drift_detection_log
+    from app.database.supabase_client import get_supabase_client
+
+    client = get_supabase_client()
+
+    # Just test that the gate evaluation doesn't crash
+    # Actual verdict depends on what's in drift_detection_log
+    try:
+        result = await evaluator._evaluate_single_gate(
+            client,
+            "site-002",
+            None,
+            "site-002",
+            gate,
+            1000.0,  # ml_hours
+            datetime.now(tz=UTC),
+        )
+
+        # Verify gate result structure
+        assert result.gate == gate
+        assert isinstance(result.passed, bool)
+        assert result.value is not None or result.reason is not None
+    except Exception as e:
+        pytest.fail(f"Drift verdict gate evaluation failed: {e}")
+
+
+@pytest.mark.asyncio
+async def test_readiness_includes_trust_metrics():
+    """Phase 240 M2.3: Readiness response includes trust metrics.
+
+    Verify that evaluate_site returns trust_confidence and equipment_findings
+    in the PromotionResult.
+    """
+    evaluator = PhasePromotionEvaluator()
+    result = await evaluator.evaluate_site("site-002", "advisory")
+
+    # Verify trust metrics are computed
+    assert result.trust_confidence is not None
+    assert isinstance(result.trust_confidence, float)
+    assert 0.0 <= result.trust_confidence <= 1.0
+
+    # Verify trust breakdown structure
+    assert result.trust_breakdown is not None
+    assert "base_trust" in result.trust_breakdown
+    assert "drift_penalty" in result.trust_breakdown
+    assert "formula" in result.trust_breakdown
+
+    # Verify equipment_findings is a list
+    assert isinstance(result.equipment_findings, list)
+
+    # Verify readiness dict includes trust metrics
+    readiness_dict = result.to_readiness_dict()
+    assert "trust_confidence" in readiness_dict
+    assert "trust_breakdown" in readiness_dict
+    assert "equipment_findings" in readiness_dict
