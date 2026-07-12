@@ -26,6 +26,34 @@ def _minutes_to_slot(next_slot_start: datetime | None) -> float | None:
     return delta / 60.0
 
 
+def _in_time_window(current_time: str, start_time: str, end_time: str) -> bool:
+    """Check if current_time (HH:MM) is within window [start_time, end_time], handling midnight wraparound.
+
+    Args:
+        current_time: Time string in HH:MM format
+        start_time: Window start in HH:MM format
+        end_time: Window end in HH:MM format
+
+    Returns:
+        True if current_time is within [start_time, end_time], False otherwise
+    """
+
+    def time_to_minutes(time_str: str) -> int:
+        h, m = map(int, time_str.split(":"))
+        return h * 60 + m
+
+    curr = time_to_minutes(current_time)
+    start = time_to_minutes(start_time)
+    end = time_to_minutes(end_time)
+
+    # Window wraps around midnight (e.g., 22:00 to 06:00)
+    if start >= end:
+        return curr >= start or curr < end
+    # Normal window (e.g., 06:00 to 22:00)
+    else:
+        return start <= curr < end
+
+
 def evaluate(
     snapshot: EnergySnapshot,
     area_schedule,  # AreaSchedule | None from eskomsepush_client
@@ -33,13 +61,34 @@ def evaluate(
     alarms: list[AlarmEvent],
     platform_name: str,
     polling_interval_seconds: int = 300,
+    alert_config: dict | None = None,
 ) -> list[AEGISResult]:
-    """Evaluate all residential AEGIS rules. Returns triggered results only."""
+    """Evaluate all residential AEGIS rules. Returns triggered results only.
+
+    Args:
+        alert_config: Optional dict of alert settings. Defaults (enabled):
+            - battery_critical_enabled: True
+            - runaway_enabled: True
+            - cost_limit_enabled: False
+            - data_stale_enabled: True
+            - appliance_kw_rating: None (for cost_limit)
+            - tariff_zar_per_kwh: None (for cost_limit)
+            - cost_limit_zar: None (for cost_limit)
+    """
+    if alert_config is None:
+        alert_config = {}
+
+    # Default enable status for each rule
+    battery_critical_enabled = alert_config.get("battery_critical_enabled", True)
+    runaway_enabled = alert_config.get("runaway_enabled", True)
+    cost_limit_enabled = alert_config.get("cost_limit_enabled", False)
+    data_stale_enabled = alert_config.get("data_stale_enabled", True)
+
     results: list[AEGISResult] = []
 
     # ── P1: Battery critical ─────────────────────────────────────────────────
     soc = snapshot.battery_soc_pct
-    if soc is not None and soc < 10:
+    if battery_critical_enabled and soc is not None and soc < 10:
         results.append(
             AEGISResult(
                 rule_id="RES_BATTERY_CRITICAL_LOW",
@@ -48,6 +97,49 @@ def evaluate(
                 triggered=True,
             )
         )
+
+    # ── P2: Appliance runaway (Tuya AC, etc) ──────────────────────────────
+    # Trigger if appliance has been running for > 5 hours continuously
+    if runaway_enabled and snapshot.source_system == "tuya":
+        runtime_minutes = getattr(snapshot, "appliance_runtime_minutes", None)
+        if runtime_minutes is not None and runtime_minutes > 5 * 60:
+            hours = runtime_minutes / 60
+            results.append(
+                AEGISResult(
+                    rule_id="RES_APPLIANCE_RUNAWAY",
+                    severity="P2",
+                    message=(
+                        f"AC/appliance running for {hours:.1f}h continuously. "
+                        f"Check {platform_name} app and consider stopping it to save battery."
+                    ),
+                    triggered=True,
+                )
+            )
+
+    # ── P2: Appliance cost limit exceeded ──────────────────────────────────
+    # Trigger if estimated cost exceeds threshold
+    if cost_limit_enabled:
+        runtime_minutes = getattr(snapshot, "appliance_runtime_minutes", None)
+        if runtime_minutes is not None:
+            kw_rating = alert_config.get("appliance_kw_rating")
+            tariff = alert_config.get("tariff_zar_per_kwh")
+            cost_limit = alert_config.get("cost_limit_zar")
+            if kw_rating is not None and tariff is not None and cost_limit is not None:
+                hours = runtime_minutes / 60.0
+                estimated_cost = (kw_rating * hours) * tariff
+                if estimated_cost > cost_limit:
+                    results.append(
+                        AEGISResult(
+                            rule_id="RES_APPLIANCE_COST_LIMIT",
+                            severity="P2",
+                            message=(
+                                f"Appliance running {hours:.1f}h: estimated cost R{estimated_cost:.2f} "
+                                f"exceeds limit R{cost_limit:.2f}. "
+                                f"R32 units use ~2–2.5kW. Turn off via {platform_name} app to save battery."
+                            ),
+                            triggered=True,
+                        )
+                    )
 
     # ── P1: Battery + loadshedding risk (with hysteresis in caller) ──────────
     if area_schedule is not None and soc is not None:
@@ -121,18 +213,19 @@ def evaluate(
             )
 
     # ── P2: Stale data ───────────────────────────────────────────────────────
-    staleness_threshold = polling_interval_seconds * 2.5
-    age_seconds = (datetime.now(UTC) - snapshot.timestamp.replace(tzinfo=UTC)).total_seconds()
-    if age_seconds > staleness_threshold:
-        elapsed_min = age_seconds / 60
-        results.append(
-            AEGISResult(
-                rule_id="RES_DATA_STALE",
-                severity="P2",
-                message=f"No fresh data for {elapsed_min:.0f}min. Check inverter connection and {platform_name} app status.",
-                triggered=True,
+    if data_stale_enabled:
+        staleness_threshold = polling_interval_seconds * 2.5
+        age_seconds = (datetime.now(UTC) - snapshot.timestamp.replace(tzinfo=UTC)).total_seconds()
+        if age_seconds > staleness_threshold:
+            elapsed_min = age_seconds / 60
+            results.append(
+                AEGISResult(
+                    rule_id="RES_DATA_STALE",
+                    severity="P2",
+                    message=f"No fresh data for {elapsed_min:.0f}min. Check inverter connection and {platform_name} app status.",
+                    triggered=True,
+                )
             )
-        )
 
     # ── Home Assistant-specific rules ─────────────────────────────────────────
     # These rules require device-level visibility (geyser, EV charger) that
