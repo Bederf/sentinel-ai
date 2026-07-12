@@ -303,9 +303,8 @@ class RetrainingScheduler:
     ) -> RetrainResult:
         """Trigger retraining for a specific model type and equipment type.
 
-        This is a lightweight wrapper - actual training would invoke
-        LSTMTrainer or AutoencoderTrainer. For now, registers the intent
-        and returns the result.
+        Orchestrates train → baseline capture → audit log in a cohesive unit.
+        For LSTM and Autoencoder, baseline metrics are persisted to ml_model_baselines.
         """
         if site_id is not None:
             from app.services.site_ai_policy_service import is_site_ml_training_enabled
@@ -351,6 +350,15 @@ class RetrainingScheduler:
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
                 result.new_model_id = train_result.get("model_id", "")
+
+                # Plan 1: Capture baseline after successful training
+                self._capture_and_persist_baseline(
+                    model_type="lstm",
+                    train_result=train_result,
+                    equipment_type=equipment_type,
+                    site_id=site_id,
+                )
+
             elif model_type == "autoencoder":
                 from ml.autoencoder.train import AutoencoderTrainer
 
@@ -366,6 +374,15 @@ class RetrainingScheduler:
                 result.success = True
                 result.metrics = train_result.get("metrics", {})
                 result.new_model_id = train_result.get("model_id", "")
+
+                # Plan 1: Capture baseline after successful training
+                self._capture_and_persist_baseline(
+                    model_type="autoencoder",
+                    train_result=train_result,
+                    equipment_type=equipment_type,
+                    site_id=site_id,
+                )
+
             elif model_type == "classifier":
                 from ml.classifier.train import ClassifierTrainer
 
@@ -383,6 +400,61 @@ class RetrainingScheduler:
 
         self._history.append(result)
         return result
+
+    def _capture_and_persist_baseline(
+        self,
+        model_type: str,
+        train_result: dict[str, Any],
+        equipment_type: str,
+        site_id: str | None = None,
+    ) -> None:
+        """Capture baseline from trained model and persist to DB.
+
+        Part of Plan 1 (Phase 239 M2.2 Real Drift Detection).
+        Wraps train→baseline_write→audit in atomic unit.
+        """
+        try:
+            from app.ml.models.baseline_persistence import (
+                capture_baseline_from_trained_model,
+                persist_baseline_to_db,
+                record_training_audit,
+            )
+
+            model_id = train_result.get("model_id")
+            if not model_id:
+                logger.warning("[BASELINE] No model_id in training result")
+                return
+
+            # Capture baseline from training result
+            baseline = capture_baseline_from_trained_model(
+                trained_model_result=train_result,
+                model_type=model_type,
+                equipment_type=equipment_type,
+                site_id=site_id,
+            )
+
+            # Persist to database (atomic write)
+            persist_baseline_to_db(baseline)
+
+            # Record audit entry
+            record_training_audit(model_id, status="baseline_written")
+
+            logger.info(
+                "[BASELINE] Successfully captured and persisted baseline for %s/%s (site=%s, model_id=%s)",
+                model_type,
+                equipment_type,
+                site_id or "global",
+                model_id,
+            )
+
+        except Exception as e:
+            logger.error(
+                "[BASELINE] Failed to capture/persist baseline for %s/%s: %s",
+                model_type,
+                equipment_type,
+                e,
+                exc_info=True,
+            )
 
     def queue_retraining(
         self,
