@@ -1504,6 +1504,25 @@ def _collect_drift_metrics() -> None:
                         ).execute()
                     except Exception as insert_err:
                         logger.debug(f"Drift log insert failed for {eq_type}: {insert_err}")
+
+                # Phase 241 Plan 1: enqueue retraining at the producer when real
+                # drift is written. Feature drift invalidates both trainable model
+                # families; enqueue() dedupes and rate-limits, and must never
+                # break metric collection.
+                if result.get("drift_detected") and data_sufficient == "true":
+                    try:
+                        from app.ml.models.retraining_queue import enqueue as enqueue_retraining
+
+                        for queue_model_type in ("lstm", "autoencoder"):
+                            enqueue_retraining(
+                                site_id="site-002",
+                                equipment_type=eq_type,
+                                model_type=queue_model_type,
+                                trigger_reason="drift_detected",
+                                drift_verdict="DRIFT_DETECTED",
+                            )
+                    except Exception as enqueue_err:
+                        logger.warning(f"Retraining enqueue failed for {eq_type}: {enqueue_err}")
             except Exception as exc:
                 logger.debug(f"Drift metric failed for {eq_type}: {exc}")
     except Exception as e:

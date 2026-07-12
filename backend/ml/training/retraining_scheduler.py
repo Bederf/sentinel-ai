@@ -10,12 +10,19 @@ training always uses the real BMS points — not hardcoded global defaults.
 """
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+# Phase 241 Plan 1: global training lock. trigger_retraining() is reached from
+# multiple paths (feedback job, API, monitoring triggers, queued executor) with
+# no mutual exclusion — concurrent trainings hammer the CPU. Every caller
+# serializes through this lock, whichever path they arrive by.
+_TRAINING_LOCK = threading.Lock()
 
 # Thresholds
 MAX_MODEL_AGE_DAYS = 30
@@ -305,7 +312,48 @@ class RetrainingScheduler:
 
         Orchestrates train → baseline capture → audit log in a cohesive unit.
         For LSTM and Autoencoder, baseline metrics are persisted to ml_model_baselines.
+
+        Serialized by a module-level lock: if a training is already in progress
+        (from any caller path), returns immediately with success=False and
+        error="training_in_progress" instead of running concurrently.
         """
+        if not _TRAINING_LOCK.acquire(blocking=False):
+            result = RetrainResult(
+                model_id=f"{site_id + '_' if site_id else ''}{model_type}_{equipment_type}",
+                model_type=model_type,
+                equipment_type=equipment_type,
+                triggered_at=datetime.now().isoformat(),
+                reason=reason,
+                site_id=site_id,
+                success=False,
+                error="training_in_progress",
+            )
+            self._history.append(result)
+            logger.warning(
+                "Retraining skipped for %s/%s site=%s: training already in progress",
+                model_type,
+                equipment_type,
+                site_id,
+            )
+            return result
+        try:
+            return self._trigger_retraining_locked(
+                model_type=model_type,
+                equipment_type=equipment_type,
+                reason=reason,
+                site_id=site_id,
+            )
+        finally:
+            _TRAINING_LOCK.release()
+
+    def _trigger_retraining_locked(
+        self,
+        model_type: str,
+        equipment_type: str,
+        reason: str = "manual",
+        site_id: str | None = None,
+    ) -> RetrainResult:
+        """Training body — always runs holding _TRAINING_LOCK (see trigger_retraining)."""
         if site_id is not None:
             from app.services.site_ai_policy_service import is_site_ml_training_enabled
 
