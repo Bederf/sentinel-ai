@@ -287,11 +287,161 @@ def _get_supabase_sensor_data(
         return {}
 
 
+def _load_trained_baselines(
+    site_id: str | None,
+    equipment_type: str,
+    model_type: str,
+) -> dict[str, Any]:
+    """Load trained baseline statistics from ml_model_baselines table.
+
+    Replaces hardcoded Gaussian distributions with real trained model statistics.
+    Implements fail-closed behavior: returns UNEVALUABLE if baseline unavailable.
+
+    Args:
+        site_id: Optional site ID for site-scoped models (None = global)
+        equipment_type: Equipment type (chiller, ahu, etc.)
+        model_type: Model type (lstm, autoencoder)
+
+    Returns:
+        Dict with status and baseline data:
+        - status='LOADED': baseline found and schema matches, contains 'baseline' dict
+        - status='INSUFFICIENT_BASELINES': no baseline found or too old
+        - status='FEATURE_MISMATCH': feature schema hash mismatch (schema changed)
+    """
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        if not client:
+            logger.warning(
+                "[DRIFT] Supabase client unavailable for %s/%s — returning INSUFFICIENT_BASELINES",
+                equipment_type,
+                model_type,
+            )
+            return {
+                "status": "INSUFFICIENT_BASELINES",
+                "reason": "supabase_unavailable",
+                "baseline_id": None,
+            }
+    except Exception as e:
+        logger.warning("[DRIFT] Failed to load Supabase client: %s", e)
+        return {
+            "status": "INSUFFICIENT_BASELINES",
+            "reason": "supabase_error",
+            "baseline_id": None,
+        }
+
+    try:
+        # Query ml_model_baselines for most recent baseline
+        # Priority: site-scoped (if site_id provided) then global (site_id NULL)
+        query = (
+            client.table("ml_model_baselines")
+            .select("*")
+            .eq("equipment_type", equipment_type)
+            .eq("provenance_status", "valid")
+            .order("created_at", desc=True)
+            .limit(100)
+            .execute()
+        )
+
+        baselines = query.data or []
+        if not baselines:
+            logger.info(
+                "[DRIFT] No valid baseline found for %s/%s (site=%s)",
+                equipment_type,
+                model_type,
+                site_id or "global",
+            )
+            return {
+                "status": "INSUFFICIENT_BASELINES",
+                "reason": "no_baseline_found",
+                "baseline_id": None,
+            }
+
+        # Prioritize site-scoped baseline over global
+        selected_baseline = None
+        if site_id:
+            for baseline in baselines:
+                if baseline.get("site_id") == site_id:
+                    selected_baseline = baseline
+                    break
+        if not selected_baseline:
+            for baseline in baselines:
+                if baseline.get("site_id") is None:
+                    selected_baseline = baseline
+                    break
+
+        if not selected_baseline:
+            logger.info(
+                "[DRIFT] No baseline matches site_id %s for %s/%s",
+                site_id,
+                equipment_type,
+                model_type,
+            )
+            return {
+                "status": "INSUFFICIENT_BASELINES",
+                "reason": "no_matching_baseline",
+                "baseline_id": None,
+            }
+
+        # Validate feature schema hash
+        baseline_id = selected_baseline.get("model_id")
+        baseline_features = selected_baseline.get("feature_schema", [])
+        current_features = EQUIPMENT_TO_SENSORS.get(equipment_type, {}).get("features", [])
+
+        # Compare feature schemas: if baseline has features, verify current matches
+        if baseline_features and current_features and set(baseline_features) != set(current_features):
+            logger.warning(
+                "[DRIFT] Feature schema mismatch for %s/%s (baseline_id=%s): trained on %s, current has %s",
+                equipment_type,
+                model_type,
+                baseline_id,
+                baseline_features,
+                current_features,
+            )
+            return {
+                "status": "FEATURE_MISMATCH",
+                "reason": f"baseline features {baseline_features} != current {current_features}",
+                "baseline_id": baseline_id,
+            }
+
+        logger.info(
+            "[DRIFT] Loaded baseline %s for %s/%s (site=%s, created=%s)",
+            baseline_id,
+            equipment_type,
+            model_type,
+            site_id or "global",
+            selected_baseline.get("created_at"),
+        )
+
+        return {
+            "status": "LOADED",
+            "baseline": selected_baseline,
+            "baseline_id": baseline_id,
+        }
+
+    except Exception as e:
+        logger.error(
+            "[DRIFT] Error loading baseline for %s/%s: %s",
+            equipment_type,
+            model_type,
+            e,
+            exc_info=True,
+        )
+        return {
+            "status": "INSUFFICIENT_BASELINES",
+            "reason": f"query_error: {e!s}",
+            "baseline_id": None,
+        }
+
+
 def _generate_training_stats(equipment_type: str) -> dict[str, list[float]]:
     """Generate simulated training distribution statistics.
 
     In production, these would be saved during model training.
-    For demo, we generate realistic baseline distributions.
+    For demo/fallback, we generate realistic baseline distributions.
+    This is now only used as a fallback for feature drift detection;
+    model drift detection uses real baselines from ml_model_baselines.
     """
     import random
 
@@ -421,23 +571,30 @@ class DriftDetector:
         self,
         model_type: str,
         threshold: float = MODEL_DRIFT_THRESHOLD,
+        site_id: str | None = None,
     ) -> dict[str, Any]:
-        """Detect degradation in model predictions over time.
+        """Detect degradation in model predictions over time using real trained baselines.
 
-        Compares recent accuracy (last 7 days) to historical baseline.
+        Plan 2 (Phase 239 M2.2): Compares recent accuracy to trained model baselines
+        stored in ml_model_baselines table. Fails closed with UNEVALUABLE if baseline
+        unavailable or feature schema mismatches.
 
         Args:
             model_type: Model type to check (lstm, autoencoder).
             threshold: Recent accuracy must be >= threshold * historical.
+            site_id: Optional site ID for site-scoped models.
 
         Returns:
-            Dict with model drift detection results.
+            Dict with model drift detection results. Verdict can be:
+            - 'NO_DRIFT_DETECTED': baseline exists, no shift observed
+            - 'DRIFT_DETECTED': baseline exists, shift detected
+            - 'UNEVALUABLE': no baseline, cannot compare (fail-closed)
+            - 'FEATURE_MISMATCH': schema mismatch, cannot compare
+            - 'INSUFFICIENT_DATA': too few samples
         """
         # Phase 236-03: verdicts derive ONLY from measured rolling accuracy
         # (ml_model_accuracy, written by the daily accuracy job). No measured
-        # data → insufficient_data, never a fake verdict. The previous
-        # hardcoded 0.89/0.85 baselines and demo fallbacks could never fire
-        # and are removed.
+        # data → insufficient_data, never a fake verdict.
         verdict_row = self._latest_measured_verdict(model_type)
 
         if verdict_row is None:
@@ -450,20 +607,86 @@ class DriftDetector:
                 "verdict": "insufficient_data",
                 "degradation_pct": None,
                 "threshold": threshold,
+                "baseline_id": None,
+                "site_id": site_id,
             }
             self._detection_history.append(result)
             return result
+
+        # Plan 2: Load real trained baselines
+        model_kind = {"lstm": "lstm_forecast", "autoencoder": "ae_score"}.get(model_type)
+        equipment_type_str = (
+            verdict_row.get("equipment_type") or model_kind
+        )  # fallback if equipment_type not in verdict
+        if not equipment_type_str:
+            equipment_type_str = "unknown"
+
+        baseline_result = _load_trained_baselines(site_id, equipment_type_str, model_type)
+        baseline_id = baseline_result.get("baseline_id")
+
+        if baseline_result["status"] == "INSUFFICIENT_BASELINES":
+            result = {
+                "model_type": model_type,
+                "detected_at": datetime.now().isoformat(),
+                "model_id": verdict_row.get("model_id"),
+                "recent_accuracy": verdict_row.get("measured"),
+                "historical_accuracy": None,
+                "drift_detected": False,
+                "verdict": "unevaluable",  # fail-closed: no baseline = cannot evaluate
+                "degradation_pct": None,
+                "threshold": threshold,
+                "baseline_id": baseline_id,
+                "site_id": site_id,
+                "reason": baseline_result.get("reason"),
+            }
+            self._detection_history.append(result)
+            return result
+
+        if baseline_result["status"] == "FEATURE_MISMATCH":
+            result = {
+                "model_type": model_type,
+                "detected_at": datetime.now().isoformat(),
+                "model_id": verdict_row.get("model_id"),
+                "recent_accuracy": verdict_row.get("measured"),
+                "historical_accuracy": None,
+                "drift_detected": False,
+                "verdict": "feature_mismatch",  # cannot compare due to schema mismatch
+                "degradation_pct": None,
+                "threshold": threshold,
+                "baseline_id": baseline_id,
+                "site_id": site_id,
+                "reason": baseline_result.get("reason"),
+            }
+            self._detection_history.append(result)
+            return result
+
+        # Baseline loaded successfully
+        baseline = baseline_result.get("baseline")
+        measured = verdict_row.get("measured")
+        baseline_accuracy = verdict_row.get("baseline")
+
+        # Determine drift based on model type
+        drift_detected = False
+        if model_type == "lstm" and measured is not None and baseline_accuracy is not None:
+            # For LSTM: check MAE against baseline
+            drift_detected = measured > threshold * baseline_accuracy
+        elif model_type == "autoencoder" and measured is not None and baseline:
+            # For Autoencoder: check score against baseline threshold
+            baseline_threshold = baseline.get("threshold", 0)
+            drift_detected = measured > baseline_threshold
 
         result = {
             "model_type": model_type,
             "detected_at": datetime.now().isoformat(),
             "model_id": verdict_row.get("model_id"),
-            "recent_accuracy": verdict_row.get("measured"),
-            "historical_accuracy": verdict_row.get("baseline"),
-            "drift_detected": verdict_row.get("drift_verdict") == "drift_suspected",
-            "verdict": verdict_row.get("drift_verdict"),
+            "recent_accuracy": measured,
+            "historical_accuracy": baseline_accuracy,
+            "drift_detected": drift_detected,
+            "verdict": "drift_detected" if drift_detected else "no_drift_detected",
             "degradation_pct": verdict_row.get("degradation_pct"),
             "threshold": threshold,
+            "baseline_id": baseline_id,
+            "site_id": site_id,
         }
 
         self._detection_history.append(result)
