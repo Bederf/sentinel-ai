@@ -3,7 +3,7 @@
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -1957,6 +1957,154 @@ async def update_site_phase(
         logger.info(f"Onboarding phase set to '{requested}' for {site_id} (JSON fallback only)")
 
     return PhaseUpdateResponse(site_id=site_id, onboarding_phase=requested)
+
+
+# ============= Phase Readiness Endpoint =============
+
+@router.get("/sites/{site_id}/readiness")
+async def get_readiness(
+    site_id: str,
+    auth: AuthContext = Depends(require_site_access("site_id", auth_level=AuthLevel.AUTHENTICATED)),
+) -> dict:
+    """Get current phase readiness status with full gate breakdown.
+
+    Returns structured eligibility data: current mode, eligible modes, reasons,
+    satisfied gates, blocked gates, and recommended next mode.
+    """
+    from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
+
+    try:
+        from app.database.supabase_client import get_supabase_client
+
+        client = get_supabase_client()
+        site_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+        if not site_row.data:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+        current_phase = site_row.data[0].get("onboarding_phase", "commissioning")
+        current_phase_norm = current_phase.lower().replace(" ", "_")
+        if current_phase_norm == "auto":
+            current_phase_norm = "automatic"
+
+        evaluator = get_phase_promotion_evaluator()
+        readiness = await evaluator.evaluate_site(site_id, current_phase_norm)
+
+        return readiness.to_readiness_dict()
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Readiness check failed for {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Readiness evaluation failed: {e}") from e
+
+
+@router.post("/sites/{site_id}/promote")
+async def promote_site(
+    site_id: str,
+    request: PhaseUpdateRequest,
+    auth: AuthContext = Depends(require_site_access("site_id", auth_level=AuthLevel.OPERATOR)),
+) -> PhaseUpdateResponse:
+    """Promote a site to a higher phase after verifying readiness (AC-5).
+
+    Operator-authorized transition. Verifies eligibility in real-time, records
+    the gate-evidence snapshot for audit replay (AC-5), and fails with 409 if
+    ineligible.
+    """
+    from app.models.onboarding_phase import normalise_stage, validate_transition
+    from app.services.phase_promotion_evaluator import get_phase_promotion_evaluator
+    from app.database.supabase_client import get_supabase_client
+
+    requested = normalise_stage(request.phase)
+
+    try:
+        client = get_supabase_client()
+        current_row = client.table("sites").select("onboarding_phase").eq("code", site_id).limit(1).execute()
+        if not current_row.data:
+            raise HTTPException(status_code=404, detail=f"Site {site_id} not found")
+
+        previous_phase = normalise_stage(current_row.data[0].get("onboarding_phase", "commissioning"))
+
+        # Validate transition shape
+        valid, err = validate_transition(previous_phase, requested)
+        if not valid:
+            raise HTTPException(status_code=400, detail={"error": "Invalid transition", "message": err})
+
+        # Fresh readiness evaluation (AC-5 prerequisite)
+        evaluator = get_phase_promotion_evaluator()
+        readiness = await evaluator.evaluate_site(site_id, previous_phase)
+
+        if not readiness.eligible:
+            # 409 with gate breakdown (same contract as 187.1)
+            failed_gates = [
+                {
+                    "gate": gate.gate,
+                    "value": gate.value,
+                    "threshold": gate.threshold,
+                    "reason": gate.reason,
+                }
+                for gate in readiness.gates
+                if not gate.passed
+            ]
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "error": "phase_promotion_blocked",
+                    "current": previous_phase,
+                    "requested": requested,
+                    "eligible": False,
+                    "failed_gates": failed_gates,
+                    "message": f"Cannot promote to {requested}: readiness gates not met",
+                },
+            )
+
+        # Record gate snapshot in audit trail (AC-5)
+        sast = timezone(timedelta(hours=2))  # South Africa Standard Time
+        met_at = datetime.now(tz=sast).isoformat()
+        gate_snapshot = {
+            "gates": [g.to_dict() for g in readiness.gates],
+            "satisfied": len([g for g in readiness.gates if g.passed]),
+            "total": len(readiness.gates),
+            "evaluated_at": met_at,
+        }
+
+        # Write phase transition (same as PATCH endpoint)
+        response = client.table("sites").update({"onboarding_phase": requested}).eq("code", site_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=500, detail="Phase update failed")
+
+        # Sync control_enabled and write flags
+        CONTROL_ALLOWED = {"supervised", "automatic"}
+        new_control_enabled = requested in CONTROL_ALLOWED
+        try:
+            client.table("sites").update({"control_enabled": new_control_enabled}).eq("code", site_id).execute()
+        except Exception as e:
+            logger.warning(f"Failed to sync control_enabled for {site_id}: {e}")
+
+        # Audit log with gate snapshot (AC-5 requirement: replayable decision)
+        try:
+            client.table("phase_transition_log").insert(
+                {
+                    "site_id": site_id,
+                    "from_phase": previous_phase,
+                    "to_phase": requested,
+                    "changed_by": auth.email or "system",
+                    "reason": request.reason or "operator_promotion_via_readiness",
+                    "gate_snapshot": gate_snapshot,
+                }
+            ).execute()
+        except Exception as e:
+            logger.warning(f"Failed to write phase transition audit for {site_id}: {e}")
+
+        logger.info(
+            f"Phase promoted: {site_id} {previous_phase} → {requested} by {auth.email} (readiness gate snapshot recorded)"
+        )
+
+        return PhaseUpdateResponse(site_id=site_id, onboarding_phase=requested)
+
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Phase promotion failed for {site_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Promotion failed: {e}") from e
 
 
 # ============= Get Single Site Endpoint =============

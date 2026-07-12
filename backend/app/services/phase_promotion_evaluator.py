@@ -7,7 +7,7 @@ itself — operators make the final decision and flip the phase manually.
 
 import logging
 from dataclasses import asdict, dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 logger = logging.getLogger("sentinel.phase_promotion")
 
@@ -16,8 +16,9 @@ logger = logging.getLogger("sentinel.phase_promotion")
 class GateResult:
     gate: str
     passed: bool
-    value: float | int | bool | None = None
+    value: float | int | bool | str | None = None
     threshold: float | int | None = None
+    reason: str | None = None
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -31,6 +32,24 @@ class PromotionResult:
     to_phase: str | None = None
     reason: str | None = None
     gates: list[GateResult] = field(default_factory=list)
+    computed_at: str | None = None
+
+    def to_readiness_dict(self) -> dict:
+        """Structured, explainable readiness breakdown (AC-1).
+
+        Never a bare eligible flag — every result carries satisfied /
+        not_satisfied lists with values, thresholds, and reasons.
+        """
+        return {
+            "eligible": self.eligible,
+            "current_mode": self.from_phase,
+            "eligible_mode": self.to_phase if self.eligible else None,
+            "recommended_next_mode": self.to_phase,
+            "reason": self.reason,
+            "computed_at": self.computed_at,
+            "satisfied": [g.to_dict() for g in self.gates if g.passed],
+            "not_satisfied": [g.to_dict() for g in self.gates if not g.passed],
+        }
 
 
 class PhasePromotionEvaluator:
@@ -105,7 +124,9 @@ class PhasePromotionEvaluator:
         from supabase import create_client
 
         client = create_client(settings.supabase_url, settings.supabase_service_role_key)
-        rows = client.table("sites").select("code, onboarding_phase").execute()
+        # Invariant I-2 scope: commercial sites only. res-* sites are a separate
+        # residential product line governed by residential onboarding.
+        rows = client.table("sites").select("code, onboarding_phase").like("code", "site-%").execute()
         if not rows.data:
             logger.warning("No sites found for promotion evaluation")
             return []
@@ -126,23 +147,34 @@ class PhasePromotionEvaluator:
                 logger.error("Promotion evaluation failed for %s: %s", code, e, exc_info=True)
                 results.append(PromotionResult(eligible=False, reason=str(e)))
 
+        # AC-7: Check for critical safety violations and demote if needed
+        # (runs after readiness evaluation, within the same cycle)
+        try:
+            await self.check_and_apply_demotions()
+        except Exception as e:
+            logger.error("Demotion check failed: %s", e, exc_info=True)
+
         return results
 
     async def evaluate_site(self, site_id: str, current_phase: str) -> PromotionResult:
         """Check all gates and surface readiness for manual operator promotion."""
 
+        sast = timezone(timedelta(hours=2))  # South Africa Standard Time
+        computed_at = datetime.now(tz=sast).isoformat()
         gates_config = self.PROMOTION_GATES.get(current_phase)
         if not gates_config:
             return PromotionResult(
                 eligible=False,
+                from_phase=current_phase,
                 reason=f"no_promotion_gates_defined_for_{current_phase}",
+                computed_at=computed_at,
             )
 
         gate_results = await self._evaluate_gates(site_id, gates_config["gates"])
         all_passed = all(g.passed for g in gate_results)
+        target = gates_config["target"]
 
         if all_passed:
-            target = gates_config["target"]
             await self._set_ready_flag(site_id, current_phase, target, gate_results)
             return PromotionResult(
                 eligible=True,
@@ -151,9 +183,76 @@ class PhasePromotionEvaluator:
                 to_phase=target,
                 reason="ready_for_manual_promotion",
                 gates=gate_results,
+                computed_at=computed_at,
             )
 
-        return PromotionResult(eligible=False, gates=gate_results)
+        await self._clear_stale_ready_flag(site_id, current_phase, target, gate_results)
+        return PromotionResult(
+            eligible=False,
+            from_phase=current_phase,
+            to_phase=target,
+            reason="eligibility_requirements_not_met",
+            gates=gate_results,
+            computed_at=computed_at,
+        )
+
+    async def _clear_stale_ready_flag(
+        self,
+        site_id: str,
+        from_phase: str,
+        to_phase: str,
+        gate_results: list[GateResult],
+    ) -> None:
+        """Clear a previously-set ready flag when eligibility regresses.
+
+        A stale ready flag is a dishonest eligibility claim — readiness must
+        track the evidence in both directions.
+        """
+        from app.config.settings import settings
+        from supabase import create_client
+
+        try:
+            client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+            existing = (
+                client.table("sites")
+                .select("phase_promotion_ready, phase_promotion_target")
+                .eq("code", site_id)
+                .limit(1)
+                .execute()
+            )
+            if not existing.data or not existing.data[0].get("phase_promotion_ready"):
+                return
+
+            sast = timezone(timedelta(hours=2))  # South Africa Standard Time
+            met_at = datetime.now(tz=sast).isoformat()
+            client.table("sites").update(
+                {
+                    "phase_promotion_ready": False,
+                    "phase_promotion_readiness": {
+                        "event": "phase_promotion_readiness",
+                        "ready": False,
+                        "from_phase": from_phase,
+                        "to_phase": to_phase,
+                        "met_at": met_at,
+                        "gate_results": [g.to_dict() for g in gate_results],
+                    },
+                }
+            ).eq("code", site_id).execute()
+
+            client.table("phase_promotion_readiness_log").insert(
+                {
+                    "site_id": site_id,
+                    "from_phase": from_phase,
+                    "to_phase": to_phase,
+                    "met": False,
+                    "met_at": met_at,
+                    "gate_results": [g.to_dict() for g in gate_results],
+                    "recorded_by": "phase_promotion_evaluator",
+                }
+            ).execute()
+            logger.info("Phase readiness cleared for %s (%s → %s eligibility regressed)", site_id, from_phase, to_phase)
+        except Exception as e:
+            logger.warning("Failed to clear stale readiness flag for %s: %s", site_id, e)
 
     async def _set_ready_flag(
         self,
@@ -170,7 +269,8 @@ class PhasePromotionEvaluator:
         from app.config.settings import settings
         from supabase import create_client
 
-        met_at = datetime.now(tz=UTC).isoformat()
+        sast = timezone(timedelta(hours=2))  # South Africa Standard Time
+        met_at = datetime.now(tz=sast).isoformat()
         readiness = {
             "event": "phase_promotion_readiness",
             "ready": True,
@@ -220,10 +320,11 @@ class PhasePromotionEvaluator:
             }
         ).eq("code", site_id).execute()
 
+        # Once-per-eligibility-edge semantics: log + notify only on the flip,
+        # not on every hourly evaluation while the site remains eligible.
         if not previous_ready:
             await self._log_readiness_flip(client, site_id, from_phase, to_phase, readiness)
-
-        await self._notify_ready(site_id, from_phase, to_phase, gate_results)
+            await self._notify_ready(site_id, from_phase, to_phase, gate_results)
 
     async def _log_readiness_flip(
         self,
@@ -284,6 +385,90 @@ class PhasePromotionEvaluator:
         except Exception as e:
             logger.warning("Phase readiness notification failed for %s: %s", site_id, e)
 
+    async def check_and_apply_demotions(self) -> None:
+        """AC-7: Check for critical safety violations and demote sites.
+
+        Runs as part of the readiness evaluation cycle. If a site in supervised
+        or automatic mode has a safety_block, immediately demote to advisory
+        (the safe mode). Demotion is never gated on human availability.
+        """
+        from app.config.settings import settings
+        from supabase import create_client
+
+        client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+        # Get all commercial sites currently in supervised or automatic
+        try:
+            sites = (
+                client.table("sites")
+                .select("code, id, onboarding_phase")
+                .like("code", "site-%")
+                .in_("onboarding_phase", ["supervised", "automatic"])
+                .execute()
+            )
+        except Exception as e:
+            logger.warning("Failed to fetch sites for demotion check: %s", e)
+            return
+
+        for site in sites.data or []:
+            site_id = site["code"]
+            current_phase = site["onboarding_phase"]
+
+            # Check for recent safety violations (critical-failure signal: safety_block in last 7 days)
+            try:
+                safety_rows = (
+                    client.table("parasite_decisions")
+                    .select("id", count="exact")
+                    .eq("site_id", site_id)
+                    .eq("decision_type", "safety_block")
+                    .gte("created_at", (datetime.now(tz=UTC) - timedelta(days=7)).isoformat())
+                    .execute()
+                )
+                violation_count = safety_rows.count if hasattr(safety_rows, "count") else len(safety_rows.data or [])
+
+                if violation_count > 0:
+                    # Critical failure: demote to advisory immediately
+                    sast = timezone(timedelta(hours=2))
+                    demoted_at = datetime.now(tz=sast).isoformat()
+
+                    # Persist demotion to phase_transition_log
+                    client.table("phase_transition_log").insert(
+                        {
+                            "site_id": site_id,
+                            "from_phase": current_phase,
+                            "to_phase": "advisory",
+                            "changed_by": "system",
+                            "reason": f"auto_demotion safety_violations:{violation_count}_in_7d",
+                        }
+                    ).execute()
+
+                    # Update phase
+                    client.table("sites").update({"onboarding_phase": "advisory"}).eq("code", site_id).execute()
+
+                    # Notify operator
+                    try:
+                        from app.models.notification import AlertLevel
+                        from app.services.notification_service import notification_service
+
+                        title = f"SENTINEL Safety Demotion — {site_id.upper()}"
+                        body = (
+                            f"Site demoted to advisory: critical safety violations detected.\n"
+                            f"Safety blocks in last 7 days: {violation_count}\n"
+                            f"Current mode revoked: {current_phase} → advisory\n"
+                            f"Action required: investigate violations before re-promotion."
+                        )
+                        await notification_service.send_alert_direct(
+                            title=title,
+                            body=body,
+                            alert_level=AlertLevel.CRITICAL,
+                        )
+                        logger.warning("Safety demotion executed for %s (%d violations)", site_id, violation_count)
+                    except Exception as notify_err:
+                        logger.warning("Demotion notification failed for %s: %s", site_id, notify_err)
+
+            except Exception as e:
+                logger.debug("Demotion check failed for %s: %s", site_id, e)
+
     async def _evaluate_gates(
         self,
         site_id: str,
@@ -329,11 +514,14 @@ class PhasePromotionEvaluator:
         # ── ml_hours_ingested >= X ──────────────────────────────────────
         if gate.startswith("ml_hours_ingested >="):
             threshold = float(gate.split(">=")[1].strip())
+            passed = ml_hours >= threshold
+            reason = f"{round(ml_hours, 1)}h {'≥' if passed else '<'} {threshold}h minimum" if passed else f"insufficient evidence: {round(ml_hours, 1)}h / {threshold}h"
             return GateResult(
                 gate=gate,
-                passed=ml_hours >= threshold,
+                passed=passed,
                 value=round(ml_hours, 1),
                 threshold=threshold,
+                reason=reason,
             )
 
         # ── hours_since_created >= X (commissioning gate) ──────────────
@@ -432,18 +620,16 @@ class PhasePromotionEvaluator:
                     client.table("equipment_analytics")
                     .select("id", count="exact")
                     .eq("site_id", site_uuid)
-                    .is_("anomaly_score", "not.null")
+                    .not_.is_("anomaly_score", "null")
                     .gte("scored_at", (now - timedelta(minutes=30)).isoformat())
                     .execute()
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
                 return GateResult(gate=gate, passed=count > 0, value=count)
             except Exception as e:
-                # Table may not exist yet in older deployments — fail open for safety
-                if "does not exist" in str(e):
-                    return GateResult(gate=gate, passed=True, value=0, threshold=1)
+                # Fail closed (AC-2): an unevaluable gate must never pass silently.
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                return GateResult(gate=gate, passed=False, value=str(e))
+                return GateResult(gate=gate, passed=False, value=None, reason=f"check_error: {e}")
 
         # ── bridge_connected ────────────────────────────────────────────
         # BridgeBMSAdapter.get_status() contract:
@@ -470,6 +656,8 @@ class PhasePromotionEvaluator:
                     from app.services.shadow_mode_polling import resolve_site_bridge_token
 
                     token = resolve_site_bridge_token(site_id, cc)
+                    if not token:
+                        return GateResult(gate=gate, passed=False, value=None, reason="check_error: no bridge token resolved")
                     resp = httpx.get(
                         f"{base_url}/api/sites/{site_id}/health",
                         headers={"Authorization": f"Bearer {token}"},
@@ -639,7 +827,7 @@ class PhasePromotionEvaluator:
         if gate.startswith("recommendations_generated >="):
             threshold = int(gate.split(">=")[1].strip())
             if not site_uuid:
-                return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
+                return GateResult(gate=gate, passed=False, value=None, threshold=threshold, reason="site_uuid_not_found")
             try:
                 rows = (
                     client.table("recommendations")
@@ -650,10 +838,12 @@ class PhasePromotionEvaluator:
                     .execute()
                 )
                 count = rows.count if hasattr(rows, "count") else len(rows.data or [])
-                return GateResult(gate=gate, passed=count >= threshold, value=count, threshold=threshold)
+                passed = count >= threshold
+                reason = f"{count} recs {'≥' if passed else '<'} {threshold} minimum" if passed else f"insufficient recommendations: {count} / {threshold}"
+                return GateResult(gate=gate, passed=passed, value=count, threshold=threshold, reason=reason)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold, reason=f"check_error: {e}")
 
         # ── recommendations_acknowledged >= X ────────────────────────────
         if gate.startswith("recommendations_acknowledged >="):
@@ -679,18 +869,20 @@ class PhasePromotionEvaluator:
         if gate.startswith("time_in_advisory_days >="):
             threshold = int(gate.split(">=")[1].strip())
             if not site_uuid:
-                return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
+                return GateResult(gate=gate, passed=False, value=None, threshold=threshold, reason="site_uuid_not_found")
             try:
                 row = client.table("sites").select("advisory_started_at").eq("id", site_uuid).limit(1).execute()
                 advisory_start = row.data[0].get("advisory_started_at") if row.data else None
                 if not advisory_start:
-                    return GateResult(gate=gate, passed=False, value=None, threshold=threshold)
+                    return GateResult(gate=gate, passed=False, value=None, threshold=threshold, reason="advisory_started_at_not_set")
                 start = datetime.fromisoformat(advisory_start.replace("Z", "+00:00"))
                 days = (now - start).days
-                return GateResult(gate=gate, passed=days >= threshold, value=days, threshold=threshold)
+                passed = days >= threshold
+                reason = f"{days}d in advisory {'≥' if passed else '<'} {threshold}d minimum" if passed else f"insufficient time: {days}d / {threshold}d"
+                return GateResult(gate=gate, passed=passed, value=days, threshold=threshold, reason=reason)
             except Exception as e:
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold)
+                return GateResult(gate=gate, passed=False, value=str(e), threshold=threshold, reason=f"check_error: {e}")
 
         # ── recommendation_acceptance_rate >= X ──────────────────────
         if gate.startswith("recommendation_acceptance_rate >="):
@@ -741,10 +933,9 @@ class PhasePromotionEvaluator:
                 count = rows_obj.count if hasattr(rows_obj, "count") else len(rows_obj.data or [])
                 return GateResult(gate=gate, passed=count == 0, value=count)
             except Exception as e:
+                # Fail closed (AC-2): an unevaluable safety gate must never pass silently.
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                if "does not exist" in str(e):
-                    return GateResult(gate=gate, passed=True, value=0)
-                return GateResult(gate=gate, passed=False, value=str(e))
+                return GateResult(gate=gate, passed=False, value=None, reason=f"check_error: {e}")
 
         # ── verified_writable_control_points >= X ──────────────────────
         if gate.startswith("verified_writable_control_points >="):
@@ -934,11 +1125,9 @@ class PhasePromotionEvaluator:
                 count = rows_obj.count if hasattr(rows_obj, "count") else len(rows_obj.data or [])
                 return GateResult(gate=gate, passed=count == 0, value=count)
             except Exception as e:
+                # Fail closed (AC-2): an unevaluable gate must never pass silently.
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                # If table doesn't exist, count as pass (no errors recorded)
-                if "does not exist" in str(e):
-                    return GateResult(gate=gate, passed=True, value=0)
-                return GateResult(gate=gate, passed=False, value=str(e))
+                return GateResult(gate=gate, passed=False, value=None, reason=f"check_error: {e}")
 
         # ── no_safety_violations_7d ────────────────────────────────────
         if gate == "no_safety_violations_7d":
@@ -956,10 +1145,9 @@ class PhasePromotionEvaluator:
                 count = rows_obj.count if hasattr(rows_obj, "count") else len(rows_obj.data or [])
                 return GateResult(gate=gate, passed=count == 0, value=count)
             except Exception as e:
+                # Fail closed (AC-2): an unevaluable safety gate must never pass silently.
                 logger.debug("Gate '%s' check failed: %s", gate, e)
-                if "does not exist" in str(e):
-                    return GateResult(gate=gate, passed=True, value=0)
-                return GateResult(gate=gate, passed=False, value=str(e))
+                return GateResult(gate=gate, passed=False, value=None, reason=f"check_error: {e}")
 
         # ── approval_accuracy >= X ──────────────────────────────────────
         if gate.startswith("approval_accuracy >="):
