@@ -171,7 +171,7 @@ class ModbusBESSWriter:
             try:
                 self._client.close()
             except Exception:
-                pass
+                logger.warning("Failed to close Modbus TCP client cleanly", exc_info=True)
             self._client = None
             self._connected = False
 

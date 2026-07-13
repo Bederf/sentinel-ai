@@ -140,7 +140,7 @@ def create_step_up_session(user_id: str, device_id: str, pin: str) -> bool:
 
                 audit_step_up_failed(user=user_id, device_id=device_id)
             except Exception:
-                pass
+                logger.warning("Failed to audit step-up authentication failure: user=%s", user_id, exc_info=True)
             return False
     except ValueError as e:
         logger.error("Invalid ADMIN_PIN_HASH format: %s", e)

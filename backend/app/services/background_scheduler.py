@@ -6331,7 +6331,7 @@ class BackgroundSchedulerService:
                             {
                                 "site_id": site_id,
                                 "model_type": model_type,
-                                "equipment_type": result.get("equipment_type"),
+                                "equipment_type": result.get("equipment_type") or model_type,
                                 "verdict": verdict,
                                 "baseline_id": result.get("baseline_id"),
                                 "score": result.get("recent_accuracy"),
@@ -6938,14 +6938,13 @@ class BackgroundSchedulerService:
         # Direct SQL fallback — reliable even when REST API auth fails
         try:
             import psycopg2
+            from app.config.settings import settings
 
-            conn = psycopg2.connect(
-                host="127.0.0.1",
-                port=55322,
-                dbname="postgres",
-                user="postgres",
-                password="postgres",
-            )
+            if not settings.database_url:
+                logger.error("Supabase retention enforcement skipped: settings.database_url is not configured")
+                return
+
+            conn = psycopg2.connect(settings.database_url)
             cursor = conn.cursor()
             for table, col, days in [
                 ("equipment_fault_events", "recorded_at", 7),

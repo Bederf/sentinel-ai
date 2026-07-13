@@ -205,7 +205,7 @@ def _resolve_user_display(user_id: str) -> str:
             if email:
                 return str(email)
     except Exception:
-        pass
+        logger.warning("Failed to resolve security audit user display name: user_id=%s", user_id, exc_info=True)
 
     return user_id
 

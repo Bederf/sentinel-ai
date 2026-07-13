@@ -643,19 +643,20 @@ async def startup_event(_: FastAPI) -> None:
             import psycopg2
             from datetime import UTC, datetime, timedelta
 
-            conn = psycopg2.connect(
-                host="127.0.0.1", port=55322, dbname="postgres", user="postgres", password="postgres"
-            )
-            with conn.cursor() as cur:
-                cur.execute("SELECT MAX(executed_at) FROM retention_enforcement_log WHERE dry_run = false")
-                row = cur.fetchone()
-            conn.close()
-            last_run = row[0] if row and row[0] else None
-            if last_run is None or (datetime.now(UTC) - last_run.replace(tzinfo=UTC)) > timedelta(hours=24):
-                _logger.info("🔄 Retention catch-up: last run >24h ago — running Supabase retention now")
-                scheduler_service._run_supabase_retention_enforcement()
+            if settings.database_url:
+                conn = psycopg2.connect(settings.database_url)
+                with conn.cursor() as cur:
+                    cur.execute("SELECT MAX(executed_at) FROM retention_enforcement_log WHERE dry_run = false")
+                    row = cur.fetchone()
+                conn.close()
+                last_run = row[0] if row and row[0] else None
+                if last_run is None or (datetime.now(UTC) - last_run.replace(tzinfo=UTC)) > timedelta(hours=24):
+                    _logger.info("🔄 Retention catch-up: last run >24h ago — running Supabase retention now")
+                    scheduler_service._run_supabase_retention_enforcement()
+                else:
+                    _logger.info("✅ Retention catch-up: last run recent (%s UTC) — skipping", last_run.isoformat())
             else:
-                _logger.info("✅ Retention catch-up: last run recent (%s UTC) — skipping", last_run.isoformat())
+                _logger.warning("⚠️ Retention catch-up check skipped: settings.database_url is not configured")
         except Exception as e:
             _logger.warning(f"⚠️ Retention catch-up check failed: {e}")
 

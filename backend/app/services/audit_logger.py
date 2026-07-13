@@ -634,7 +634,7 @@ class AuditLogger:
                     "id", "00000000-0000-0000-0000-000000000000"
                 ).execute()
             except Exception:
-                pass
+                logger.warning("Failed to clear audit_log table during audit logger reset", exc_info=True)
             logger.info("Cleared all audit logs")
 
     async def archive_old_audit_logs(self, days_old: int = 30) -> int:
@@ -676,7 +676,7 @@ class AuditLogger:
         try:
             self._flush_buffer()
         except Exception:
-            pass
+            logger.warning("Failed to flush buffered audit entries before archival", exc_info=True)
 
         try:
             supabase = get_supabase_client()

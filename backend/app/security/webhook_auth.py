@@ -189,7 +189,7 @@ async def verify_whatsapp_webhook(request: Request) -> bytes:
             _source_ip = request.client.host if request.client else None
             audit_webhook_suspicious("whatsapp", "signature_verification_failed", source_ip=_source_ip)
         except Exception:
-            pass
+            logger.warning("Failed to audit suspicious WhatsApp webhook", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid webhook signature",
@@ -303,7 +303,7 @@ async def verify_telegram_webhook(request: Request) -> bytes:
             _source_ip = request.client.host if request.client else None
             audit_webhook_suspicious("telegram", "secret_verification_failed", source_ip=_source_ip)
         except Exception:
-            pass
+            logger.warning("Failed to audit suspicious Telegram webhook", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Invalid webhook secret",

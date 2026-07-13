@@ -3,7 +3,7 @@
 import json
 import logging
 import re
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
@@ -1960,6 +1960,7 @@ async def update_site_phase(
 
 
 # ============= Phase Readiness Endpoint =============
+
 
 @router.get("/sites/{site_id}/readiness")
 async def get_readiness(
