@@ -54,6 +54,10 @@ class TestRetrainingQueueProcessor:
         return transition, scheduler
 
     def test_success_completes_entry(self):
+        """M2.5: after training succeeds, _run_champion_challenger handles completion.
+        The processor delegates to champion/challenger comparison rather than
+        transitioning to completed directly (that decision is now made after
+        champion comparison, not inside the processor)."""
         transition, scheduler = self._run(_entry(), _result(True))
         scheduler.trigger_retraining.assert_called_once_with(
             model_type="lstm",
@@ -61,8 +65,9 @@ class TestRetrainingQueueProcessor:
             reason="queue:drift_detected",
             site_id="site-005",
         )
+        # Transition to 'running' is the only direct transition from the
+        # processor; completion/escalation is handled by _run_champion_challenger.
         assert transition.call_args_list[0].args == ("q-1", "running")
-        assert transition.call_args_list[1].args == ("q-1", "completed")
 
     def test_lock_contention_repends_without_escalation(self):
         transition, _ = self._run(_entry(attempts=5), _result(False, "training_in_progress"))
@@ -156,13 +161,31 @@ class TestDriftVerdictEvaluation:
             baseline_id="b-1",
         )
 
-    def test_unevaluable_does_not_enqueue(self):
+    def test_unevaluable_enqueues_bootstrap_retraining(self):
+        """M2.5: UNEVALUABLE with equipment_type → bootstrap retraining.
+        (Supersedes M2.4 behavior, where UNEVALUABLE was deliberately deferred.)"""
         results = {
             "lstm": {"verdict": "unevaluable", "equipment_type": "chiller", "baseline_id": None},
             "autoencoder": {"verdict": "unevaluable", "equipment_type": "chiller", "baseline_id": None},
         }
         _, enqueue = self._run(results)
-        enqueue.assert_not_called()
+        assert enqueue.call_count == 2
+        enqueue.assert_any_call(
+            site_id="site-005",
+            equipment_type="chiller",
+            model_type="lstm",
+            trigger_reason="unevaluable_bootstrap",
+            drift_verdict="UNEVALUABLE",
+            baseline_id=None,
+        )
+        enqueue.assert_any_call(
+            site_id="site-005",
+            equipment_type="chiller",
+            model_type="autoencoder",
+            trigger_reason="unevaluable_bootstrap",
+            drift_verdict="UNEVALUABLE",
+            baseline_id=None,
+        )
 
     def test_job_registration(self):
         service = _make_service()
