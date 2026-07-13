@@ -340,6 +340,37 @@ class ModelRegistry:
             return self._resolve_model_paths(self.registry["models"][model_id])
         return None
 
+    def get_active_model_with_fallback(
+        self, model_type: str, equipment_type: str, site_id: str | None = None
+    ) -> tuple[dict | None, str | None]:
+        """Resolve champion with global fallback (Phase 245 M2.6 N4).
+
+        Tries site-scoped champion first; if none exists, falls back to the
+        global (non-site-scoped) champion for the same model_type + equipment_type
+        pair. Returns (model, resolution_path) where resolution_path is:
+
+        - ``"site"`` — site-scoped champion found (most relevant scope)
+        - ``"global_fallback"`` — no site champion, global champion used instead
+        - ``None`` — neither site nor global champion exists (first-ever model)
+
+        The caller records ``resolution_path`` in ``model_promotion_log.champion_source``
+        so every comparison is auditable.
+        """
+        # 1. Try site-scoped
+        champion = self.get_active_model(model_type, equipment_type, site_id=site_id)
+        if champion is not None:
+            return champion, "site"
+
+        # 2. Fall back to global (only if a site_id was requested; if the
+        #    caller already passed site_id=None, we've already tried global)
+        if site_id is not None:
+            champion = self.get_active_model(model_type, equipment_type, site_id=None)
+            if champion is not None:
+                return champion, "global_fallback"
+
+        # 3. Neither exists
+        return None, None
+
     def list_models(
         self,
         model_type: str | None = None,

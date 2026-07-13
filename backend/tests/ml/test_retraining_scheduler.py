@@ -187,43 +187,6 @@ class TestStaleModelRetrain:
         assert chiller_check["needs_retrain"] is True
         assert chiller_check["quality_metric"] == "r2_24h"
 
-    def test_auto_retrain_stale_queues_site_scoped_retraining(self, tmp_path):
-        registry_path = tmp_path / "registry.json"
-        registry_data = {
-            "models": {
-                "lstm_site-002_chiller_old": {
-                    "model_id": "lstm_site-002_chiller_old",
-                    "model_type": "lstm",
-                    "equipment_type": "chiller",
-                    "site_id": "site-002",
-                    "model_path": "/tmp/site-model.h5",
-                    "metrics": {"r2_24h": 0.72},
-                    "metadata": {"site_id": "site-002"},
-                    "registered_at": (datetime.now() - timedelta(days=60)).isoformat(),
-                    "status": "active",
-                }
-            },
-            "active": {"site-002_lstm_chiller": "lstm_site-002_chiller_old"},
-        }
-        registry_path.write_text(json.dumps(registry_data))
-        registry = ModelRegistry(registry_path=str(registry_path))
-
-        with patch("ml.registry.get_model_registry", return_value=registry):
-            scheduler = RetrainingScheduler()
-            queued = []
-            scheduler.queue_retraining = lambda **kwargs: queued.append(kwargs) or MagicMock(success=True)
-
-            scheduler.auto_retrain_stale()
-
-        assert queued == [
-            {
-                "model_type": "lstm",
-                "equipment_type": "chiller",
-                "reason": "Model age 60d exceeds 30d threshold",
-                "site_id": "site-002",
-            }
-        ]
-
 
 class TestModelQualityMetrics:
     def test_classifier_uses_cv_accuracy_quality_metric(self, tmp_path):

@@ -5693,10 +5693,13 @@ class BackgroundSchedulerService:
     @track_job_metrics("auto_retrain_stale_models")
     def _run_ml_retraining(self):
         """
-        Check for stale ML models and trigger retraining if needed.
+        Check for stale ML models and enqueue retraining via the standard queue.
 
-        Runs as background job - only retrains ONE model per cycle to avoid
-        system overload. Models are prioritized by age and performance degradation.
+        Phase 245 M2.6 (N2): Stale-model retraining now routes through
+        ml_retraining_queue → champion/challenger → promote-or-escalate,
+        instead of calling trigger_retraining() directly. Every stale model
+        found by check_all_models() is enqueued; deduplication and 24h
+        rate-limiting in enqueue() prevent flooding.
         """
         try:
             if self._shutdown_requested.is_set():
@@ -5737,49 +5740,58 @@ class BackgroundSchedulerService:
                 logger.info("✅ All ML models are fresh and performing well - no retraining needed")
                 return
 
-            # Get priority model (oldest first, then worst performing)
-            priority_model = sorted(
+            # Phase 245 M2.6: enqueue ALL stale models via the standard queue.
+            # The queue processor (30-min cadence) drains them one at a time
+            # through training → champion/challenger → promote-or-escalate.
+            # Deduplication + 24h rate-limit in enqueue() prevent flooding.
+            from app.ml.models.retraining_queue import enqueue as enqueue_retraining
+
+            enqueued = 0
+            skipped = 0
+            for model in sorted(
                 stale_models,
                 key=lambda m: (
-                    -999 if m["status"] == "missing" else m.get("age_days", 0),  # Missing models highest priority
-                    m.get("r2_score", 1.0),  # Then by R² score (lowest first)
+                    -999 if m["status"] == "missing" else m.get("age_days", 0),
+                    m.get("r2_score", 1.0),
                 ),
-            )[0]
+            ):
+                eq_type = model.get("equipment_type")
+                mtype = model.get("model_type")
+                sid = model.get("site_id")
+
+                queue_id = enqueue_retraining(
+                    site_id=sid,
+                    equipment_type=eq_type,
+                    model_type=mtype,
+                    trigger_reason="stale_model",
+                    drift_verdict=None,
+                    baseline_id=None,
+                )
+                if queue_id:
+                    enqueued += 1
+                    logger.info(
+                        "[ML-RETRAIN] Enqueued stale %s/%s site=%s age=%sd → queue:%s",
+                        mtype,
+                        eq_type,
+                        sid or "global",
+                        model.get("age_days", "?"),
+                        queue_id,
+                    )
+                else:
+                    skipped += 1
+                    logger.debug(
+                        "[ML-RETRAIN] Skipped stale %s/%s site=%s (dedupe/rate-limited)",
+                        mtype,
+                        eq_type,
+                        sid or "global",
+                    )
 
             logger.info(
-                f"Found {len(stale_models)} stale/underperforming models. "
-                f"Retraining priority: {priority_model['equipment_type']} ({priority_model['model_type']}) - "
-                f"Status: {priority_model['status']},"
-                f" Age: {priority_model['age_days']}d,"
-                f" R²: {priority_model.get('r2_score', 'N/A')}"
+                "Staleness check complete: %d stale → %d enqueued, %d skipped",
+                len(stale_models),
+                enqueued,
+                skipped,
             )
-
-            # Trigger retraining for ONE model only (others will be retrained in subsequent cycles)
-            retrain_result = scheduler.queue_retraining(
-                model_type=priority_model["model_type"],
-                equipment_type=priority_model["equipment_type"],
-                reason=priority_model.get("reason", "scheduled_maintenance"),
-                site_id=priority_model.get("site_id"),
-            )
-
-            if retrain_result.queued:
-                logger.info(
-                    f"✅ Retraining queued for {retrain_result.model_type}/{retrain_result.equipment_type} "
-                    f"(site={retrain_result.site_id or 'global'})"
-                )
-            elif retrain_result.success:
-                logger.info(
-                    f"✅ Retraining triggered for {retrain_result.model_type}/{retrain_result.equipment_type}. "
-                    f"New model ID: {retrain_result.new_model_id}"
-                )
-            else:
-                logger.error(f"❌ Failed to trigger retraining: {retrain_result.error}")
-
-            # Log summary of remaining stale models (for monitoring)
-            if len(stale_models) > 1:
-                remaining = stale_models[1:]
-                remaining_strs = [f"{m['equipment_type']} ({m['status']})" for m in remaining]
-                logger.info(f"Remaining stale models ({len(remaining)}): {', '.join(remaining_strs)}")
 
         except Exception as e:
             logger.error(f"Failed to run ML model retraining check: {e}", exc_info=True)
@@ -6225,13 +6237,12 @@ class BackgroundSchedulerService:
             )
 
             if result.success:
-                transition(queue_id, "completed")
-                logger.info(
-                    "[RETRAIN-QUEUE] Completed %s/%s site=%s (new_model=%s)",
-                    model_type,
-                    equipment_type,
-                    site_id,
-                    result.new_model_id,
+                self._run_champion_challenger(
+                    queue_id=queue_id,
+                    site_id=site_id,
+                    equipment_type=equipment_type,
+                    model_type=model_type,
+                    result=result,
                 )
             elif result.error == "training_in_progress":
                 # Another trigger path holds the training lock — not a failure.
@@ -6264,6 +6275,165 @@ class BackgroundSchedulerService:
                 )
         except Exception as e:
             logger.error("[RETRAIN-QUEUE] Queue processing failed: %s", e, exc_info=True)
+
+    def _run_champion_challenger(
+        self,
+        queue_id: str,
+        site_id: str,
+        equipment_type: str,
+        model_type: str,
+        result: Any,
+    ) -> None:
+        """Phase 243 (M2.5): Compare retrained model vs champion, then promote or escalate.
+
+        Runs after successful retraining in the queue processor. Uses
+        result.new_model_id (NOT result.model_id, which is a synthetic
+        composite string — N1 fix from pre-check gate).
+        """
+        from app.ml.models.champion_challenger import get_champion_challenger_service
+        from app.ml.models.retraining_queue import transition as transition_queue
+        from app.database.supabase_client import get_supabase_client
+        from ml.registry import get_model_registry
+
+        challenger_model_id = result.new_model_id
+        if not challenger_model_id:
+            transition_queue(queue_id, "escalated", error="no_model_id_from_retraining")
+            logger.error("[RETRAIN-QUEUE] ESCALATED %s: retraining returned no model_id", queue_id)
+            return
+
+        registry = get_model_registry()
+        champion, resolution_path = registry.get_active_model_with_fallback(model_type, equipment_type, site_id=site_id)
+
+        def _write_log(
+            client: Any,
+            outcome: str,
+            champion_id: str | None,
+            champion_metric: float | None = None,
+            challenger_metric: float | None = None,
+            metric_name: str = "",
+            reason: str | None = None,
+            champion_source: str | None = None,
+        ) -> None:
+            try:
+                client.table("model_promotion_log").insert(
+                    {
+                        "site_id": site_id,
+                        "equipment_type": equipment_type,
+                        "model_type": model_type,
+                        "champion_model_id": champion_id,
+                        "challenger_model_id": challenger_model_id,
+                        "champion_metric": champion_metric,
+                        "challenger_metric": challenger_metric,
+                        "comparison_metric_name": metric_name,
+                        "outcome": outcome,
+                        "reason": reason,
+                        "champion_source": champion_source,
+                    }
+                ).execute()
+            except Exception as write_err:
+                logger.warning(
+                    "[RETRAIN-QUEUE] Failed to write promotion log for %s: %s",
+                    queue_id,
+                    write_err,
+                )
+
+        if champion is None:
+            logger.info(
+                "[RETRAIN-QUEUE] No champion for %s/%s/%s — auto-promoting challenger %s",
+                site_id,
+                equipment_type,
+                model_type,
+                challenger_model_id,
+            )
+            registry.set_active(challenger_model_id, site_id=site_id)
+            client = get_supabase_client()
+            if client:
+                _write_log(client, "PROMOTED", None, reason="First-ever model — auto-promoted")
+            transition_queue(queue_id, "completed")
+            logger.info(
+                "[RETRAIN-QUEUE] Promoted %s/%s site=%s (new_model=%s) [auto: no champion]",
+                model_type,
+                equipment_type,
+                site_id,
+                challenger_model_id,
+            )
+            return
+
+        champion_id = champion.get("model_id") or champion.get("id", "")
+
+        if resolution_path == "global_fallback":
+            logger.info(
+                "[RETRAIN-QUEUE] Using global champion fallback for %s/%s/%s: %s",
+                site_id,
+                equipment_type,
+                model_type,
+                champion_id,
+            )
+
+        logger.info(
+            "[RETRAIN-QUEUE] Comparing champion=%s vs challenger=%s for %s/%s/%s",
+            champion_id,
+            challenger_model_id,
+            site_id,
+            equipment_type,
+            model_type,
+        )
+
+        service = get_champion_challenger_service()
+        challenger_metrics: dict[str, float] = result.metrics or {}
+        comp = service.compare(
+            champion_model_id=champion_id,
+            challenger_model_id=challenger_model_id,
+            site_id=site_id,
+            equipment_type=equipment_type,
+            model_type=model_type,
+            challenger_metrics=challenger_metrics,
+        )
+
+        client = get_supabase_client()
+        if client:
+            _write_log(
+                client,
+                comp.outcome,
+                champion_id=champion_id,
+                champion_metric=comp.champion_metric,
+                challenger_metric=comp.challenger_metric,
+                metric_name=comp.comparison_metric_name,
+                reason=comp.reason,
+                champion_source=resolution_path,
+            )
+
+        if comp.outcome == "PROMOTED":
+            registry.set_active(challenger_model_id, site_id=site_id)
+            transition_queue(queue_id, "completed")
+            logger.info(
+                "[RETRAIN-QUEUE] PROMOTED %s over %s for %s/%s/%s: %s",
+                challenger_model_id,
+                champion_id,
+                site_id,
+                equipment_type,
+                model_type,
+                comp.reason,
+            )
+        elif comp.outcome == "CHAMPION_RETAINED":
+            transition_queue(queue_id, "completed")
+            logger.info(
+                "[RETRAIN-QUEUE] RETAINED champion %s for %s/%s/%s: %s",
+                champion_id,
+                site_id,
+                equipment_type,
+                model_type,
+                comp.reason,
+            )
+        else:
+            transition_queue(queue_id, "escalated", error=comp.reason or "inconclusive comparison")
+            logger.warning(
+                "[RETRAIN-QUEUE] ESCALATED %s/%s/%s: champion/challenger comparison INCONCLUSIVE — %s",
+                site_id,
+                equipment_type,
+                model_type,
+                comp.reason,
+            )
 
     def add_drift_verdict_evaluation_job(self, interval_seconds: int = 3600):
         """
@@ -6301,10 +6471,11 @@ class BackgroundSchedulerService:
         Writes UPPERCASE verdicts (DRIFT_DETECTED / NO_DRIFT_DETECTED /
         UNEVALUABLE / FEATURE_MISMATCH / INSUFFICIENT_DATA) to
         drift_detection_log — the casing the demotion watcher and readiness
-        drift gates match on. DRIFT_DETECTED additionally enqueues retraining
-        (dedupe + 24h rate-limit live in enqueue()); UNEVALUABLE does not
-        enqueue — retraining a site with no usable accuracy data would only
-        burn attempts (deferred to M2.5).
+        drift gates match on.         DRIFT_DETECTED or UNEVALUABLE enqueues retraining
+        (dedupe + 24h rate-limit live in enqueue()). UNEVALUABLE
+        is gated on equipment_type being non-null and belonging to a known
+        equipment type — INSUFFICIENT_DATA (equipment_type=None) does not
+        enqueue. UNEVALUABLE enqueues with trigger_reason="unevaluable_bootstrap".
         """
         if self._shutdown_requested.is_set():
             logger.info("Skipping drift verdict evaluation during scheduler shutdown")
@@ -6341,14 +6512,31 @@ class BackgroundSchedulerService:
                         ).execute()
                         rows_written += 1
 
-                        if verdict == "DRIFT_DETECTED" and result.get("equipment_type"):
+                        if verdict in ("DRIFT_DETECTED", "UNEVALUABLE") and result.get("equipment_type"):
+                            eq_type = result["equipment_type"]
+                            # N3 guard: UNEVALUABLE verdict's equipment_type may fall
+                            # back to model_kind ("lstm_forecast"/"ae_score") when the
+                            # model_id parser fails. Filter against known types.
+                            from ml.training.retraining_scheduler import EQUIPMENT_TYPES as _KNOWN_EQ_TYPES
+
+                            if eq_type not in _KNOWN_EQ_TYPES:
+                                logger.debug(
+                                    "[DRIFT-VERDICT] Skipping enqueue for %s/%s: equipment_type=%s not in known types",
+                                    site_id,
+                                    model_type,
+                                    eq_type,
+                                )
+                                continue
+
                             from app.ml.models.retraining_queue import enqueue as enqueue_retraining
+
+                            trigger_reason = "unevaluable_bootstrap" if verdict == "UNEVALUABLE" else "drift_detected"
 
                             enqueue_retraining(
                                 site_id=site_id,
-                                equipment_type=result["equipment_type"],
+                                equipment_type=eq_type,
                                 model_type=model_type,
-                                trigger_reason="drift_detected",
+                                trigger_reason=trigger_reason,
                                 drift_verdict=verdict,
                                 baseline_id=result.get("baseline_id"),
                             )
