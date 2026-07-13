@@ -179,6 +179,40 @@ def transition(queue_id: str, new_status: str, error: str | None = None) -> bool
         return False
 
 
+def get_active_statuses_for_site(site_id: str) -> dict[str, str]:
+    """Map equipment_type → worst active queue status for a site. Never raises.
+
+    Active statuses are pending/running/escalated; when an equipment type has
+    several entries (lstm + autoencoder), the worst wins
+    (escalated > running > pending). Used by the readiness path (AC-6) to
+    surface retraining state on equipment findings; empty dict on any failure.
+    """
+    priority = {"pending": 1, "running": 2, "escalated": 3}
+    try:
+        client = _get_client()
+        if not client:
+            return {}
+        resp = (
+            client.table(TABLE)
+            .select("equipment_type,status")
+            .eq("site_id", site_id)
+            .in_("status", ["pending", "running", "escalated"])
+            .execute()
+        )
+        statuses: dict[str, str] = {}
+        for row in resp.data or []:
+            eq_type = row.get("equipment_type")
+            status = row.get("status")
+            if not eq_type or status not in priority:
+                continue
+            if eq_type not in statuses or priority[status] > priority[statuses[eq_type]]:
+                statuses[eq_type] = status
+        return statuses
+    except Exception as e:
+        logger.warning("[RETRAIN-QUEUE] get_active_statuses_for_site failed for %s: %s", site_id, e)
+        return {}
+
+
 def get_oldest_pending() -> dict | None:
     """Return the oldest pending queue entry, or None. Never raises."""
     try:

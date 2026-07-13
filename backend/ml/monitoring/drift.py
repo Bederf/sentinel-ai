@@ -287,6 +287,23 @@ def _get_supabase_sensor_data(
         return {}
 
 
+def _equipment_type_from_model_id(model_id: str | None) -> str | None:
+    """Extract the equipment type embedded in a model_id.
+
+    Phase 241 Plan 2: ml_model_accuracy has no equipment_type column, but
+    model IDs carry it (e.g. 'autoencoder_site-002_chiller_20260701_142014').
+    Returns None when no known equipment type token is present, so callers
+    fail closed instead of guessing.
+    """
+    if not model_id:
+        return None
+    tokens = model_id.split("_")
+    for eq_type in EQUIPMENT_TYPES:
+        if eq_type in tokens:
+            return eq_type
+    return None
+
+
 def _load_trained_baselines(
     site_id: str | None,
     equipment_type: str,
@@ -595,12 +612,15 @@ class DriftDetector:
         # Phase 236-03: verdicts derive ONLY from measured rolling accuracy
         # (ml_model_accuracy, written by the daily accuracy job). No measured
         # data → insufficient_data, never a fake verdict.
-        verdict_row = self._latest_measured_verdict(model_type)
+        # Phase 241 Plan 2: site-scoped — a site without its own measured
+        # accuracy rows fails closed instead of borrowing another site's.
+        verdict_row = self._latest_measured_verdict(model_type, site_id=site_id)
 
         if verdict_row is None:
             result = {
                 "model_type": model_type,
                 "detected_at": datetime.now().isoformat(),
+                "equipment_type": None,
                 "recent_accuracy": None,
                 "historical_accuracy": None,
                 "drift_detected": False,
@@ -629,6 +649,7 @@ class DriftDetector:
                 "model_type": model_type,
                 "detected_at": datetime.now().isoformat(),
                 "model_id": verdict_row.get("model_id"),
+                "equipment_type": equipment_type_str,
                 "recent_accuracy": verdict_row.get("measured"),
                 "historical_accuracy": None,
                 "drift_detected": False,
@@ -647,6 +668,7 @@ class DriftDetector:
                 "model_type": model_type,
                 "detected_at": datetime.now().isoformat(),
                 "model_id": verdict_row.get("model_id"),
+                "equipment_type": equipment_type_str,
                 "recent_accuracy": verdict_row.get("measured"),
                 "historical_accuracy": None,
                 "drift_detected": False,
@@ -679,6 +701,7 @@ class DriftDetector:
             "model_type": model_type,
             "detected_at": datetime.now().isoformat(),
             "model_id": verdict_row.get("model_id"),
+            "equipment_type": equipment_type_str,
             "recent_accuracy": measured,
             "historical_accuracy": baseline_accuracy,
             "drift_detected": drift_detected,
@@ -836,7 +859,7 @@ class DriftDetector:
             return _generate_current_stats(equipment_type, drift_amount=0.0)
         return current
 
-    def _latest_measured_verdict(self, model_type: str) -> dict[str, Any] | None:
+    def _latest_measured_verdict(self, model_type: str, site_id: str | None = None) -> dict[str, Any] | None:
         """Latest measured drift verdict for a model type from ml_model_accuracy.
 
         Phase 236-03: the real drift signal. Returns None when no measured
@@ -846,6 +869,10 @@ class DriftDetector:
 
         model_type is the drift-loop label ('lstm'/'autoencoder'); the
         accuracy table keys by model_kind ('lstm_forecast'/'ae_score').
+
+        Phase 241 Plan 2: optional site_id filter — when provided, only that
+        site's measured rows are considered, so per-site verdict evaluation
+        never borrows another site's accuracy (cross-site independence).
         """
         model_kind = {"lstm": "lstm_forecast", "autoencoder": "ae_score"}.get(model_type)
         if model_kind is None:
@@ -859,15 +886,10 @@ class DriftDetector:
             # ml_accuracy_service.reconcile_drift_findings. Here we surface the
             # most recent run and, within it, prefer a drift_suspected row so the
             # summary never hides a drifting model behind an arbitrary healthy one.
-            result = (
-                client.table("ml_model_accuracy")
-                .select("*")
-                .eq("model_kind", model_kind)
-                .eq("window_days", 7)
-                .order("computed_at", desc=True)
-                .limit(50)
-                .execute()
-            )
+            query = client.table("ml_model_accuracy").select("*").eq("model_kind", model_kind).eq("window_days", 7)
+            if site_id is not None:
+                query = query.eq("site_id", site_id)
+            result = query.order("computed_at", desc=True).limit(50).execute()
         except Exception as e:
             logger.debug("Measured verdict lookup failed for %s: %s", model_type, e)
             return None
@@ -891,6 +913,7 @@ class DriftDetector:
             degradation = None
         return {
             "model_id": row.get("model_id"),
+            "equipment_type": _equipment_type_from_model_id(row.get("model_id")),
             "measured": measured,
             "baseline": baseline,
             "drift_verdict": row.get("drift_verdict"),

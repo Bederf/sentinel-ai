@@ -529,20 +529,30 @@ class PhasePromotionEvaluator:
         # Equipment findings
         equipment_findings_list = create_findings_from_drift(site_id, equipment_verdicts)
 
+        # Phase 241 M2.4 (AC-6): surface retraining queue state on findings —
+        # operators see "drift detected AND repair is pending/running/escalated"
+        try:
+            from app.ml.models.retraining_queue import get_active_statuses_for_site
+
+            retrain_statuses = get_active_statuses_for_site(site_id)
+        except Exception:
+            retrain_statuses = {}
+
         # Convert findings to response format
         equipment_findings = []
         for f in equipment_findings_list:
             eq_type = f.get("equipment_type", "unknown")
             verdict_tuple = equipment_verdicts.get(eq_type, ("UNEVALUABLE", None))
-            equipment_findings.append(
-                {
-                    "equipment_id": f.get("equipment_id", "unknown"),
-                    "equipment_type": eq_type,
-                    "drift_verdict": verdict_tuple[0],
-                    "finding_type": f.get("finding_type"),
-                    "severity": f.get("severity", "low"),
-                }
-            )
+            finding = {
+                "equipment_id": f.get("equipment_id", "unknown"),
+                "equipment_type": eq_type,
+                "drift_verdict": verdict_tuple[0],
+                "finding_type": f.get("finding_type"),
+                "severity": f.get("severity", "low"),
+            }
+            if eq_type in retrain_statuses:
+                finding["retraining"] = retrain_statuses[eq_type]
+            equipment_findings.append(finding)
 
         logger.debug(
             "[READINESS] Site %s: trust_confidence=%.4f, base_trust=%.4f, drift_penalty=%.4f",

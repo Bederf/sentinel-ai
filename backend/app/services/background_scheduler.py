@@ -6153,6 +6153,217 @@ class BackgroundSchedulerService:
                 exc_info=True,
             )
 
+    def add_retraining_queue_processor_job(self, interval_seconds: int = 1800):
+        """
+        Add the ml_retraining_queue processor job (Phase 241 M2.4 Plan 2).
+
+        Drains the drift-triggered retraining queue: at most ONE entry per run
+        (deliberate CPU throttle — training is the heaviest job on this host).
+        trigger_retraining is serialized by the global training lock, so a run
+        that collides with an age-based or API-triggered training re-pends the
+        entry instead of training concurrently.
+
+        Args:
+            interval_seconds: How often to drain one entry (default: 1800 = 30 min)
+        """
+        if self.scheduler.get_job("retraining_queue_processor"):
+            self.scheduler.remove_job("retraining_queue_processor")
+            logger.info("Removed existing retraining queue processor job")
+
+        self.scheduler.add_job(
+            func=self._run_retraining_queue_processor,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="retraining_queue_processor",
+            name="ML Retraining Queue Processor",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
+        logger.info(f"Added retraining queue processor job with {interval_seconds}s interval")
+
+    @track_job_metrics("retraining_queue_processor")
+    def _run_retraining_queue_processor(self):
+        """Process the oldest pending ml_retraining_queue entry (max one per run).
+
+        Outcome handling (trigger_retraining never raises — branch on result):
+        - success                → completed
+        - training_in_progress   → re-pend (lock contention is not a failure)
+        - permanent error        → escalated immediately (no retries)
+        - transient error        → re-pend until attempts >= 3, then escalated
+        """
+        if self._shutdown_requested.is_set():
+            logger.info("Skipping retraining queue processing during scheduler shutdown")
+            return
+        try:
+            from app.ml.models.retraining_queue import (
+                get_oldest_pending,
+                is_permanent_failure,
+                transition,
+            )
+            from ml.training.retraining_scheduler import get_retraining_scheduler
+
+            entry = get_oldest_pending()
+            if not entry:
+                logger.debug("[RETRAIN-QUEUE] No pending entries")
+                return
+
+            queue_id = entry["id"]
+            site_id = entry.get("site_id")
+            equipment_type = entry.get("equipment_type")
+            model_type = entry.get("model_type")
+            # attempts BEFORE this run; transition to 'running' increments it
+            attempts_after_this_run = int(entry.get("attempts", 0)) + 1
+
+            transition(queue_id, "running")
+
+            result = get_retraining_scheduler().trigger_retraining(
+                model_type=model_type,
+                equipment_type=equipment_type,
+                reason=f"queue:{entry.get('trigger_reason', 'unknown')}",
+                site_id=site_id,
+            )
+
+            if result.success:
+                transition(queue_id, "completed")
+                logger.info(
+                    "[RETRAIN-QUEUE] Completed %s/%s site=%s (new_model=%s)",
+                    model_type,
+                    equipment_type,
+                    site_id,
+                    result.new_model_id,
+                )
+            elif result.error == "training_in_progress":
+                # Another trigger path holds the training lock — not a failure.
+                transition(queue_id, "pending")
+                logger.info(
+                    "[RETRAIN-QUEUE] Re-pended %s/%s site=%s: training lock held elsewhere",
+                    model_type,
+                    equipment_type,
+                    site_id,
+                )
+            elif is_permanent_failure(result.error) or attempts_after_this_run >= 3:
+                transition(queue_id, "escalated", error=result.error)
+                logger.warning(
+                    "[RETRAIN-QUEUE] ESCALATED %s/%s site=%s after %d attempt(s) — operator review required: %s",
+                    model_type,
+                    equipment_type,
+                    site_id,
+                    attempts_after_this_run,
+                    result.error,
+                )
+            else:
+                transition(queue_id, "pending", error=result.error)
+                logger.warning(
+                    "[RETRAIN-QUEUE] Transient failure for %s/%s site=%s (attempt %d/3), will retry: %s",
+                    model_type,
+                    equipment_type,
+                    site_id,
+                    attempts_after_this_run,
+                    result.error,
+                )
+        except Exception as e:
+            logger.error("[RETRAIN-QUEUE] Queue processing failed: %s", e, exc_info=True)
+
+    def add_drift_verdict_evaluation_job(self, interval_seconds: int = 3600):
+        """
+        Add the drift verdict evaluation job (Phase 241 M2.4 Plan 2).
+
+        This is the production caller of detect_model_drift() — before this job,
+        no code path wrote verdict rows to drift_detection_log, so the Phase 240
+        sustained-drift demotion watcher and the readiness drift gates could
+        never see real verdicts. Cheap: baseline lookup + comparison against
+        ml_model_accuracy — no training.
+
+        Args:
+            interval_seconds: Evaluation cadence (default: 3600 = 1 hour)
+        """
+        if self.scheduler.get_job("drift_verdict_evaluation"):
+            self.scheduler.remove_job("drift_verdict_evaluation")
+            logger.info("Removed existing drift verdict evaluation job")
+
+        self.scheduler.add_job(
+            func=self._run_drift_verdict_evaluation,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="drift_verdict_evaluation",
+            name="Drift Verdict Evaluation (model drift → verdict rows)",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+            misfire_grace_time=300,
+        )
+        logger.info(f"Added drift verdict evaluation job with {interval_seconds}s interval")
+
+    @track_job_metrics("drift_verdict_evaluation")
+    def _run_drift_verdict_evaluation(self):
+        """Evaluate model drift per site × model family and persist verdict rows.
+
+        Writes UPPERCASE verdicts (DRIFT_DETECTED / NO_DRIFT_DETECTED /
+        UNEVALUABLE / FEATURE_MISMATCH / INSUFFICIENT_DATA) to
+        drift_detection_log — the casing the demotion watcher and readiness
+        drift gates match on. DRIFT_DETECTED additionally enqueues retraining
+        (dedupe + 24h rate-limit live in enqueue()); UNEVALUABLE does not
+        enqueue — retraining a site with no usable accuracy data would only
+        burn attempts (deferred to M2.5).
+        """
+        if self._shutdown_requested.is_set():
+            logger.info("Skipping drift verdict evaluation during scheduler shutdown")
+            return
+        try:
+            from app.core.site_resolver import get_registered_site_ids
+            from app.database.supabase_client import get_supabase_client
+            from ml.monitoring.drift import get_drift_detector
+
+            client = get_supabase_client()
+            if not client:
+                logger.warning("[DRIFT-VERDICT] Supabase client unavailable, skipping")
+                return
+
+            detector = get_drift_detector()
+            rows_written = 0
+
+            for site_id in get_registered_site_ids():
+                for model_type in ("lstm", "autoencoder"):
+                    try:
+                        result = detector.detect_model_drift(model_type, site_id=site_id)
+                        verdict = (result.get("verdict") or "unevaluable").upper()
+                        client.table("drift_detection_log").insert(
+                            {
+                                "site_id": site_id,
+                                "model_type": model_type,
+                                "equipment_type": result.get("equipment_type"),
+                                "verdict": verdict,
+                                "baseline_id": result.get("baseline_id"),
+                                "score": result.get("recent_accuracy"),
+                                "drift_detected": bool(result.get("drift_detected")),
+                                "source": "drift_verdict_evaluation",
+                            }
+                        ).execute()
+                        rows_written += 1
+
+                        if verdict == "DRIFT_DETECTED" and result.get("equipment_type"):
+                            from app.ml.models.retraining_queue import enqueue as enqueue_retraining
+
+                            enqueue_retraining(
+                                site_id=site_id,
+                                equipment_type=result["equipment_type"],
+                                model_type=model_type,
+                                trigger_reason="drift_detected",
+                                drift_verdict=verdict,
+                                baseline_id=result.get("baseline_id"),
+                            )
+                    except Exception as eval_err:
+                        logger.warning(
+                            "[DRIFT-VERDICT] Evaluation failed for %s/%s: %s",
+                            site_id,
+                            model_type,
+                            eval_err,
+                        )
+
+            logger.debug("[DRIFT-VERDICT] Wrote %d verdict row(s)", rows_written)
+        except Exception as e:
+            logger.error("[DRIFT-VERDICT] Verdict evaluation failed: %s", e, exc_info=True)
+
     def add_mv_verification_job(self, interval_seconds: int = 900):
         """Add periodic M&V verification job for applied recommendations."""
         if self.scheduler.get_job("mv_verification"):

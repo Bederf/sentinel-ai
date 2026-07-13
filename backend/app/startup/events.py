@@ -959,6 +959,29 @@ async def startup_event(_: FastAPI) -> None:
         except Exception as e:
             _logger.error(f"⚠️ Phase promotion evaluator initialization failed: {e}")
 
+        # Phase 240 M2.3: sustained-drift demotion watcher (was defined but never
+        # registered — without this the 24h drift→advisory demotion never runs)
+        try:
+            scheduler_service.add_sustained_drift_demotion_job(interval_seconds=3600)
+            _logger.info("✅ Sustained drift demotion watcher initialized (hourly)")
+        except Exception as e:
+            _logger.error(f"⚠️ Sustained drift demotion watcher initialization failed: {e}")
+
+        # Phase 241 M2.4: drift verdict evaluation (production caller of
+        # detect_model_drift — writes verdict rows the watcher + readiness read)
+        try:
+            scheduler_service.add_drift_verdict_evaluation_job(interval_seconds=3600)
+            _logger.info("✅ Drift verdict evaluation initialized (hourly)")
+        except Exception as e:
+            _logger.error(f"⚠️ Drift verdict evaluation initialization failed: {e}")
+
+        # Phase 241 M2.4: retraining queue processor (one entry per 30 min)
+        try:
+            scheduler_service.add_retraining_queue_processor_job(interval_seconds=1800)
+            _logger.info("✅ Retraining queue processor initialized (30 min, one entry per run)")
+        except Exception as e:
+            _logger.error(f"⚠️ Retraining queue processor initialization failed: {e}")
+
         # IPMVP data sync — hourly fetch of energy, OAT, events, occupancy, tariff
         try:
             scheduler_service.add_ipmvp_sync_job(interval_hours=1)
