@@ -243,6 +243,63 @@ jobs:
           retention-days: 90
 
   # ===========================================================================
+  # Job 3.5: Snyk (dependency + code vulnerability scanning)
+  # ===========================================================================
+  # Requires a SNYK_TOKEN repository secret (repo Settings -> Secrets and
+  # variables -> Actions -> New repository secret). Sign up at snyk.io (free
+  # tier available), then Account Settings -> General -> Auth Token.
+  # Skipped (not failed) entirely until that secret exists, so this never
+  # blocks anything until it's actually configured. `snyk test` exits
+  # non-zero on any known vulnerability, same as pip-audit/safety above, so
+  # results are advisory (visible in the Security tab via SARIF) rather than
+  # build-breaking, consistent with the other dependency scans in this file.
+  snyk-scan:
+    name: Snyk (dependency scan)
+    runs-on: ubuntu-latest
+    if: ${{ secrets.SNYK_TOKEN != '' }}
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Snyk — Python (backend)
+        uses: snyk/actions/python-3.11@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: --file=backend/requirements.txt --sarif-file-output=snyk-python.sarif
+
+      - name: Snyk — Node (frontend)
+        uses: snyk/actions/node@master
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          command: test
+          args: --file=frontend/package-lock.json --sarif-file-output=snyk-node.sarif
+
+      - name: Upload Python SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-python.sarif
+          category: snyk-python
+
+      - name: Upload Node SARIF
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-node.sarif
+          category: snyk-node
+
+  # ===========================================================================
   # Job 4: Container Image Scanning (Trivy) — DISABLED
   # ===========================================================================
   # Skipped: requires ~2GB disk for Docker image pull on GitHub runners,
@@ -333,6 +390,7 @@ jobs:
     continue-on-error: false
     permissions:
       contents: read
+      pull-requests: read
 
     steps:
       - name: Checkout Code
@@ -407,7 +465,7 @@ jobs:
   security-summary:
     name: Security Scan Summary
     runs-on: ubuntu-latest
-    needs: [sast-python, sast-frontend, dependency-check, container-scan, secrets-scan, secrets-pr-gate]
+    needs: [sast-python, sast-frontend, dependency-check, snyk-scan, container-scan, secrets-scan, secrets-pr-gate]
     if: always()
 
     steps:
@@ -428,6 +486,7 @@ jobs:
           echo "| Python SAST (Bandit) | ${{ needs.sast-python.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Frontend Audit (npm) | ${{ needs.sast-frontend.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Dependency Check | ${{ needs.dependency-check.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Snyk (dependency scan) | ${{ needs.snyk-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Container Scan (Trivy) | ${{ needs.container-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| Secrets Detection (Gitleaks) | ${{ needs.secrets-scan.result }} |" >> $GITHUB_STEP_SUMMARY
           echo "| PR Gate: Gitleaks (zero tolerance) | ${{ needs.secrets-pr-gate.result }} |" >> $GITHUB_STEP_SUMMARY

@@ -23,8 +23,13 @@ Every push and pull request to `main` runs:
 - **Bandit** — Python static analysis (SAST)
 - **npm audit** — frontend dependency vulnerabilities
 - **pip-audit** / **Safety** — backend dependency vulnerabilities
-- **Gitleaks** — secrets detection (PR-blocking on any finding)
+- **Snyk** — dependency + code vulnerability scanning, results published to the repo's Security tab
+  (requires a `SNYK_TOKEN` repository secret; skipped, not failed, until one is configured)
+- **Gitleaks** — secrets detection (PR-blocking on any finding via the zero-tolerance PR gate)
 - **Dependabot** — weekly dependency update scans across pip, npm, GitHub Actions, and Docker base images
+
+Branch protection on `main` requires the Bandit and Gitleaks PR-gate checks to pass before a pull
+request — including Dependabot's own — can be merged.
 
 See [`.github/workflows/security-scan.yml`](.github/workflows/security-scan.yml) for the exact checks.
 
