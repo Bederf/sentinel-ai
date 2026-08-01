@@ -248,15 +248,18 @@ jobs:
   # Requires a SNYK_TOKEN repository secret (repo Settings -> Secrets and
   # variables -> Actions -> New repository secret). Sign up at snyk.io (free
   # tier available), then Account Settings -> General -> Auth Token.
-  # Skipped (not failed) entirely until that secret exists, so this never
-  # blocks anything until it's actually configured. `snyk test` exits
-  # non-zero on any known vulnerability, same as pip-audit/safety above, so
-  # results are advisory (visible in the Security tab via SARIF) rather than
-  # build-breaking, consistent with the other dependency scans in this file.
+  # The `secrets` context can't appear in an `if:` condition at any level
+  # (GitHub Actions rejects the whole workflow file if it does — this bit us
+  # once already), so there's no clean way to skip this job when the secret
+  # is absent. Instead every step relies on `continue-on-error: true`: without
+  # SNYK_TOKEN, `snyk test` fails on auth and the job stays green anyway.
+  # `snyk test` also exits non-zero on any known vulnerability, same as
+  # pip-audit/safety above, so results are advisory (visible in the Security
+  # tab via SARIF) rather than build-breaking, consistent with the other
+  # dependency scans in this file.
   snyk-scan:
     name: Snyk (dependency scan)
     runs-on: ubuntu-latest
-    if: ${{ secrets.SNYK_TOKEN != '' }}
     permissions:
       contents: read
       security-events: write
