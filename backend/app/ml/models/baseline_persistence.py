@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 
 def _compute_md5_hash(data: str) -> str:
-    """Compute MD5 hash of a string."""
-    return hashlib.md5(data.encode()).hexdigest()
+    """Compute MD5 hash of a string. Non-cryptographic use (schema fingerprint), not for security."""
+    return hashlib.md5(data.encode(), usedforsecurity=False).hexdigest()
 
 
 def _compute_feature_schema_hash(features: list[str], target: str) -> str:

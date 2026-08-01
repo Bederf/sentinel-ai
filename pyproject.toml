@@ -7,7 +7,7 @@ name = "simbiot-concept-connector"
 version = "1.0.0"
 description = "SIMBIOT integration module: SENTINEL AI ↔ MRI Evolution (Concept) via FSI Public API"
 readme = "README.md"
-license = {text = "Proprietary — SENTINEL Platform"}
+license = {text = "Apache-2.0"}
 requires-python = ">=3.10"
 authors = [
     {name = "SENTINEL Platform Team"},

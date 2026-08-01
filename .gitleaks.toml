@@ -1,0 +1,77 @@
+# Public-safe Gitleaks configuration for the sentinel-ai (public) repository.
+#
+# This is a DIFFERENT, narrower file than the internal .gitleaks.toml used in
+# bms-intelligence — that file has a blanket `docs/.*\.md` allowlist entry
+# which is unjustifiably broad and (per the 2026-07-31 security audit) is
+# exactly the kind of entry that let a real-secrets-bearing document
+# (AUTH-INFRASTRUCTURE-DISCOVERY-REPORT.md) go unflagged internally. Do not
+# copy that file here. Every entry below was individually verified against
+# actual file content during the 2026-07-31 audit — no broad directories,
+# no blanket doc/test excludes.
+#
+# This file is not synced automatically by scripts/sync-sentinel-ai.sh (which
+# excludes .gitleaks.toml so the two configs can diverge deliberately). It
+# must be manually placed as `.gitleaks.toml` in the sentinel-ai repo root
+# whenever this file changes.
+
+title = "sentinel-ai public gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+  description = "Verified false positives — each entry checked against actual content, 2026-07-31"
+  paths = [
+    # Test fixture: mock jwt_secret_key set on a pytest MagicMock, not a real key
+    '''backend/tests/startup/test_startup_validation\.py''',
+    # Test fixture: deliberately fake api_key value used to test the app's own
+    # secret-redaction filter (test asserts it gets replaced with a redaction marker)
+    '''backend/tests/api/test_mcp_security_registry\.py''',
+    # Placeholder values ("demo-token", example equipment codes) in a manual API smoke-test script
+    '''backend/tests/manual_gating_test\.sh''',
+    # Synthetic WireGuard public keys used only to test base64/length/charset validation logic
+    '''backend/tests/services/residential/test_wireguard_peer_manager\.py''',
+    # Test fixture token for the sensor-ingest endpoint test suite
+    '''backend/tests/space/test_sensor_ingest\.py''',
+    # Placeholder value ("invalid-token") in a manual module-toggle diagnostic script
+    '''backend/tests/test_module_toggle_diagnostic\.sh''',
+    # Municipal tariff catalog entry key/slug, not a credential
+    '''backend/app/data/municipal_tariff_sources\.json''',
+    # High-entropy dict key name in recommendation-action construction, not a secret
+    '''backend/app/services/background_scheduler\.py''',
+    # Self-referential rotation-tracking log; states "no leaks found", flagged on its own table structure
+    '''docs/09-security/secret-rotation-log\.md''',
+    # Literal placeholder "YOUR_JWT_TOKEN" in an example curl command
+    '''docs/03-api-reference/water-api\.md''',
+    # JSON error-response shape documentation and field-name descriptions only, no credential content
+    '''docs/03-api-reference/system-health-api\.md''',
+    # Env var documentation with placeholder values (INFLUXDB_TOKEN=<your-token>)
+    '''docs/04-features/42-data-collection-storage\.md''',
+    # Documented example webhook secret ("sentry-bms-phase-41") — phase-numbered demo value, not a live credential
+    '''docs/04-features/41-ml-knowledge-capture-01\.md''',
+    # Device fixture data, no real secrets (pre-existing entry, verified 2026-07-31)
+    '''backend/app/data/space/sensor_devices\.json''',
+    # Supabase's own publicly-documented fixed local-dev demo anon key (JWT payload literally
+    # contains "iss":"supabase-demo") — not a real credential, shared across every local install
+    '''backend/app/api/stats\.py''',
+    # Test fixture: intentionally realistic-looking fake JWT used to test the redaction filter itself
+    '''backend/app/security/tests/test_output_filter\.py''',
+    # Historical secret in an old commit already removed from the current file; current content is clean
+    '''backend/app/services/supabase_retention_service\.py''',
+    # age PUBLIC key (prefix "age1...") used to encrypt secrets TO — not sensitive by design
+    '''infra/scripts/sops-encrypt\.sh''',
+    # Operational audit-log/recommendation data (timestamps, IDs, action records) that coincidentally
+    # matches a payment-token entropy heuristic; not a Square credential — this project has no Square integration
+    '''backend/app/data/audit_log\.json''',
+    '''backend/app/data/recommendations\.json''',
+    # Architecture/flow documentation only — matched on a long class/function identifier name, no secret value present
+    '''docs/05-integrations/SENTRY_JWT_AUTH_SETUP\.md''',
+  ]
+
+# Custom rules — SENTINEL-specific patterns the gitleaks defaults miss
+[[rules]]
+id = "sentinel-telegram-bot-token"
+description = "Telegram bot token (numeric_id:hash format)"
+regex = '''\b[0-9]{8,10}:AA[A-Za-z0-9_\-]{30,}\b'''
+tags = ["secret", "telegram"]
+keywords = ["telegram", "bot", "token"]

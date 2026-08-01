@@ -106,8 +106,9 @@ backend/ml/models/registry.json.lock
 backend/app/data/space/node_room_mapping.json
 backend/app/data/space/_local_node_mapping.json
 backend/app/data/space/node_room_mapping.local.json
-# Next.js build output
+# Next.js build output (stray build cache, not part of this Vite frontend's source)
 backend/.next/
+frontend/.next/
 # Python dependency lock
 backend/uv.lock
 
@@ -140,3 +141,9 @@ site_id Building Document Sub Class Docu.tsv
 
 # Runtime artifact — created by TariffScheduleRepository when Supabase unavailable
 municipal_tariff_schedules.json
+
+# Infisical secrets (Phase 65.0)
+backend/env.secrets
+sentry-gateway/.infisical.json
+.infisical.json
+infisical-scan.yaml

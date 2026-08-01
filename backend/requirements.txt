@@ -9,7 +9,7 @@ pydantic[email]>=2.6.1
 pydantic-settings>=2.1.0
 
 # HTTP Client (async preferred over requests)
-httpx>=0.26.0,<0.28
+httpx>=0.28.0,<1.0.0
 requests>=2.31.0  # Fallback for legacy integrations
 
 # AI/LLM
@@ -19,6 +19,7 @@ voyageai==0.4.1
 # Database
 supabase>=2.3.0
 psycopg2-binary==2.9.9
+redis>=5.0.0
 
 # Time-Series Database
 influxdb-client>=1.38.0
@@ -41,6 +42,7 @@ pytest>=9.0.3
 pytest-asyncio>=0.25.0
 pytest-cov>=4.0.0
 pytest-timeout>=2.1.0
+ruff>=0.15.1
 
 # Background Tasks
 apscheduler==3.10.4
@@ -136,3 +138,4 @@ odse>=0.4.0                    # ODS-E schema validation for Asoba eSUMS integra
 
 # KNX/IP Protocol (Wave 1 - SENTINEL BMS Adapter)
 xknx>=2.12.0
+infisical-python>=2.0.0

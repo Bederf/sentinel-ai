@@ -1,30 +1,41 @@
 # Sentinel AI
 
-Smart building operations platform powered by AI. Complements existing BMS (BACnet, Modbus, Desigo, Niagara) with predictive analytics, automated fault detection, and intelligent work order generation.
+> Your buildings talk. We help you listen.
+
+Sentinel manages **knowledge about buildings** so that humans and AI can make **safe, evidence-based decisions**.
+
+It is a **data-agnostic AI-powered building intelligence layer** that sits above any BMS/SCADA system. Every input — BACnet telemetry, a staff complaint, an AI prediction — follows the same closed-loop lifecycle:
+
+```text
+Observation → Evidence → Knowledge → Decision → Action → Outcome → Observation
+```
+
+| Source | Input | Evidence | Knowledge | Output |
+|---|---|---|---|---|
+| Building | BACnet telemetry | sensor_readings | Equipment state | Recommendation |
+| Humans | Staff complaint | observation_store | Occupancy/comfort | Work order |
+| Models | Prediction error | accuracy_log | Drift verdict | Retraining trigger |
+
+Sentinel is not a BMS. It is the **intelligence layer** — observational, predictive, and trust-gated from shadow through autonomous authority.
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    FE["Frontend (React/Vite)<br/>Cockpit dashboards + settings"]
+    FE -- "REST + SSE" --> BE["Backend (FastAPI)"]
+    subgraph BE_INNER[" "]
+        AG["Agents<br/>(NLP, Graph)"]
+        SV["Services<br/>(ML, Health)"]
+        AD["Adapters<br/>(BMS, IoT)"]
+        SC["Scheduler<br/>(APScheduler tasks)"]
+    end
+    BE --> BE_INNER
+    BE_INNER --> DB["Database Layer (Supabase)<br/>PostgreSQL + Redis caching + real-time"]
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                        Frontend (React/Vite)                  │
-│                     Cockpit dashboards + settings             │
-└──────────────────────────┬───────────────────────────────────┘
-                           │ REST + SSE
-┌──────────────────────────▼───────────────────────────────────┐
-│                      Backend (FastAPI)                        │
-│                                                               │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐ │
-│  │  Agents  │  │ Services │  │ Adapters │  │  Scheduler   │ │
-│  │  (NLP,   │  │ (ML,     │  │ (BMS,    │  │  (APScheduler│ │
-│  │  Graph)  │  │  Health) │  │  IoT)    │  │   tasks)     │ │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘ │
-│                                                               │
-│  ┌────────────────────────────────────────────────────────┐  │
-│  │               Database Layer (Supabase)                 │  │
-│  │      PostgreSQL + Redis caching + real-time             │  │
-│  └────────────────────────────────────────────────────────┘  │
-└──────────────────────────────────────────────────────────────┘
-```
+
+Full system design: [`docs/02-architecture/system-overview.md`](docs/02-architecture/system-overview.md) and
+[architecture decision records](docs/02-architecture/).
 
 ## Quick Start
 
@@ -109,6 +120,23 @@ See `.env.example` for all required configuration:
 - **Protocol agnostic** — SIMBIOT adapter layer works with BACnet, Modbus, Desigo, Niagara
 - **Human-in-loop** — All automated actions require operator approval
 
+## Documentation
+
+[`docs/README.md`](docs/README.md) is the full documentation index. Highlights:
+
+- [Getting started](docs/01-getting-started/) — quick start, dev environment, local setup
+- [Architecture](docs/02-architecture/) — system overview and ADRs
+- [API reference](docs/03-api-reference/)
+- [Security & privacy](docs/09-security/)
+
+## Security
+
+See [`SECURITY.md`](SECURITY.md) for how to report a vulnerability and what the automated security checks cover.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for local checks to run before opening a pull request.
+
 ## License
 
-Proprietary. All rights reserved.
+[Apache License 2.0](LICENSE).
