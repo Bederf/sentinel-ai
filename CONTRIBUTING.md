@@ -34,6 +34,33 @@ npm run test:run
 A pull request is expected to pass linting, type checking, and unit tests. Integration tests (needing a live
 Supabase instance) and E2E tests run separately and don't block merges.
 
+## Known CI limitations
+
+CI's `backend-tests` job runs the full non-integration test suite against placeholder credentials
+(`SUPABASE_SERVICE_ROLE_KEY=test-key-not-real`, a local `DATABASE_URL`) and no Ollama instance. In a
+generic checkout with no local services running, a substantial number of tests are expected to fail —
+this is a known gap, not a secret, and not evidence the sanitized/public history is broken. As of this
+writing the suite runs ~6,400 tests with a ~91% pass rate; almost all remaining failures fall into:
+
+- **Auth/API tests expecting a real Supabase instance** (`assert 401 == ...`, `postgrest.exceptions.APIError:
+  JWSError`) — these hit `SUPABASE_URL`/`DATABASE_URL` for real and get rejected by whatever is actually
+  listening on `127.0.0.1:55321`/`55322` (or time out if nothing is). Reproduce locally with the
+  [Supabase CLI](https://supabase.com/docs/guides/cli): `supabase start` in the repo root picks up the
+  committed `supabase/config.toml`, which pins those exact ports.
+- **Tests exercising local LLM fallback** (`app/services/ollama_client.py`, `hybrid_ai_service.py`,
+  `model_gateway.py`) — need a running [Ollama](https://ollama.com) instance; fail with attribute/connection
+  errors otherwise.
+- **`pytest-asyncio` version drift** — the CI install step doesn't pin `pytest-asyncio`'s version, so a small
+  cluster of `RuntimeError: no current event loop` / `coroutine is not subscriptable` failures can appear or
+  disappear depending on which release `pip`/`uv` resolves at install time.
+- A long tail of pre-existing, single-test assertion failures across unrelated subsystems (equipment-code
+  mapping, health scoring, notification counters) that predate any given change and are tracked as ordinary
+  backlog, not release blockers.
+
+If you're touching one of these areas, run the affected test file directly with the real local services up
+rather than relying on the full-suite CI signal, and don't assume a red `backend-tests` run means your change
+broke something until you've checked which category the failures fall into.
+
 ## Commit messages
 
 This repo follows [Conventional Commits](https://www.conventionalcommits.org/):
