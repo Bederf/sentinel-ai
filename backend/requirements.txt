@@ -1,15 +1,15 @@
 # BMS Intelligence Backend Dependencies
 
 # Web Framework
-fastapi>=0.116.0
-uvicorn[standard]==0.27.1
+fastapi>=0.140.13
+uvicorn[standard]==0.52.0
 
 # Settings and Validation
-pydantic[email]>=2.6.1
-pydantic-settings>=2.1.0
+pydantic[email]>=2.13.4
+pydantic-settings>=2.14.2
 
 # HTTP Client (async preferred over requests)
-httpx>=0.28.0,<1.0.0
+httpx>=0.28.1,<1.0.0
 requests>=2.31.0  # Fallback for legacy integrations
 
 # AI/LLM
@@ -17,7 +17,7 @@ anthropic>=0.39.0
 voyageai==0.4.1
 
 # Database
-supabase>=2.3.0
+supabase>=2.31.0
 psycopg2-binary==2.9.9
 redis>=5.0.0
 asyncpg>=0.29.0
@@ -91,7 +91,7 @@ slowapi>=0.1.9
 bcrypt>=4.2.0
 
 # Encryption (Phase 1b FSR Compliance - Cryptography)
-cryptography>=42.0.0  # AES-256 encryption for audit logs and PII at rest
+cryptography>=49.0.0  # AES-256 encryption for audit logs and PII at rest
 defusedxml>=0.7.1     # Secure XML parsing (XXE/bomb protection)
 
 # DXF File Parsing (Phase B: Digital Twin Builder)
