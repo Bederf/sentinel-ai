@@ -2,7 +2,7 @@
 
 # Build stage
 # node:20.19-alpine — builder stage only, not in production image
-FROM node:20.19-alpine AS builder
+FROM node:26.4-alpine AS builder
 
 WORKDIR /app
 
