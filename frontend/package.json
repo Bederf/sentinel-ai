@@ -32,7 +32,7 @@
     "framer-motion": "^12.38.0",
     "gsap": "^3.14.2",
     "leaflet": "^1.9.4",
-    "lucide-react": "^1.27.0",
+    "lucide-react": "^1.28.0",
     "postcss": "^8.5.25",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
