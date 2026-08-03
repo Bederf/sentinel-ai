@@ -1,7 +1,7 @@
 # BMS Intelligence Backend Dependencies
 
 # Web Framework
-fastapi>=0.140.13
+fastapi>=0.141.1
 uvicorn[standard]==0.52.0
 
 # Settings and Validation
