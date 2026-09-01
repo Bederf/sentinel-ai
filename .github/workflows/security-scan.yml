@@ -104,7 +104,7 @@ jobs:
 
       - name: Upload Bandit Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: bandit-sast-report
           path: bandit-report.json
@@ -163,7 +163,7 @@ jobs:
 
       - name: Upload npm Audit Report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: npm-audit-report
           path: frontend/npm-audit-report.json
@@ -234,7 +234,7 @@ jobs:
 
       - name: Upload Dependency Reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dependency-audit-reports
           path: |
@@ -374,7 +374,7 @@ jobs:
 
       - name: Upload Trivy Reports
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: trivy-scan-reports
           path: |
