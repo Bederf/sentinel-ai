@@ -12,7 +12,7 @@ PDF_LOW_TEXT_THRESHOLD = 200
 
 
 def extract_text_from_pdf(file_bytes: bytes) -> str:
-    """Extract text from PDF using PyPDF2.
+    """Extract text from PDF using pypdf.
 
     Args:
         file_bytes: Raw PDF file bytes
@@ -23,7 +23,7 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     try:
         from io import BytesIO
 
-        from PyPDF2 import PdfReader
+        from pypdf import PdfReader
 
         pdf_reader = PdfReader(BytesIO(file_bytes))
         text_parts = []
@@ -39,14 +39,14 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
         return "\n\n".join(text_parts)
 
     except ImportError as exc:
-        raise ImportError("PyPDF2 is required for PDF extraction. Install with: pip install PyPDF2") from exc
+        raise ImportError("pypdf is required for PDF extraction. Install with: pip install pypdf") from exc
     except Exception as e:
         logger.error(f"Error extracting text from PDF: {e}")
         raise
 
 
 def _extract_text_from_pdf_native(file_bytes: bytes) -> str:
-    """Native PyPDF2 extraction — no OCR involved."""
+    """Native pypdf extraction — no OCR involved."""
     return extract_text_from_pdf(file_bytes)
 
 

@@ -23,9 +23,12 @@
   "author": "AimTheLaw Development Team",
   "license": "MIT",
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250927.0",
+    "@cloudflare/workers-types": "^5.20261024.1",
     "typescript": "^5.9.2",
-    "wrangler": "^4.55.0"
+    "wrangler": "^4.152.0"
+  },
+  "overrides": {
+    "undici": "7.30.1"
   },
   "engines": {
     "node": ">=18.0.0"
