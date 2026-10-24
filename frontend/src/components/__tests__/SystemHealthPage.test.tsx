@@ -113,7 +113,7 @@ describe('SystemHealthPage', () => {
 
   async function openHistoricalTab() {
     await waitFor(() => expect(screen.getByText('System Health')).toBeInTheDocument());
-    await userEvent.click(screen.getByRole('button', { name: 'Historical' }));
+    await userEvent.click(screen.getByRole('tab', { name: 'Historical' }));
   }
 
   // ===== LOADING & ERROR STATES =====

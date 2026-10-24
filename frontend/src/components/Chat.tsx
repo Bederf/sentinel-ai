@@ -66,7 +66,7 @@ export function Chat({ defaultSiteId }: ChatProps) {
   // Speech-to-text, text-to-speech, and VAD hooks
   const stt = useSpeechRecognition();
   const tts = useTextToSpeech();
-  const vad = useVAD({
+  const _vad = useVAD({
     onSpeechStart: () => setVoiceState("user_speaking"),
     onSpeechEnd: (_audioBlob, _transcript) => {
       // VAD detected end of speech — transcript sent via STT

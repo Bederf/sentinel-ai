@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { OptimizationToggleGated } from "./OptimizationToggleGated";
 import { OptimizationRecommendationModal } from "./OptimizationRecommendationModal";
-import { formatRelativeTime } from "../lib/timeFormat";
 import api, { type ROISummaryResponse } from '@/lib/api';
 import type {
   OptimizationStatusResponse,
@@ -45,7 +44,6 @@ export function OptimizationInfoCard({
 }: OptimizationInfoCardProps) {
   const [optimizationStatus, setOptimizationStatus] =
     useState<OptimizationStatusType>("unknown");
-  const [lastOptimization, setLastOptimization] = useState<string | null>(null);
   const [currentRecommendation, setCurrentRecommendation] =
     useState<OptimizationRecommendation | null>(null);
   const [monthlySavings, setMonthlySavings] = useState<MonthlySavingsSummary | null>(null);
@@ -59,7 +57,6 @@ export function OptimizationInfoCard({
   // Phase-aware mode label: onboarding_phase from settings page is the master
   const effectivePhase = sitePhase;
   const isAdvisory = effectivePhase === "shadow_live" || effectivePhase === "advisory";
-  const isAutoMode = mode === "automatic" && effectivePhase === "automatic";
 
   // Sync mode with onboardingPhase prop when it changes
   useEffect(() => {
@@ -86,7 +83,6 @@ export function OptimizationInfoCard({
           full_settings: status.optimization_settings
         });
         setOptimizationStatus(status.optimization_status);
-        setLastOptimization(status.last_optimization);
         setCurrentRecommendation(status.last_recommendation);
         setMonthlySavings(status.monthly_savings || null);
         if (status.optimization_settings?.mode) {
@@ -293,7 +289,9 @@ export function OptimizationInfoCard({
                 const status = await api.getOptimizationStatus(siteId);
                 setOptimizationStatus(status.optimization_status);
                 if (status.optimization_settings?.mode) setMode(status.optimization_settings.mode);
-              } catch (_) {}
+              } catch (_) {
+                // The toggle already reports its own error state; keep the card usable.
+              }
             }}
           />
         </div>

@@ -168,13 +168,6 @@ export default function InspectionForm({
 
   const progress = getCompletionProgress();
 
-  const panelStyle: React.CSSProperties = {
-    background: "var(--color-sentinel-bg-panel)",
-    border: "1px solid var(--color-sentinel-border)",
-    borderRadius: 8,
-    padding: 16,
-  };
-
   const cardStyle: React.CSSProperties = {
     background: "var(--color-sentinel-bg-panel)",
     border: "1px solid var(--color-sentinel-border)",

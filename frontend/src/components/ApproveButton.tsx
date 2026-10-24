@@ -70,17 +70,6 @@ export function ApproveButton({
     }
   })()
 
-  const tierBg = (() => {
-    switch (tier) {
-      case 3:
-        return 'rgba(var(--color-sentinel-red-rgb), 0.15)'
-      case 2:
-        return 'rgba(var(--color-sentinel-amber-rgb), 0.15)'
-      default:
-        return 'rgba(var(--color-sentinel-green-rgb), 0.15)'
-    }
-  })()
-
   /**
    * Start hold timer when mouse down
    */
