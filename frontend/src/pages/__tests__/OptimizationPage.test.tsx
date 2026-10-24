@@ -169,7 +169,7 @@ describe('OptimizationPage', () => {
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText('Energy Control')).toBeInTheDocument();
+        expect(screen.getByText('AI Optimisation')).toBeInTheDocument();
       });
     });
 
@@ -198,7 +198,7 @@ describe('OptimizationPage', () => {
       render(<OptimizationPage />, { wrapper: createTestWrapper() });
 
       await waitFor(() => {
-        expect(screen.getByText(/Optimisation/)).toBeInTheDocument();
+        expect(screen.getByText('Optimisation & Recommendations')).toBeInTheDocument();
       });
     });
   });
