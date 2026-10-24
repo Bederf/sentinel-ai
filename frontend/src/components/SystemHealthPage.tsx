@@ -1196,19 +1196,19 @@ export default function SystemHealthPage() {
                   {history.metrics?.trend === 'improving' && (
                     <>
                       <TrendingUp className="w-5 h-5" style={{ color: "var(--color-sentinel-green)" }} />
-                      <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.35)", color: "var(--color-sentinel-green)" }}>Improving</span>
+                      <span data-testid="badge-green" className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(16, 185, 129, 0.15)", border: "1px solid rgba(16, 185, 129, 0.35)", color: "var(--color-sentinel-green)" }}>Improving</span>
                     </>
                   )}
                   {history.metrics?.trend === 'degrading' && (
                     <>
                       <TrendingDown className="w-5 h-5" style={{ color: "var(--color-sentinel-red)" }} />
-                      <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(220, 38, 38, 0.15)", border: "1px solid rgba(220, 38, 38, 0.35)", color: "var(--color-sentinel-red)" }}>Degrading</span>
+                      <span data-testid="badge-red" className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(220, 38, 38, 0.15)", border: "1px solid rgba(220, 38, 38, 0.35)", color: "var(--color-sentinel-red)" }}>Degrading</span>
                     </>
                   )}
                   {history.metrics?.trend === 'stable' && (
                     <>
                       <Clock className="w-5 h-5" style={{ color: "var(--color-sentinel-text-disabled)" }} />
-                      <span className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(148, 163, 184, 0.15)", border: "1px solid rgba(148, 163, 184, 0.35)", color: "var(--color-sentinel-text-secondary)" }}>Stable</span>
+                      <span data-testid="badge-gray" className="text-xs font-semibold px-2 py-1 rounded" style={{ background: "rgba(148, 163, 184, 0.15)", border: "1px solid rgba(148, 163, 184, 0.35)", color: "var(--color-sentinel-text-secondary)" }}>Stable</span>
                     </>
                   )}
                 </div>
@@ -1217,9 +1217,9 @@ export default function SystemHealthPage() {
               {healthTrendData.length > 0 && (
                 <div className="rounded-lg p-4" style={{ background: "var(--color-sentinel-bg-panel)", border: "1px solid var(--color-sentinel-border)" }}>
                   <p className="uppercase text-[11px] tracking-wide" style={{ color: "var(--color-sentinel-text-secondary)" }}>Health Score Trend</p>
-                  <div className="mt-6">
+                  <div className="mt-6" data-testid="line-chart">
                     <ResponsiveContainer width="100%" height={300}>
-                      <LineChart data={healthTrendData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
+                      <LineChart data={healthTrendData} data-testid="line-chart" margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="var(--color-sentinel-border)" />
                         <XAxis dataKey="date" stroke="var(--color-sentinel-text-secondary)" fontSize={12} />
                         <YAxis width={40} stroke="var(--color-sentinel-text-secondary)" fontSize={12} />

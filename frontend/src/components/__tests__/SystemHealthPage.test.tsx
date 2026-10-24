@@ -14,6 +14,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import React from 'react';
@@ -109,6 +110,11 @@ describe('SystemHealthPage', () => {
     vi.clearAllMocks();
     queryClient.clear();
   });
+
+  async function openHistoricalTab() {
+    await waitFor(() => expect(screen.getByText('System Health')).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: 'Historical' }));
+  }
 
   // ===== LOADING & ERROR STATES =====
   describe('Loading and Error States', () => {
@@ -223,7 +229,7 @@ describe('SystemHealthPage', () => {
 
       await waitFor(() => {
         expect(screen.getByText('hvac')).toBeInTheDocument();
-        expect(screen.getByText('lighting')).toBeInTheDocument();
+        expect(screen.getByText('Lighting Telemetry')).toBeInTheDocument();
         expect(screen.getByText('power')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
@@ -241,9 +247,8 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        const metrics = screen.getAllByTestId('metric');
-        // Integration metrics (4) + component metrics (2)
-        expect(metrics.length).toBeGreaterThanOrEqual(2);
+        expect(screen.getByText('90')).toBeInTheDocument();
+        expect(screen.getByText('Lighting Telemetry')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
@@ -255,7 +260,6 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
-
       await waitFor(() => {
         expect(screen.getByTestId('progress-bar-green')).toBeInTheDocument();
       }, { timeout: 2000 });
@@ -271,7 +275,6 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
-
       await waitFor(() => {
         expect(screen.getByTestId('progress-bar-yellow')).toBeInTheDocument();
       }, { timeout: 2000 });
@@ -295,6 +298,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Average Health Score')).toBeInTheDocument();
@@ -316,6 +320,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Uptime (24h)')).toBeInTheDocument();
@@ -337,6 +342,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Min Score')).toBeInTheDocument();
@@ -360,6 +366,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Improving')).toBeInTheDocument();
@@ -381,6 +388,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Degrading')).toBeInTheDocument();
@@ -402,6 +410,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Stable')).toBeInTheDocument();
@@ -427,6 +436,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByTestId('line-chart')).toBeInTheDocument();
@@ -479,8 +489,7 @@ describe('SystemHealthPage', () => {
       await waitFor(() => {
         expect(screen.getByText('Health')).toBeInTheDocument();
         expect(screen.getByText('Historical')).toBeInTheDocument();
-        expect(screen.getByText('AI Performance')).toBeInTheDocument();
-        expect(screen.getByText('Model Health')).toBeInTheDocument();
+        expect(screen.getByText('AI Actions')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
@@ -498,9 +507,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        const cards = screen.getAllByTestId('card');
-        // Overall card + integration card + 3 component cards + historical cards
-        expect(cards.length).toBeGreaterThanOrEqual(4);
+        expect(screen.getByText('Platform Components')).toBeInTheDocument();
       }, { timeout: 2000 });
     });
   });
@@ -515,7 +522,6 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
-
       await waitFor(() => {
         expect(screen.getByText('System Health')).toBeInTheDocument();
         expect(screen.getByText('85')).toBeInTheDocument();
@@ -536,6 +542,7 @@ describe('SystemHealthPage', () => {
       });
 
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
+      await openHistoricalTab();
 
       await waitFor(() => {
         expect(screen.getByText('Average Health Score')).toBeInTheDocument();
