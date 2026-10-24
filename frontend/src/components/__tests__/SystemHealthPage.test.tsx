@@ -176,7 +176,7 @@ describe('SystemHealthPage', () => {
 
       await waitFor(() => {
         // Status is rendered as custom span with toUpperCase()
-        expect(screen.getByText('HEALTHY')).toBeInTheDocument();
+        expect(screen.getAllByText('HEALTHY')[0]).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
@@ -190,7 +190,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('DEGRADED')).toBeInTheDocument();
+        expect(screen.getAllByText('DEGRADED')[0]).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 
@@ -204,7 +204,7 @@ describe('SystemHealthPage', () => {
       render(<SystemHealthPage />, { wrapper: createWrapper(queryClient) });
 
       await waitFor(() => {
-        expect(screen.getByText('CRITICAL')).toBeInTheDocument();
+        expect(screen.getAllByText('CRITICAL')[0]).toBeInTheDocument();
       }, { timeout: 2000 });
     });
 

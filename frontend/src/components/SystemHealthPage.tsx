@@ -519,7 +519,7 @@ export default function SystemHealthPage() {
             ? 'var(--color-sentinel-red)'
             : 'var(--color-sentinel-text-disabled)';
     return (
-      <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(148, 163, 184, 0.2)' }}>
+      <div data-testid={`progress-bar-${color}`} className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(148, 163, 184, 0.2)' }}>
         <div className="h-2 w-full origin-left transition-transform duration-500 will-change-transform rounded-full" style={{ transform: `scaleX(${Math.min(100, Math.max(0, value)) / 100})`, background: barColor }} />
       </div>
     );
