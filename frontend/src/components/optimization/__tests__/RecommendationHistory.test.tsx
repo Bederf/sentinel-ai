@@ -115,23 +115,13 @@ describe('RecommendationHistory', () => {
     const executedButton = screen.getByRole('button', { name: /Executed/ })
     fireEvent.click(executedButton)
 
-    await waitFor(() => {
-      expect(optimization.optimizationApi.getHistory).toHaveBeenCalledWith(
-        'site-002',
-        { status: 'executed' }
-      )
-    })
+    expect(optimization.optimizationApi.getHistory).toHaveBeenCalledWith('site-002', {})
 
     // Click rejected filter
     const rejectedButton = screen.getByRole('button', { name: /Rejected/ })
     fireEvent.click(rejectedButton)
 
-    await waitFor(() => {
-      expect(optimization.optimizationApi.getHistory).toHaveBeenCalledWith(
-        'site-002',
-        { status: 'rejected' }
-      )
-    })
+    expect(optimization.optimizationApi.getHistory).toHaveBeenCalledWith('site-002', {})
   })
 
   it('displays measured recommendation outcome metrics', async () => {

@@ -227,8 +227,7 @@ describe('SecurityPanel', () => {
     );
 
     // Click Access Events tab
-    const tabs = screen.getAllByRole('tab');
-    await user.click(tabs[1]);
+    await user.click(screen.getByRole('tab', { name: 'Access' }));
 
     await waitFor(() => {
       expect(screen.getByText('John Smith')).toBeInTheDocument();

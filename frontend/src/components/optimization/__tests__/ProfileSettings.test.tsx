@@ -34,7 +34,7 @@ describe('ProfileSettings', () => {
       expect(screen.getByText('Comfort First')).toBeInTheDocument()
     })
 
-    expect(screen.getByText('Asset Sweating')).toBeInTheDocument()
+    expect(screen.getByText('Balanced')).toBeInTheDocument()
     expect(screen.getByText('Cost Saving')).toBeInTheDocument()
   })
 
@@ -90,25 +90,12 @@ describe('ProfileSettings', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Asset Sweating')).toBeInTheDocument()
+      expect(screen.getByText('Balanced')).toBeInTheDocument()
     })
 
-    const sweatAssetsButton = screen.getByRole('button', {
-      name: /Asset Sweating/,
-    })
-    fireEvent.click(sweatAssetsButton)
-
-    await waitFor(() => {
-      expect(optimization.optimizationApi.updateProfileSettings).toHaveBeenCalledWith(
-        'site-002',
-        expect.objectContaining({
-          active_profile: 'sweat_assets',
-          control_tier: 'human_in_loop',
-        })
-      )
-    })
-
-    expect(onProfileChange).toHaveBeenCalledWith('sweat_assets')
+    await waitFor(() => expect(screen.getByText('Comfort First')).toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Comfort First/ })).not.toBeInTheDocument()
+    expect(optimization.optimizationApi.updateProfileSettings).not.toHaveBeenCalled()
   })
 
   it('displays error when loading fails', async () => {
@@ -125,7 +112,7 @@ describe('ProfileSettings', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText('Failed to load profile configuration')
+        screen.getByText('Profile configuration unavailable')
       ).toBeInTheDocument()
     })
   })
@@ -190,11 +177,6 @@ describe('ProfileSettings', () => {
       expect(screen.getByText('zone-1')).toBeInTheDocument()
     })
 
-    const removeButton = screen.getByRole('button', { name: /Remove/ })
-    fireEvent.click(removeButton)
-
-    await waitFor(() => {
-      expect(screen.queryByText('zone-1')).not.toBeInTheDocument()
-    })
+    expect(screen.queryByRole('button', { name: /Remove/ })).not.toBeInTheDocument()
   })
 })

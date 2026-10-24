@@ -44,6 +44,7 @@ export function TabBar({
         ...style,
       }}
       className="scrollbar-hide"
+      role="tablist"
     >
       <style>{`.scrollbar-hide::-webkit-scrollbar { display: none; }`}</style>
       {tabs.map((tab) => {
@@ -52,6 +53,8 @@ export function TabBar({
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
+            role="tab"
+            aria-selected={isActive}
             aria-label={tab.label}
             style={{
               flexShrink: 0,
