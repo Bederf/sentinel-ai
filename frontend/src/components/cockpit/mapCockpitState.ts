@@ -825,7 +825,7 @@ function buildShadowTelemetrySummary(
   if (totalKw > 0) {
     return `Energy Centre load is ${totalKw} kW under shadow observation mode.`
   }
-  return 'Telemetry indicates stable operation.'
+  return 'Building is calm.'
 }
 
 function flowPathsFromNarrative(narrative: BuildingStateNarrative | null): Array<{
@@ -1051,7 +1051,7 @@ export function mapCockpitState(
       orientationDegrees: summary.orientationDegrees ?? null,
       onboardingPhase,
       posture: formatPostureLabel(payload.building_posture),
-      mode: isShadowPhase ? 'watch' : payload.operator_guidance.mode,
+      mode: payload.operator_guidance.mode,
       renderState: 'live',
       dataFreshnessLabel: summary.dataFreshnessLabel,
       buildingGeometry: summary.buildingGeometry ?? null,
@@ -1078,15 +1078,15 @@ export function mapCockpitState(
             : payload.operator_guidance.headline),
     },
     activeCondition: {
-      summary: isShadowPhase
-        ? shadowSummary
-        : (narrative?.message
-            ?? (filteredEquipmentWarnings.length > 0
-              ? `${filteredEquipmentWarnings.length} equipment at health warning`
-              : secondaryTensions.length > 0
-                ? `${secondaryTensions.length} emerging risk${secondaryTensions.length !== 1 ? 's' : ''} detected`
-                : 'Building is calm.')),
-      rationale: isShadowPhase
+      summary: narrative?.message
+        ?? (isShadowPhase
+          ? shadowSummary
+          : (filteredEquipmentWarnings.length > 0
+            ? `${filteredEquipmentWarnings.length} equipment at health warning`
+            : secondaryTensions.length > 0
+              ? `${secondaryTensions.length} emerging risk${secondaryTensions.length !== 1 ? 's' : ''} detected`
+              : 'Building is calm.')),
+      rationale: isShadowPhase && narrative
         ? `Shadow training mode: telemetry-only observation across ${locationSummary(narrative)}.`
         : (
           narrative
@@ -1104,17 +1104,16 @@ export function mapCockpitState(
                 ? secondaryTensions.map((t) => t.message).join(' ')
                 : 'No dominant narrative is active. The building is operating within margin.'
         ),
-      confidenceLabel: isShadowPhase ? 'Observation only' : payload.operator_guidance.headline,
+      confidenceLabel: isShadowPhase && narrative ? 'Observation only' : payload.operator_guidance.headline,
     },
     decision: {
       impact: locationSummary(narrative),
-      summary: isShadowPhase
-        ? 'Observe telemetry flow and model calibration.'
-        : (narrative?.action ?? 'No action needed.'),
+      summary: payload.primary_narrative?.action
+        ?? 'No action needed.',
       tradeoff: narrative
         ? secondarySummary
         : secondarySummary,
-      confidence: isShadowPhase ? 'Shadow training mode' : payload.operator_guidance.headline,
+      confidence: isShadowPhase && narrative ? 'Shadow training mode' : payload.operator_guidance.headline,
     },
     visualTwin: {
       headline: narrative

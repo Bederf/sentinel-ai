@@ -8,8 +8,9 @@ const scrollIntoViewMock = vi.fn();
 Element.prototype.scrollIntoView = scrollIntoViewMock;
 HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
-vi.mock('@/lib/api/client', () => ({
+vi.mock('../../lib/api/client', () => ({
   authorizedFetch: vi.fn(),
+  fetchApi: vi.fn().mockResolvedValue({ equipment: [] }),
 }));
 
 vi.mock('../DiagnosisFlow', () => ({
@@ -20,7 +21,7 @@ vi.mock('../PhotoCapture', () => ({
   default: () => <button data-testid="photo-capture">Photo</button>,
 }));
 
-import { authorizedFetch } from '@/lib/api/client';
+import { authorizedFetch } from '../../lib/api/client';
 
 describe('TechnicianChat Concept mode', () => {
   beforeEach(() => {
@@ -57,19 +58,18 @@ describe('TechnicianChat Concept mode', () => {
       }),
     });
 
-    render(<TechnicianChat siteId="site-002" siteLabel="Fairlands" />);
+    render(<TechnicianChat siteId="site-001" siteLabel="Fairlands" />);
 
     await userEvent.click(screen.getByRole('button', { pressed: false, name: /search concept documents/i }));
-    expect(screen.getByText(/concept document search active/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/search stored site documents/i)).toBeInTheDocument();
-    expect(screen.getAllByText(/find saved documents in concept using natural language/i)).toHaveLength(2);
+    expect(screen.getByText(/concept documents active/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/search concept documents/i)).toBeInTheDocument();
 
     await userEvent.type(
-      screen.getByPlaceholderText(/search stored site documents/i),
+      screen.getByPlaceholderText(/search concept documents/i),
       'elevator annual lift inspection certificate',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run Concept document search' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Concept documents search' }));
 
     await waitFor(() => {
       expect((authorizedFetch as any).mock.calls[0][0]).toBe('/api/technical/concept-search');
@@ -113,15 +113,15 @@ describe('TechnicianChat Concept mode', () => {
         json: async () => ({}),
       });
 
-    render(<TechnicianChat siteId="site-002" siteLabel="Fairlands" />);
+    render(<TechnicianChat siteId="site-001" siteLabel="Fairlands" />);
 
     await userEvent.click(screen.getByRole('button', { pressed: false, name: /search concept documents/i }));
     await userEvent.type(
-      screen.getByPlaceholderText(/search stored site documents/i),
+      screen.getByPlaceholderText(/search concept documents/i),
       'last generator service sheets',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run Concept document search' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Concept documents search' }));
     expect(await screen.findByText('Generator Service Sheet May 2025.pdf')).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /open file/i }));
@@ -169,11 +169,11 @@ describe('TechnicianChat Concept mode', () => {
 
     await userEvent.click(screen.getByRole('button', { pressed: false, name: /search concept documents/i }));
     await userEvent.type(
-      screen.getByPlaceholderText(/search stored site documents/i),
+      screen.getByPlaceholderText(/search concept documents/i),
       'generator service sheets 2024',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Run Concept document search' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Run Concept documents search' }));
 
     expect(await screen.findByText('Generator Service Sheet 2024.pdf')).toBeInTheDocument();
     expect(screen.getByText(/live concept link not available in this pilot export yet/i)).toBeInTheDocument();

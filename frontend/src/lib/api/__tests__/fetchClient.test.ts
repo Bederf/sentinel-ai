@@ -11,6 +11,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { apiFetch, ApiError } from '../fetchClient';
+import { setAccessToken, clearAccessToken } from '../client';
 
 // Mock fetch globally
 const mockFetch = vi.fn();
@@ -72,10 +73,12 @@ describe('FetchClient - apiFetch', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    clearAccessToken();
   });
 
   afterEach(() => {
     localStorage.clear();
+    clearAccessToken();
   });
 
   describe('Successful Requests', () => {
@@ -118,7 +121,7 @@ describe('FetchClient - apiFetch', () => {
 
   describe('Auth Header Management', () => {
     it('should add Authorization header when token exists', async () => {
-      localStorage.setItem('sentinel_token', 'auth-token-123');
+      setAccessToken('auth-token-123');
 
       mockFetch.mockResolvedValueOnce({
         ok: true,

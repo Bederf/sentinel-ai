@@ -24,12 +24,13 @@ Element.prototype.scrollIntoView = scrollIntoViewMock;
 HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
 
 // Mock API client FIRST (use alias path)
-vi.mock('@/lib/api/client', () => ({
+vi.mock('../../lib/api/client', () => ({
   authorizedFetch: vi.fn(),
+  fetchApi: vi.fn(),
 }));
 
 // Then import after mock is defined
-import { authorizedFetch } from '@/lib/api/client';
+import { authorizedFetch } from '../../lib/api/client';
 
 // Mock DiagnosisFlow component
 vi.mock('../DiagnosisFlow', () => ({
@@ -65,8 +66,6 @@ vi.mock('../PhotoCapture', () => ({
     </button>
   ),
 }));
-
-import { authorizedFetch } from '@/lib/api/client';
 
 describe('TechnicianChat', () => {
   beforeEach(() => {
@@ -206,7 +205,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getByRole('button', { name: '' }); // Send button has icon
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test message');
       fireEvent.click(sendButton);
@@ -269,7 +268,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getByRole('button', { name: '' });
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test message');
       fireEvent.click(sendButton);
@@ -299,9 +298,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.textContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test message');
       fireEvent.click(sendButton!);
@@ -330,9 +327,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.textContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test message');
       fireEvent.click(sendButton!);
@@ -354,9 +349,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.textContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'user message');
       fireEvent.click(sendButton!);
@@ -384,9 +377,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.textContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -409,9 +400,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.textContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test message');
       fireEvent.click(sendButton!);
@@ -443,9 +432,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'E4');
       fireEvent.click(sendButton!);
@@ -473,9 +460,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -507,9 +492,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -543,9 +526,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -585,9 +566,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -620,9 +599,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -750,9 +727,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -783,9 +758,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -804,9 +777,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -826,9 +797,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -851,9 +820,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -873,9 +840,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'test');
       fireEvent.click(sendButton!);
@@ -950,9 +915,7 @@ describe('TechnicianChat', () => {
       const input = screen.getByPlaceholderText(
         /Describe a fault or search for parts/
       ) as HTMLInputElement;
-      const sendButton = screen.getAllByRole('button').find(
-        (btn) => !btn.testContent
-      );
+      const sendButton = screen.getByRole('button', { name: 'Send technical chat message' });
 
       await userEvent.type(input, 'high pressure');
       fireEvent.click(sendButton!);

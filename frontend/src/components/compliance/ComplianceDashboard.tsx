@@ -7,7 +7,19 @@
  * Electrical, and Lift compliance workflows.
  */
 
-import { useState } from 'react'
+import { Children, cloneElement, createContext, useContext, useState } from 'react'
+
+const Grid = ({ className = '', children }: any) => <div className={className}>{children}</div>
+const Card = ({ className = '', children }: any) => <div className={`rounded-lg p-4 ${className}`} style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)' }}>{children}</div>
+const Title = ({ children }: any) => <h2 className="font-semibold" style={{ color: 'var(--color-sentinel-text-primary)' }}>{children}</h2>
+const Text = ({ children }: any) => <span style={{ color: 'var(--color-sentinel-text-secondary)' }}>{children}</span>
+const Badge = ({ children, color }: any) => <span className={`rounded px-2 py-1 text-xs font-semibold text-${color}-700`}>{children}</span>
+const TabPanel = ({ children }: any) => <div role="tabpanel">{children}</div>
+const TabContext = createContext<any>(null)
+const TabGroup = ({ children, index, onIndexChange }: any) => <TabContext.Provider value={{ index, onIndexChange }}><div>{children}</div></TabContext.Provider>
+const TabList = ({ children, className = '' }: any) => <div role="tablist" className={className}>{Children.map(children, (child, index) => cloneElement(child, { tabIndex: index }))}</div>
+const Tab = ({ children, tabIndex = 0 }: any) => { const ctx = useContext(TabContext); return <button type="button" role="tab" onClick={() => ctx?.onIndexChange?.(tabIndex)}>{children}</button> }
+const TabPanels = ({ children }: any) => <div>{children}</div>
 
 import { OHSPanel } from './OHSPanel'
 import { FireEquipmentPanel } from './FireEquipmentPanel'

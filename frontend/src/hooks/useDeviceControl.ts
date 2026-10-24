@@ -105,6 +105,11 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
 
       // Check safety status (pass device directly to avoid stale closure)
       await checkSafetyStatus(id, device);
+      if (device.metadata?.life_safety) {
+        setSafetyStatus({ status: "blocked", message: "Control blocked for life-safety equipment" });
+      } else if (device.metadata?.critical) {
+        setSafetyStatus({ status: "warning", message: "Critical device requires additional review" });
+      }
     } catch (err) {
       console.error("Failed to fetch device:", err);
       setState((prev) => ({
@@ -119,10 +124,20 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
   // Check safety status
   const checkSafetyStatus = useCallback(async (id: string, _deviceOverride?: Device | null) => {
     try {
+      const device = _deviceOverride;
+      if (device?.metadata?.life_safety) {
+        setSafetyStatus({ status: "blocked", message: "Control blocked for life-safety equipment" });
+        return;
+      }
       const result = await api.getDeviceSafetyStatus(id);
+      const overallStatus = result.overall_status ?? result.status;
+      if (device?.metadata?.critical && overallStatus === "safe") {
+        setSafetyStatus({ status: "warning", message: "Critical device requires additional review" });
+        return;
+      }
       setSafetyStatus({
-        status: result.overall_status === "alarm" ? "warning" : result.overall_status === "unknown" ? "safe" : result.overall_status,
-        message: result.overall_status === "blocked" ? "Control blocked by safety rules" : undefined,
+        status: overallStatus === "alarm" ? "warning" : overallStatus === "unknown" ? "safe" : overallStatus,
+        message: overallStatus === "blocked" ? "Control blocked by safety rules" : undefined,
       });
     } catch (err) {
       console.warn("Failed to check safety status, defaulting to safe:", err);
@@ -207,8 +222,8 @@ export function useDeviceControl(options: UseDeviceControlOptions = {}) {
 
   // Get device point value
   const getPointValue = useCallback((pointName: string): number | boolean | null => {
-    return state.points[pointName]?.value ?? null;
-  }, [state.points]);
+    return state.points[pointName]?.value ?? state.device?.points[pointName]?.default_value ?? null;
+  }, [state.device, state.points]);
 
   // Get device point metadata
   const getPointMetadata = useCallback((pointName: string) => {
