@@ -25,6 +25,7 @@ vi.mock('@/lib/api', () => ({
     getDevicePoints: vi.fn(),
     readDevicePoint: vi.fn(),
     controlDevice: vi.fn(),
+    getDeviceSafetyStatus: vi.fn().mockResolvedValue({ status: 'safe', allowed: true }),
   },
 }));
 

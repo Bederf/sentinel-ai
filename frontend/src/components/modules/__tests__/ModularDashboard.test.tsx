@@ -78,21 +78,15 @@ vi.mock('../../../hooks/useHealthThresholds', () => ({
 
 // Mock module dashboards via Suspense lazy loading
 vi.mock('../../energy-centre/EnergyCentreDashboard', () => ({
-  default: Promise.resolve({
-    EnergyCentreDashboard: () => <div data-testid="energy-dashboard">Energy Dashboard</div>,
-  }),
+  EnergyCentreDashboard: () => <div data-testid="energy-dashboard">Energy Dashboard</div>,
 }));
 
 vi.mock('../../hvac/HVACDashboard', () => ({
-  default: Promise.resolve({
-    HVACDashboard: () => <div data-testid="hvac-dashboard">HVAC Dashboard</div>,
-  }),
+  HVACDashboard: () => <div data-testid="hvac-dashboard">HVAC Dashboard</div>,
 }));
 
 vi.mock('../../solar/SolarDashboard', () => ({
-  default: Promise.resolve({
-    SolarDashboard: () => <div data-testid="solar-dashboard">Solar Dashboard</div>,
-  }),
+  SolarDashboard: () => <div data-testid="solar-dashboard">Solar Dashboard</div>,
 }));
 
 describe('ModularDashboard', () => {

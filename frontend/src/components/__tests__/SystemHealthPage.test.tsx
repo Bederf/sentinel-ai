@@ -49,16 +49,11 @@ vi.mock('@/lib/api', () => ({
         last_check: new Date().toISOString(),
       })
     ),
+    getUnmatchedPoints: vi.fn(() => Promise.resolve({ points: [], total: 0 })),
   },
 }));
 
-// No-op: Tremor components have been replaced with plain HTML
-      React.default.createElement('span', {
-        'data-testid': `badge-${color}`,
-        children,
-      }),
-  };
-});
+// Tremor components have been replaced with plain HTML in the production component.
 
 // Mock useServerEvents hook
 vi.mock('@/hooks/useServerEvents', () => ({

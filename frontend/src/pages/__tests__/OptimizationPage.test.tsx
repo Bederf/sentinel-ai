@@ -31,6 +31,7 @@ vi.mock('@/lib/api', () => ({
     getPredictions: vi.fn().mockResolvedValue({ predictions: [] }),
     getEskomStatus: vi.fn().mockResolvedValue({ status: 'normal', stage: 0 }),
     getSiteEskomStatus: vi.fn().mockResolvedValue({ status: 'normal', stage: 0 }),
+    getThermalRunway: vi.fn().mockResolvedValue(null),
     getRecommendations: vi.fn().mockResolvedValue([]),
   },
   authorizedFetch: vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({}) }),

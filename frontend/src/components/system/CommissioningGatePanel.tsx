@@ -138,7 +138,7 @@ export function CommissioningGatePanel({ commissioning, qualityGate }: Commissio
   const allPassed = commissioning?.all_gates_passed ?? false;
   const passedGates = new Set(
     commissioning
-      ? Object.keys(GATE_LABELS).filter(g => !commissioning.blocking_gates.includes(g))
+      ? Object.keys(GATE_LABELS).filter(g => !(commissioning.blocking_gates ?? []).includes(g))
       : []
   );
 

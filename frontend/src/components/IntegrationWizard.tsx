@@ -220,7 +220,7 @@ export function IntegrationWizard({ siteId, onClose, onComplete: _onComplete }: 
   const currentStepIndex = steps.findIndex(s => s.id === currentStep);
 
   return (
-    <div className="p-6 max-w-4xl mx-auto" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)', borderRadius: 8 }}>
+    <div data-testid="card" className="p-6 max-w-4xl mx-auto" style={{ background: 'var(--color-sentinel-bg-panel)', border: '1px solid var(--color-sentinel-border)', borderRadius: 8 }}>
       {/* Progress stepper */}
       <div className="mb-8">
         <div className="flex items-center justify-between">

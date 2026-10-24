@@ -722,7 +722,7 @@ export default function SystemHealthPage() {
                 qualityGateStatus={qualityGate?.overall_status ?? null}
                 gates={commissioning ? GATE_IDS.map(id => ({
                   name: id,
-                  passed: !commissioning.blocking_gates.includes(id),
+                  passed: !(commissioning.blocking_gates ?? []).includes(id),
                   label: GATE_LABEL_MAP[id] ?? id,
                 })) : undefined}
               />
@@ -1102,11 +1102,11 @@ export default function SystemHealthPage() {
                   </div>
                 </div>
               )}
-              {(!dataFreshness || dataFreshness.sources.length === 0) && (
+              {(!dataFreshness || (dataFreshness.sources ?? []).length === 0) && (
                 <p className="text-sm" style={{ color: "var(--color-sentinel-text-secondary)" }}>No freshness data available</p>
               )}
               <div className="space-y-3">
-                {dataFreshness?.sources.map((source: FreshnessSource) => {
+                {(dataFreshness?.sources ?? []).map((source: FreshnessSource) => {
                   const agePct = source.age_seconds != null
                     ? Math.min(100, (source.age_seconds / source.target_seconds) * 100)
                     : 0;
